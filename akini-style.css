@@ -4456,8 +4456,6 @@ body.dark-mode .akini-slider-value {
 .beautify-header,
 .icity-header,
 .create-group-header,
-#app-add-contact > div:first-child,
-#app-contact-detail > div:first-child,
 #musicContactPicker > div > div:first-child {
   position: fixed !important;
   top: 0;
@@ -4474,11 +4472,6 @@ body.dark-mode .akini-slider-value {
 .settings-body,
 .beautify-body {
   padding-top: 56px !important;
-}
-#app-add-contact > div,
-#app-contact-detail > div,
-#app-create-group > .create-group-wrapper {
-  padding-top: 50px !important;
 }
 #icityArea > div:nth-child(2) {
   padding-top: 50px !important;

@@ -15212,7 +15212,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return (el && el.onclick) || (el && el.getAttribute("data-bound"));
       });
       dbg(
-        "构建 v20260821o | 联系人:" +
+        "构建 v20260821p | 联系人:" +
           (window.akiniContacts
             ? window.akiniContacts.getContacts().length
             : "无") +
