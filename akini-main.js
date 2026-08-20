@@ -307,11 +307,97 @@ document.addEventListener("DOMContentLoaded", function () {
         },
       };
     })();
+    !(function () {
+      var CACHE_NAME = "akini-data-v1",
+        SNAPSHOT_KEY = "akini_localstorage_snapshot";
+      window._akiniCacheStore = {
+        backupAll: function (e) {
+          try {
+            if ("undefined" == typeof caches || !caches.open) return void (e && e());
+            var data = {};
+            for (var i = 0; i < localStorage.length; i++) {
+              var k = localStorage.key(i);
+              if (k && k.indexOf("akini_") === 0) {
+                try {
+                  data[k] = localStorage.getItem(k);
+                } catch (t) {}
+              }
+            }
+            caches
+              .open(CACHE_NAME)
+              .then(function (cache) {
+                return cache.put(
+                  SNAPSHOT_KEY,
+                  new Response(JSON.stringify(data), {
+                    headers: { "Content-Type": "application/json" },
+                  }),
+                );
+              })
+              .then(function () {
+                e && e();
+              })
+              .catch(function () {
+                e && e();
+              });
+          } catch (t) {
+            e && e();
+          }
+        },
+        restoreAll: function (e) {
+          try {
+            if ("undefined" == typeof caches || !caches.open)
+              return void (e && e());
+            caches
+              .open(CACHE_NAME)
+              .then(function (cache) {
+                return cache.match(SNAPSHOT_KEY);
+              })
+              .then(function (response) {
+                if (!response) return e && e();
+                return response.text();
+              })
+              .then(function (text) {
+                if (!text) return e && e();
+                var data = JSON.parse(text);
+                var changed = !1;
+                for (var k in data)
+                  if (data.hasOwnProperty(k) && k.indexOf("akini_") === 0) {
+                    try {
+                      var cur = localStorage.getItem(k);
+                      if (
+                        !cur ||
+                        cur === "" ||
+                        cur === "null" ||
+                        cur === "undefined" ||
+                        cur === "[]" ||
+                        cur === "{}" ||
+                        cur.length === 0
+                      ) {
+                        localStorage.setItem(k, data[k]);
+                        changed = !0;
+                      }
+                    } catch (t) {}
+                  }
+                e && e(changed);
+              })
+              .catch(function () {
+                e && e();
+              });
+          } catch (t) {
+            e && e();
+          }
+        },
+      };
+    })();
     try {
-      window._idbStore &&
-        window._idbStore.restoreAll &&
-        window._idbStore.restoreAll(function () {
-          console.log("[Akini] idb restoreAll done");
+      window._akiniCacheStore &&
+        window._akiniCacheStore.restoreAll &&
+        window._akiniCacheStore.restoreAll(function () {
+          window._idbStore &&
+            window._idbStore.restoreAll &&
+            window._idbStore.restoreAll(function () {
+              console.log("[Akini] cache+idb restoreAll done");
+            });
         });
     } catch (e) {
       console.warn("[Akini] restoreAll error", e);
@@ -2309,6 +2395,10 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
         var t = U.innerHTML;
+        var deduped = __akiniDeduplicateChatHTML(t);
+        if (deduped !== t) {
+          (U.innerHTML = deduped), (t = deduped);
+        }
         if (e) {
           var d = U.getAttribute("data-rendered-chat-id");
           if (d && d !== e && t && "" !== t.trim()) {
@@ -2319,9 +2409,9 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!t || "" === t.trim()) {
             var n = window.akiniContacts.getSession(e);
             if (n && n.messagesHTML && "" !== n.messagesHTML.trim()) {
-              U.innerHTML = n.messagesHTML;
+              U.innerHTML = __akiniDeduplicateChatHTML(n.messagesHTML);
               U.scrollTop = U.scrollHeight;
-              C(e, n.messagesHTML);
+              C(e, U.innerHTML);
             }
             return;
           }
@@ -3053,7 +3143,7 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (e) {}
           })(function (t) {
             if (t) {
-              U.innerHTML = t;
+              U.innerHTML = __akiniDeduplicateChatHTML(t);
               try {
                 U.setAttribute(
                   "data-rendered-chat-id",
@@ -3074,6 +3164,22 @@ document.addEventListener("DOMContentLoaded", function () {
           renderHomeAvatarContacts(),
         et(),
         Tn());
+      try {
+        if (window.akiniContacts && window.akiniContacts.getSessions) {
+          var sessions = window.akiniContacts.getSessions();
+          for (var sid in sessions)
+            if (sessions.hasOwnProperty(sid)) {
+              var sess = sessions[sid];
+              if (sess && sess.messagesHTML) {
+                var clean = __akiniDeduplicateChatHTML(sess.messagesHTML);
+                if (clean !== sess.messagesHTML) {
+                  window.akiniContacts.updateSession(sid, { messagesHTML: clean });
+                  C(sid, clean);
+                }
+              }
+            }
+        }
+      } catch (t) {}
       try {
         var a = localStorage.getItem("akini_wordbank") || "[]";
         0 === JSON.parse(a).length &&
@@ -3116,6 +3222,10 @@ document.addEventListener("DOMContentLoaded", function () {
           window._idbStore &&
             window._idbStore.backupAll &&
             window._idbStore.backupAll(),
+          localStorage.length > 0 &&
+            window._akiniCacheStore &&
+            window._akiniCacheStore.backupAll &&
+            window._akiniCacheStore.backupAll(),
           window.akiniContacts &&
             window.akiniContacts.backupToIDB &&
             (window.akiniContacts.backupToIDB(
@@ -3154,17 +3264,49 @@ document.addEventListener("DOMContentLoaded", function () {
           return a.length >= b.length ? a : b;
         });
       t.forEach(function (src) {
-        __akRows(src).forEach(function (row) {
-          var sig = row.replace(/\s+/g, "");
+        var div = document.createElement("div");
+        div.innerHTML = src;
+        Array.from(div.querySelectorAll(".msg-row")).forEach(function (row) {
+          var bubble = row.querySelector(".bubble"),
+            meta = row.querySelector(".msg-meta"),
+            sig = row.classList.contains("me") ? "me" : "other";
+          if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
+          else sig += "|" + (row.textContent || "").trim();
+          if (meta) sig += "|" + (meta.textContent || "").trim();
           if (!seen.has(sig)) {
             seen.add(sig);
-            allRows.push(row);
+            allRows.push(row.outerHTML);
           }
         });
       });
       if (allRows.length === 0) return longest;
-      var merged = allRows.join("");
-      return merged.length >= longest.length ? merged : longest;
+      return allRows.join("");
+    }
+    function __akiniDeduplicateChatHTML(html) {
+      if (!html || "string" != typeof html) return html;
+      var div = document.createElement("div");
+      div.innerHTML = html;
+      var rows = Array.from(div.querySelectorAll(".msg-row")),
+        seen = new Set(),
+        keep = [];
+      rows.forEach(function (row) {
+        var bubble = row.querySelector(".bubble"),
+          meta = row.querySelector(".msg-meta"),
+          sig = row.classList.contains("me") ? "me" : "other";
+        if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
+        else sig += "|" + (row.textContent || "").trim();
+        if (meta) sig += "|" + (meta.textContent || "").trim();
+        if (!seen.has(sig)) {
+          seen.add(sig);
+          keep.push(row);
+        }
+      });
+      if (keep.length === rows.length) return html;
+      div.innerHTML = "";
+      keep.forEach(function (row) {
+        div.appendChild(row);
+      });
+      return div.innerHTML;
     }
     function et() {
       function t(t) {
@@ -3317,7 +3459,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           window.akiniContacts.backupToIDB("akini_wb_groups", a);
         }
-      }, 500));
+      }, 5000));
     function flushAllData() {
       try {
         if (window._restoringData) return;
@@ -3326,6 +3468,12 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
         if (window._idbStore && window._idbStore.backupAll)
           window._idbStore.backupAll();
+        if (
+          window._akiniCacheStore &&
+          window._akiniCacheStore.backupAll &&
+          localStorage.length > 0
+        )
+          window._akiniCacheStore.backupAll();
         var snapshot = {};
         for (var e = 0; e < localStorage.length; e++) {
           var key = localStorage.key(e);
@@ -3395,7 +3543,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (e && (!U.innerHTML || "" === U.innerHTML.trim())) {
               var sess = window.akiniContacts.getSession(e);
               if (sess && sess.messagesHTML && "" !== sess.messagesHTML.trim()) {
-                U.innerHTML = sess.messagesHTML;
+                U.innerHTML = __akiniDeduplicateChatHTML(sess.messagesHTML);
                 U.setAttribute("data-rendered-chat-id", e);
                 U.scrollTop = U.scrollHeight;
               }
@@ -3427,6 +3575,10 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!e) return;
           var html = U.innerHTML || "";
           if (html.trim()) {
+            var dedupedHtml = __akiniDeduplicateChatHTML(html);
+            if (dedupedHtml !== html) {
+              (U.innerHTML = dedupedHtml), (html = dedupedHtml);
+            }
             if (!window._restoringChatHistory) {
               var d = U.getAttribute("data-rendered-chat-id");
               if (d && d === e) {
@@ -3440,7 +3592,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           var sess = window.akiniContacts.getSession(e);
           if (sess && sess.messagesHTML && "" !== sess.messagesHTML.trim()) {
-            U.innerHTML = sess.messagesHTML;
+            U.innerHTML = __akiniDeduplicateChatHTML(sess.messagesHTML);
             U.setAttribute("data-rendered-chat-id", e);
             U.scrollTop = U.scrollHeight;
             return;
@@ -3450,7 +3602,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (window.akiniContacts.getActiveChatId() !== e) return;
             if (window._restoringChatHistory) return;
             if (U.innerHTML && "" !== U.innerHTML.trim()) return;
-            U.innerHTML = t;
+            U.innerHTML = __akiniDeduplicateChatHTML(t);
             U.setAttribute("data-rendered-chat-id", e);
             U.scrollTop = U.scrollHeight;
             window.akiniContacts.updateSession(e, { messagesHTML: t });
@@ -3804,7 +3956,7 @@ document.addEventListener("DOMContentLoaded", function () {
       function l(t) {
         U &&
           ((window._restoringChatHistory = !0),
-          (U.innerHTML = t || ""),
+          (U.innerHTML = __akiniDeduplicateChatHTML(t || "")),
           U.setAttribute &&
             U.setAttribute(
               "data-rendered-chat-id",
@@ -14174,6 +14326,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           var t = window.AudioContext || window.webkitAudioContext;
           if (!t) return;
+          if (m && g && "running" === m.state) return;
           (m || (m = new t()),
             "suspended" === m.state && m.resume().catch(function () {}),
             g ||
@@ -14197,6 +14350,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function V() {
         try {
+          if (h && !h.paused) return;
           if (
             (h ||
               (((h = document.createElement("audio")).loop = !0),
@@ -14345,16 +14499,18 @@ document.addEventListener("DOMContentLoaded", function () {
         _spLastTs = 0,
         _spLastW = 0;
       function _smoothProg() {
-        if (d && k > 0 && u && !u.paused) {
-          var el = (performance.now() - _spLastTs) / 1000,
-            iw = _spLastW + el;
-          if (iw < k) {
-            if (e.progress) e.progress.value = (iw / k) * 100;
-            if (e.curTime) {
-              var m = Math.floor(iw / 60),
-                s = Math.floor(iw % 60);
-              e.curTime.textContent = m + ":" + (s < 10 ? "0" + s : s);
-            }
+        if (!u || u.paused || !d || k <= 0) {
+          _spRaf = null;
+          return;
+        }
+        var el = (performance.now() - _spLastTs) / 1000,
+          iw = _spLastW + el;
+        if (iw < k) {
+          if (e.progress) e.progress.value = (iw / k) * 100;
+          if (e.curTime) {
+            var m = Math.floor(iw / 60),
+              s = Math.floor(iw % 60);
+            e.curTime.textContent = m + ":" + (s < 10 ? "0" + s : s);
           }
         }
         _spRaf = requestAnimationFrame(_smoothProg);
@@ -15174,7 +15330,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return (el && el.onclick) || (el && el.getAttribute("data-bound"));
       });
       dbg(
-        "构建 v20260821r | 联系人:" +
+        "构建 v20260821u | 联系人:" +
           (window.akiniContacts
             ? window.akiniContacts.getContacts().length
             : "无") +
