@@ -3389,6 +3389,19 @@ document.addEventListener("DOMContentLoaded", function () {
           try {
             flushAllData();
           } catch (t) {}
+        else if (U && window.akiniContacts) {
+          try {
+            var e = window.akiniContacts.getActiveChatId();
+            if (e && (!U.innerHTML || "" === U.innerHTML.trim())) {
+              var sess = window.akiniContacts.getSession(e);
+              if (sess && sess.messagesHTML && "" !== sess.messagesHTML.trim()) {
+                U.innerHTML = sess.messagesHTML;
+                U.setAttribute("data-rendered-chat-id", e);
+                U.scrollTop = U.scrollHeight;
+              }
+            }
+          } catch (t) {}
+        }
       }),
       window.addEventListener("pageshow", function (t) {
         t.persisted &&
@@ -7237,59 +7250,8 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!t) return !1;
             var e = JSON.parse(t);
             if (!e || !e.active) return !1;
-            try {
-              var s = sessionStorage.getItem("akini_call_session_id");
-              if (!s || (e.sessionId && s !== e.sessionId)) {
-                return (Se(), !1);
-              }
-            } catch (t) {}
-            return !(
-              !e.active ||
-              (!e.answered && e.savedAt && Date.now() - e.savedAt > 12e3
-                ? ((we.active = !0),
-                  (we.answered = !1),
-                  (we.isMyCalling = !!e.isMyCalling),
-                  (we.isGroupCall = !!e.isGroupCall),
-                  (we.targetId = e.targetId || null),
-                  (we.callerName = e.callerName || ""),
-                  (we.selectedMembers = (e.selectedMembers || []).map(
-                    function (t) {
-                      return {
-                        id: t.id || null,
-                        name: t.name || "",
-                        avatar: t.avatar || "",
-                        answered: !!t.answered,
-                      };
-                    },
-                  )),
-                  Se("timeout"),
-                  1)
-                : ((we.active = !0),
-                  (we.answered = !!e.answered),
-                  (we.isMinimized = !!e.isMinimized),
-                  (we.isMyCalling = !!e.isMyCalling),
-                  (we.isGroupCall = !!e.isGroupCall),
-                  (we.targetId = e.targetId || null),
-                  (we.groupName = e.groupName || ""),
-                  (we.groupAvatar = e.groupAvatar || null),
-                  (we.callerName = e.callerName || ""),
-                  (we.callerAvatar = e.callerAvatar || ""),
-                  (we.activeMember = e.activeMember || null),
-                  (we.selectedMembers = (e.selectedMembers || []).map(
-                    function (t) {
-                      return {
-                        id: t.id || null,
-                        name: t.name || "",
-                        avatar: t.avatar || "",
-                        answered: !!t.answered,
-                      };
-                    },
-                  )),
-                  e.callStartTime && (xe = e.callStartTime),
-                  (window.__akiniCallSessionId = e.sessionId || s || null),
-                  (window._callState = we),
-                  0))
-            );
+            Se();
+            return !1;
           } catch (t) {
             return (Ie(), !1);
           }
@@ -15212,7 +15174,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return (el && el.onclick) || (el && el.getAttribute("data-bound"));
       });
       dbg(
-        "构建 v20260821p | 联系人:" +
+        "构建 v20260821r | 联系人:" +
           (window.akiniContacts
             ? window.akiniContacts.getContacts().length
             : "无") +

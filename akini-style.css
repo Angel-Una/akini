@@ -2407,7 +2407,7 @@ body.bubble-black
 }
 .friends-header {
   height: 200px;
-  background-color: #fff;
+  background: linear-gradient(135deg, #3a4452, #1f2733);
   background-size: cover;
   background-position: center;
   position: relative;
@@ -4053,6 +4053,7 @@ body.dark-mode .wbItem {
 #inAppNotifBanner .notif-text {
   flex: 1;
   min-width: 0;
+  padding-left: 6px;
 }
 #inAppNotifBanner .notif-name {
   font-size: 13px;
