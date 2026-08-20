@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.png" />
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script type="module" crossorigin src="./index-B4bs__PV.js"></script>
+    <link rel="stylesheet" crossorigin href="./index-BFNDHFGS.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      if('serviceWorker' in navigator){
+        navigator.serviceWorker.register('./service-worker.js').then(function(reg){ console.log('[Akini] SW registered', reg.scope); }).catch(function(err){ console.warn('[Akini] SW registration failed', err); });
+      }
+      if('Notification' in window && Notification.permission === 'default'){
+        Notification.requestPermission().then(function(status){ console.log('[Akini] Notification permission', status); }).catch(function(){});
+      }
+    </script>
+  </body>
+</html>
