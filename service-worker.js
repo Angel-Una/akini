@@ -1,11 +1,13 @@
-const CACHE_NAME = 'akini-cache-v20260821b';
+const CACHE_NAME = 'akini-cache-v20260821j';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
   './akini.html',
   './akini-style.css',
   './akini-main.js',
-  './favicon.png'
+  './favicon.png',
+  './index-C6bmDTGc.js',
+  './index-WP0DuMMi.css'
 ];
 
 self.addEventListener('install', function(event) {
