@@ -1952,9 +1952,7 @@ body.bubble-black
   align-items: flex-start;
   gap: 8px;
 }
-.chat-body .msg-row.group .msg-sender-name {
-  display: none;
-}
+.chat-body .msg-row.group .msg-sender-name { display: none !important; }
 .chat-body .msg-row.group .msg-content-line {
   align-items: flex-start;
 }

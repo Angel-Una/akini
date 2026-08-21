@@ -1,4 +1,7 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
+window._openSurveyList = window._openSurveyList || function(){
+  alert("问卷模块未加载，请重新部署最新版本的 akini.html 并清理缓存后重试。");
+};
 function setHtmlKeepInput(t, e) {
   if (t) {
     var n = t.querySelector('input[type="file"]'),
@@ -955,13 +958,14 @@ document.addEventListener("DOMContentLoaded", function () {
         var valid = wb.filter(function (t) {
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
-          return t && t.text && "pat" !== e && "pat" !== n;
+          return t && (t.text || t.content) && "pat" !== e && "pat" !== n;
         });
         if (!valid.length) return "";
         var out = [];
         for (var i = 0; i < count; i++) {
           var idx = Math.floor(Math.random() * valid.length);
-          out.push(valid[idx].text);
+          var itemText = (valid[idx].text || valid[idx].content || "").replace(/[\r\n]+/g, " ").trim();
+          if (itemText) out.push(itemText);
         }
         return out.join("\n");
       };
@@ -1446,22 +1450,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!r || !c) return;
         var l = t === window.akiniContacts.getActiveChatId(),
           s = "group" === r.type,
-          u = (
-            window._akiniAv ||
-            (window._akiniAv = function (v, s) {
-              s = s || 38;
-              var x = v && String(v).trim();
-              if (x) return nt(x, s);
-              try {
-                var ls = localStorage.getItem("akini_ta_avatar");
-                if (ls && ls.trim()) return nt(ls, s);
-              } catch (e) {}
-              var cc =
-                window.__akiniAvatarCache && window.__akiniAvatarCache.ta;
-              if (cc) return nt(cc, s);
-              return nt("", s);
-            })
-          )(c.avatar, 38),
+          u = nt(c.avatar || c.name || "🐰", 38),
           m = getContactStickersSync(c.id),
           f = i("akini_wordbank", []).filter(function (t) {
             return !t.tab || "main" === t.tab;
@@ -1622,7 +1611,10 @@ document.addEventListener("DOMContentLoaded", function () {
               : f[Math.floor(Math.random() * f.length)],
             j = "string" == typeof q ? q : q.text || q.content || "";
           if (!j) continue;
-          msgArr.push({ html: rt(j), text: B + j });
+          // 清除字卡内容中多余的换行符，单条字卡自然流式展示
+          j = j.replace(/[\r\n]+/g, " ").trim();
+          if (!j) continue;
+          msgArr.push({ html: (B ? '<span style="color:#1890ff;font-weight:600;">' + rt(B.trim()) + '</span> ' : '') + rt(j), text: (B ? B.trim() + " " : "") + j });
         }
         if (0 === msgArr.length) return;
         var $ = "";
@@ -1636,87 +1628,101 @@ document.addEventListener("DOMContentLoaded", function () {
             rt(J) +
             "</div>";
         }
-        ((P = s
-          ? '<div class="msg-bubble-wrap"><div class="msg-sender-name">' +
-            rt(c.name) +
-            '</div><div class="msg-bubble-row">'
-          : ""),
-          (H = s ? "</div></div>" : ""));
-        ((p.innerHTML =
-          '<div class="msg-content-line">' +
-          P +
-          '<div class="msg-avatar" data-sender-name="' +
-          rt(c.name) +
-          '">' +
-          u +
-          '</div><div class="bubble">' +
-          msgArr
-            .map(function (x) {
-              return x.html;
-            })
-            .join(
-              '<div style="height:1px;background:rgba(255,255,255,0.15);margin:4px 0;"></div>',
-            ) +
-          "</div>" +
-          ($
-            ? '<div style="flex-basis:100%;width:100%;padding-left:44px;box-sizing:border-box;margin-top:2px;">' +
-              $ +
-              "</div>"
-            : "") +
-          H +
-          "</div>" +
-          ""),
-          (v = msgArr
-            .map(function (x) {
-              return x.text;
-            })
-            .join(" ")),
-          Math.random() < window.AKR.getProb("noReply") && (isNoReply = !0));
-        if (l && U)
-          (U.appendChild(p),
-            window.akiniContacts.updateSession(t, {
-              lastMsg: v,
-              lastTime: Date.now(),
-              lastSenderAvatar: c.avatar,
-              lastSenderName: c.name,
-              messagesHTML: U.innerHTML,
-            }),
-            C(t, U.innerHTML),
-            S(),
-            (U.scrollTop = U.scrollHeight),
-            hideTypingBubble(t),
-            h &&
-              p &&
-              setTimeout(
-                function () {
-                  if (p.parentNode) {
-                    var t = document.createElement("div");
-                    ((t.className = "msg-row system"),
-                      (t.innerHTML =
-                        '<div class="bubble">' +
-                        c.name +
-                        " 撤回了一条消息</div>"),
-                      p.replaceWith(t),
-                      S());
-                  }
-                },
-                2e3 + 3e3 * Math.random(),
-              ));
-        else {
-          R =
-            ((G = window.akiniContacts.getSession(t)).messagesHTML || "") +
-            p.outerHTML;
-          var G,
-            K = (G.unread || 0) + 1;
-          (window.akiniContacts.updateSession(t, {
+        // 每条字卡独立一个气泡：生成 rows 数组，每条 msgArr[i] → 独立一个 msg-row
+        v = msgArr.map(function (x) { return x.text; }).join(" ");
+        if (Math.random() < window.AKR.getProb("noReply")) isNoReply = true;
+
+        var rows = msgArr.map(function(msgItem, idx){
+          var rowDiv = document.createElement("div");
+          rowDiv.className = "msg-row other" + (s ? " group" : "");
+          var bubbleInner = msgItem.html;
+          var showMeta = (idx === 0) || s;
+          if (s) {
+            // 群聊：头像+气泡，头像上方不显示名字，气泡自然流式
+            var memberAv = u; // 成员真实头像
+            rowDiv.innerHTML =
+              '<div class="msg-content-line">' +
+              '<div class="msg-avatar" data-sender-name="' + rt(c.name) + '">' + memberAv + '</div>' +
+              '<div class="bubble">' + bubbleInner + '</div>' +
+              '</div>' +
+              ($ && idx === msgArr.length - 1
+                ? '<div style="flex-basis:100%;width:100%;padding-left:44px;box-sizing:border-box;margin-top:2px;">' + $ + '</div>'
+                : '');
+          } else {
+            rowDiv.innerHTML =
+              '<div class="msg-content-line">' +
+              (showMeta ? '<div class="msg-avatar" data-sender-name="' + rt(c.name) + '">' + u + '</div>' : '<div style="width:44px;flex-shrink:0;"></div>') +
+              '<div class="bubble">' + bubbleInner + '</div>' +
+              '</div>' +
+              ($  && idx === msgArr.length - 1
+                ? '<div style="flex-basis:100%;width:100%;padding-left:44px;box-sizing:border-box;margin-top:2px;">' + $ + '</div>'
+                : '');
+          }
+          return rowDiv;
+        });
+
+        // p 保持第一行用于撤回定位
+        p = rows[0] || p;
+
+        if (l && U) {
+          rows.forEach(function(row){ U.appendChild(row); });
+          window.akiniContacts.updateSession(t, {
+            lastMsg: v,
+            lastTime: Date.now(),
+            lastSenderAvatar: c.avatar,
+            lastSenderName: c.name,
+            messagesHTML: U.innerHTML,
+          });
+          C(t, U.innerHTML);
+          S();
+          U.scrollTop = U.scrollHeight;
+          hideTypingBubble(t);
+          if (h && rows.length > 0) {
+            var targetRow = rows[rows.length - 1];
+            setTimeout(function () {
+              if (targetRow && targetRow.parentNode) {
+                var bubbleEl = targetRow.querySelector(".bubble");
+                var recalledText = "";
+                if (bubbleEl) {
+                  recalledText = (bubbleEl.textContent || "").trim();
+                }
+                var recallSys = document.createElement("div");
+                recallSys.className = "msg-row system";
+                recallSys.innerHTML = '<div class="bubble">' + rt(c.name) + " 撤回了一条消息</div>";
+                var contentSys = null;
+                if (recalledText) {
+                  contentSys = document.createElement("div");
+                  contentSys.className = "msg-row system";
+                  contentSys.innerHTML = '<div class="bubble" style="font-size:12px;color:#888;">(' + rt(recalledText) + ')</div>';
+                }
+                targetRow.replaceWith(recallSys);
+                if (contentSys) {
+                  recallSys.insertAdjacentElement("afterend", contentSys);
+                }
+                S();
+                try {
+                  window.akiniContacts.updateSession(t, {
+                    lastMsg: c.name + " 撤回了一条消息",
+                    lastTime: Date.now(),
+                    messagesHTML: U.innerHTML,
+                  });
+                  C(t, U.innerHTML);
+                } catch(e){}
+              }
+            }, 2e3 + 3e3 * Math.random());
+          }
+        } else {
+          R = ((G = window.akiniContacts.getSession(t)).messagesHTML || "") + rows.map(function(r){ return r.outerHTML; }).join("");
+          var G, K = (G.unread || 0) + 1;
+          window.akiniContacts.updateSession(t, {
             messagesHTML: R,
             lastMsg: v.replace(/^【转账】/, "转账："),
             lastTime: Date.now(),
             unread: K,
             lastSenderAvatar: c.avatar,
             lastSenderName: c.name,
-          }),
-            C(t, R));
+          });
+          C(t, R);
         }
         if ((V(), "function" == typeof window.showInAppNotif)) {
           var X = {
@@ -1756,7 +1762,12 @@ document.addEventListener("DOMContentLoaded", function () {
         (K.placeholder = "输入消息..."),
         zt && zt.classList.remove("show"));
       const o = document.createElement("div");
-      ((o.className = "msg-row me"),
+      // 群聊下我的消息也标记 group 类，保证布局一致
+      var __sendTarget0 = window.akiniContacts.getChatTarget(
+        window.akiniContacts.getActiveChatId(),
+      );
+      var __isGroupSend = __sendTarget0 && "group" === __sendTarget0.type;
+      ((o.className = "msg-row me" + (__isGroupSend ? " group" : "")),
         (o.innerHTML =
           '<div class="msg-content-line"><div class="bubble">' +
           t +
@@ -2810,12 +2821,28 @@ document.addEventListener("DOMContentLoaded", function () {
           t &&
           "string" == typeof t &&
           0 === t.indexOf("akini_")
-        )
+        ) {
+          window.__akiniDirty = !0;
           try {
-            window._idbStore &&
-              window._idbStore.set &&
-              window._idbStore.set(t, e);
+            window.__akiniIdbQueue = window.__akiniIdbQueue || {};
+            window.__akiniIdbQueue[t] = e;
+            if (!window.__akiniIdbFlushTimer) {
+              window.__akiniIdbFlushTimer = setTimeout(function () {
+                window.__akiniIdbFlushTimer = null;
+                try {
+                  var q = window.__akiniIdbQueue || {};
+                  window.__akiniIdbQueue = {};
+                  if (window._idbStore && window._idbStore.set) {
+                    for (var k in q) {
+                      if (Object.prototype.hasOwnProperty.call(q, k))
+                        window._idbStore.set(k, q[k]);
+                    }
+                  }
+                } catch (n) {}
+              }, 2000);
+            }
           } catch (n) {}
+        }
         return a;
       } catch (c) {
         if (
@@ -3486,6 +3513,9 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       setInterval(function () {
         if (window._restoringData) return;
+        if (document.hidden) return;
+        if (!window.__akiniDirty) return;
+        window.__akiniDirty = !1;
         window._idbStore &&
           window._idbStore.backupAll &&
           window._idbStore.backupAll();
@@ -3611,6 +3641,7 @@ document.addEventListener("DOMContentLoaded", function () {
       document.addEventListener("visibilitychange", function () {
         if (document.hidden)
           try {
+            window.__akiniDirty = !1;
             flushAllData();
           } catch (t) {}
         else if (U && window.akiniContacts) {
@@ -3628,14 +3659,21 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }),
       window.addEventListener("pageshow", function (t) {
-        t.persisted &&
-          window._idbStore &&
-          window._idbStore.restoreAll &&
-          window._idbStore.restoreAll(function () {
-            window.akiniContacts &&
-              window.akiniContacts.tryRestoreFromBackup &&
-              window.akiniContacts.tryRestoreFromBackup(__akiniBootApp);
-          });
+        if (!t.persisted) return;
+        window.__akiniDirty = !0;
+        if (window.akiniContacts && window.akiniContacts.resetCache) {
+          try {
+            window.akiniContacts.resetCache();
+            var _cid = window.akiniContacts.getActiveChatId();
+            var _cfirst = window.akiniContacts.getContacts()[0];
+            if (!_cid && _cfirst) {
+              window.akiniContacts.setActiveChatId(_cfirst.id);
+            }
+          } catch (err) {}
+        }
+        try {
+          if (window.reRenderAll) window.reRenderAll();
+        } catch (err) {}
       }),
       (window._restoringChatHistory = !0),
       U && (U.innerHTML = ""),
@@ -4196,20 +4234,7 @@ document.addEventListener("DOMContentLoaded", function () {
       yt &&
         a(yt, function (t) {
           (t && (t.stopPropagation(), t.preventDefault()),
-            (function () {
-              if (window.akiniContacts) {
-                var t = document.getElementById("createGroupNameInput"),
-                  e = document.getElementById("createGroupAvatarPreview"),
-                  n = t ? t.value.trim() : "",
-                  i = (e && e.getAttribute("data-avatar")) || "👥";
-                dt.length < 2
-                  ? alert("请至少选择 2 个联系人")
-                  : n
-                    ? (window.akiniContacts.addGroup(n, i, dt.slice()),
-                      o("chat-list"))
-                    : alert("请输入群聊名称");
-              }
-            })());
+            alert("群聊功能已下线，请使用单人聊天"));
         }),
       pt &&
         a(pt, function (t) {
@@ -4231,8 +4256,7 @@ document.addEventListener("DOMContentLoaded", function () {
     var wt = document.getElementById("chatListAddBtn");
     wt &&
       wt.addEventListener("click", function (t) {
-        (t.stopPropagation(),
-          o("contacts" === kt ? "add-contact" : "create-group"));
+        (t.stopPropagation(), o("add-contact"));
       });
     var kt = "wechat";
     function _t(t) {
@@ -5056,18 +5080,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       qt &&
         a(qt, function () {
-          var t = window.akiniContacts
-              ? window.akiniContacts.getActiveChatId()
-              : null,
-            e = t ? window.akiniContacts.getChatTarget(t) : null;
-          e &&
-            "group" === e.type &&
-            confirm("确定解散群聊“" + e.name + "”吗？群聊记录也会被删除。") &&
-            (window.akiniContacts.deleteGroup(t),
-            (Y.style.display = "none"),
-            (Y.style.pointerEvents = "none"),
-            o("chat-list"),
-            ot());
+          alert("群聊功能已下线");
         }));
     (me(),
       (function () {
@@ -5746,7 +5759,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? t.target.closest(".wb-pick-group-btn")
                 : null;
               if (!e) return;
-              // v20260821x: 滚动/滑动中不触发选择，防止误触加入错误分组
+              // v20260821z9: 滚动/滑动中不触发选择，防止误触加入错误分组
               if (L.__akScrollLock && Date.now() - L.__akScrollLock < 350) return;
               if (L.__akTouchMoved) return;
               const n = e.dataset.gid,
@@ -10824,6 +10837,71 @@ document.addEventListener("DOMContentLoaded", function () {
             (e.addEventListener("touchend", n, { passive: !1 }),
             e.addEventListener("dblclick", n));
         });
+
+        // 群聊消息中头像双击 → 拍一拍
+        (function initGroupAvatarPoke(){
+          var chatBody = document.getElementById("chatBody");
+          if(!chatBody) return;
+          var lastTap = 0, pokeLock = false;
+          function handleGroupAvatarDblClick(e){
+            var avatarEl = e.target.closest ? e.target.closest(".msg-avatar") : null;
+            if(!avatarEl) return;
+            var rowEl = avatarEl.closest(".msg-row.group");
+            if(!rowEl) return; // 只在群聊行触发
+            var now = Date.now();
+            if(now - lastTap < 400){
+              if(pokeLock) return;
+              pokeLock = true;
+              setTimeout(function(){ pokeLock = false; }, 800);
+              lastTap = 0;
+              // 确定被拍的成员名字
+              var senderName = avatarEl.getAttribute("data-sender-name") || "对方";
+              var myName = localStorage.getItem("akini_my_name") || "我";
+              var chatId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+              if(!chatId) return;
+              // 显示系统消息「我拍了拍XX」
+              var sysRow = document.createElement("div");
+              sysRow.className = "msg-row system";
+              sysRow.innerHTML = '<div class="bubble">' + myName + '拍了拍' + senderName + '</div>';
+              if(U){ U.appendChild(sysRow); U.scrollTop = U.scrollHeight; }
+              S && S();
+              // 保存会话
+              if(window.akiniContacts && window.akiniContacts.updateSession && U){
+                window.akiniContacts.updateSession(chatId, {
+                  messagesHTML: U.innerHTML,
+                  lastMsg: myName + "拍了拍" + senderName,
+                  lastTime: Date.now()
+                });
+                C && C(chatId, U.innerHTML);
+              }
+              // 被拍成员随机发一条回复
+              setTimeout(function(){
+                if(!chatId || !window.akiniContacts) return;
+                var groupTarget = window.akiniContacts.getChatTarget(chatId);
+                if(!groupTarget || groupTarget.type !== "group") return;
+                var memberIds = groupTarget.memberIds || [];
+                // 找到被拍成员的 id
+                var pokedId = null;
+                memberIds.forEach(function(mid){
+                  var mc = window.akiniContacts.getChatTarget(mid);
+                  if(mc && mc.name === senderName) pokedId = mid;
+                });
+                var replyMemberId = pokedId || (memberIds.length > 0 ? memberIds[0] : null);
+                if(!replyMemberId) return;
+                // 让被拍成员发一条随机字卡消息
+                if(typeof w === "function"){
+                  w(chatId, replyMemberId, { forceText: null });
+                }
+              }, 1000 + Math.random() * 1500);
+            } else {
+              lastTap = now;
+            }
+          }
+          chatBody.addEventListener("click", handleGroupAvatarDblClick);
+          chatBody.addEventListener("touchend", function(e){
+            handleGroupAvatarDblClick(e);
+          }, { passive: true });
+        })();
       })(),
       (window.taPokeWithText = function (t, e) {
         if (!window.akiniContacts) return;
@@ -15428,7 +15506,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return (el && el.onclick) || (el && el.getAttribute("data-bound"));
       });
       dbg(
-        "构建 v20260821x | 联系人:" +
+        "构建 v20260821z9 | 联系人:" +
           (window.akiniContacts
             ? window.akiniContacts.getContacts().length
             : "无") +
@@ -15444,3 +15522,25 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   })();
 })();
+
+    // 纪念日数据多重安全回填与恢复
+    function __akiniRestoreMemorial() {
+      try {
+        var dNum = document.getElementById("dayNumber");
+        var dLabel = document.getElementById("dayLabel");
+        var sDate = localStorage.getItem("akini_start_date");
+        var sLabel = localStorage.getItem("akini_day_label");
+        if (dNum && sDate) {
+          var diff = Math.floor((new Date() - new Date(sDate)) / 864e5);
+          if (diff < 0) diff = 0;
+          dNum.innerText = diff;
+        }
+        if (dLabel && sLabel) {
+          dLabel.innerText = sLabel;
+        }
+      } catch(e){}
+    }
+    window.__akiniRestoreMemorial = __akiniRestoreMemorial;
+    requestAnimationFrame(__akiniRestoreMemorial);
+    setTimeout(__akiniRestoreMemorial, 300);
+    setTimeout(__akiniRestoreMemorial, 1000);
