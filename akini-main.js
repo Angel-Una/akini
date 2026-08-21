@@ -1,4 +1,5 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
+window.__AKINI_VERSION__ = "20260822b2";
 window._openSurveyList = window._openSurveyList || function(){
   if (window.akiniSurvey && typeof window.akiniSurvey.openSurveyList === "function") {
     window.akiniSurvey.openSurveyList();
@@ -1627,7 +1628,11 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         if (0 === msgArr.length) return;
         var $ = "";
-        if (_ && Math.random() < window.AKR.getProb("quote")) {
+        // 引用消息：_ 已在上方按 quote 概率触发并随机选取，此处直接展示（避免二次随机导致引用不显示）
+        if (_) {
+          // 每次渲染重新随机选取一条我的消息，确保引用内容有变化
+          var _fresh = getMyLatestMessageText();
+          if (_fresh) _ = _fresh;
           var W = b || "我",
             J = _.slice(0, 40) + (_.length > 40 ? "…" : "");
           $ =
@@ -2425,6 +2430,136 @@ document.addEventListener("DOMContentLoaded", function () {
           2e3 + 3e3 * Math.random(),
         );
       }
+      // 赠送商品 / 代付卡片：格式随机（赠送商品 or 代付），物品随机
+      function doGift() {
+        h();
+        var giftItems = [
+          "玫瑰花束", "巧克力礼盒", "星空投影灯", "香薰蜡烛",
+          "毛绒抱枕", "手链", "口红", "香水", "蓝牙耳机",
+          "保温杯", "玩偶", "项链", "面膜套装", "零食大礼包",
+          "暖手宝", "马克杯", "台灯", "笔记本", "钢笔", "钥匙扣"
+        ];
+        var item = giftItems[Math.floor(Math.random() * giftItems.length)];
+        var isPay = Math.random() < 0.5; // 随机：赠送商品 / 代付
+        var title = isPay ? "代付" : "赠送商品";
+        var desc = isPay
+          ? "帮我代付一下这个商品吧～"
+          : "送你一个小礼物，喜欢吗？";
+        var price = (Math.floor(Math.random() * 20) + 1) * 9.9;
+        var priceStr = price.toFixed(2);
+        var card =
+          '<div class="msg-row other"><div class="msg-content-line"><div class="msg-avatar">' +
+          i +
+          '</div><div class="bubble" style="background:#fff;color:#333;border:1px solid #eee;min-width:200px;max-width:240px;padding:0;overflow:hidden;">' +
+          '<div style="padding:12px 14px;">' +
+          '<div style="font-size:13px;color:#888;margin-bottom:8px;">' + rt(title) + '</div>' +
+          '<div style="display:flex;align-items:center;gap:10px;">' +
+          '<div style="width:48px;height:48px;border-radius:8px;background:#f5f5f5;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;">🎁</div>' +
+          '<div style="flex:1;min-width:0;">' +
+          '<div style="font-size:14px;font-weight:600;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + rt(item) + '</div>' +
+          '<div style="font-size:12px;color:#999;margin-top:2px;">' + rt(desc) + '</div>' +
+          '</div></div>' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">' +
+          '<span style="font-size:15px;font-weight:700;color:#ff4d4f;">¥' + priceStr + '</span>' +
+          '<span style="font-size:12px;color:#07c160;font-weight:600;">' + (isPay ? "去代付" : "已赠送") + '</span>' +
+          '</div></div></div></div></div>';
+        var lastMsg = (isPay ? "代付：" : "赠送商品：") + item;
+        if (a && U) {
+          var gi = document.createElement("div");
+          gi.innerHTML = card;
+          U.appendChild(gi.firstChild);
+          U.scrollTop = U.scrollHeight;
+          S();
+          window.akiniContacts.updateSession(t, {
+            lastMsg: lastMsg,
+            lastTime: Date.now(),
+            lastSenderAvatar: e.avatar,
+            lastSenderName: e.name,
+          });
+        } else {
+          var gg = window.akiniContacts.getSession(t);
+          var gc = (gg.messagesHTML || "") + card;
+          window.akiniContacts.updateSession(t, {
+            messagesHTML: gc,
+            lastMsg: lastMsg,
+            lastTime: Date.now(),
+            unread: (gg.unread || 0) + 1,
+            lastSenderAvatar: e.avatar,
+            lastSenderName: e.name,
+          });
+          C(t, gc);
+        }
+        if ((V(), "function" == typeof window.showInAppNotif)) {
+          window.showInAppNotif({
+            app: "微信",
+            appIcon: "💬",
+            avatar: i,
+            name: e.name,
+            fullContent: !0,
+            msg: lastMsg,
+            chatId: t,
+            onTap: function () { ct(t); },
+          });
+        }
+      }
+      // 联系人发送我创建的问卷：随机选一条我创建的问卷
+      function doSurvey() {
+        h();
+        if (!window.akiniSurvey || !window.akiniSurvey.getSurveys) return;
+        var mySurveys = window.akiniSurvey.getSurveys() || [];
+        if (0 === mySurveys.length) return;
+        var survey = mySurveys[Math.floor(Math.random() * mySurveys.length)];
+        var qCount = (survey.questions && survey.questions.length) || 0;
+        var card =
+          '<div class="msg-row other"><div class="msg-content-line"><div class="msg-avatar">' +
+          i +
+          '</div><div class="bubble" style="background:#fff;color:#333;border:1px solid #eee;min-width:200px;max-width:240px;padding:12px 14px;">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">' +
+          '<span style="font-size:20px;">📋</span>' +
+          '<span style="font-size:14px;font-weight:600;color:#333;">问卷</span>' +
+          '</div>' +
+          '<div style="font-size:14px;color:#333;margin-bottom:6px;word-break:break-word;">' + rt(survey.title || "未命名问卷") + '</div>' +
+          '<div style="font-size:12px;color:#999;">共 ' + qCount + ' 道题</div>' +
+          '</div></div></div>';
+        var lastMsg = "问卷：" + (survey.title || "未命名问卷");
+        if (a && U) {
+          var si = document.createElement("div");
+          si.innerHTML = card;
+          U.appendChild(si.firstChild);
+          U.scrollTop = U.scrollHeight;
+          S();
+          window.akiniContacts.updateSession(t, {
+            lastMsg: lastMsg,
+            lastTime: Date.now(),
+            lastSenderAvatar: e.avatar,
+            lastSenderName: e.name,
+          });
+        } else {
+          var sg = window.akiniContacts.getSession(t);
+          var sc = (sg.messagesHTML || "") + card;
+          window.akiniContacts.updateSession(t, {
+            messagesHTML: sc,
+            lastMsg: lastMsg,
+            lastTime: Date.now(),
+            unread: (sg.unread || 0) + 1,
+            lastSenderAvatar: e.avatar,
+            lastSenderName: e.name,
+          });
+          C(t, sc);
+        }
+        if ((V(), "function" == typeof window.showInAppNotif)) {
+          window.showInAppNotif({
+            app: "微信",
+            appIcon: "💬",
+            avatar: i,
+            name: e.name,
+            fullContent: !0,
+            msg: lastMsg,
+            chatId: t,
+            onTap: function () { ct(t); },
+          });
+        }
+      }
       function runExtras() {
         var list = [];
         if (ex.transfer) list.push(doTransfer);
@@ -2432,6 +2567,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (ex.poke) list.push(doPoke);
         if (ex.call) list.push(doCall);
         if (ex.recall) list.push(doRecall);
+        if (ex.gift) list.push(doGift);
+        if (ex.survey) list.push(doSurvey);
         if (0 === list.length) return;
         var k = 0;
         function next() {
@@ -12273,12 +12410,25 @@ document.addEventListener("DOMContentLoaded", function () {
                 c = o && o.name ? o.name : i.name,
                 l = o && o.avatar ? o.avatar : i.avatar,
                 s = q();
+              // 2% 概率夹带表情包
+              var attachSticker = window.AKR && Math.random() < window.AKR.getProb("icitySticker");
+              var stickerUrl = "";
+              if (attachSticker) {
+                var _stickers = getContactStickersSync(i.id);
+                if (_stickers && _stickers.length > 0) {
+                  stickerUrl = _stickers[Math.floor(Math.random() * _stickers.length)];
+                }
+              }
+              var diaryText = e;
+              if (stickerUrl) {
+                diaryText = e + ' <img src="' + stickerUrl + '" style="max-width:100px;max-height:100px;border-radius:8px;display:inline-block;vertical-align:middle;margin-left:4px;">';
+              }
               (s.push({
                 id: Date.now() + "_" + Math.floor(1e3 * Math.random()),
                 who: a,
                 author: c,
                 authorId: a,
-                text: e,
+                text: diaryText,
                 ts: Date.now(),
                 likes: 0,
                 likers: [],
