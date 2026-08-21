@@ -473,6 +473,9 @@ document.addEventListener("DOMContentLoaded", function () {
         t.style.touchAction = "manipulation";
         t.__akTapLock = 0;
         t.__akTapHandled = 0;
+        t.__touchStartX = 0;
+        t.__touchStartY = 0;
+        t.__touchMoved = false;
         var swallowNext = function () {
           var done = 0;
           var h = function (ev) {
@@ -507,8 +510,36 @@ document.addEventListener("DOMContentLoaded", function () {
           e(evt);
         };
         t.addEventListener(
+          "touchstart",
+          function (evt) {
+            if (evt.touches && evt.touches.length > 0) {
+              t.__touchStartX = evt.touches[0].clientX;
+              t.__touchStartY = evt.touches[0].clientY;
+              t.__touchMoved = false;
+            }
+          },
+          { passive: true },
+        );
+        t.addEventListener(
+          "touchmove",
+          function (evt) {
+            if (evt.touches && evt.touches.length > 0) {
+              var dx = Math.abs(evt.touches[0].clientX - t.__touchStartX);
+              var dy = Math.abs(evt.touches[0].clientY - t.__touchStartY);
+              if (dx > 8 || dy > 8) {
+                t.__touchMoved = true;
+              }
+            }
+          },
+          { passive: true },
+        );
+        t.addEventListener(
           "touchend",
           function (evt) {
+            if (t.__touchMoved) {
+              t.__touchMoved = false;
+              return;
+            }
             fire(evt);
           },
           { passive: false },
@@ -785,6 +816,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (Array.isArray(cur) && cur.length > 0) e = cur;
         }
         ((d = e), localStorage.setItem(t, JSON.stringify(e)), c(t, e));
+        try { if(typeof window._snapshotCritical === 'function') window._snapshotCritical(); } catch(err){}
       }
       function y() {
         if (m) return m;
@@ -797,6 +829,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (Array.isArray(cur) && cur.length > 0) t = cur;
         }
         ((m = t), localStorage.setItem(e, JSON.stringify(t)), c(e, t));
+        try { if(typeof window._snapshotCritical === 'function') window._snapshotCritical(); } catch(err){}
       }
       function v(t) {
         return f().find(function (e) {
@@ -15330,7 +15363,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return (el && el.onclick) || (el && el.getAttribute("data-bound"));
       });
       dbg(
-        "构建 v20260821u | 联系人:" +
+        "构建 v20260821v | 联系人:" +
           (window.akiniContacts
             ? window.akiniContacts.getContacts().length
             : "无") +

@@ -1183,7 +1183,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
   }
   function resetProbDefaultsIfNeeded(){
     try {
-      var CURR = 'v20260821u';
+      var CURR = 'v20260821v';
       if (localStorage.getItem('akini_prob_version') === CURR) return;
       lsSet('akini_prob_version', CURR);
       // 本版重置回复相关概率为新默认值（用户指定）
@@ -1309,8 +1309,34 @@ var last=0;document.addEventListener("click",function(e){var t=e.target;var now=
   const DEFAULT_RIGHT = "我也是";
   function $(id){ return document.getElementById(id); }
   function it(t,e){if(e=e||"",!t||"string"!=typeof t)return e;t=t.trim();if(!t)return e;if(0===t.indexOf("<img")){var n=t.match(/src="([^"]*)"/);if(!n||!n[1])return e;t=n[1]}return 0===t.indexOf("data:")||0===t.indexOf("http")?'<img src="'+t.replace(/"/g,"&quot;")+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">':t||e}
-  window.getMyAvatar=function getMyAvatar(){var n=localStorage.getItem("akini_my_avatar");if(n)return it(n,"🐻");const t=window.__akiniAvatarCache?window.__akiniAvatarCache.my:"";if(t)return it(t,"🐻");return "🐻";}
-  window.getContacts=function getContacts(){var list=[];try{var ls=JSON.parse(localStorage.getItem("akini_contacts")||"[]");if(Array.isArray(ls))list=ls;}catch(e){}if(window.akiniContacts&&window.akiniContacts.getContacts){var api=window.akiniContacts.getContacts();if(api&&api.length){var seen=new Set(list.map(function(c){return c.id}));api.forEach(function(c){if(c&&c.id&&!seen.has(c.id)){seen.add(c.id);list.push(c)}})}}if(list.length)return list;return [];}
+  window.getMyAvatar=function getMyAvatar(){var n=localStorage.getItem("akini_my_avatar");if(n)return it(n,"🐻");const t=window.__akiniAvatarCache?window.__akiniAvatarCache.my:"";if(t)return it(t,"🐻");return "🐻";};
+  window.getTaAvatar=function getTaAvatar(id){
+    if(id && window.akiniContacts && window.akiniContacts.getChatTarget){
+      var ct = window.akiniContacts.getChatTarget(id);
+      if(ct && ct.avatar) return it(ct.avatar, "🐰");
+    }
+    var active = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+    if(active && window.akiniContacts && window.akiniContacts.getChatTarget){
+      var act = window.akiniContacts.getChatTarget(active);
+      if(act && act.avatar) return it(act.avatar, "🐰");
+    }
+    var n = localStorage.getItem("akini_ta_avatar");
+    if(n) return it(n, "🐰");
+    const t = window.__akiniAvatarCache ? window.__akiniAvatarCache.ta : "";
+    if(t) return it(t, "🐰");
+    return "🐰";
+  };
+  window.getContacts=function getContacts(){
+    if(window.akiniContacts && window.akiniContacts.getContacts){
+      var api = window.akiniContacts.getContacts();
+      if(Array.isArray(api) && api.length) return api;
+    }
+    try{
+      var ls = JSON.parse(localStorage.getItem("akini_contacts")||"[]");
+      if(Array.isArray(ls) && ls.length) return ls;
+    }catch(e){}
+    return [];
+  };
   function getSelectedContactId(){var contacts=getContacts();if(!contacts.length)return null;var saved="";try{saved=localStorage.getItem(KEY)||""}catch(e){}var exists=contacts.some(function(c){return c.id===saved});if(exists)return saved;var def=contacts.find(function(c){return c.isDefault});if(!def&&contacts.length)def=contacts[0];if(def){try{localStorage.setItem(KEY,def.id)}catch(e){}return def.id}return null;}
   function getContactById(id){var contacts=getContacts();for(var i=0;i<contacts.length;i++)if(contacts[i].id===id)return contacts[i];return null;}
   function isSwapped(){var t=localStorage.getItem("akini_swap_avatar_pos");return"true"===t||"1"===t}
@@ -1985,9 +2011,19 @@ var last=0;document.addEventListener("click",function(e){var t=e.target;var now=
     }
     styleEl.textContent=final;
     try{localStorage.setItem(KEY,raw);}catch(e){}
+    try{if(window._idbStore&&window._idbStore.set){window._idbStore.set(KEY,raw);window._idbStore.set(KEY+"_backup",raw);}}catch(e){}
     /* 刷新当前聊天渲染，让新样式立即作用于已有消息 */
     try{window.reRenderAll&&window.reRenderAll();}catch(e){}
-    
+    /* 强制所有气泡微任务立即重新触发重排与重绘，避免样式延迟或卡顿 */
+    requestAnimationFrame(function(){
+      var bubbles=document.querySelectorAll(".bubble, .bubble.me, .bubble.other, .survey-bubble, .preview-bubble");
+      bubbles.forEach(function(b){
+        b.style.display="none";
+        b.offsetHeight;
+        b.style.display="";
+      });
+      window.dispatchEvent(new CustomEvent("akini:bubble-css-updated"));
+    });
   }
   window.applyBubbleCss=applyCss;
 
@@ -2945,12 +2981,24 @@ setInterval(akiniCheckScrollText,3000);
 
   // ===== Render survey list =====
   function getCurrentSurveyChatId(){
-    return window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+    var id = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+    if(!id){
+      try{ id = localStorage.getItem("akini_active_chat_id") || ""; }catch(e){}
+    }
+    if(!id){
+      var contacts = window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+      if(contacts.length > 0) id = contacts[0].id;
+    }
+    return id || "ta";
   }
 
   function getSurveysByChat(chatId){
-    if(!chatId) return [];
-    return surveys.filter(function(s){ return s.targetId === chatId; });
+    if(!chatId) return surveys.slice();
+    var list = surveys.filter(function(s){
+      return s.targetId === chatId || (s.selectedMembers && s.selectedMembers.indexOf(chatId) >= 0);
+    });
+    if(list.length === 0 && surveys.length > 0) return surveys.slice();
+    return list;
   }
 
   function renderSurveyList(){
@@ -2970,13 +3018,14 @@ setInterval(akiniCheckScrollText,3000);
       var timeStr = s.createdAt ? new Date(s.createdAt).toLocaleString("zh-CN", {month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit"}) : "";
       var title = (s.title || "").trim() || ("问卷 " + (idx+1));
       var statusBadge = s.replied
-        ? '<div style="font-size:12px;color:#07c160;margin-top:6px">已回答</div>'
-        : '<div style="font-size:12px;color:#999;margin-top:6px">未回答</div>';
-      html += '<div class="survey-list-item" data-idx="'+realIdx+'" style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.03)">'+
+        ? '<div style="font-size:12px;color:#07c160;margin-top:6px;font-weight:500">✓ 已回答</div>'
+        : '<div style="font-size:12px;color:#ff9800;margin-top:6px;font-weight:500">待回答</div>';
+      var senderLabel = s.direction === "receive" ? (s.senderName || "对方发来") : "我创建的";
+      html += '<div class="survey-list-item" data-idx="'+realIdx+'" style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.04);border:1px solid #f0f0f0">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">'+
           '<div style="flex:1;min-width:0">'+
             '<div style="font-size:16px;font-weight:600;color:#111;margin-bottom:4px">'+escapeHtml(title)+'</div>'+
-            '<div style="font-size:13px;color:#888">'+qCount+' 个问题 · '+timeStr+'</div>'+
+            '<div style="font-size:13px;color:#888">'+senderLabel+' · '+qCount+' 个问题 · '+timeStr+'</div>'+
             statusBadge+
           '</div>'+
         '</div>'+
@@ -2986,7 +3035,12 @@ setInterval(akiniCheckScrollText,3000);
     container.querySelectorAll(".survey-list-item").forEach(function(item){
       item.addEventListener("click", function(){
         var idx = parseInt(item.getAttribute("data-idx"));
-        showSurveyDetail(idx);
+        var s = surveys[idx];
+        if(s && s.direction === "receive" && !s.replied){
+          openSurveyReply(idx);
+        } else {
+          showSurveyDetail(idx);
+        }
       });
     });
   }
@@ -3007,9 +3061,9 @@ setInterval(akiniCheckScrollText,3000);
     if(!container) return;
     loadSurveys();
     var chatId = getCurrentSurveyChatId();
-    var created = surveys.filter(function(s){ return s.direction !== "receive" && s.targetId === chatId; });
+    var created = surveys.filter(function(s){ return s.direction !== "receive"; });
     if(created.length === 0){
-      container.innerHTML = '<div style="text-align:center;color:#999;padding:60px 20px;font-size:14px">暂无创建的问卷<br>点击右下角 + 新建问卷</div>';
+      container.innerHTML = '<div style="text-align:center;color:#999;padding:60px 20px;font-size:14px">暂无创建的问卷<br>点击右上角新建问卷</div>';
       return;
     }
     var html = '';
@@ -3018,24 +3072,35 @@ setInterval(akiniCheckScrollText,3000);
       var qCount = (s.questions && s.questions.length) || 0;
       var timeStr = s.createdAt ? new Date(s.createdAt).toLocaleString("zh-CN", {month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit"}) : "";
       var title = (s.title || "").trim() || ("问卷 " + (idx+1));
+      var replyCount = (s.replies && s.replies.length) || 0;
       var qPreview = (s.questions || []).map(function(q, i){ return escapeHtml((i+1)+'. '+(q.text || '未命名问题')); }).join('<br>');
-      html += '<div class="survey-created-item" data-idx="'+realIdx+'" style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.03)">'+
-        '<div style="font-size:16px;font-weight:600;color:#111;margin-bottom:6px">'+escapeHtml(title)+'</div>'+
-        '<div style="font-size:13px;color:#888;margin-bottom:8px">'+qCount+' 个问题 · '+timeStr+'</div>'+
+      html += '<div class="survey-created-item" data-idx="'+realIdx+'" style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.04);border:1px solid #f0f0f0">'+
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">'+
+          '<div style="font-size:16px;font-weight:600;color:#111">'+escapeHtml(title)+'</div>'+
+          '<button type="button" class="survey-fast-send-btn" data-idx="'+realIdx+'" style="padding:4px 12px;background:#07c160;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer">发送</button>'+
+        '</div>'+
+        '<div style="font-size:13px;color:#888;margin-bottom:8px">'+qCount+' 个问题 · '+replyCount+' 人已回答 · '+timeStr+'</div>'+
         '<div style="font-size:13px;color:#555;line-height:1.6">'+qPreview+'</div>'+
       '</div>';
     });
     container.innerHTML = html;
     container.querySelectorAll(".survey-created-item").forEach(function(item){
-      item.addEventListener("click", function(){
+      item.addEventListener("click", function(e){
+        if(e.target.closest(".survey-fast-send-btn")) return;
         var idx = parseInt(item.getAttribute("data-idx"));
         closeSurveyCreatedList();
         openSurveyEdit(idx);
       });
     });
+    container.querySelectorAll(".survey-fast-send-btn").forEach(function(btn){
+      btn.addEventListener("click", function(e){
+        e.stopPropagation();
+        var idx = parseInt(btn.getAttribute("data-idx"));
+        sendExistingSurvey(idx);
+      });
+    });
   }
 
-  // ===== Show survey detail =====
   function showSurveyDetail(idx, memberId, fromChat){
     var s = surveys[idx];
     if(!s) return;
@@ -3411,12 +3476,13 @@ setInterval(akiniCheckScrollText,3000);
       var chatId = targetId || (window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "ta");
       var chatBody = document.getElementById("chatBody");
       var U = window.__akiniChatBody || chatBody;
-      if(!U || !window.akiniContacts) return;
-      var target = window.akiniContacts.getChatTarget(chatId);
-      var senderName = isReply ? (target ? target.name : "对方") : (localStorage.getItem("akini_my_name") || "我");
+      if(!U) return;
+      var target = window.akiniContacts && window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(chatId) : null;
+      var member = memberId && window.akiniContacts && window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(memberId) : target;
+      var senderName = isReply ? (member ? member.name : (target ? target.name : "对方")) : (localStorage.getItem("akini_my_name") || "我");
       var row = document.createElement("div");
       row.className = "msg-row " + (isReply ? "other" : "me");
-      var avatar = isReply ? window.getTaAvatar() : window.getMyAvatar();
+      var avatar = isReply ? (window.getTaAvatar ? window.getTaAvatar(memberId || chatId) : "🐰") : (window.getMyAvatar ? window.getMyAvatar() : "🐻");
       var content = '<div class="msg-content-line">'
         + (isReply ? '<div class="msg-avatar">' + avatar + '</div>' : '')
         + '<div class="bubble survey-bubble" data-survey-id="' + survey.id + '" data-survey-reply="' + (isReply ? "1" : "0") + '"' + (isReply && memberId ? ' data-member-id="' + memberId + '"' : '') + '>'
@@ -3427,8 +3493,10 @@ setInterval(akiniCheckScrollText,3000);
       row.innerHTML = content;
       U.appendChild(row);
       U.scrollTop = U.scrollHeight;
-      window.akiniContacts.setActiveChatId(chatId);
-      window.akiniContacts.updateSession(chatId, { lastMsg: "【问卷】" + (survey.questions ? survey.questions.length : 0) + "个问题", lastTime: Date.now(), lastSenderAvatar: avatar, lastSenderName: senderName, messagesHTML: U.innerHTML });
+      if(window.akiniContacts && window.akiniContacts.setActiveChatId) window.akiniContacts.setActiveChatId(chatId);
+      if(window.akiniContacts && window.akiniContacts.updateSession){
+        window.akiniContacts.updateSession(chatId, { lastMsg: "【问卷】" + (survey.title || ((survey.questions ? survey.questions.length : 0) + "个问题")), lastTime: Date.now(), lastSenderAvatar: avatar, lastSenderName: senderName, messagesHTML: U.innerHTML });
+      }
       if(window._saveChat) window._saveChat();
     }catch(e){ console.error("[survey] insertSurveyBubble error", e); }
   }
@@ -3444,7 +3512,9 @@ setInterval(akiniCheckScrollText,3000);
         if(st) st.textContent = statusText;
       });
       var chatId = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "ta";
-      window.akiniContacts.updateSession(chatId, { messagesHTML: chatBody.innerHTML });
+      if(window.akiniContacts && window.akiniContacts.updateSession){
+        window.akiniContacts.updateSession(chatId, { messagesHTML: chatBody.innerHTML });
+      }
       if(window._saveChat) window._saveChat();
     }catch(e){ console.error("[survey] updateSurveyBubbleStatus error", e); }
   }
@@ -3476,11 +3546,11 @@ setInterval(akiniCheckScrollText,3000);
     };
   }
 
-  // ===== Send survey (新建/编辑后发送) =====
+  // ===== 发送问卷（新建）=====
   function sendSurvey(){
     var targetId = getCurrentSurveyChatId();
     if(!targetId){ alert("请先进入一个聊天再发送问卷"); return; }
-    var target = window.akiniContacts.getChatTarget(targetId);
+    var target = window.akiniContacts && window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(targetId) : null;
     var chatType = (target && target.type) || "contact";
     var selectedMembers = [];
     if(chatType === "group"){
@@ -3491,7 +3561,6 @@ setInterval(akiniCheckScrollText,3000);
     }
     var survey = validateAndBuildSurvey(targetId, chatType, selectedMembers);
     if(!survey) return;
-    // 编辑模式：更新已有问卷
     if(editingSurveyId){
       var existIdx = surveys.findIndex(function(s){ return s.id === editingSurveyId; });
       if(existIdx >= 0){
@@ -3512,7 +3581,7 @@ setInterval(akiniCheckScrollText,3000);
       insertSurveyBubble(survey, false, "未回答", targetId);
       closeSurveyCreate();
       selectedMembers.forEach(function(mid, idx){
-        var replyDelay = 1500 + idx * 1500 + Math.random() * 2000;
+        var replyDelay = 1200 + idx * 1500 + Math.random() * 1500;
         setTimeout(function(){
           simulateReply(survey.id, targetId, mid);
         }, replyDelay);
@@ -3525,10 +3594,10 @@ setInterval(akiniCheckScrollText,3000);
     var s = surveys[idx];
     if(!s) return;
     var targetId = getCurrentSurveyChatId();
-    if(!targetId || targetId !== s.targetId){ alert("只能发送当前聊天框创建的问卷"); return; }
-    var chatType = s.chatType || "contact";
+    if(!targetId){ alert("请先进入一个聊天再发送问卷"); return; }
+    var target = window.akiniContacts && window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(targetId) : null;
+    var chatType = (target && target.type) || s.chatType || "contact";
     var selectedMembers = (chatType === "group" && s.selectedMembers && s.selectedMembers.length) ? s.selectedMembers.slice() : [targetId];
-    // 复制一份新问卷实例发送（保持原问卷不变）
     var copy = {
       id: "survey_" + Date.now() + "_" + Math.random().toString(36).slice(2,8),
       title: s.title || "",
@@ -3550,7 +3619,7 @@ setInterval(akiniCheckScrollText,3000);
     setTimeout(function(){
       insertSurveyBubble(copy, false, "未回答", targetId);
       selectedMembers.forEach(function(mid, i){
-        var replyDelay = 1500 + i * 1500 + Math.random() * 2000;
+        var replyDelay = 1200 + i * 1500 + Math.random() * 1500;
         setTimeout(function(){ simulateReply(copy.id, targetId, mid); }, replyDelay);
       });
     }, 300);
@@ -3577,30 +3646,32 @@ setInterval(akiniCheckScrollText,3000);
       var q = questions[i];
       if(!(q.text || "").trim()){ alert("请填写问题 "+(i+1)+" 的内容"); return; }
       var validOptions = (q.options || []).filter(function(o){ return (o || "").trim(); });
-      if(validOptions.length < 1){ alert("问题 "+(i+1)+" 至少需要 1 个选项"); return; }
+      if(validOptions.length < 1){ alert("问题 "+(i+1)+" 至少需要 1 个选项"); return null; }
       q.options = validOptions;
     }
-    var idx = surveys.findIndex(function(s){ return s.id === editingSurveyId; });
-    if(idx < 0) return;
-    var s = surveys[idx];
-    s.title = (surveyTitle || "").trim();
-    s.questions = questions.slice();
-    saveSurveys();
-    renderSurveyList();
-    renderSurveyCreatedList();
-    alert("已保存");
+    var existIdx = surveys.findIndex(function(s){ return s.id === editingSurveyId; });
+    if(existIdx >= 0){
+      surveys[existIdx].title = (surveyTitle || "").trim();
+      surveys[existIdx].questions = questions.slice();
+      if(surveys[existIdx].chatType === "group"){
+        surveys[existIdx].selectedMembers = selectedSurveyMembers.slice();
+      }
+      saveSurveys();
+      alert("问卷已保存");
+      closeSurveyCreate();
+      renderSurveyList();
+      renderSurveyCreatedList();
+    }
+    editingSurveyId = null;
   }
 
-  // ===== 编辑模式：发送当前问卷 =====
   function sendSurveyEdit(){
-    saveSurveyEdit();
     if(!editingSurveyId) return;
-    var idx = surveys.findIndex(function(s){ return s.id === editingSurveyId; });
-    if(idx < 0) return;
-    sendExistingSurvey(idx);
+    var existIdx = surveys.findIndex(function(s){ return s.id === editingSurveyId; });
+    if(existIdx < 0) return;
+    sendExistingSurvey(existIdx);
   }
 
-  // ===== 编辑模式：删除当前问卷 =====
   function deleteSurveyEdit(){
     if(!editingSurveyId) return;
     var idx = surveys.findIndex(function(s){ return s.id === editingSurveyId; });
@@ -3612,17 +3683,19 @@ setInterval(akiniCheckScrollText,3000);
   // ===== Simulate contact reply =====
   function simulateReply(surveyId, targetId, memberId){
     try{
+      loadSurveys();
       var survey = surveys.find(function(s){ return s.id === surveyId; });
       if(!survey) return;
       targetId = targetId || survey.targetId || (window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "ta");
       memberId = memberId || targetId;
-      if(survey.replies && survey.replies.find(function(r){ return r.memberId === memberId; })) return;
-      var answers = survey.questions.map(function(q){
-        return Math.floor(Math.random() * (q.options || []).length);
+      survey.replies = survey.replies || [];
+      if(survey.replies.find(function(r){ return r.memberId === memberId; })) return;
+      var answers = (survey.questions || []).map(function(q){
+        var opts = q.options || [""];
+        return Math.floor(Math.random() * opts.length);
       });
       var note = "";
       if(window.pickWordCards) note = window.pickWordCards(1);
-      survey.replies = survey.replies || [];
       survey.replies.push({ memberId: memberId, answers: answers, note: note, ts: Date.now() });
       var allReplied = true;
       if((survey.selectedMembers || []).length > 0){
@@ -3633,45 +3706,13 @@ setInterval(akiniCheckScrollText,3000);
         survey.replied = true;
       }
       saveSurveys();
-      if(window.openChat) window.openChat(targetId, true);
-      setTimeout(function(){
-        if(allReplied) updateSurveyBubbleStatus(surveyId, "已回答");
-        insertSurveyBubble(survey, true, "已回答", targetId, memberId);
-      }, 300);
+      if(allReplied) updateSurveyBubbleStatus(surveyId, "已回答");
+      insertSurveyBubble(survey, true, "已回答", targetId, memberId);
+      renderSurveyList();
+      renderSurveyCreatedList();
     }catch(e){ console.error("[survey] simulateReply error", e); }
   }
 
-  // ===== 联系人主动发我创建的问卷给我 =====
-  window.__surveyReceiveFromContact = function(contactId, surveyId){
-    try{
-      var s = surveys.find(function(x){ return x.id === surveyId; });
-      if(!s) return;
-      var contacts = (window.akiniContacts && window.akiniContacts.getContacts) ? window.akiniContacts.getContacts() : [];
-      var ct = contacts.find(function(x){ return x.id === contactId; }) || { id: contactId, name: "对方" };
-      // 创建一份待我回答的问卷（direction=receive）
-      var recv = {
-        id: "survey_recv_" + Date.now() + "_" + Math.random().toString(36).slice(2,8),
-        title: s.title || "",
-        questions: (s.questions || []).map(function(q){ return { text: q.text, options: (q.options||[]).slice() }; }),
-        createdAt: Date.now(),
-        senderName: ct.name || "对方",
-        targetId: contactId,
-        chatType: "contact",
-        selectedMembers: [contactId],
-        replies: [],
-        replied: false,
-        direction: "receive"
-      };
-      surveys.push(recv);
-      saveSurveys();
-      if(window.openChat) window.openChat(contactId, true);
-      setTimeout(function(){
-        insertSurveyBubble(recv, true, "待回答", contactId);
-      }, 300);
-    }catch(e){ console.error("[survey] __surveyReceiveFromContact error", e); }
-  };
-
-  // ===== Bind events =====
   function bindEvents(){
     var backBtn = document.getElementById("surveyListBackBtn");
     if(backBtn) backBtn.addEventListener("click", closeSurveyList);
