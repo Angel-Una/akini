@@ -1,6 +1,15 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
 window._openSurveyList = window._openSurveyList || function(){
-  alert("问卷模块未加载，请重新部署最新版本的 akini.html 并清理缓存后重试。");
+  if (window.akiniSurvey && typeof window.akiniSurvey.openSurveyList === "function") {
+    window.akiniSurvey.openSurveyList();
+    return;
+  }
+  var el = document.getElementById("surveyListModal");
+  if (el) {
+    el.style.display = "flex";
+    return;
+  }
+  console.warn("[Akini] 问卷模块未就绪，请清理缓存并重新部署最新版本。");
 };
 function setHtmlKeepInput(t, e) {
   if (t) {
@@ -1322,7 +1331,7 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
               localStorage.setItem(n, i);
             } catch (t) {}
-          window.__akiniSyncingAvatars || Tn();
+          Tn();
         }
       });
     }
@@ -3195,9 +3204,8 @@ document.addEventListener("DOMContentLoaded", function () {
         window._restoringData = !1;
       }, 3000);
       if (
-        (window.__akiniAvatarCache &&
-          ((window.__akiniAvatarCache.my = ""),
-          (window.__akiniAvatarCache.ta = "")),
+        (window.__akiniAvatarCache ||
+          (window.__akiniAvatarCache = { my: "", ta: "" }),
         window.akiniContacts)
       ) {
         (window.akiniContacts.resetCache && window.akiniContacts.resetCache(),
@@ -4937,7 +4945,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 0),
               "survey" === n &&
                 setTimeout(function () {
-                  window._openSurveyList && window._openSurveyList();
+                  if (window.akiniSurvey && typeof window.akiniSurvey.openSurveyList === "function") {
+                    window.akiniSurvey.openSurveyList();
+                  } else if (window._openSurveyList) {
+                    window._openSurveyList();
+                  }
                 }, 0),
               hidePlusMenu());
           }
@@ -5759,7 +5771,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? t.target.closest(".wb-pick-group-btn")
                 : null;
               if (!e) return;
-              // v20260821z9: 滚动/滑动中不触发选择，防止误触加入错误分组
+              // v20260822a1: 滚动/滑动中不触发选择，防止误触加入错误分组
               if (L.__akScrollLock && Date.now() - L.__akScrollLock < 350) return;
               if (L.__akTouchMoved) return;
               const n = e.dataset.gid,
@@ -10658,7 +10670,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   (document.getElementById("inputMyName") || {}).value ||
                   localStorage.getItem("akini_my_name") ||
                   "我",
-                n = it(t || localStorage.getItem("akini_my_avatar"), "🐻");
+                n = it(t || ("function" == typeof window.getMyAvatar ? window.getMyAvatar() : localStorage.getItem("akini_my_avatar")), "🐻");
               var i = null;
               window.akiniContacts &&
                 (i = window.akiniContacts.getChatTarget(
@@ -10668,7 +10680,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   ? i.name
                   : localStorage.getItem("akini_ta_name") || "哥哥",
                 o = it(
-                  i ? i.avatar : localStorage.getItem("akini_ta_avatar"),
+                  i ? i.avatar : ("function" == typeof window.getTaAvatar ? window.getTaAvatar() : localStorage.getItem("akini_ta_avatar")),
                   "🐰",
                 ),
                 r = { name: e, avatar: n },
@@ -10787,7 +10799,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 "function" == typeof window.renderBeautifyContacts &&
                   window.renderBeautifyContacts(),
                 xt(),
-                "function" == typeof ot && ot());
+                "function" == typeof ot && ot(),
+                "function" == typeof window.updatePreview && window.updatePreview());
               const B = document.getElementById("settingsMyAvatar");
               B && (B.innerHTML = n);
               const T = document.getElementById("settingsTaAvatar");
@@ -15506,7 +15519,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return (el && el.onclick) || (el && el.getAttribute("data-bound"));
       });
       dbg(
-        "构建 v20260821z9 | 联系人:" +
+        "构建 v20260822a1 | 联系人:" +
           (window.akiniContacts
             ? window.akiniContacts.getContacts().length
             : "无") +
