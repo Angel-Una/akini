@@ -403,32 +403,30 @@ document.addEventListener("DOMContentLoaded", function () {
       console.warn("[Akini] restoreAll error", e);
     }
     ((window.onerror = function (t, e, n, i, a) {
-      var o = document.getElementById("globalErrorBanner");
-      o ||
-        (((o = document.createElement("div")).id = "globalErrorBanner"),
-        (o.style.cssText =
-          "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;"),
-        document.body.appendChild(o));
-      var r = t + "";
-      return (
-        a && a.stack && (r += "\\n" + a.stack),
-        (o.textContent += "JS错误: " + r + " (line " + n + ")\\n"),
-        console.error("[Akini Error]", t, "line:" + n, "col:" + i, a),
-        !0
-      );
+      console.error("[Akini Error]", t, "line:" + n, "col:" + i, a);
+      if (localStorage.getItem("akini_debug") === "1") {
+        var o = document.getElementById("globalErrorBanner");
+        o || (((o = document.createElement("div")).id = "globalErrorBanner"),
+          (o.style.cssText = "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;"),
+          document.body.appendChild(o));
+        var r = t + "";
+        a && a.stack && (r += "\n" + a.stack);
+        o.textContent += "JS错误: " + r + " (line " + n + ")\n";
+      }
+      return !0;
     }),
       window.addEventListener("unhandledrejection", function (t) {
-        var e = document.getElementById("globalErrorBanner");
-        e ||
-          (((e = document.createElement("div")).id = "globalErrorBanner"),
-          (e.style.cssText =
-            "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;"),
-          document.body.appendChild(e));
-        var n = t.reason,
-          i = n && n.message ? n.message : String(n);
-        (n && n.stack && (i += "\\n" + n.stack),
-          (e.textContent += "Promise错误: " + i + "\\n"),
-          console.error("[Akini Promise Error]", n));
+        var n = t.reason;
+        console.error("[Akini Promise Error]", n);
+        if (localStorage.getItem("akini_debug") === "1") {
+          var e = document.getElementById("globalErrorBanner");
+          e || (((e = document.createElement("div")).id = "globalErrorBanner"),
+            (e.style.cssText = "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;"),
+            document.body.appendChild(e));
+          var i = n && n.message ? n.message : String(n);
+          n && n.stack && (i += "\n" + n.stack);
+          e.textContent += "Promise错误: " + i + "\n";
+        }
       }));
     const t = [520, 1314, 9999, 10001, 13140, 5200, 52e3];
     function e() {
@@ -801,11 +799,27 @@ document.addEventListener("DOMContentLoaded", function () {
       var d = null,
         m = null;
       function f() {
-        if (d) return d;
+        if (d && Array.isArray(d) && d.length > 0) return d;
         var e = i(t, []);
         if (!Array.isArray(e) || 0 === e.length) {
-          if (window._restoringData) return (d = []);
-          e = [];
+          var b = i(t + "_backup", []);
+          if (Array.isArray(b) && b.length > 0) e = b;
+        }
+        if (!Array.isArray(e) || 0 === e.length) {
+          var taName = localStorage.getItem("akini_ta_name") || "对方";
+          var taAvatar = localStorage.getItem("akini_ta_avatar") || "🐰";
+          e = [{
+            id: "default_contact",
+            name: taName,
+            avatar: taAvatar,
+            isDefault: true,
+            createdAt: Date.now()
+          }];
+          try {
+            localStorage.setItem(t, JSON.stringify(e));
+            localStorage.setItem(t + "_backup", JSON.stringify(e));
+            c(t, e);
+          } catch(err){}
         }
         return ((d = e), e);
       }
@@ -1394,8 +1408,37 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       v = t;
     }
+    function appendTimestampIfNeeded() {
+      if (!U) return;
+      const t = Date.now();
+      if (t - v > 6e4) {
+        const e = document.createElement("div");
+        ((e.className = "timestamp-row"),
+          e.setAttribute(
+            "data-time",
+            (function (t) {
+              const e = new Date(t),
+                n = e.getHours(),
+                i = String(e.getMinutes()).padStart(2, "0");
+              let a = "凌晨";
+              return (
+                n >= 6 && n < 11
+                  ? (a = "早上")
+                  : n >= 11 && n < 13
+                    ? (a = "中午")
+                    : n >= 13 && n < 18
+                      ? (a = "下午")
+                      : n >= 18 && n < 24 && (a = "晚上"),
+                a + " " + String(n).padStart(2, "0") + ":" + i
+              );
+            })(t),
+          ),
+          U.appendChild(e));
+      }
+      v = t;
+    }
     function w(t, a, o) {
-      h();
+      appendTimestampIfNeeded();
       try {
         if (((o = o || {}), !window.akiniContacts)) return;
         var r = window.akiniContacts.getChatTarget(t),
@@ -1428,7 +1471,7 @@ document.addEventListener("DOMContentLoaded", function () {
           p = document.createElement("div");
         p.className = y;
         var v = "",
-          h = !1,
+          isNoReply = !1,
           w = o.forceMentions || [],
           k = null,
           _ = o.quoteText || "",
@@ -1628,7 +1671,7 @@ document.addEventListener("DOMContentLoaded", function () {
               return x.text;
             })
             .join(" ")),
-          Math.random() < window.AKR.getProb("noReply") && (h = !0));
+          Math.random() < window.AKR.getProb("noReply") && (isNoReply = !0));
         if (l && U)
           (U.appendChild(p),
             window.akiniContacts.updateSession(t, {
@@ -5703,6 +5746,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? t.target.closest(".wb-pick-group-btn")
                 : null;
               if (!e) return;
+              // v20260821x: 滚动/滑动中不触发选择，防止误触加入错误分组
+              if (L.__akScrollLock && Date.now() - L.__akScrollLock < 350) return;
+              if (L.__akTouchMoved) return;
               const n = e.dataset.gid,
                 i = l();
               (c.forEach((t) => {
@@ -5714,6 +5760,25 @@ document.addEventListener("DOMContentLoaded", function () {
                 f(),
                 m());
             }),
+          L &&
+            (L.addEventListener(
+              "touchmove",
+              function () {
+                L.__akTouchMoved = true;
+                L.__akScrollLock = Date.now();
+              },
+              { passive: !0 },
+            ),
+            L.addEventListener(
+              "touchstart",
+              function () {
+                L.__akTouchMoved = false;
+              },
+              { passive: !0 },
+            ),
+            L.addEventListener("scroll", function () {
+              L.__akScrollLock = Date.now();
+            }, { passive: !0 })),
           D &&
             a(D, function () {
               M && (M.style.display = "none");
@@ -15363,7 +15428,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return (el && el.onclick) || (el && el.getAttribute("data-bound"));
       });
       dbg(
-        "构建 v20260821v | 联系人:" +
+        "构建 v20260821x | 联系人:" +
           (window.akiniContacts
             ? window.akiniContacts.getContacts().length
             : "无") +
