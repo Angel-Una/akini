@@ -1,6 +1,6 @@
 self.addEventListener("message", function(event){if(event.data && event.data.type === "GET_CACHE_NAME"){if(event.ports && event.ports[0]){event.ports[0].postMessage({cacheName: CACHE_NAME});}}});
 
-const CACHE_NAME = 'akini-cache-v20260829as';
+const CACHE_NAME = 'akini-cache-v20260830au';
 const PRECACHE_ASSETS = [
   './',
   './index.html',

@@ -24,6 +24,21 @@ function __akiniShowBanner(msg, color) {
   b.textContent = msg;
 }
 window.__akiniBootStep = "start";
+/* 背景图设置读写：iCity 我的/联系人、主页、网易云、封面、纪念日 */
+window.__akiniBgSettings = {
+  apply: function(element, defaultPos, defaultSize){
+    if(!element) return;
+    element.style.backgroundPosition = defaultPos || "center";
+    element.style.backgroundSize = defaultSize || "contain";
+  }
+};
+window.__akiniIcityBgSettings = {
+  apply: function(element, isMy, contactId){
+    if(!element) return;
+    element.style.backgroundPosition = "center";
+    element.style.backgroundSize = "contain";
+  }
+};
 /* 默认开启：已读回执、时间戳（仅在用户从未设置时写入） */
 (function () {
   try {
@@ -3744,9 +3759,13 @@ document.addEventListener("DOMContentLoaded", function () {
           } else {
             if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
             else sig += "|" + (row.textContent || "").trim();
-            var ts = row.getAttribute("data-ts");
-            if (ts) sig += "|ts:" + ts;
-            if (meta) sig += "|" + (meta.textContent || "").trim();
+            // 使用显示的时间/已读状态去重，避免内部毫秒级时间戳导致重复消息无法合并
+            if (meta) {
+              sig += "|meta:" + (meta.textContent || "").trim();
+            } else {
+              var ts = row.getAttribute("data-ts");
+              if (ts) sig += "|ts:" + ts;
+            }
           }
           if (!seen.has(sig)) {
             seen.add(sig);
@@ -3805,9 +3824,13 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
           else sig += "|" + (row.textContent || "").trim();
-          var ts = row.getAttribute("data-ts");
-          if (ts) sig += "|ts:" + ts;
-          if (meta) sig += "|" + (meta.textContent || "").trim();
+          // 使用显示的时间/已读状态去重，避免内部毫秒级时间戳导致重复消息无法合并
+          if (meta) {
+            sig += "|meta:" + (meta.textContent || "").trim();
+          } else {
+            var ts = row.getAttribute("data-ts");
+            if (ts) sig += "|ts:" + ts;
+          }
         }
         if (!seen.has(sig)) {
           seen.add(sig);
@@ -6772,7 +6795,9 @@ document.addEventListener("DOMContentLoaded", function () {
           (i.push(o),
             R(i),
             n && ((n.style.display = "none"), n.classList.remove("show")),
-            t());
+            t(),
+            window._scheduleContactLikeOnFriends && window._scheduleContactLikeOnFriends(o.id),
+            window._scheduleContactCommentOnFriends && window._scheduleContactCommentOnFriends(o.id));
         }));
       const u = document.getElementById("friendsHeader");
       (D("akini_friends_bg", function (t) {
@@ -6879,9 +6904,8 @@ document.addEventListener("DOMContentLoaded", function () {
         D("akini_cover_img", function (e) {
           if (e) {
             ((t.style.backgroundImage = `url(${e})`),
-              (t.style.backgroundSize = "cover"),
-              (t.style.backgroundPosition = "center"),
-              (t.textContent = ""));
+              (t.textContent = ""),
+              window.__akiniBgSettings.apply(t, "center", "cover"));
           }
         });
       const n = document.getElementById("bgArea");
@@ -6889,8 +6913,7 @@ document.addEventListener("DOMContentLoaded", function () {
         D("akini_bg_img", function (t) {
           t &&
             ((n.style.backgroundImage = `url(${t})`),
-            (n.style.backgroundSize = "cover"),
-            (n.style.backgroundPosition = "center"));
+            window.__akiniBgSettings.apply(n, "center", "cover"));
         });
     })();
     const ge = document.getElementById("callMiniWindow"),
@@ -8917,22 +8940,24 @@ document.addEventListener("DOMContentLoaded", function () {
             e &&
               (t
                 ? ((e.style.backgroundImage = "url(" + t + ")"),
-                  (e.style.backgroundSize = "cover"),
-                  (e.style.backgroundPosition = "center"))
+                  window.__akiniIcityBgSettings.apply(e, true, null))
                 : ((e.style.backgroundImage = ""),
                   (e.style.background =
-                    "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)")));
+                    "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)"),
+                  (e.style.backgroundSize = "contain"),
+                  (e.style.backgroundPosition = "center")));
           }),
           D("akini_icity_ta_bg", function (t) {
             var e = document.querySelector(".icity-ta-bg-div");
             e &&
               (t
                 ? ((e.style.backgroundImage = "url(" + t + ")"),
-                  (e.style.backgroundSize = "cover"),
-                  (e.style.backgroundPosition = "center"))
+                  window.__akiniIcityBgSettings.apply(e, false, null))
                 : ((e.style.backgroundImage = ""),
                   (e.style.background =
-                    "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)")));
+                    "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"),
+                  (e.style.backgroundSize = "contain"),
+                  (e.style.backgroundPosition = "center")));
           }));
         var m = q(),
           f = document.getElementById("icityDiaryList"),
@@ -10266,9 +10291,8 @@ document.addEventListener("DOMContentLoaded", function () {
               });
           (n.push(i),
             j(n),
-            window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
-            window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),
-            window.scheduleTaReplySoon && window.scheduleTaReplySoon(i.id),
+            window._scheduleContactLikeOnIcity && window._scheduleContactLikeOnIcity(i.id),
+            window._scheduleContactCommentOnIcity && window._scheduleContactCommentOnIcity(i.id),
             c && (c.value = ""));
           var a = document.getElementById("icityTab1"),
             o = document.getElementById("icityTab2"),
@@ -10431,15 +10455,17 @@ document.addEventListener("DOMContentLoaded", function () {
                 l && (l.textContent = "@" + i.handle);
                 var s = document.getElementById("icityTaBioDisplay");
                 (s && (s.textContent = i.bio),
-                  D("akini_icity_ta_bg_" + t, function (t) {
+                  D("akini_icity_ta_bg_" + t, function (n) {
                     var e = a.querySelector(".icity-ta-bg-div");
-                    e && t
-                      ? ((e.style.backgroundImage = "url(" + t + ")"),
-                        (e.style.backgroundSize = "cover"))
+                    e && n
+                      ? ((e.style.backgroundImage = "url(" + n + ")"),
+                        window.__akiniIcityBgSettings.apply(e, false, t))
                       : e &&
                         ((e.style.backgroundImage = ""),
                           (e.style.background =
-                            "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"));
+                            "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"),
+                          (e.style.backgroundSize = "contain"),
+                          (e.style.backgroundPosition = "center"));
                   }));
                 var d = q().filter(function (e) {
                     return (
@@ -10522,10 +10548,14 @@ document.addEventListener("DOMContentLoaded", function () {
             n = i(e, {}),
             a = document.getElementById("icityTaNickInput"),
             o = document.getElementById("icityTaHandleInput"),
-            r = document.getElementById("icityTaBioInput");
+            r = document.getElementById("icityTaBioInput"),
+            posSel = document.getElementById("icityTaBgPos"),
+            sizeSel = document.getElementById("icityTaBgSize");
           (a && (n.name = a.value.trim()),
             o && (n.handle = o.value.trim()),
             r && (n.bio = r.value.trim()));
+          posSel && window.__akiniIcityBgSettings.setPos(false, t, posSel.value);
+          sizeSel && window.__akiniIcityBgSettings.setSize(false, t, sizeSel.value);
           var c = JSON.stringify(n);
           try {
             localStorage.setItem(e, c);
@@ -10542,15 +10572,21 @@ document.addEventListener("DOMContentLoaded", function () {
           i && (i.value = e.handle),
           a && (a.value = e.bio),
           window.fillPreview("icityEditTaAvatarPreview", e.avatar || "🐰"));
-        var o = document.getElementById("icityEditTaBgPreview");
+        var o = document.getElementById("icityEditTaBgPreview"),
+          posSel = document.getElementById("icityTaBgPos"),
+          sizeSel = document.getElementById("icityTaBgSize");
+        posSel && (posSel.value = window.__akiniIcityBgSettings.getPos(false, t));
+        sizeSel && (sizeSel.value = window.__akiniIcityBgSettings.getSize(false, t));
         D("akini_icity_ta_bg_" + t, function (t) {
           o && t
             ? ((o.style.backgroundImage = "url(" + t + ")"),
-              (o.style.backgroundSize = "cover"))
+              window.__akiniIcityBgSettings.apply(o, false, window._icityEditContactId))
             : o &&
               ((o.style.backgroundImage = ""),
                 (o.style.background =
-                  "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"));
+                  "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"),
+                (o.style.backgroundSize = "contain"),
+                (o.style.backgroundPosition = "center"));
         });
       }
       (S &&
@@ -10578,15 +10614,21 @@ document.addEventListener("DOMContentLoaded", function () {
                   localStorage.getItem("akini_icity_my_avatar") ||
                   "🐱",
               ));
-            var c = document.getElementById("icityEditMyBgPreview");
+            var c = document.getElementById("icityEditMyBgPreview"),
+              myPosSel = document.getElementById("icityMyBgPos"),
+              mySizeSel = document.getElementById("icityMyBgSize");
+            myPosSel && (myPosSel.value = window.__akiniIcityBgSettings.getPos(true, null));
+            mySizeSel && (mySizeSel.value = window.__akiniIcityBgSettings.getSize(true, null));
             (D("akini_icity_my_bg", function (t) {
               c &&
                 (t
                   ? ((c.style.backgroundImage = "url(" + t + ")"),
-                    (c.style.backgroundSize = "cover"))
+                    window.__akiniIcityBgSettings.apply(c, true, null))
                   : ((c.style.backgroundImage = ""),
                     (c.style.background =
-                      "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)")));
+                      "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)"),
+                    (c.style.backgroundSize = "contain"),
+                    (c.style.backgroundPosition = "center")));
             }),
               p &&
                 ((p.style.display = "flex"), (p.style.visibility = "visible")));
@@ -10615,15 +10657,21 @@ document.addEventListener("DOMContentLoaded", function () {
                     localStorage.getItem("akini_icity_my_avatar") ||
                     "🐱",
                 ));
-              var r = document.getElementById("icityEditMyBgPreview");
+              var r = document.getElementById("icityEditMyBgPreview"),
+                myPosSel2 = document.getElementById("icityMyBgPos"),
+                mySizeSel2 = document.getElementById("icityMyBgSize");
+              myPosSel2 && (myPosSel2.value = window.__akiniIcityBgSettings.getPos(true, null));
+              mySizeSel2 && (mySizeSel2.value = window.__akiniIcityBgSettings.getSize(true, null));
               D("akini_icity_my_bg", function (t) {
                 r &&
                   (t
                     ? ((r.style.backgroundImage = "url(" + t + ")"),
-                      (r.style.backgroundSize = "cover"))
+                      window.__akiniIcityBgSettings.apply(r, true, null))
                     : ((r.style.backgroundImage = ""),
                       (r.style.background =
-                        "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)")));
+                        "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)"),
+                      (r.style.backgroundSize = "contain"),
+                      (r.style.backgroundPosition = "center")));
               });
               var c = window.akiniContacts
                 ? window.akiniContacts.getContacts()
@@ -10671,6 +10719,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 alert("保存失败，请稍后重试"));
             }
           }),
+
         (k = "icityEditMyBgBtn"),
         (_ = "icityMyBgInput"),
         (b = "akini_icity_my_bg"),
@@ -10695,7 +10744,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     (b.indexOf("_bg") >= 0
                       ? ((e.style.backgroundImage =
                           "url(" + t.target.result + ")"),
-                        (e.style.backgroundSize = "cover"))
+                        window.__akiniIcityBgSettings.apply(e, true, null))
                       : (e.innerHTML =
                           '<img src="' +
                           t.target.result +
@@ -10705,15 +10754,13 @@ document.addEventListener("DOMContentLoaded", function () {
                   var n = document.getElementById("icityMyBgArea");
                   n &&
                     ((n.style.backgroundImage = "url(" + t.target.result + ")"),
-                    (n.style.backgroundSize = "cover"),
-                    (n.style.backgroundPosition = "center"));
+                    window.__akiniIcityBgSettings.apply(n, true, null));
                 }
                 if ("akini_icity_ta_bg" === b) {
                   var i = document.querySelector(".icity-ta-bg-div");
                   i &&
                     ((i.style.backgroundImage = "url(" + t.target.result + ")"),
-                    (i.style.backgroundSize = "cover"),
-                    (i.style.backgroundPosition = "center"));
+                    window.__akiniIcityBgSettings.apply(i, false, null));
                 }
               }),
                 e.readAsDataURL(t));
@@ -10733,7 +10780,7 @@ document.addEventListener("DOMContentLoaded", function () {
               var n = document.getElementById("icityEditTaBgPreview");
               n &&
                 ((n.style.backgroundImage = "url(" + t.target.result + ")"),
-                (n.style.backgroundSize = "cover"));
+                window.__akiniIcityBgSettings.apply(n, false, window._icityEditContactId));
             }),
               e.readAsDataURL(t));
           }
@@ -11395,18 +11442,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 window.renderHomeAvatarPreviews();
               const C = document.getElementById("chatBody");
               (C &&
-                (C.querySelectorAll(".msg-row.me .msg-avatar").forEach(
-                  function (t) {
-                    t.innerHTML = n;
-                  },
-                ),
-                (i && "group" === i.type) ||
-                  C.querySelectorAll(".msg-row.other .msg-avatar").forEach(
-                    function (t) {
-                      t.innerHTML = o;
-                    },
-                  )),
-                [
+                [ // 历史聊天记录头像保持原样，不随当前头像设置重置
+
                   "icityMyAvatar2",
                   "icityMyAvatar3",
                   "icityEditMyAvatarPreview",
@@ -11760,9 +11797,8 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("phoneFrame");
               (e &&
                 ((e.style.backgroundImage = `url(${t.target.result})`),
-                (e.style.backgroundSize = "cover"),
-                (e.style.backgroundPosition = "center"),
-                (e.style.backgroundRepeat = "no-repeat")),
+                (e.style.backgroundRepeat = "no-repeat"),
+                window.__akiniBgSettings.apply(e, "center", "contain")),
                 L("akini_home_bg", t.target.result));
             }),
               e.readAsDataURL(t));
@@ -11772,9 +11808,8 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("phoneFrame");
               e &&
                 ((e.style.backgroundImage = `url(${t})`),
-                (e.style.backgroundSize = "cover"),
-                (e.style.backgroundPosition = "center"),
-                (e.style.backgroundRepeat = "no-repeat"));
+                (e.style.backgroundRepeat = "no-repeat"),
+                window.__akiniBgSettings.apply(e, "center", "contain"));
             }
           }));
         const d = document.getElementById("fileInputMusicBg");
@@ -11788,10 +11823,9 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("musicBgLayer");
               e &&
                 ((e.style.backgroundImage = `url(${t.target.result})`),
-                (e.style.backgroundSize = "cover"),
-                (e.style.backgroundPosition = "center"),
                 (e.style.backgroundRepeat = "no-repeat"),
-                (e.style.display = "block"));
+                (e.style.display = "block"),
+                window.__akiniBgSettings.apply(e, "center", "cover"));
             }),
               e.readAsDataURL(t),
               (this.value = ""));
@@ -11801,10 +11835,9 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("musicBgLayer");
               e &&
                 ((e.style.backgroundImage = `url(${t})`),
-                (e.style.backgroundSize = "cover"),
-                (e.style.backgroundPosition = "center"),
                 (e.style.backgroundRepeat = "no-repeat"),
-                (e.style.display = "block"));
+                (e.style.display = "block"),
+                window.__akiniBgSettings.apply(e, "center", "cover"));
             }
           }));
         const u = document.getElementById("fileInputDayBgBeautify");
@@ -11818,8 +11851,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 n = document.getElementById("bgArea");
               (n &&
                 ((n.style.backgroundImage = `url(${e})`),
-                (n.style.backgroundSize = "cover"),
-                (n.style.backgroundPosition = "center")),
+                window.__akiniBgSettings.apply(n, "center", "cover")),
                 L("akini_bg_img", e));
             }),
               e.readAsDataURL(t),
@@ -11836,9 +11868,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 n = document.getElementById("coverAreaMain");
               (n &&
                 ((n.style.backgroundImage = `url(${e})`),
-                (n.style.backgroundSize = "cover"),
-                (n.style.backgroundPosition = "center"),
-                (n.textContent = "")),
+                (n.textContent = ""),
+                window.__akiniBgSettings.apply(n, "center", "cover")),
                 L("akini_cover_img", e));
             }),
               e.readAsDataURL(t),
@@ -13279,9 +13310,217 @@ document.addEventListener("DOMContentLoaded", function () {
               e(1e4, 6e4),
             ));
         }),
-        function n() {
-          /* 已禁用自动点赞/评论调度 */
-        });
+        (window._pickRandomContact = function () {
+          var e = window.akiniContacts ? window.akiniContacts.getContacts() : [];
+          return e.length ? e[Math.floor(Math.random() * e.length)] : null;
+        }),
+        (window._contactIcityAllowed = function () {
+          return (
+            "1" === localStorage.getItem("akini_toggle_contactIcityToggle") &&
+            window.AKR.isInTimeRange("icity")
+          );
+        }),
+        (window._contactFriendsAllowed = function () {
+          return (
+            "1" === localStorage.getItem("akini_toggle_contactFriendsToggle") &&
+            window.AKR.isInTimeRange("friends")
+          );
+        }),
+        (window._pickIcityComment = function () {
+          try {
+            return Dn(1);
+          } catch (t) {
+            return "";
+          }
+        }),
+        (window._scheduleContactLikeOnIcity = function (n) {
+          var i = "icityLike_" + n;
+          t[i] ||
+            ((t[i] = !0),
+            setTimeout(
+              function () {
+                if (!window._contactIcityAllowed()) return;
+                var t = q(),
+                  e = t.find(function (t) {
+                    return t.id == n;
+                  });
+                if (e && ("me" === e.who || "me" === e.author)) {
+                  var i = window._pickRandomContact();
+                  if (i) {
+                    e.likers = e.likers || [];
+                    e.likers.indexOf(i.name) < 0 &&
+                      (e.likers.push(i.name), (e.likes = (e.likes || 0) + 1),
+                      j(t),
+                      window._renderIcity && window._renderIcity(),
+                      window.renderIcityProfileDiaries &&
+                        (window.renderIcityProfileDiaries("icityMyProfileDiaries", "me"),
+                        window.renderIcityProfileDiaries("icityTaProfileDiaries", "ta")),
+                      "function" == typeof window.showInAppNotif &&
+                        window.showInAppNotif({
+                          app: "icity",
+                          avatar: i.avatar,
+                          name: i.name,
+                          fullContent: !0,
+                          msg: "喜欢了你的日记",
+                          onTap: function () {
+                            r("icityArea");
+                          },
+                        }));
+                  }
+                }
+              },
+              60 *
+                1e3 *
+                (parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60") +
+                  Math.random() *
+                    Math.max(
+                      0,
+                      parseFloat(localStorage.getItem("akini_num_icityPostMax") || "90") -
+                        parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60"),
+                    )),
+            ));
+        }),
+        (window._scheduleContactCommentOnIcity = function (n) {
+          var i = "icityCmt_" + n;
+          t[i] ||
+            ((t[i] = !0),
+            setTimeout(
+              function () {
+                if (!window._contactIcityAllowed()) return;
+                var t = q(),
+                  e = t.find(function (t) {
+                    return t.id == n;
+                  });
+                if (e && ("me" === e.who || "me" === e.author)) {
+                  var i = window._pickRandomContact(),
+                    a = window._pickIcityComment();
+                  if (i && a) {
+                    e.comments = e.comments || [];
+                    e.comments.push({
+                      author: i.name,
+                      authorId: i.id,
+                      text: a,
+                      avatar: i.avatar,
+                      ts: Date.now(),
+                    });
+                    j(t);
+                    window._renderIcity && window._renderIcity();
+                    window.renderIcityProfileDiaries &&
+                      (window.renderIcityProfileDiaries("icityMyProfileDiaries", "me"),
+                      window.renderIcityProfileDiaries("icityTaProfileDiaries", "ta"));
+                    "function" == typeof window.showInAppNotif &&
+                      window.showInAppNotif({
+                        app: "icity",
+                        avatar: i.avatar,
+                        name: i.name,
+                        fullContent: !0,
+                        msg: "评论了你的日记：" + a,
+                        onTap: function () {
+                          r("icityArea");
+                        },
+                      });
+                  }
+                }
+              },
+              60 *
+                1e3 *
+                (parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60") +
+                  Math.random() *
+                    Math.max(
+                      0,
+                      parseFloat(localStorage.getItem("akini_num_icityPostMax") || "90") -
+                        parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60"),
+                    )),
+            ));
+        }),
+        (window._scheduleContactLikeOnFriends = function (n) {
+          var i = "friendsLike_" + n;
+          t[i] ||
+            ((t[i] = !0),
+            setTimeout(
+              function () {
+                if (!window._contactFriendsAllowed()) return;
+                var t = O(),
+                  e = t.find(function (t) {
+                    return t.id == n;
+                  });
+                if (e) {
+                  var i = window._pickRandomContact();
+                  if (i) {
+                    e.likes = e.likes || [];
+                    e.likes.indexOf(i.name) < 0 &&
+                      (e.likes.push(i.name),
+                      R(t),
+                      window._renderPosts && window._renderPosts(),
+                      "function" == typeof window.showInAppNotif &&
+                        window.showInAppNotif({
+                          app: "朋友圈",
+                          avatar: i.avatar,
+                          name: i.name,
+                          fullContent: !0,
+                          msg: "点赞了你的朋友圈",
+                          onTap: function () {
+                            o("friends");
+                          },
+                        }));
+                  }
+                }
+              },
+              60 *
+                1e3 *
+                (parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60") +
+                  Math.random() *
+                    Math.max(
+                      0,
+                      parseFloat(localStorage.getItem("akini_num_friendsPostMax") || "90") -
+                        parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60"),
+                    )),
+            ));
+        }),
+        (window._scheduleContactCommentOnFriends = function (n) {
+          var i = "friendsCmt_" + n;
+          t[i] ||
+            ((t[i] = !0),
+            setTimeout(
+              function () {
+                if (!window._contactFriendsAllowed()) return;
+                var t = O(),
+                  e = t.find(function (t) {
+                    return t.id == n;
+                  });
+                if (e) {
+                  var i = window._pickRandomContact(),
+                    a = window._pickIcityComment();
+                  if (i && a) {
+                    e.comments = e.comments || [];
+                    e.comments.push({ author: i.name, text: a, ts: Date.now() });
+                    R(t);
+                    window._renderPosts && window._renderPosts();
+                    "function" == typeof window.showInAppNotif &&
+                      window.showInAppNotif({
+                        app: "朋友圈",
+                        avatar: i.avatar,
+                        name: i.name,
+                        fullContent: !0,
+                        msg: "评论了你的朋友圈：" + a,
+                        onTap: function () {
+                          o("friends");
+                        },
+                      });
+                  }
+                }
+              },
+              60 *
+                1e3 *
+                (parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60") +
+                  Math.random() *
+                    Math.max(
+                      0,
+                      parseFloat(localStorage.getItem("akini_num_friendsPostMax") || "90") -
+                        parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60"),
+                    )),
+            ));
+        }));
     })();
     (function () {
       function Wt(t, e) {
