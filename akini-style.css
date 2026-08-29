@@ -4834,16 +4834,32 @@ button.back-btn[type="button"] {
   height: 44px !important;
 }
 .music-player-info {
-  align-self: center !important;
+  align-self: stretch !important;
   align-items: flex-start !important;
   padding: 0 !important;
+  width: 100%;
+  min-width: 0;
+}
+.music-player-meta {
+  width: 100%;
+  min-width: 0;
 }
 .music-player-title {
   font-size: 15px !important;
   margin-bottom: 2px !important;
+  width: 100%;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .music-player-artist {
   font-size: 12px !important;
+  width: 100%;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .music-player-controls {
   gap: 6px !important;

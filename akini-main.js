@@ -1562,9 +1562,7 @@ document.addEventListener("DOMContentLoaded", function () {
       } else {
         var newMeta = document.createElement("div");
         newMeta.className = "msg-meta";
-        newMeta.style.cssText = isMe
-          ? "display:flex;justify-content:flex-end;padding-right:46px;margin-top:2px;"
-          : "display:flex;justify-content:flex-start;padding-left:46px;margin-top:2px;";
+        newMeta.style.cssText = "display:flex;justify-content:flex-end;padding-right:46px;margin-top:2px;";
         newMeta.innerHTML = '<span style="font-size:10px;color:#aaa;">已读</span>';
         row.appendChild(newMeta);
       }
@@ -2720,33 +2718,43 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
     function C(t, e) {
-      if (!t || !e || "string" != typeof e || "" === e.trim()) return;
+      if (!t || "string" != typeof e) return;
       E[t] = e;
+      var key = "akini_chat_history_" + t;
+      var backup = "akini_chat_history_backup_" + t;
       try {
-        _idbStore.set("akini_chat_history_" + t, e);
+        _idbStore.set(key, e);
       } catch (e) {}
       try {
-        _idbStore.set("akini_chat_history_backup_" + t, e);
+        _idbStore.set(backup, e);
       } catch (e) {}
       try {
-        localStorage.setItem("akini_chat_history_" + t, e);
+        localStorage.setItem(key, e);
       } catch (i) {
         B();
         try {
-          localStorage.setItem("akini_chat_history_" + t, e);
+          localStorage.setItem(key, e);
         } catch (i) {}
       }
       try {
-        localStorage.setItem("akini_chat_history_backup_" + t, e);
+        localStorage.setItem(backup, e);
       } catch (i) {
         B();
         try {
-          localStorage.setItem("akini_chat_history_backup_" + t, e);
+          localStorage.setItem(backup, e);
         } catch (i) {}
       }
       try {
-        var ck = "akini_chat_history_" + t;
-        void ck;
+        window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
+      } catch (e) {}
+    }
+    function __akiniSaveChatHistory(t, e) {
+      if (!t || "string" != typeof e) return;
+      C(t, e);
+      try {
+        _idbStore.set("akini_chat_history_" + t, e, function () {
+          _idbStore.set("akini_chat_history_backup_" + t, e);
+        });
       } catch (e) {}
     }
     function B() {
@@ -2758,8 +2766,6 @@ document.addEventListener("DOMContentLoaded", function () {
         "akini_friends_bg",
         "akini_cover_img",
         "akini_chat_bg",
-        "akini_chat_history",
-        "akini_chat_history_backup",
         "akini_contact_stickers",
         "akini_stickers",
         "akini_stickers_idx",
@@ -8602,10 +8608,21 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!n) return void a();
             n.remove();
             const t = document.getElementById("chatBody");
-            if (t)
+            if (t && window.akiniContacts) {
               try {
-                _idbStore.set("akini_chat_history", t.innerHTML);
+                var activeId = window.akiniContacts.getActiveChatId();
+                var html = t.innerHTML;
+                window.akiniContacts.updateSession(activeId, { messagesHTML: html });
+                if (typeof C === "function") C(activeId, html);
+                else {
+                  try { localStorage.setItem("akini_chat_history_" + activeId, html); } catch (e) {}
+                  try { localStorage.setItem("akini_chat_history_backup_" + activeId, html); } catch (e) {}
+                  try { _idbStore.set("akini_chat_history_" + activeId, html); } catch (e) {}
+                  try { _idbStore.set("akini_chat_history_backup_" + activeId, html); } catch (e) {}
+                }
+                try { _idbStore.set("akini_chat_history", html); } catch (t) {}
               } catch (t) {}
+            }
             a();
           }));
     })();
@@ -10788,13 +10805,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     var fallbackTarget = activeChatId ? window.akiniContacts.getChatTarget(activeChatId) : null;
                     if (fallbackTarget) otherContact = fallbackTarget;
                   }
-                  // 信件详情显示发件人头像：sent 显示我，received 显示联系人
-                  var senderName, senderAvatar;
+                  // 信件详情：我寄/回显示我的头像，联系人寄/回显示联系人的头像；姓名始终显示联系人
+                  var senderAvatar;
                   if ("sent" === e) {
-                    senderName = n || localStorage.getItem("akini_my_name") || "我";
                     senderAvatar = localStorage.getItem("akini_my_avatar") || "🐱";
                   } else {
-                    senderName = otherContact ? (otherContact.name || a) : a;
                     senderAvatar = otherContact ? (otherContact.avatar || "🐰") : (localStorage.getItem("akini_ta_avatar") || "🐰");
                   }
                   if (avatarEl) {
@@ -10803,7 +10818,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (!avatarEl.innerHTML.trim()) avatarEl.innerHTML = "🐰";
                   }
                   if (nameEl) {
-                    nameEl.textContent = senderName;
+                    nameEl.textContent = a;
                   }
                   (o &&
                     ("sent" === e
@@ -13741,7 +13756,6 @@ document.addEventListener("DOMContentLoaded", function () {
           loginStatus: document.getElementById("musicLoginStatus"),
           songName: document.getElementById("musicSongName"),
           artist: document.getElementById("musicArtist"),
-          followBtn: document.getElementById("musicFollowBtn"),
           leftAvatar: document.getElementById("musicLeftAvatar"),
           centerAvatar: document.getElementById("musicCenterAvatar"),
           rightAvatar: document.getElementById("musicRightAvatar"),
@@ -14908,8 +14922,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ) {
           var R = c[l];
           ((e.songName.textContent = R.title || "未知歌曲"),
-            (e.artist.textContent = R.artist || "未知歌手"),
-            (e.followBtn.style.display = "inline-block"));
+            (e.artist.textContent = R.artist || "未知歌手"));
           var F =
             R.cover ||
             "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -15725,8 +15738,7 @@ document.addEventListener("DOMContentLoaded", function () {
         _spLastTs = performance.now();
         ((k = bt(n.duration)),
           (e.songName.textContent = n.title || "未知歌曲"),
-          (e.artist.textContent = n.artist || "未知歌手"),
-          (e.followBtn.style.display = "inline-block"));
+          (e.artist.textContent = n.artist || "未知歌手"));
         var i =
           n.cover ||
           "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
