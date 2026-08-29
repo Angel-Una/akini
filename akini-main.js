@@ -1,65 +1,4 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
-window.__akiniNormalizeWordbankImport = function(x) {
-  if (!x) return x;
-  if (Array.isArray(x)) {
-    return { customReplyGroups: [__akiniNormalizeGroup({ name: "导入内容", items: x })] };
-  }
-  if (typeof x !== "object") return x;
-  var out = {
-    customReplyGroups: [],
-    customReplies: Array.isArray(x.customReplies) ? x.customReplies : [],
-    customEmojis: Array.isArray(x.customEmojis) ? x.customEmojis : [],
-    customPokes: Array.isArray(x.customPokes) ? x.customPokes : []
-  };
-  if (Array.isArray(x.customReplyGroups)) {
-    x.customReplyGroups.forEach(function(g) { out.customReplyGroups.push(__akiniNormalizeGroup(g)); });
-  }
-  var groupKeys = ["groups", "分组", "categories", "wb_groups", "replyGroups", "groupList", "replyGroup", "reply_groups", "group"];
-  groupKeys.forEach(function(k) {
-    if (Array.isArray(x[k])) {
-      x[k].forEach(function(g) { out.customReplyGroups.push(__akiniNormalizeGroup(g)); });
-    }
-  });
-  if (x.groups && typeof x.groups === "object" && !Array.isArray(x.groups)) {
-    Object.keys(x.groups).forEach(function(name) {
-      out.customReplyGroups.push(__akiniNormalizeGroup({ name: name, items: x.groups[name] }));
-    });
-  }
-  var topKeys = ["wordbank", "cards", "main", "items", "replies", "words", "list", "data", "texts", "content"];
-  topKeys.forEach(function(k) {
-    if (Array.isArray(x[k]) && x[k].length) {
-      var name = k === "wordbank" ? "字卡库" : k === "cards" ? "卡片" : "导入内容";
-      out.customReplyGroups.push(__akiniNormalizeGroup({ name: name, items: x[k] }));
-    }
-  });
-  return out;
-};
-window.__akiniNormalizeGroup = function(g) {
-  if (!g) return { name: "未命名", items: [] };
-  if (typeof g === "string") return { name: g, items: [] };
-  var name = g.name || g.groupName || g.group || g.title || g.label || g.category || "未命名";
-  var items = [];
-  var itemKeys = ["items", "cards", "replies", "words", "texts", "content", "list", "data", "sentences", "phrases"];
-  itemKeys.forEach(function(k) {
-    if (Array.isArray(g[k])) items = items.concat(__akiniFlattenArray(g[k]));
-  });
-  if (items.length === 0 && (typeof g === "string" || (typeof g.text === "string" || typeof g.content === "string"))) {
-    items.push(g);
-  }
-  return { name: String(name), items: items };
-};
-window.__akiniFlattenArray = function(arr) {
-  var out = [];
-  if (!Array.isArray(arr)) return arr ? [arr] : out;
-  arr.forEach(function(it) {
-    if (Array.isArray(it)) {
-      out = out.concat(__akiniFlattenArray(it));
-    } else if (it !== null && it !== undefined) {
-      out.push(it);
-    }
-  });
-  return out;
-};
 function setHtmlKeepInput(t, e) {
   if (t) {
     var n = t.querySelector('input[type="file"]'),
@@ -458,26 +397,23 @@ document.addEventListener("DOMContentLoaded", function () {
         backupAll: function (e) {
           n(function (n) {
             if (n) {
-              try {
-                var tx = n.transaction(t, "readwrite"),
-                  store = tx.objectStore(t);
-                for (var o = 0; o < localStorage.length; o++) {
-                  var r = localStorage.key(o),
-                    c = localStorage.getItem(r);
-                  // 不用空值/空数组/空对象覆盖 IDB 中已有的有效数据，避免把好数据备份成空
-                  if (r && null !== c && c !== "" && c !== "[]" && c !== "{}" && c !== "null" && c !== "undefined") {
-                    store.put(c, r);
-                  }
-                }
-                ((tx.oncomplete = function () {
-                  e && e();
-                }),
-                  (tx.onerror = function () {
-                    e && e();
-                  }));
-              } catch (err) {
-                e && e();
+              for (
+                var i = n.transaction(t, "readwrite"),
+                  a = i.objectStore(t),
+                  o = 0;
+                o < localStorage.length;
+                o++
+              ) {
+                var r = localStorage.key(o),
+                  c = localStorage.getItem(r);
+                r && null !== c && a.put(c, r);
               }
+              ((i.oncomplete = function () {
+                e && e();
+              }),
+                (i.onerror = function () {
+                  e && e();
+                }));
             } else e && e();
           });
         },
@@ -504,7 +440,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     v !== "undefined"
                   ) {
                     var cur = localStorage.getItem(k);
-                    // 仅当本地缺失，或本地数据明显更短时才用 IDB 恢复，避免旧快照覆盖新数据
                     if (
                       !cur ||
                       cur === "" ||
@@ -512,8 +447,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       cur === "undefined" ||
                       cur === "[]" ||
                       cur === "{}" ||
-                      cur.length === 0 ||
-                      cur.length + 200 < (v || "").length
+                      cur.length === 0
                     ) {
                       try {
                         localStorage.setItem(k, v);
@@ -1628,7 +1562,9 @@ document.addEventListener("DOMContentLoaded", function () {
       } else {
         var newMeta = document.createElement("div");
         newMeta.className = "msg-meta";
-        newMeta.style.cssText = "display:flex;justify-content:flex-end;padding-right:46px;margin-top:2px;";
+        newMeta.style.cssText = isMe
+          ? "display:flex;justify-content:flex-end;padding-right:46px;margin-top:2px;"
+          : "display:flex;justify-content:flex-start;padding-left:46px;margin-top:2px;";
         newMeta.innerHTML = '<span style="font-size:10px;color:#aaa;">已读</span>';
         row.appendChild(newMeta);
       }
@@ -2784,43 +2720,33 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
     function C(t, e) {
-      if (!t || "string" != typeof e) return;
+      if (!t || !e || "string" != typeof e || "" === e.trim()) return;
       E[t] = e;
-      var key = "akini_chat_history_" + t;
-      var backup = "akini_chat_history_backup_" + t;
       try {
-        _idbStore.set(key, e);
+        _idbStore.set("akini_chat_history_" + t, e);
       } catch (e) {}
       try {
-        _idbStore.set(backup, e);
+        _idbStore.set("akini_chat_history_backup_" + t, e);
       } catch (e) {}
       try {
-        localStorage.setItem(key, e);
+        localStorage.setItem("akini_chat_history_" + t, e);
       } catch (i) {
         B();
         try {
-          localStorage.setItem(key, e);
+          localStorage.setItem("akini_chat_history_" + t, e);
         } catch (i) {}
       }
       try {
-        localStorage.setItem(backup, e);
+        localStorage.setItem("akini_chat_history_backup_" + t, e);
       } catch (i) {
         B();
         try {
-          localStorage.setItem(backup, e);
+          localStorage.setItem("akini_chat_history_backup_" + t, e);
         } catch (i) {}
       }
       try {
-        window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
-      } catch (e) {}
-    }
-    function __akiniSaveChatHistory(t, e) {
-      if (!t || "string" != typeof e) return;
-      C(t, e);
-      try {
-        _idbStore.set("akini_chat_history_" + t, e, function () {
-          _idbStore.set("akini_chat_history_backup_" + t, e);
-        });
+        var ck = "akini_chat_history_" + t;
+        void ck;
       } catch (e) {}
     }
     function B() {
@@ -2832,6 +2758,8 @@ document.addEventListener("DOMContentLoaded", function () {
         "akini_friends_bg",
         "akini_cover_img",
         "akini_chat_bg",
+        "akini_chat_history",
+        "akini_chat_history_backup",
         "akini_contact_stickers",
         "akini_stickers",
         "akini_stickers_idx",
@@ -4008,13 +3936,6 @@ document.addEventListener("DOMContentLoaded", function () {
               window.akiniContacts.tryRestoreFromBackup(__akiniBootApp);
           });
       }),
-      // 定期备份到 IndexedDB：移动端 beforeunload/pagehide 不可靠，靠定时器保证数据落盘
-      setInterval(function () {
-        try {
-          if (window._restoringData || window._restoringChatHistory) return;
-          V();
-        } catch (t) {}
-      }, 15000),
       (window._restoringChatHistory = !0),
       U && (U.innerHTML = ""),
       setTimeout(function () {
@@ -5857,7 +5778,6 @@ document.addEventListener("DOMContentLoaded", function () {
           S.addEventListener("change", function () {
             const i = this.files[0];
             if (!i) return;
-            const isTextFile = (i.name && i.name.toLowerCase().endsWith(".txt")) || i.type === "text/plain" || i.type === "text/x-log" || i.type === "";
             const a = new FileReader();
             ((a.onload = function (i) {
               try {
@@ -5906,18 +5826,6 @@ document.addEventListener("DOMContentLoaded", function () {
                       t.text1 ||
                       t.label ||
                       t.key ||
-                      t.text ||
-                      t.content ||
-                      t.文字 ||
-                      t.文本 ||
-                      t.关键词 ||
-                      t.回复 ||
-                      t.内容 ||
-                      t.答案 ||
-                      t.消息 ||
-                      t.话术 ||
-                      t.问题 ||
-                      t.提示词 ||
                       "";
                     i = Array.isArray(_f)
                       ? _f
@@ -5949,7 +5857,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                   }
                 }
-                const I = !isTextFile && (p.startsWith("{") || p.startsWith("["));
+                const I = p.startsWith("{") || p.startsWith("[");
                 let x = null;
                 if (I)
                   try {
@@ -5957,11 +5865,6 @@ document.addEventListener("DOMContentLoaded", function () {
                   } catch (C) {
                     return void (window.__akiniCenterModal && window.__akiniCenterModal("导入失败", "JSON 解析失败：" + C.message));
                   }
-                if (x && typeof x === "object") {
-                  try {
-                    x = window.__akiniNormalizeWordbankImport(x);
-                  } catch (C) {}
-                }
                 if (Array.isArray(x)) x.forEach((t) => a(t, { tab: "main" }));
                 else if (x && "object" == typeof x) {
                   (function () {
@@ -6020,32 +5923,12 @@ document.addEventListener("DOMContentLoaded", function () {
                           });
                           h++;
                         }
-                        (function () {
-                          for (
-                            var _i = 0,
-                              _ka = [
-                                "items",
-                                "replies",
-                                "cards",
-                                "words",
-                                "list",
-                                "data",
-                                "wordbank",
-                                "main",
-                                "customReplies",
-                                "customPokes",
-                                "customEmojis",
-                              ];
-                            _i < _ka.length;
-                            _i++
-                          ) {
-                            if (Array.isArray(t[_ka[_i]]))
-                              return t[_ka[_i]];
-                          }
-                          return [];
-                        })().forEach((t) =>
-                          a(t, { tab: "main", gid: e }),
-                        );
+                        (Array.isArray(t.items)
+                          ? t.items
+                          : Array.isArray(t.replies)
+                            ? t.replies
+                            : []
+                        ).forEach((t) => a(t, { tab: "main", gid: e }));
                       }),
                     Array.isArray(x.customReplies) &&
                       x.customReplies.forEach((t) => a(t, { tab: "main" })),
@@ -6116,6 +5999,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       x.text.split("\n").forEach((t) => a(t, { tab: "main" }));
                   }
                   0 === v &&
+                    0 === h &&
                     [
                       "items",
                       "replies",
@@ -6129,7 +6013,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       Array.isArray(x[t]) &&
                         x[t].forEach((t) => a(t, { tab: "main" }));
                     });
-                } else p.split(/\r\n|\n|\r/).forEach((t) => { const s = t.trim(); if (s) a(s, { tab: "main" }); });
+                } else p.split("\n").forEach((t) => a(t, { tab: "main" }));
                 (h > 0 && u(b), s(k), c.clear());
                 let E = "main";
                 console.log("[wordbank] 导入完成：新增" + v + "条，分组" + h + "个，当前总数" + k.length + "，切换到tab=" + (v > 0 ? E : t));
@@ -8718,21 +8602,10 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!n) return void a();
             n.remove();
             const t = document.getElementById("chatBody");
-            if (t && window.akiniContacts) {
+            if (t)
               try {
-                var activeId = window.akiniContacts.getActiveChatId();
-                var html = t.innerHTML;
-                window.akiniContacts.updateSession(activeId, { messagesHTML: html });
-                if (typeof C === "function") C(activeId, html);
-                else {
-                  try { localStorage.setItem("akini_chat_history_" + activeId, html); } catch (e) {}
-                  try { localStorage.setItem("akini_chat_history_backup_" + activeId, html); } catch (e) {}
-                  try { _idbStore.set("akini_chat_history_" + activeId, html); } catch (e) {}
-                  try { _idbStore.set("akini_chat_history_backup_" + activeId, html); } catch (e) {}
-                }
-                try { _idbStore.set("akini_chat_history", html); } catch (t) {}
+                _idbStore.set("akini_chat_history", t.innerHTML);
               } catch (t) {}
-            }
             a();
           }));
     })();
@@ -10915,11 +10788,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     var fallbackTarget = activeChatId ? window.akiniContacts.getChatTarget(activeChatId) : null;
                     if (fallbackTarget) otherContact = fallbackTarget;
                   }
-                  // 信件详情：我寄/回显示我的头像，联系人寄/回显示联系人的头像；姓名始终显示联系人
-                  var senderAvatar;
+                  // 信件详情显示发件人头像：sent 显示我，received 显示联系人
+                  var senderName, senderAvatar;
                   if ("sent" === e) {
+                    senderName = n || localStorage.getItem("akini_my_name") || "我";
                     senderAvatar = localStorage.getItem("akini_my_avatar") || "🐱";
                   } else {
+                    senderName = otherContact ? (otherContact.name || a) : a;
                     senderAvatar = otherContact ? (otherContact.avatar || "🐰") : (localStorage.getItem("akini_ta_avatar") || "🐰");
                   }
                   if (avatarEl) {
@@ -10928,7 +10803,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (!avatarEl.innerHTML.trim()) avatarEl.innerHTML = "🐰";
                   }
                   if (nameEl) {
-                    nameEl.textContent = a;
+                    nameEl.textContent = senderName;
                   }
                   (o &&
                     ("sent" === e
@@ -13866,6 +13741,7 @@ document.addEventListener("DOMContentLoaded", function () {
           loginStatus: document.getElementById("musicLoginStatus"),
           songName: document.getElementById("musicSongName"),
           artist: document.getElementById("musicArtist"),
+          followBtn: document.getElementById("musicFollowBtn"),
           leftAvatar: document.getElementById("musicLeftAvatar"),
           centerAvatar: document.getElementById("musicCenterAvatar"),
           rightAvatar: document.getElementById("musicRightAvatar"),
@@ -15032,7 +14908,8 @@ document.addEventListener("DOMContentLoaded", function () {
         ) {
           var R = c[l];
           ((e.songName.textContent = R.title || "未知歌曲"),
-            (e.artist.textContent = R.artist || "未知歌手"));
+            (e.artist.textContent = R.artist || "未知歌手"),
+            (e.followBtn.style.display = "inline-block"));
           var F =
             R.cover ||
             "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -15526,15 +15403,6 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           localStorage.setItem("akini_music_index", String(l));
         } catch (t) {}
-        // 清理旧音频，避免切歌后仍播放上一首
-        if (u) {
-          try {
-            u.pause();
-            u.removeAttribute("src");
-            u.load();
-          } catch (t) {}
-        }
-        (E = null), (S = 0), (A = null);
         It();
       }
       function St(next) {
@@ -15772,10 +15640,7 @@ document.addEventListener("DOMContentLoaded", function () {
           try {
             a = localStorage.getItem("akini_netease_cookie") || "";
           } catch (t) {}
-        if (!n && !i && kt(e)) {
-          // 命中缓存时仍需把当前 URL 设置给音频，避免旧音频继续播放
-          return E && vt(E, i ? "fetch-retry" : "fetch"), Promise.resolve();
-        }
+        if (!n && !i && kt(e)) return Promise.resolve();
         var o = t + "/song/url?id=" + encodeURIComponent(String(e.id)) + "&cookie=" + encodeURIComponent(a || "");
         return fetch(o)
           .then(function (t) {
@@ -15860,7 +15725,8 @@ document.addEventListener("DOMContentLoaded", function () {
         _spLastTs = performance.now();
         ((k = bt(n.duration)),
           (e.songName.textContent = n.title || "未知歌曲"),
-          (e.artist.textContent = n.artist || "未知歌手"));
+          (e.artist.textContent = n.artist || "未知歌手"),
+          (e.followBtn.style.display = "inline-block"));
         var i =
           n.cover ||
           "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
