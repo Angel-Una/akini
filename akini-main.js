@@ -601,43 +601,70 @@ document.addEventListener("DOMContentLoaded", function () {
     })();
     try {
       window._akiniRestoreFromSnapshot = function (e) {
-        try {
-          const sources = [
-            localStorage.getItem("akini_localstorage_snapshot"),
-            localStorage.getItem("akini_localstorage_snapshot_backup"),
-          ];
-          let restored = 0;
-          sources.forEach(function (src) {
-            if (!src) return;
-            try {
-              var data = JSON.parse(src);
-              if (data && "object" == typeof data) {
-                for (var k in data) {
-                  if (
-                    data.hasOwnProperty(k) &&
-                    k.indexOf("akini_") === 0
-                  ) {
-                    try {
-                      var cur = localStorage.getItem(k);
-                      if (
-                        !cur ||
-                        cur === "" ||
-                        cur === "null" ||
-                        cur === "undefined" ||
-                        cur === "[]" ||
-                        cur === "{}"
-                      ) {
-                        localStorage.setItem(k, data[k]);
-                        restored++;
-                      }
-                    } catch (x) {}
-                  }
+        function restoreFromSource(src) {
+          if (!src) return 0;
+          try {
+            var data = JSON.parse(src);
+            if (data && "object" == typeof data) {
+              var restored = 0;
+              for (var k in data) {
+                if (data.hasOwnProperty(k) && k.indexOf("akini_") === 0) {
+                  try {
+                    var cur = localStorage.getItem(k);
+                    if (
+                      !cur ||
+                      cur === "" ||
+                      cur === "null" ||
+                      cur === "undefined" ||
+                      cur === "[]" ||
+                      cur === "{}"
+                    ) {
+                      localStorage.setItem(k, data[k]);
+                      restored++;
+                    }
+                  } catch (x) {}
                 }
               }
-            } catch (p) {}
-          });
-          console.log("[Akini] restoreFromSnapshot restored", restored);
-        } catch (e) {}
+              return restored;
+            }
+          } catch (p) {}
+          return 0;
+        }
+
+        // 快照同时保存在 localStorage 和 IndexedDB；先尝试 localStorage，再用 IDB 兜底
+        try {
+          var lsRestored = restoreFromSource(localStorage.getItem("akini_localstorage_snapshot")) +
+            restoreFromSource(localStorage.getItem("akini_localstorage_snapshot_backup"));
+          if (lsRestored > 0) {
+            console.log("[Akini] restoreFromSnapshot restored", lsRestored);
+            "function" == typeof e && e();
+            return;
+          }
+        } catch (p) {}
+
+        try {
+          if (window._idbStore && window._idbStore.get) {
+            var keys = ["akini_localstorage_snapshot", "akini_localstorage_snapshot_backup"];
+            var completed = 0;
+            var callbacked = !1;
+            var done = function () {
+              if (callbacked) return;
+              completed++;
+              if (completed >= keys.length) {
+                callbacked = !0;
+                "function" == typeof e && e();
+              }
+            };
+            keys.forEach(function (key) {
+              window._idbStore.get(key, function (v) {
+                if (v) restoreFromSource(v);
+                done();
+              });
+            });
+            setTimeout(done, 2000); // 安全兜底
+            return;
+          }
+        } catch (p) {}
         "function" == typeof e && e();
       };
       window._akiniCacheStore &&
@@ -649,11 +676,33 @@ document.addEventListener("DOMContentLoaded", function () {
               window._akiniRestoreFromSnapshot &&
                 window._akiniRestoreFromSnapshot(function () {
                   console.log("[Akini] cache+idb+snapshot restoreAll done");
-                  // 恢复完成后标记并重新渲染 iCity，确保同步缓存读取到恢复后的数据
+                  // 恢复完成后：清掉可能已缓存的空数据，重新读取并渲染
                   try {
                     window._akiniDataRestored = true;
+                    // 清联系人/会话内存缓存，让下次读取从已恢复的 localStorage 取
+                    if (window.akiniContacts && window.akiniContacts.resetCache)
+                      window.akiniContacts.resetCache();
+                    // 清 iCity 日记同步缓存并重新读取
+                    try {
+                      if ("function" == typeof window._akiniClearDiaryCache)
+                        window._akiniClearDiaryCache();
+                    } catch (e) {}
+                    // 重绘聊天列表和 iCity
+                    if ("function" == typeof window.renderChatList)
+                      window.renderChatList();
                     if ("function" == typeof window._renderIcity)
                       window._renderIcity();
+                    // 若当前正在聊天界面，重新打开当前会话以加载恢复的聊天记录
+                    try {
+                      if (
+                        window.akiniContacts &&
+                        window.location.hash === "#chat" &&
+                        "function" == typeof window.openChat
+                      ) {
+                        var activeId = window.akiniContacts.getActiveChatId();
+                        if (activeId) window.openChat(activeId, true);
+                      }
+                    } catch (e) {}
                   } catch (e) {}
                 });
             });
@@ -3224,6 +3273,9 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     })();
     var F = null;
+    (window._akiniClearDiaryCache = function () {
+      F = null;
+    }),
     ((window._akiniGetDiaries = function () {
       try {
         return q();
@@ -12380,12 +12432,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260829ap 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260829aq 调整默认开关，删除旧默认值让 t() 重新写入
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260829ap") {
-            localStorage.setItem("akini_app_version", "20260829ap");
+          if (ver !== "20260829aq") {
+            localStorage.setItem("akini_app_version", "20260829aq");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");

@@ -270,6 +270,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   max-height: 100%;
   overflow-y: auto;
   padding-bottom: 12px;
+  /* 红色圈起的应用区域必须可以上下滑动 */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
 }
 .left-apps-row {
   display: flex;
