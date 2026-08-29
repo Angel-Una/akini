@@ -270,10 +270,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   max-height: 100%;
   overflow-y: auto;
   padding-bottom: 12px;
-  /* 红色圈起的应用区域必须可以上下滑动 */
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
 }
 .left-apps-row {
   display: flex;
@@ -288,7 +284,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   touch-action: manipulation !important;
 }
 #appBtnMail .icon-wrap {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.18);
   border: 1px solid rgba(255, 255, 255, 0.25);
 }
 .app-item {
@@ -320,7 +316,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   align-items: center;
   font-size: 24px;
   color: #666;
-  background: transparent;
+  background: rgba(255, 255, 255, 0.18);
   padding: 4px;
   margin-bottom: 4px;
   overflow: hidden;
@@ -5192,12 +5188,20 @@ button.back-btn[type="button"] {
   padding-top: max(12px, env(safe-area-inset-top, 12px)) !important;
   min-height: 56px !important;
 }
-
-/* 导入入口和菜单按钮始终可见，避免登录后消失 */
-#musicImportRow,
-#musicMenuBtn,
-#musicImportBtn {
-  display: flex !important;
-  visibility: visible !important;
-  opacity: 1 !important;
+/* 修复首页内容被遮挡 */
+.middle-row {
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+}
+.left-apps-container {
+  overflow-y: visible !important;
+  overflow-x: hidden !important;
+  max-height: none !important;
+  padding-bottom: 80px !important;
+}
+.right-card {
+  overflow: visible !important;
+}
+.content-wrapper {
+  padding-bottom: 80px !important;
 }

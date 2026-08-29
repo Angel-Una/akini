@@ -1,4 +1,65 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
+window.__akiniNormalizeWordbankImport = function(x) {
+  if (!x) return x;
+  if (Array.isArray(x)) {
+    return { customReplyGroups: [__akiniNormalizeGroup({ name: "导入内容", items: x })] };
+  }
+  if (typeof x !== "object") return x;
+  var out = {
+    customReplyGroups: [],
+    customReplies: Array.isArray(x.customReplies) ? x.customReplies : [],
+    customEmojis: Array.isArray(x.customEmojis) ? x.customEmojis : [],
+    customPokes: Array.isArray(x.customPokes) ? x.customPokes : []
+  };
+  if (Array.isArray(x.customReplyGroups)) {
+    x.customReplyGroups.forEach(function(g) { out.customReplyGroups.push(__akiniNormalizeGroup(g)); });
+  }
+  var groupKeys = ["groups", "分组", "categories", "wb_groups", "replyGroups", "groupList", "replyGroup", "reply_groups", "group"];
+  groupKeys.forEach(function(k) {
+    if (Array.isArray(x[k])) {
+      x[k].forEach(function(g) { out.customReplyGroups.push(__akiniNormalizeGroup(g)); });
+    }
+  });
+  if (x.groups && typeof x.groups === "object" && !Array.isArray(x.groups)) {
+    Object.keys(x.groups).forEach(function(name) {
+      out.customReplyGroups.push(__akiniNormalizeGroup({ name: name, items: x.groups[name] }));
+    });
+  }
+  var topKeys = ["wordbank", "cards", "main", "items", "replies", "words", "list", "data", "texts", "content"];
+  topKeys.forEach(function(k) {
+    if (Array.isArray(x[k]) && x[k].length) {
+      var name = k === "wordbank" ? "字卡库" : k === "cards" ? "卡片" : "导入内容";
+      out.customReplyGroups.push(__akiniNormalizeGroup({ name: name, items: x[k] }));
+    }
+  });
+  return out;
+};
+window.__akiniNormalizeGroup = function(g) {
+  if (!g) return { name: "未命名", items: [] };
+  if (typeof g === "string") return { name: g, items: [] };
+  var name = g.name || g.groupName || g.group || g.title || g.label || g.category || "未命名";
+  var items = [];
+  var itemKeys = ["items", "cards", "replies", "words", "texts", "content", "list", "data", "sentences", "phrases"];
+  itemKeys.forEach(function(k) {
+    if (Array.isArray(g[k])) items = items.concat(__akiniFlattenArray(g[k]));
+  });
+  if (items.length === 0 && (typeof g === "string" || (typeof g.text === "string" || typeof g.content === "string"))) {
+    items.push(g);
+  }
+  return { name: String(name), items: items };
+};
+window.__akiniFlattenArray = function(arr) {
+  var out = [];
+  if (!Array.isArray(arr)) return arr ? [arr] : out;
+  arr.forEach(function(it) {
+    if (Array.isArray(it)) {
+      out = out.concat(__akiniFlattenArray(it));
+    } else if (it !== null && it !== undefined) {
+      out.push(it);
+    }
+  });
+  return out;
+};
 function setHtmlKeepInput(t, e) {
   if (t) {
     var n = t.querySelector('input[type="file"]'),
@@ -29,7 +90,7 @@ window.__akiniBootStep = "start";
   try {
     ["readReceiptToggle", "timestampToggle"].forEach(function (key) {
       if (localStorage.getItem("akini_toggle_" + key) === null) {
-        localStorage.setItem("akini_toggle_" + key, "0");
+        localStorage.setItem("akini_toggle_" + key, "1");
       }
     });
   } catch (e) {}
@@ -92,16 +153,10 @@ window.AKR = (function () {
     var r = Math.random();
     return r < 0.55 ? 1 : r < 0.88 ? 2 : 3;
   }
-  /* 回复行为：未开“已读不回”时必回；开启后才按概率已读不回；3% 概率触发拍一拍 */
+  /* 回复行为：已读必回为主，低概率已读不回；3% 概率触发拍一拍 */
   function pickReplyBehavior() {
-    var readNoReply = false;
-    try {
-      readNoReply = localStorage.getItem("akini_toggle_readNoReplyToggle") === "1";
-    } catch (e) {}
-    if (readNoReply) {
-      if (Math.random() < getProb("noReply"))
-        return { type: "none", cardCount: 0, extra: {} };
-    }
+    if (Math.random() < getProb("noReply"))
+      return { type: "none", cardCount: 0, extra: {} };
     var extra = {};
     if (Math.random() < getProb("poke")) extra.poke = true;
     return {
@@ -600,111 +655,13 @@ document.addEventListener("DOMContentLoaded", function () {
       };
     })();
     try {
-      window._akiniRestoreFromSnapshot = function (e) {
-        function restoreFromSource(src) {
-          if (!src) return 0;
-          try {
-            var data = JSON.parse(src);
-            if (data && "object" == typeof data) {
-              var restored = 0;
-              for (var k in data) {
-                if (data.hasOwnProperty(k) && k.indexOf("akini_") === 0) {
-                  try {
-                    var cur = localStorage.getItem(k);
-                    if (
-                      !cur ||
-                      cur === "" ||
-                      cur === "null" ||
-                      cur === "undefined" ||
-                      cur === "[]" ||
-                      cur === "{}"
-                    ) {
-                      localStorage.setItem(k, data[k]);
-                      restored++;
-                    }
-                  } catch (x) {}
-                }
-              }
-              return restored;
-            }
-          } catch (p) {}
-          return 0;
-        }
-
-        // 快照同时保存在 localStorage 和 IndexedDB；先尝试 localStorage，再用 IDB 兜底
-        try {
-          var lsRestored = restoreFromSource(localStorage.getItem("akini_localstorage_snapshot")) +
-            restoreFromSource(localStorage.getItem("akini_localstorage_snapshot_backup"));
-          if (lsRestored > 0) {
-            console.log("[Akini] restoreFromSnapshot restored", lsRestored);
-            "function" == typeof e && e();
-            return;
-          }
-        } catch (p) {}
-
-        try {
-          if (window._idbStore && window._idbStore.get) {
-            var keys = ["akini_localstorage_snapshot", "akini_localstorage_snapshot_backup"];
-            var completed = 0;
-            var callbacked = !1;
-            var done = function () {
-              if (callbacked) return;
-              completed++;
-              if (completed >= keys.length) {
-                callbacked = !0;
-                "function" == typeof e && e();
-              }
-            };
-            keys.forEach(function (key) {
-              window._idbStore.get(key, function (v) {
-                if (v) restoreFromSource(v);
-                done();
-              });
-            });
-            setTimeout(done, 2000); // 安全兜底
-            return;
-          }
-        } catch (p) {}
-        "function" == typeof e && e();
-      };
       window._akiniCacheStore &&
         window._akiniCacheStore.restoreAll &&
         window._akiniCacheStore.restoreAll(function () {
           window._idbStore &&
             window._idbStore.restoreAll &&
             window._idbStore.restoreAll(function () {
-              window._akiniRestoreFromSnapshot &&
-                window._akiniRestoreFromSnapshot(function () {
-                  console.log("[Akini] cache+idb+snapshot restoreAll done");
-                  // 恢复完成后：清掉可能已缓存的空数据，重新读取并渲染
-                  try {
-                    window._akiniDataRestored = true;
-                    // 清联系人/会话内存缓存，让下次读取从已恢复的 localStorage 取
-                    if (window.akiniContacts && window.akiniContacts.resetCache)
-                      window.akiniContacts.resetCache();
-                    // 清 iCity 日记同步缓存并重新读取
-                    try {
-                      if ("function" == typeof window._akiniClearDiaryCache)
-                        window._akiniClearDiaryCache();
-                    } catch (e) {}
-                    // 重绘聊天列表和 iCity
-                    if ("function" == typeof window.renderChatList)
-                      window.renderChatList();
-                    if ("function" == typeof window._renderIcity)
-                      window._renderIcity();
-                    // 若当前正在聊天界面，重新打开当前会话以加载恢复的聊天记录
-                    try {
-                      if (
-                        window.akiniContacts &&
-                        window.location.hash === "#chat" &&
-                        "function" == typeof window.openChat
-                      ) {
-                        var activeId = window.akiniContacts.getActiveChatId();
-                        if (activeId) window.openChat(activeId, true);
-                      }
-                    } catch (e) {}
-                  } catch (e) {}
-                });
+              console.log("[Akini] cache+idb restoreAll done");
             });
         });
     } catch (e) {
@@ -3184,12 +3141,6 @@ document.addEventListener("DOMContentLoaded", function () {
         )
           throw c;
         B();
-        // 配额超限导致 localStorage 写入失败时，仍把数据写入 IndexedDB，避免数据彻底丢失
-        try {
-          window._idbStore &&
-            window._idbStore.set &&
-            window._idbStore.set(t, e);
-        } catch (_) {}
         try {
           return T.call(this, t, e);
         } catch (t) {}
@@ -3273,9 +3224,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     })();
     var F = null;
-    (window._akiniClearDiaryCache = function () {
-      F = null;
-    }),
     ((window._akiniGetDiaries = function () {
       try {
         return q();
@@ -3295,8 +3243,7 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
       }));
     function q() {
-      // F 为空（含首次读取时本地尚未恢复）时重新读取，避免把空数组永久缓存导致数据丢失
-      if (!F || F.length === 0) {
+      if (!F) {
         var t =
           localStorage.getItem("akini_icity_diaries") ||
           localStorage.getItem("akini_icity_diaries_backup");
@@ -3959,7 +3906,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           window.akiniContacts.backupToIDB("akini_wb_groups", a);
         }
-      }, 10000));
+      }, 60000));
     function flushAllData() {
       try {
         if (window._restoringData) return;
@@ -5548,7 +5495,8 @@ document.addEventListener("DOMContentLoaded", function () {
           e = "",
           n = "",
           r = !1,
-          c = new Set();
+          c = new Set(),
+          wAutoSwitching = !1;
         function l() {
           return i("akini_wordbank", []);
         }
@@ -5615,6 +5563,21 @@ document.addEventListener("DOMContentLoaded", function () {
             );
           }
           if (0 === a.length) {
+            if (!wAutoSwitching) {
+              const all = l();
+              const first = all.find((e) => (e.tab || "main") !== t);
+              if (first && y) {
+                wAutoSwitching = !0;
+                (t = first.tab || "main"),
+                  y.querySelectorAll(".tab").forEach((e) =>
+                    e.classList.remove("active"),
+                  );
+                const L = y.querySelector('[data-tab="' + t + '"]');
+                L && L.classList.add("active");
+                const r = f();
+                return (wAutoSwitching = !1), r;
+              }
+            }
             return (
               (i.innerHTML =
                 '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0;">' +
@@ -5894,6 +5857,7 @@ document.addEventListener("DOMContentLoaded", function () {
           S.addEventListener("change", function () {
             const i = this.files[0];
             if (!i) return;
+            const isTextFile = (i.name && i.name.toLowerCase().endsWith(".txt")) || i.type === "text/plain" || i.type === "text/x-log" || i.type === "";
             const a = new FileReader();
             ((a.onload = function (i) {
               try {
@@ -5942,6 +5906,18 @@ document.addEventListener("DOMContentLoaded", function () {
                       t.text1 ||
                       t.label ||
                       t.key ||
+                      t.text ||
+                      t.content ||
+                      t.文字 ||
+                      t.文本 ||
+                      t.关键词 ||
+                      t.回复 ||
+                      t.内容 ||
+                      t.答案 ||
+                      t.消息 ||
+                      t.话术 ||
+                      t.问题 ||
+                      t.提示词 ||
                       "";
                     i = Array.isArray(_f)
                       ? _f
@@ -5973,7 +5949,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                   }
                 }
-                const I = p.startsWith("{") || p.startsWith("[");
+                const I = !isTextFile && (p.startsWith("{") || p.startsWith("["));
                 let x = null;
                 if (I)
                   try {
@@ -5981,6 +5957,11 @@ document.addEventListener("DOMContentLoaded", function () {
                   } catch (C) {
                     return void (window.__akiniCenterModal && window.__akiniCenterModal("导入失败", "JSON 解析失败：" + C.message));
                   }
+                if (x && typeof x === "object") {
+                  try {
+                    x = window.__akiniNormalizeWordbankImport(x);
+                  } catch (C) {}
+                }
                 if (Array.isArray(x)) x.forEach((t) => a(t, { tab: "main" }));
                 else if (x && "object" == typeof x) {
                   (function () {
@@ -6148,7 +6129,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       Array.isArray(x[t]) &&
                         x[t].forEach((t) => a(t, { tab: "main" }));
                     });
-                } else p.split("\n").forEach((t) => a(t, { tab: "main" }));
+                } else p.split(/\r\n|\n|\r/).forEach((t) => { const s = t.trim(); if (s) a(s, { tab: "main" }); });
                 (h > 0 && u(b), s(k), c.clear());
                 let E = "main";
                 console.log("[wordbank] 导入完成：新增" + v + "条，分组" + h + "个，当前总数" + k.length + "，切换到tab=" + (v > 0 ? E : t));
@@ -12432,12 +12413,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260829aq 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260828ak 调整默认开关，删除旧默认值让 t() 重新写入
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260829aq") {
-            localStorage.setItem("akini_app_version", "20260829aq");
+          if (ver !== "20260828ak") {
+            localStorage.setItem("akini_app_version", "20260828ak");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
@@ -12578,7 +12559,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }),
         window._requestNotificationPermission(),
         t("quoteReplyToggle", !1),
-        t("readReceiptToggle", !1),
+        t("readReceiptToggle", !0),
         t("readNoReplyToggle", !1),
         t("emojiMixToggle", !1),
         t("contactEmojiToggle", !1),
@@ -12595,7 +12576,7 @@ document.addEventListener("DOMContentLoaded", function () {
         t("contactShopToggle", !1),
         t("contactFriendsToggle", !1),
         t("contactIcityToggle", !1),
-        t("timestampToggle", !1),
+        t("timestampToggle", !0),
         t("darkModeToggle", !1),
         document.querySelectorAll(".style-btn").forEach((t) => {
           a(t, function () {
@@ -13885,7 +13866,6 @@ document.addEventListener("DOMContentLoaded", function () {
           loginStatus: document.getElementById("musicLoginStatus"),
           songName: document.getElementById("musicSongName"),
           artist: document.getElementById("musicArtist"),
-          listenTime: document.getElementById("musicPlayerListenTime"),
           leftAvatar: document.getElementById("musicLeftAvatar"),
           centerAvatar: document.getElementById("musicCenterAvatar"),
           rightAvatar: document.getElementById("musicRightAvatar"),
@@ -14243,16 +14223,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 try {
                   localStorage.removeItem("akini_music_exited");
                 } catch (e) {}
-                // 保留已选联系人，退出一起听后也不清空，避免重新选人
-                if (hasContacts && T.length === 0) {
+                // 打开选人浮层时，若已退出或没有联系人，清空上次选择，避免旧数据导致人数不符
+                if (exited || !hasContacts) {
+                  T.length = 0;
                   try {
-                    T = JSON.parse(
-                      localStorage.getItem("akini_music_selected_contacts") ||
-                        "[]",
-                    );
-                  } catch (e) {
-                    T = [];
-                  }
+                    localStorage.removeItem("akini_music_selected_contacts");
+                  } catch (e) {}
                   Ot();
                 }
                 Rt();
@@ -15379,29 +15355,13 @@ document.addEventListener("DOMContentLoaded", function () {
             (Q(), u && u.paused && u.play().catch(function () {})));
       }
       function lt() {
-        var selectedSeconds = 0;
-        if (T && T.length > 0) {
-          var nowDelta = x ? Math.floor((Date.now() - x) / 1e3) : 0;
-          T.forEach(function (ct) {
-            if (ct && ct.id) {
-              selectedSeconds += (listenMap[ct.id] || 0) + nowDelta;
-            }
-          });
-        }
-        var totalDisplay = selectedSeconds > 0 ? selectedSeconds : I + (x ? Math.floor((Date.now() - x) / 1e3) : 0);
-        var n = Math.floor(totalDisplay / 60),
+        var t = I + (x ? Math.floor((Date.now() - x) / 1e3) : 0),
+          n = Math.floor(t / 60),
           i = Math.floor(n / 60),
           a = "";
         i > 0 && (a += i + " 小时 ");
-        var names = "";
-        if (T && T.length > 0) {
-          names = T.map(function (ct) { return ct.name || "TA"; }).join("、");
-        } else {
-          names = "TA";
-        }
-        var o = "与 " + names + " 一起听了 " + (a += (n % 60) + " 分钟");
+        var o = "TA就在你身边 · 一起听了 " + (a += (n % 60) + " 分钟");
         e.distanceText && (e.distanceText.textContent = o);
-        e.listenTime && (e.listenTime.textContent = o);
       }
       function st() {
         var t = [
