@@ -1,6 +1,4 @@
-self.addEventListener("message", function(event){if(event.data && event.data.type === "GET_CACHE_NAME"){if(event.ports && event.ports[0]){event.ports[0].postMessage({cacheName: CACHE_NAME});}}});
-
-const CACHE_NAME = 'akini-cache-v20260829as';
+const CACHE_NAME = 'akini-cache-v20260830aw';
 const PRECACHE_ASSETS = [
   './',
   './index.html',
@@ -37,8 +35,6 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
-  // 所有请求统一使用 network-first：优先取最新资源，失败时回退缓存
-  // 对 HTML 和 service-worker.js 请求强制 no-store，避免浏览器 HTTP 缓存返回旧版本
   var req = event.request;
   var url = new URL(req.url);
   var isNav = req.mode === 'navigate';
@@ -53,15 +49,6 @@ self.addEventListener('fetch', function(event) {
         caches.open(CACHE_NAME).then(function(cache) {
           cache.put(event.request, clone);
         }).catch(function(){});
-      }
-      return response;
-    }).catch(function() {
-      return caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
-        return cached || fetch(event.request);
-      });
-    })
-  );
-});
       }
       return response;
     }).catch(function() {
@@ -108,4 +95,12 @@ self.addEventListener('notificationclick', function(event) {
       self.clients.openWindow('./akini.html');
     })
   );
+});
+
+self.addEventListener('message', function(event){
+  if(event.data && event.data.type === 'GET_CACHE_NAME'){
+    if(event.ports && event.ports[0]){
+      event.ports[0].postMessage({cacheName: CACHE_NAME});
+    }
+  }
 });
