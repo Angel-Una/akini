@@ -24,21 +24,21 @@ function __akiniShowBanner(msg, color) {
   b.textContent = msg;
 }
 window.__akiniBootStep = "start";
-/* 背景图设置读写：iCity 我的/联系人、主页、网易云、封面、纪念日 */
-window.__akiniBgSettings = {
-  apply: function(element, defaultPos, defaultSize){
-    if(!element) return;
-    element.style.backgroundPosition = defaultPos || "center";
-    element.style.backgroundSize = defaultSize || "contain";
-  }
-};
-window.__akiniIcityBgSettings = {
-  apply: function(element, isMy, contactId){
-    if(!element) return;
-    element.style.backgroundPosition = "center";
-    element.style.backgroundSize = "contain";
-  }
-};
+/* 尽早同步用户装扮，避免先显示默认再替换的闪烁 */
+(function () {
+  try {
+    var bg = localStorage.getItem("akini_home_bg");
+    if (bg) {
+      var pf = document.getElementById("phoneFrame");
+      if (pf) {
+        pf.style.backgroundImage = "url(" + bg + ")";
+        pf.style.backgroundSize = "cover";
+        pf.style.backgroundPosition = "center";
+        pf.style.backgroundRepeat = "no-repeat";
+      }
+    }
+  } catch (e) {}
+})();
 /* 默认开启：已读回执、时间戳（仅在用户从未设置时写入） */
 (function () {
   try {
@@ -59,8 +59,8 @@ window.AKR = (function () {
     groupTransferMe: 0.08,
     noReply: 0.05,
     sticker: 0.22,
-    incomingCall: 0.25,
-    groupCall: 0.25,
+    incomingCall: 0.05,
+    groupCall: 0.05,
     answerCall: 0.65,
     missCall: 0.30,
     refundTransfer: 0.1,
@@ -1209,15 +1209,22 @@ document.addEventListener("DOMContentLoaded", function () {
                   "🐱",
           };
         var e = v(t);
-        if (e)
+        if (e) {
+          var a = e.avatar;
+          if (!a && e.isDefault) {
+            try {
+              a = localStorage.getItem("akini_ta_avatar") || "";
+            } catch (e) {}
+          }
           return {
             type: "contact",
             id: e.id,
             name: e.name,
-            avatar: e.avatar,
+            avatar: a || e.avatar,
             isDefault: e.isDefault,
             createdAt: e.createdAt,
           };
+        }
         var n = h(t);
         return n
           ? {
@@ -3061,6 +3068,22 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           _idbStore.set("akini_icity_ta_avatar", e);
         } catch (t) {}
+        try {
+          if (
+            window.akiniContacts &&
+            window.akiniContacts.getContacts &&
+            window.akiniContacts.updateContact
+          ) {
+            var _defC = window.akiniContacts
+              .getContacts()
+              .find(function (c) {
+                return c.isDefault;
+              });
+            if (_defC && (!_defC.avatar || _defC.avatar === "🐰")) {
+              window.akiniContacts.updateContact(_defC.id, { avatar: e });
+            }
+          }
+        } catch (t) {}
       }
       if (i && !a)
         return (
@@ -3759,13 +3782,6 @@ document.addEventListener("DOMContentLoaded", function () {
           } else {
             if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
             else sig += "|" + (row.textContent || "").trim();
-            // 使用显示的时间/已读状态去重，避免内部毫秒级时间戳导致重复消息无法合并
-            if (meta) {
-              sig += "|meta:" + (meta.textContent || "").trim();
-            } else {
-              var ts = row.getAttribute("data-ts");
-              if (ts) sig += "|ts:" + ts;
-            }
           }
           if (!seen.has(sig)) {
             seen.add(sig);
@@ -3824,13 +3840,6 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
           else sig += "|" + (row.textContent || "").trim();
-          // 使用显示的时间/已读状态去重，避免内部毫秒级时间戳导致重复消息无法合并
-          if (meta) {
-            sig += "|meta:" + (meta.textContent || "").trim();
-          } else {
-            var ts = row.getAttribute("data-ts");
-            if (ts) sig += "|ts:" + ts;
-          }
         }
         if (!seen.has(sig)) {
           seen.add(sig);
@@ -6795,9 +6804,7 @@ document.addEventListener("DOMContentLoaded", function () {
           (i.push(o),
             R(i),
             n && ((n.style.display = "none"), n.classList.remove("show")),
-            t(),
-            window._scheduleContactLikeOnFriends && window._scheduleContactLikeOnFriends(o.id),
-            window._scheduleContactCommentOnFriends && window._scheduleContactCommentOnFriends(o.id));
+            t());
         }));
       const u = document.getElementById("friendsHeader");
       (D("akini_friends_bg", function (t) {
@@ -6904,8 +6911,9 @@ document.addEventListener("DOMContentLoaded", function () {
         D("akini_cover_img", function (e) {
           if (e) {
             ((t.style.backgroundImage = `url(${e})`),
-              (t.textContent = ""),
-              window.__akiniBgSettings.apply(t, "center", "cover"));
+              (t.style.backgroundSize = "cover"),
+              (t.style.backgroundPosition = "center"),
+              (t.textContent = ""));
           }
         });
       const n = document.getElementById("bgArea");
@@ -6913,7 +6921,8 @@ document.addEventListener("DOMContentLoaded", function () {
         D("akini_bg_img", function (t) {
           t &&
             ((n.style.backgroundImage = `url(${t})`),
-            window.__akiniBgSettings.apply(n, "center", "cover"));
+            (n.style.backgroundSize = "cover"),
+            (n.style.backgroundPosition = "center"));
         });
     })();
     const ge = document.getElementById("callMiniWindow"),
@@ -8940,24 +8949,27 @@ document.addEventListener("DOMContentLoaded", function () {
             e &&
               (t
                 ? ((e.style.backgroundImage = "url(" + t + ")"),
-                  window.__akiniIcityBgSettings.apply(e, true, null))
+                  (e.style.backgroundSize = "cover"),
+                  (e.style.backgroundPosition = "center"))
                 : ((e.style.backgroundImage = ""),
                   (e.style.background =
-                    "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)"),
-                  (e.style.backgroundSize = "contain"),
-                  (e.style.backgroundPosition = "center")));
+                    "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)")));
           }),
           D("akini_icity_ta_bg", function (t) {
             var e = document.querySelector(".icity-ta-bg-div");
-            e &&
-              (t
-                ? ((e.style.backgroundImage = "url(" + t + ")"),
-                  window.__akiniIcityBgSettings.apply(e, false, null))
-                : ((e.style.backgroundImage = ""),
-                  (e.style.background =
-                    "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"),
-                  (e.style.backgroundSize = "contain"),
-                  (e.style.backgroundPosition = "center")));
+            if (!e) return;
+            if (!t) {
+              try {
+                t = localStorage.getItem("akini_icity_my_bg");
+              } catch (e) {}
+            }
+            t
+              ? ((e.style.backgroundImage = "url(" + t + ")"),
+                (e.style.backgroundSize = "cover"),
+                (e.style.backgroundPosition = "center"))
+              : ((e.style.backgroundImage = ""),
+                (e.style.background =
+                  "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)"));
           }));
         var m = q(),
           f = document.getElementById("icityDiaryList"),
@@ -10291,8 +10303,9 @@ document.addEventListener("DOMContentLoaded", function () {
               });
           (n.push(i),
             j(n),
-            window._scheduleContactLikeOnIcity && window._scheduleContactLikeOnIcity(i.id),
-            window._scheduleContactCommentOnIcity && window._scheduleContactCommentOnIcity(i.id),
+            window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
+            window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),
+            window.scheduleTaReplySoon && window.scheduleTaReplySoon(i.id),
             c && (c.value = ""));
           var a = document.getElementById("icityTab1"),
             o = document.getElementById("icityTab2"),
@@ -10455,17 +10468,15 @@ document.addEventListener("DOMContentLoaded", function () {
                 l && (l.textContent = "@" + i.handle);
                 var s = document.getElementById("icityTaBioDisplay");
                 (s && (s.textContent = i.bio),
-                  D("akini_icity_ta_bg_" + t, function (n) {
+                  D("akini_icity_ta_bg_" + t, function (t) {
                     var e = a.querySelector(".icity-ta-bg-div");
-                    e && n
-                      ? ((e.style.backgroundImage = "url(" + n + ")"),
-                        window.__akiniIcityBgSettings.apply(e, false, t))
+                    e && t
+                      ? ((e.style.backgroundImage = "url(" + t + ")"),
+                        (e.style.backgroundSize = "cover"))
                       : e &&
                         ((e.style.backgroundImage = ""),
                           (e.style.background =
-                            "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"),
-                          (e.style.backgroundSize = "contain"),
-                          (e.style.backgroundPosition = "center"));
+                            "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"));
                   }));
                 var d = q().filter(function (e) {
                     return (
@@ -10548,14 +10559,10 @@ document.addEventListener("DOMContentLoaded", function () {
             n = i(e, {}),
             a = document.getElementById("icityTaNickInput"),
             o = document.getElementById("icityTaHandleInput"),
-            r = document.getElementById("icityTaBioInput"),
-            posSel = document.getElementById("icityTaBgPos"),
-            sizeSel = document.getElementById("icityTaBgSize");
+            r = document.getElementById("icityTaBioInput");
           (a && (n.name = a.value.trim()),
             o && (n.handle = o.value.trim()),
             r && (n.bio = r.value.trim()));
-          posSel && window.__akiniIcityBgSettings.setPos(false, t, posSel.value);
-          sizeSel && window.__akiniIcityBgSettings.setSize(false, t, sizeSel.value);
           var c = JSON.stringify(n);
           try {
             localStorage.setItem(e, c);
@@ -10572,21 +10579,15 @@ document.addEventListener("DOMContentLoaded", function () {
           i && (i.value = e.handle),
           a && (a.value = e.bio),
           window.fillPreview("icityEditTaAvatarPreview", e.avatar || "🐰"));
-        var o = document.getElementById("icityEditTaBgPreview"),
-          posSel = document.getElementById("icityTaBgPos"),
-          sizeSel = document.getElementById("icityTaBgSize");
-        posSel && (posSel.value = window.__akiniIcityBgSettings.getPos(false, t));
-        sizeSel && (sizeSel.value = window.__akiniIcityBgSettings.getSize(false, t));
+        var o = document.getElementById("icityEditTaBgPreview");
         D("akini_icity_ta_bg_" + t, function (t) {
           o && t
             ? ((o.style.backgroundImage = "url(" + t + ")"),
-              window.__akiniIcityBgSettings.apply(o, false, window._icityEditContactId))
+              (o.style.backgroundSize = "cover"))
             : o &&
               ((o.style.backgroundImage = ""),
                 (o.style.background =
-                  "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"),
-                (o.style.backgroundSize = "contain"),
-                (o.style.backgroundPosition = "center"));
+                  "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"));
         });
       }
       (S &&
@@ -10614,21 +10615,15 @@ document.addEventListener("DOMContentLoaded", function () {
                   localStorage.getItem("akini_icity_my_avatar") ||
                   "🐱",
               ));
-            var c = document.getElementById("icityEditMyBgPreview"),
-              myPosSel = document.getElementById("icityMyBgPos"),
-              mySizeSel = document.getElementById("icityMyBgSize");
-            myPosSel && (myPosSel.value = window.__akiniIcityBgSettings.getPos(true, null));
-            mySizeSel && (mySizeSel.value = window.__akiniIcityBgSettings.getSize(true, null));
+            var c = document.getElementById("icityEditMyBgPreview");
             (D("akini_icity_my_bg", function (t) {
               c &&
                 (t
                   ? ((c.style.backgroundImage = "url(" + t + ")"),
-                    window.__akiniIcityBgSettings.apply(c, true, null))
+                    (c.style.backgroundSize = "cover"))
                   : ((c.style.backgroundImage = ""),
                     (c.style.background =
-                      "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)"),
-                    (c.style.backgroundSize = "contain"),
-                    (c.style.backgroundPosition = "center")));
+                      "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)")));
             }),
               p &&
                 ((p.style.display = "flex"), (p.style.visibility = "visible")));
@@ -10657,21 +10652,15 @@ document.addEventListener("DOMContentLoaded", function () {
                     localStorage.getItem("akini_icity_my_avatar") ||
                     "🐱",
                 ));
-              var r = document.getElementById("icityEditMyBgPreview"),
-                myPosSel2 = document.getElementById("icityMyBgPos"),
-                mySizeSel2 = document.getElementById("icityMyBgSize");
-              myPosSel2 && (myPosSel2.value = window.__akiniIcityBgSettings.getPos(true, null));
-              mySizeSel2 && (mySizeSel2.value = window.__akiniIcityBgSettings.getSize(true, null));
+              var r = document.getElementById("icityEditMyBgPreview");
               D("akini_icity_my_bg", function (t) {
                 r &&
                   (t
                     ? ((r.style.backgroundImage = "url(" + t + ")"),
-                      window.__akiniIcityBgSettings.apply(r, true, null))
+                      (r.style.backgroundSize = "cover"))
                     : ((r.style.backgroundImage = ""),
                       (r.style.background =
-                        "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)"),
-                      (r.style.backgroundSize = "contain"),
-                      (r.style.backgroundPosition = "center")));
+                        "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)")));
               });
               var c = window.akiniContacts
                 ? window.akiniContacts.getContacts()
@@ -10719,7 +10708,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 alert("保存失败，请稍后重试"));
             }
           }),
-
         (k = "icityEditMyBgBtn"),
         (_ = "icityMyBgInput"),
         (b = "akini_icity_my_bg"),
@@ -10744,7 +10732,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     (b.indexOf("_bg") >= 0
                       ? ((e.style.backgroundImage =
                           "url(" + t.target.result + ")"),
-                        window.__akiniIcityBgSettings.apply(e, true, null))
+                        (e.style.backgroundSize = "cover"))
                       : (e.innerHTML =
                           '<img src="' +
                           t.target.result +
@@ -10754,13 +10742,15 @@ document.addEventListener("DOMContentLoaded", function () {
                   var n = document.getElementById("icityMyBgArea");
                   n &&
                     ((n.style.backgroundImage = "url(" + t.target.result + ")"),
-                    window.__akiniIcityBgSettings.apply(n, true, null));
+                    (n.style.backgroundSize = "cover"),
+                    (n.style.backgroundPosition = "center"));
                 }
                 if ("akini_icity_ta_bg" === b) {
                   var i = document.querySelector(".icity-ta-bg-div");
                   i &&
                     ((i.style.backgroundImage = "url(" + t.target.result + ")"),
-                    window.__akiniIcityBgSettings.apply(i, false, null));
+                    (i.style.backgroundSize = "cover"),
+                    (i.style.backgroundPosition = "center"));
                 }
               }),
                 e.readAsDataURL(t));
@@ -10780,7 +10770,7 @@ document.addEventListener("DOMContentLoaded", function () {
               var n = document.getElementById("icityEditTaBgPreview");
               n &&
                 ((n.style.backgroundImage = "url(" + t.target.result + ")"),
-                window.__akiniIcityBgSettings.apply(n, false, window._icityEditContactId));
+                (n.style.backgroundSize = "cover"));
             }),
               e.readAsDataURL(t));
           }
@@ -11442,8 +11432,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 window.renderHomeAvatarPreviews();
               const C = document.getElementById("chatBody");
               (C &&
-                [ // 历史聊天记录头像保持原样，不随当前头像设置重置
-
+                (C.querySelectorAll(".msg-row.me .msg-avatar").forEach(
+                  function (t) {
+                    t.innerHTML = n;
+                  },
+                ),
+                (i && "group" === i.type) ||
+                  C.querySelectorAll(".msg-row.other .msg-avatar").forEach(
+                    function (t) {
+                      t.innerHTML = o;
+                    },
+                  )),
+                [
                   "icityMyAvatar2",
                   "icityMyAvatar3",
                   "icityEditMyAvatarPreview",
@@ -11513,8 +11513,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     const Mn = document.getElementById("inputTaName"),
       Ln = document.getElementById("inputMyName");
-    function Dn() {
-      const count = Math.floor(Math.random() * (12 - 8 + 1)) + 8;
+    function Dn(count) {
+      count = parseInt(count, 10);
+      if (isNaN(count) || count < 1) count = Math.floor(Math.random() * 5) + 1;
       const raw = window.pickWordCards(count);
       if (!raw) return "";
       return (
@@ -11797,8 +11798,9 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("phoneFrame");
               (e &&
                 ((e.style.backgroundImage = `url(${t.target.result})`),
-                (e.style.backgroundRepeat = "no-repeat"),
-                window.__akiniBgSettings.apply(e, "center", "contain")),
+                (e.style.backgroundSize = "cover"),
+                (e.style.backgroundPosition = "center"),
+                (e.style.backgroundRepeat = "no-repeat")),
                 L("akini_home_bg", t.target.result));
             }),
               e.readAsDataURL(t));
@@ -11808,8 +11810,9 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("phoneFrame");
               e &&
                 ((e.style.backgroundImage = `url(${t})`),
-                (e.style.backgroundRepeat = "no-repeat"),
-                window.__akiniBgSettings.apply(e, "center", "contain"));
+                (e.style.backgroundSize = "cover"),
+                (e.style.backgroundPosition = "center"),
+                (e.style.backgroundRepeat = "no-repeat"));
             }
           }));
         const d = document.getElementById("fileInputMusicBg");
@@ -11823,9 +11826,10 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("musicBgLayer");
               e &&
                 ((e.style.backgroundImage = `url(${t.target.result})`),
+                (e.style.backgroundSize = "cover"),
+                (e.style.backgroundPosition = "center"),
                 (e.style.backgroundRepeat = "no-repeat"),
-                (e.style.display = "block"),
-                window.__akiniBgSettings.apply(e, "center", "cover"));
+                (e.style.display = "block"));
             }),
               e.readAsDataURL(t),
               (this.value = ""));
@@ -11835,9 +11839,10 @@ document.addEventListener("DOMContentLoaded", function () {
               const e = document.getElementById("musicBgLayer");
               e &&
                 ((e.style.backgroundImage = `url(${t})`),
+                (e.style.backgroundSize = "cover"),
+                (e.style.backgroundPosition = "center"),
                 (e.style.backgroundRepeat = "no-repeat"),
-                (e.style.display = "block"),
-                window.__akiniBgSettings.apply(e, "center", "cover"));
+                (e.style.display = "block"));
             }
           }));
         const u = document.getElementById("fileInputDayBgBeautify");
@@ -11851,7 +11856,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 n = document.getElementById("bgArea");
               (n &&
                 ((n.style.backgroundImage = `url(${e})`),
-                window.__akiniBgSettings.apply(n, "center", "cover")),
+                (n.style.backgroundSize = "cover"),
+                (n.style.backgroundPosition = "center")),
                 L("akini_bg_img", e));
             }),
               e.readAsDataURL(t),
@@ -11868,8 +11874,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 n = document.getElementById("coverAreaMain");
               (n &&
                 ((n.style.backgroundImage = `url(${e})`),
-                (n.textContent = ""),
-                window.__akiniBgSettings.apply(n, "center", "cover")),
+                (n.style.backgroundSize = "cover"),
+                (n.style.backgroundPosition = "center"),
+                (n.textContent = "")),
                 L("akini_cover_img", e));
             }),
               e.readAsDataURL(t),
@@ -12165,7 +12172,7 @@ document.addEventListener("DOMContentLoaded", function () {
               if (!e) return void t();
               const n = e.name,
                 i = nt(e.avatar, 40),
-                a = c(Math.floor(3 * Math.random()) + 1);
+                a = c(Math.floor(5 * Math.random()) + 1);
               if (a) {
                 var l = O();
                 var post = {
@@ -12243,6 +12250,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 i = nt(e.avatar, 40),
                 a = localStorage.getItem("akini_my_name") || "我";
               let l = O();
+              var now = Date.now(),
+                THREE_MIN = 3 * 60 * 1e3;
               var s = !1,
                 d = window._pendingFriendsReplies || [];
               ((window._pendingFriendsReplies = []),
@@ -12250,7 +12259,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   var e = l.find(function (e) {
                     return e.ts === t.ts;
                   });
-                  if (e) {
+                  if (e && Date.now() - (e.ts || 0) <= THREE_MIN) {
                     var r = (e.comments || [])
                       .slice()
                       .reverse()
@@ -12290,54 +12299,71 @@ document.addEventListener("DOMContentLoaded", function () {
                   }
                 }));
               const u = l.filter(function (t) {
-                  return !t.author || (t.author !== n && t.authorId !== e.id);
-                }),
-                m = Math.random();
+                if (t.author && (t.author === n || t.authorId === e.id))
+                  return !1;
+                var postTs = t.ts || 0;
+                return now - postTs <= THREE_MIN;
+              });
+              const alreadyLiked = u.filter(function (t) {
+                return (t.likes || []).indexOf(n) >= 0;
+              });
+              var likeCandidates = u.filter(function (t) {
+                return (t.likes || []).indexOf(n) < 0;
+              });
               var f = u.filter(function (t) {
-                var e = (t.comments || [])
+                var userComments = (t.comments || []).filter(function (c) {
+                  return c.author === a;
+                });
+                if (userComments.length === 0) return !1;
+                var lastContactComment = (t.comments || [])
                   .slice()
                   .reverse()
-                  .find(function (t) {
-                    return t.author === n;
+                  .find(function (c) {
+                    return c.author === n;
                   });
-                if (!e) return !0;
-                var i = (t.comments || []).indexOf(e);
-                return (t.comments || []).some(function (t, e) {
-                  return t.author === a && t.replyTo === n && e > i;
+                if (!lastContactComment) return !0;
+                var lastContactIdx = (t.comments || []).indexOf(
+                  lastContactComment,
+                );
+                return (t.comments || []).some(function (c, idx) {
+                  return c.author === a && idx > lastContactIdx;
                 });
               });
-              if (m < 0.5 && u.length > 0) {
-                var g = !1;
-                (u.forEach(function (t) {
-                  var e = l.indexOf(t);
-                  e >= 0 &&
-                    ((l[e].likes = l[e].likes || []),
-                    Array.isArray(l[e].likes) || (l[e].likes = []),
-                    n &&
-                      l[e].likes.indexOf(n) < 0 &&
-                      (l[e].likes.push(n), (g = !0)));
-                }),
-                  g &&
-                    ((s = !0),
-                    window.showInAppNotif({
-                      app: "朋友圈",
-                      avatar: i,
-                      name: n,
-                      fullContent: !0,
-                      msg: "点赞了你的动态",
-                      onTap: function () {
-                        o("friends");
-                      },
-                    })));
+              var m = Math.random();
+              if (m < 0.5 && likeCandidates.length > 0) {
+                var g = !1,
+                  likePost =
+                    likeCandidates[Math.floor(Math.random() * likeCandidates.length)],
+                  likeIdx = l.indexOf(likePost);
+                likeIdx >= 0 &&
+                  ((l[likeIdx].likes = l[likeIdx].likes || []),
+                  Array.isArray(l[likeIdx].likes) || (l[likeIdx].likes = []),
+                  l[likeIdx].likes.push(n),
+                  (g = !0),
+                  window.showInAppNotif({
+                    app: "朋友圈",
+                    avatar: i,
+                    name: n,
+                    fullContent: !0,
+                    msg: "点赞了你的动态",
+                    onTap: function () {
+                      o("friends");
+                    },
+                  }));
               } else if (f.length > 0) {
                 var y = c(1);
                 if (y) {
                   var p = f[Math.floor(Math.random() * f.length)],
                     v = l.indexOf(p);
-                  (v >= 0 &&
+                  v >= 0 &&
                     ((l[v].comments = l[v].comments || []),
-                    l[v].comments.push({ author: n, text: y, ts: Date.now() }),
-                    (s = !0)),
+                    l[v].comments.push({
+                      author: n,
+                      text: y,
+                      replyTo: a,
+                      ts: Date.now(),
+                    }),
+                    (s = !0),
                     window.showInAppNotif({
                       app: "朋友圈",
                       avatar: i,
@@ -12416,11 +12442,15 @@ document.addEventListener("DOMContentLoaded", function () {
               (isNaN(d) || d < s) && (d = s));
             var m = (s + Math.random() * (d - s)) * (u ? 36e5 : 6e4);
             setTimeout(function () {
+              if (!window.AKR.isInTimeRange("mail")) {
+                t();
+                return;
+              }
               if ("1" !== localStorage.getItem("akini_toggle_contactMailToggle")) {
                 t();
                 return;
               }
-              const wc = c(Math.floor(10 * Math.random()) + 1);
+              const wc = c(Math.floor(5 * Math.random()) + 1);
               if (!wc) return void t();
               var s = "",
                 d = null;
@@ -12958,7 +12988,7 @@ document.addEventListener("DOMContentLoaded", function () {
               t();
               return;
             }
-            var e = Dn(Math.floor(3 * Math.random()) + 1);
+            var e = Dn(Math.floor(5 * Math.random()) + 1);
             if ((e && (e = e.replace(/\n/g, " ")), e)) {
               var n = window.akiniContacts
                   ? window.akiniContacts.getContacts()
@@ -13023,6 +13053,8 @@ document.addEventListener("DOMContentLoaded", function () {
         return localStorage.getItem("akini_icity_my_nick") || "我";
       }
       function a(t) {
+        var postTs = t && t.ts ? t.ts : 0;
+        if (Date.now() - postTs > 3 * 60 * 1e3) return !1;
         for (
           var e = (function (t) {
               var e = i(),
@@ -13044,14 +13076,17 @@ document.addEventListener("DOMContentLoaded", function () {
             o = e.taNames,
             r = t.comments || [],
             c = -1,
-            l = r.length - 1;
+            l = r.length - 1,
+            hasUserComment = !1;
           l >= 0;
           l--
-        )
+        ) {
           if (o.indexOf(r[l].author) >= 0) {
             c = l;
-            break;
           }
+          if (r[l].author === a) hasUserComment = !0;
+        }
+        if (!hasUserComment) return !1;
         if (c < 0) return !0;
         var s = r[c].author;
         for (l = c + 1; l < r.length; l++)
@@ -13088,7 +13123,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   n = e.find(function (e) {
                     return e.id == t;
                   });
-                if (n && _isIcityContactAuthor(n)) {
+                if (n && _isIcityContactAuthor(n) && Date.now() - (n.ts || 0) <= 3 * 60 * 1e3) {
                   var i = o(n),
                     a = i.name,
                     c = i.avatar;
@@ -13310,217 +13345,9 @@ document.addEventListener("DOMContentLoaded", function () {
               e(1e4, 6e4),
             ));
         }),
-        (window._pickRandomContact = function () {
-          var e = window.akiniContacts ? window.akiniContacts.getContacts() : [];
-          return e.length ? e[Math.floor(Math.random() * e.length)] : null;
-        }),
-        (window._contactIcityAllowed = function () {
-          return (
-            "1" === localStorage.getItem("akini_toggle_contactIcityToggle") &&
-            window.AKR.isInTimeRange("icity")
-          );
-        }),
-        (window._contactFriendsAllowed = function () {
-          return (
-            "1" === localStorage.getItem("akini_toggle_contactFriendsToggle") &&
-            window.AKR.isInTimeRange("friends")
-          );
-        }),
-        (window._pickIcityComment = function () {
-          try {
-            return Dn(1);
-          } catch (t) {
-            return "";
-          }
-        }),
-        (window._scheduleContactLikeOnIcity = function (n) {
-          var i = "icityLike_" + n;
-          t[i] ||
-            ((t[i] = !0),
-            setTimeout(
-              function () {
-                if (!window._contactIcityAllowed()) return;
-                var t = q(),
-                  e = t.find(function (t) {
-                    return t.id == n;
-                  });
-                if (e && ("me" === e.who || "me" === e.author)) {
-                  var i = window._pickRandomContact();
-                  if (i) {
-                    e.likers = e.likers || [];
-                    e.likers.indexOf(i.name) < 0 &&
-                      (e.likers.push(i.name), (e.likes = (e.likes || 0) + 1),
-                      j(t),
-                      window._renderIcity && window._renderIcity(),
-                      window.renderIcityProfileDiaries &&
-                        (window.renderIcityProfileDiaries("icityMyProfileDiaries", "me"),
-                        window.renderIcityProfileDiaries("icityTaProfileDiaries", "ta")),
-                      "function" == typeof window.showInAppNotif &&
-                        window.showInAppNotif({
-                          app: "icity",
-                          avatar: i.avatar,
-                          name: i.name,
-                          fullContent: !0,
-                          msg: "喜欢了你的日记",
-                          onTap: function () {
-                            r("icityArea");
-                          },
-                        }));
-                  }
-                }
-              },
-              60 *
-                1e3 *
-                (parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60") +
-                  Math.random() *
-                    Math.max(
-                      0,
-                      parseFloat(localStorage.getItem("akini_num_icityPostMax") || "90") -
-                        parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60"),
-                    )),
-            ));
-        }),
-        (window._scheduleContactCommentOnIcity = function (n) {
-          var i = "icityCmt_" + n;
-          t[i] ||
-            ((t[i] = !0),
-            setTimeout(
-              function () {
-                if (!window._contactIcityAllowed()) return;
-                var t = q(),
-                  e = t.find(function (t) {
-                    return t.id == n;
-                  });
-                if (e && ("me" === e.who || "me" === e.author)) {
-                  var i = window._pickRandomContact(),
-                    a = window._pickIcityComment();
-                  if (i && a) {
-                    e.comments = e.comments || [];
-                    e.comments.push({
-                      author: i.name,
-                      authorId: i.id,
-                      text: a,
-                      avatar: i.avatar,
-                      ts: Date.now(),
-                    });
-                    j(t);
-                    window._renderIcity && window._renderIcity();
-                    window.renderIcityProfileDiaries &&
-                      (window.renderIcityProfileDiaries("icityMyProfileDiaries", "me"),
-                      window.renderIcityProfileDiaries("icityTaProfileDiaries", "ta"));
-                    "function" == typeof window.showInAppNotif &&
-                      window.showInAppNotif({
-                        app: "icity",
-                        avatar: i.avatar,
-                        name: i.name,
-                        fullContent: !0,
-                        msg: "评论了你的日记：" + a,
-                        onTap: function () {
-                          r("icityArea");
-                        },
-                      });
-                  }
-                }
-              },
-              60 *
-                1e3 *
-                (parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60") +
-                  Math.random() *
-                    Math.max(
-                      0,
-                      parseFloat(localStorage.getItem("akini_num_icityPostMax") || "90") -
-                        parseFloat(localStorage.getItem("akini_num_icityPostMin") || "60"),
-                    )),
-            ));
-        }),
-        (window._scheduleContactLikeOnFriends = function (n) {
-          var i = "friendsLike_" + n;
-          t[i] ||
-            ((t[i] = !0),
-            setTimeout(
-              function () {
-                if (!window._contactFriendsAllowed()) return;
-                var t = O(),
-                  e = t.find(function (t) {
-                    return t.id == n;
-                  });
-                if (e) {
-                  var i = window._pickRandomContact();
-                  if (i) {
-                    e.likes = e.likes || [];
-                    e.likes.indexOf(i.name) < 0 &&
-                      (e.likes.push(i.name),
-                      R(t),
-                      window._renderPosts && window._renderPosts(),
-                      "function" == typeof window.showInAppNotif &&
-                        window.showInAppNotif({
-                          app: "朋友圈",
-                          avatar: i.avatar,
-                          name: i.name,
-                          fullContent: !0,
-                          msg: "点赞了你的朋友圈",
-                          onTap: function () {
-                            o("friends");
-                          },
-                        }));
-                  }
-                }
-              },
-              60 *
-                1e3 *
-                (parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60") +
-                  Math.random() *
-                    Math.max(
-                      0,
-                      parseFloat(localStorage.getItem("akini_num_friendsPostMax") || "90") -
-                        parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60"),
-                    )),
-            ));
-        }),
-        (window._scheduleContactCommentOnFriends = function (n) {
-          var i = "friendsCmt_" + n;
-          t[i] ||
-            ((t[i] = !0),
-            setTimeout(
-              function () {
-                if (!window._contactFriendsAllowed()) return;
-                var t = O(),
-                  e = t.find(function (t) {
-                    return t.id == n;
-                  });
-                if (e) {
-                  var i = window._pickRandomContact(),
-                    a = window._pickIcityComment();
-                  if (i && a) {
-                    e.comments = e.comments || [];
-                    e.comments.push({ author: i.name, text: a, ts: Date.now() });
-                    R(t);
-                    window._renderPosts && window._renderPosts();
-                    "function" == typeof window.showInAppNotif &&
-                      window.showInAppNotif({
-                        app: "朋友圈",
-                        avatar: i.avatar,
-                        name: i.name,
-                        fullContent: !0,
-                        msg: "评论了你的朋友圈：" + a,
-                        onTap: function () {
-                          o("friends");
-                        },
-                      });
-                  }
-                }
-              },
-              60 *
-                1e3 *
-                (parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60") +
-                  Math.random() *
-                    Math.max(
-                      0,
-                      parseFloat(localStorage.getItem("akini_num_friendsPostMax") || "90") -
-                        parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "60"),
-                    )),
-            ));
-        }));
+        function n() {
+          /* 已禁用自动点赞/评论调度 */
+        });
     })();
     (function () {
       function Wt(t, e) {
@@ -15655,7 +15482,7 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           names = "TA";
         }
-        var o = "与 " + names + " 一起听了 " + (a += (n % 60) + " 分钟");
+        var o = "TA就在你的身边 一起听了 " + (a += (n % 60) + " 分钟");
         e.distanceText && (e.distanceText.textContent = o);
         e.listenTime && (e.listenTime.textContent = o);
       }

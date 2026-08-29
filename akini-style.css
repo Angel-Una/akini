@@ -252,7 +252,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .middle-row {
   display: flex;
   justify-content: flex-start;
-  padding: 6px 16px 12px;
+  padding: 3px 16px 12px;
   flex: 1;
   min-height: 0;
   align-items: flex-start;
@@ -264,8 +264,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   gap: 10px;
   flex-shrink: 0;
-  margin-top: 4px;
-  margin-left: 12px;
+  margin-top: 2px;
+  margin-left: 17px;
   width: 204px;
   max-height: 100%;
   overflow-y: auto;
@@ -290,16 +290,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 #appBtnMail .icon-wrap {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.25);
-}
-/* 微信/信箱/网易云/iCity/商店/纪念日/聊天预览模块整体上移 5px */
-#appBtnChat,
-#appBtnMail,
-#appBtnMusic,
-#appBtnIcity,
-#appBtnShop,
-#bgArea,
-#chatPreview {
-  transform: translateY(-5px) !important;
 }
 .app-item {
   background: 0 0;
@@ -417,7 +407,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   left: -80px;
   margin-left: 0;
   transform: translateX(0);
-  top: 0;
+  top: -2px;
 }
 .preview-row {
   display: flex;
@@ -456,16 +446,16 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .preview-bubble {
   flex: 1;
   min-width: 0;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   padding: 8px 12px;
   font-size: 13px;
   color: #333;
   line-height: 1.5;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   outline: 0;
   -webkit-user-modify: read-write;
   user-select: text;
@@ -474,33 +464,21 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   max-width: 160px;
 }
 .preview-bubble:focus {
-  background: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.75);
 }
 .bottom-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 6px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 16px 16px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
-  z-index: 200;
-  background: transparent;
-  pointer-events: none;
-}
-.bottom-bar > * {
-  pointer-events: auto;
 }
 .bottom-btn-container {
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.5);
   border-radius: 28px;
   padding: 6px 12px;
   display: flex;
   gap: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 .bottom-btn {
   background: 0 0;
@@ -3725,9 +3703,6 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   position: relative;
   overflow: visible;
   z-index: 0;
-  background-repeat: no-repeat;
-  background-size: contain;
-  background-position: center;
 }
 #icityMyBgArea > div {
   position: absolute;
@@ -3749,9 +3724,6 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   position: relative;
   overflow: visible;
   z-index: 0;
-  background-repeat: no-repeat;
-  background-size: contain;
-  background-position: center;
 }
 #icityTaProfileBack,
 #icityTaProfileEditBtn {
@@ -3771,8 +3743,8 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   display: flex;
   align-items: center;
   padding: 16px 18px;
-  background: transparent;
-  border-bottom: none;
+  background: #fff;
+  border-bottom: 1px solid #e8e8e8;
   flex-shrink: 0;
   position: fixed;
   top: 0;
@@ -3781,16 +3753,6 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   width: 100%;
   box-sizing: border-box;
   z-index: 100;
-}
-.icity-header .back-btn,
-.icity-header .title {
-  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
-}
-body.dark-mode .icity-header .title {
-  color: #f0f0f0;
-}
-body.dark-mode .icity-header .back-btn {
-  color: #f0f0f0;
 }
 .icity-header .back-btn {
   margin-right: 12px;
