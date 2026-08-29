@@ -649,6 +649,12 @@ document.addEventListener("DOMContentLoaded", function () {
               window._akiniRestoreFromSnapshot &&
                 window._akiniRestoreFromSnapshot(function () {
                   console.log("[Akini] cache+idb+snapshot restoreAll done");
+                  // 恢复完成后标记并重新渲染 iCity，确保同步缓存读取到恢复后的数据
+                  try {
+                    window._akiniDataRestored = true;
+                    if ("function" == typeof window._renderIcity)
+                      window._renderIcity();
+                  } catch (e) {}
                 });
             });
         });
@@ -3129,6 +3135,12 @@ document.addEventListener("DOMContentLoaded", function () {
         )
           throw c;
         B();
+        // 配额超限导致 localStorage 写入失败时，仍把数据写入 IndexedDB，避免数据彻底丢失
+        try {
+          window._idbStore &&
+            window._idbStore.set &&
+            window._idbStore.set(t, e);
+        } catch (_) {}
         try {
           return T.call(this, t, e);
         } catch (t) {}
@@ -3231,7 +3243,8 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
       }));
     function q() {
-      if (!F) {
+      // F 为空（含首次读取时本地尚未恢复）时重新读取，避免把空数组永久缓存导致数据丢失
+      if (!F || F.length === 0) {
         var t =
           localStorage.getItem("akini_icity_diaries") ||
           localStorage.getItem("akini_icity_diaries_backup");
@@ -12367,12 +12380,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260829ao 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260829ap 调整默认开关，删除旧默认值让 t() 重新写入
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260829ao") {
-            localStorage.setItem("akini_app_version", "20260829ao");
+          if (ver !== "20260829ap") {
+            localStorage.setItem("akini_app_version", "20260829ap");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
