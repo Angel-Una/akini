@@ -29,7 +29,7 @@ window.__akiniBootStep = "start";
   try {
     ["readReceiptToggle", "timestampToggle"].forEach(function (key) {
       if (localStorage.getItem("akini_toggle_" + key) === null) {
-        localStorage.setItem("akini_toggle_" + key, "1");
+        localStorage.setItem("akini_toggle_" + key, "0");
       }
     });
   } catch (e) {}
@@ -92,10 +92,16 @@ window.AKR = (function () {
     var r = Math.random();
     return r < 0.55 ? 1 : r < 0.88 ? 2 : 3;
   }
-  /* 回复行为：已读必回为主，低概率已读不回；3% 概率触发拍一拍 */
+  /* 回复行为：未开“已读不回”时必回；开启后才按概率已读不回；3% 概率触发拍一拍 */
   function pickReplyBehavior() {
-    if (Math.random() < getProb("noReply"))
-      return { type: "none", cardCount: 0, extra: {} };
+    var readNoReply = false;
+    try {
+      readNoReply = localStorage.getItem("akini_toggle_readNoReplyToggle") === "1";
+    } catch (e) {}
+    if (readNoReply) {
+      if (Math.random() < getProb("noReply"))
+        return { type: "none", cardCount: 0, extra: {} };
+    }
     var extra = {};
     if (Math.random() < getProb("poke")) extra.poke = true;
     return {
@@ -397,23 +403,26 @@ document.addEventListener("DOMContentLoaded", function () {
         backupAll: function (e) {
           n(function (n) {
             if (n) {
-              for (
-                var i = n.transaction(t, "readwrite"),
-                  a = i.objectStore(t),
-                  o = 0;
-                o < localStorage.length;
-                o++
-              ) {
-                var r = localStorage.key(o),
-                  c = localStorage.getItem(r);
-                r && null !== c && a.put(c, r);
-              }
-              ((i.oncomplete = function () {
-                e && e();
-              }),
-                (i.onerror = function () {
+              try {
+                var tx = n.transaction(t, "readwrite"),
+                  store = tx.objectStore(t);
+                for (var o = 0; o < localStorage.length; o++) {
+                  var r = localStorage.key(o),
+                    c = localStorage.getItem(r);
+                  // 不用空值/空数组/空对象覆盖 IDB 中已有的有效数据，避免把好数据备份成空
+                  if (r && null !== c && c !== "" && c !== "[]" && c !== "{}" && c !== "null" && c !== "undefined") {
+                    store.put(c, r);
+                  }
+                }
+                ((tx.oncomplete = function () {
                   e && e();
-                }));
+                }),
+                  (tx.onerror = function () {
+                    e && e();
+                  }));
+              } catch (err) {
+                e && e();
+              }
             } else e && e();
           });
         },
@@ -440,6 +449,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     v !== "undefined"
                   ) {
                     var cur = localStorage.getItem(k);
+                    // 仅当本地缺失，或本地数据明显更短时才用 IDB 恢复，避免旧快照覆盖新数据
                     if (
                       !cur ||
                       cur === "" ||
@@ -447,7 +457,8 @@ document.addEventListener("DOMContentLoaded", function () {
                       cur === "undefined" ||
                       cur === "[]" ||
                       cur === "{}" ||
-                      cur.length === 0
+                      cur.length === 0 ||
+                      cur.length + 200 < (v || "").length
                     ) {
                       try {
                         localStorage.setItem(k, v);
@@ -589,13 +600,56 @@ document.addEventListener("DOMContentLoaded", function () {
       };
     })();
     try {
+      window._akiniRestoreFromSnapshot = function (e) {
+        try {
+          const sources = [
+            localStorage.getItem("akini_localstorage_snapshot"),
+            localStorage.getItem("akini_localstorage_snapshot_backup"),
+          ];
+          let restored = 0;
+          sources.forEach(function (src) {
+            if (!src) return;
+            try {
+              var data = JSON.parse(src);
+              if (data && "object" == typeof data) {
+                for (var k in data) {
+                  if (
+                    data.hasOwnProperty(k) &&
+                    k.indexOf("akini_") === 0
+                  ) {
+                    try {
+                      var cur = localStorage.getItem(k);
+                      if (
+                        !cur ||
+                        cur === "" ||
+                        cur === "null" ||
+                        cur === "undefined" ||
+                        cur === "[]" ||
+                        cur === "{}"
+                      ) {
+                        localStorage.setItem(k, data[k]);
+                        restored++;
+                      }
+                    } catch (x) {}
+                  }
+                }
+              }
+            } catch (p) {}
+          });
+          console.log("[Akini] restoreFromSnapshot restored", restored);
+        } catch (e) {}
+        "function" == typeof e && e();
+      };
       window._akiniCacheStore &&
         window._akiniCacheStore.restoreAll &&
         window._akiniCacheStore.restoreAll(function () {
           window._idbStore &&
             window._idbStore.restoreAll &&
             window._idbStore.restoreAll(function () {
-              console.log("[Akini] cache+idb restoreAll done");
+              window._akiniRestoreFromSnapshot &&
+                window._akiniRestoreFromSnapshot(function () {
+                  console.log("[Akini] cache+idb+snapshot restoreAll done");
+                });
             });
         });
     } catch (e) {
@@ -1562,9 +1616,7 @@ document.addEventListener("DOMContentLoaded", function () {
       } else {
         var newMeta = document.createElement("div");
         newMeta.className = "msg-meta";
-        newMeta.style.cssText = isMe
-          ? "display:flex;justify-content:flex-end;padding-right:46px;margin-top:2px;"
-          : "display:flex;justify-content:flex-start;padding-left:46px;margin-top:2px;";
+        newMeta.style.cssText = "display:flex;justify-content:flex-end;padding-right:46px;margin-top:2px;";
         newMeta.innerHTML = '<span style="font-size:10px;color:#aaa;">已读</span>';
         row.appendChild(newMeta);
       }
@@ -2720,33 +2772,43 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
     function C(t, e) {
-      if (!t || !e || "string" != typeof e || "" === e.trim()) return;
+      if (!t || "string" != typeof e) return;
       E[t] = e;
+      var key = "akini_chat_history_" + t;
+      var backup = "akini_chat_history_backup_" + t;
       try {
-        _idbStore.set("akini_chat_history_" + t, e);
+        _idbStore.set(key, e);
       } catch (e) {}
       try {
-        _idbStore.set("akini_chat_history_backup_" + t, e);
+        _idbStore.set(backup, e);
       } catch (e) {}
       try {
-        localStorage.setItem("akini_chat_history_" + t, e);
+        localStorage.setItem(key, e);
       } catch (i) {
         B();
         try {
-          localStorage.setItem("akini_chat_history_" + t, e);
+          localStorage.setItem(key, e);
         } catch (i) {}
       }
       try {
-        localStorage.setItem("akini_chat_history_backup_" + t, e);
+        localStorage.setItem(backup, e);
       } catch (i) {
         B();
         try {
-          localStorage.setItem("akini_chat_history_backup_" + t, e);
+          localStorage.setItem(backup, e);
         } catch (i) {}
       }
       try {
-        var ck = "akini_chat_history_" + t;
-        void ck;
+        window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
+      } catch (e) {}
+    }
+    function __akiniSaveChatHistory(t, e) {
+      if (!t || "string" != typeof e) return;
+      C(t, e);
+      try {
+        _idbStore.set("akini_chat_history_" + t, e, function () {
+          _idbStore.set("akini_chat_history_backup_" + t, e);
+        });
       } catch (e) {}
     }
     function B() {
@@ -2758,8 +2820,6 @@ document.addEventListener("DOMContentLoaded", function () {
         "akini_friends_bg",
         "akini_cover_img",
         "akini_chat_bg",
-        "akini_chat_history",
-        "akini_chat_history_backup",
         "akini_contact_stickers",
         "akini_stickers",
         "akini_stickers_idx",
@@ -3834,7 +3894,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           window.akiniContacts.backupToIDB("akini_wb_groups", a);
         }
-      }, 60000));
+      }, 10000));
     function flushAllData() {
       try {
         if (window._restoringData) return;
@@ -3936,6 +3996,13 @@ document.addEventListener("DOMContentLoaded", function () {
               window.akiniContacts.tryRestoreFromBackup(__akiniBootApp);
           });
       }),
+      // 定期备份到 IndexedDB：移动端 beforeunload/pagehide 不可靠，靠定时器保证数据落盘
+      setInterval(function () {
+        try {
+          if (window._restoringData || window._restoringChatHistory) return;
+          V();
+        } catch (t) {}
+      }, 15000),
       (window._restoringChatHistory = !0),
       U && (U.innerHTML = ""),
       setTimeout(function () {
@@ -5416,8 +5483,7 @@ document.addEventListener("DOMContentLoaded", function () {
           e = "",
           n = "",
           r = !1,
-          c = new Set(),
-          wAutoSwitching = !1;
+          c = new Set();
         function l() {
           return i("akini_wordbank", []);
         }
@@ -5484,21 +5550,6 @@ document.addEventListener("DOMContentLoaded", function () {
             );
           }
           if (0 === a.length) {
-            if (!wAutoSwitching) {
-              const all = l();
-              const first = all.find((e) => (e.tab || "main") !== t);
-              if (first && y) {
-                wAutoSwitching = !0;
-                (t = first.tab || "main"),
-                  y.querySelectorAll(".tab").forEach((e) =>
-                    e.classList.remove("active"),
-                  );
-                const L = y.querySelector('[data-tab="' + t + '"]');
-                L && L.classList.add("active");
-                const r = f();
-                return (wAutoSwitching = !1), r;
-              }
-            }
             return (
               (i.innerHTML =
                 '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0;">' +
@@ -5923,12 +5974,32 @@ document.addEventListener("DOMContentLoaded", function () {
                           });
                           h++;
                         }
-                        (Array.isArray(t.items)
-                          ? t.items
-                          : Array.isArray(t.replies)
-                            ? t.replies
-                            : []
-                        ).forEach((t) => a(t, { tab: "main", gid: e }));
+                        (function () {
+                          for (
+                            var _i = 0,
+                              _ka = [
+                                "items",
+                                "replies",
+                                "cards",
+                                "words",
+                                "list",
+                                "data",
+                                "wordbank",
+                                "main",
+                                "customReplies",
+                                "customPokes",
+                                "customEmojis",
+                              ];
+                            _i < _ka.length;
+                            _i++
+                          ) {
+                            if (Array.isArray(t[_ka[_i]]))
+                              return t[_ka[_i]];
+                          }
+                          return [];
+                        })().forEach((t) =>
+                          a(t, { tab: "main", gid: e }),
+                        );
                       }),
                     Array.isArray(x.customReplies) &&
                       x.customReplies.forEach((t) => a(t, { tab: "main" })),
@@ -5999,7 +6070,6 @@ document.addEventListener("DOMContentLoaded", function () {
                       x.text.split("\n").forEach((t) => a(t, { tab: "main" }));
                   }
                   0 === v &&
-                    0 === h &&
                     [
                       "items",
                       "replies",
@@ -8602,10 +8672,21 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!n) return void a();
             n.remove();
             const t = document.getElementById("chatBody");
-            if (t)
+            if (t && window.akiniContacts) {
               try {
-                _idbStore.set("akini_chat_history", t.innerHTML);
+                var activeId = window.akiniContacts.getActiveChatId();
+                var html = t.innerHTML;
+                window.akiniContacts.updateSession(activeId, { messagesHTML: html });
+                if (typeof C === "function") C(activeId, html);
+                else {
+                  try { localStorage.setItem("akini_chat_history_" + activeId, html); } catch (e) {}
+                  try { localStorage.setItem("akini_chat_history_backup_" + activeId, html); } catch (e) {}
+                  try { _idbStore.set("akini_chat_history_" + activeId, html); } catch (e) {}
+                  try { _idbStore.set("akini_chat_history_backup_" + activeId, html); } catch (e) {}
+                }
+                try { _idbStore.set("akini_chat_history", html); } catch (t) {}
               } catch (t) {}
+            }
             a();
           }));
     })();
@@ -10788,13 +10869,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     var fallbackTarget = activeChatId ? window.akiniContacts.getChatTarget(activeChatId) : null;
                     if (fallbackTarget) otherContact = fallbackTarget;
                   }
-                  // 信件详情显示发件人头像：sent 显示我，received 显示联系人
-                  var senderName, senderAvatar;
+                  // 信件详情：我寄/回显示我的头像，联系人寄/回显示联系人的头像；姓名始终显示联系人
+                  var senderAvatar;
                   if ("sent" === e) {
-                    senderName = n || localStorage.getItem("akini_my_name") || "我";
                     senderAvatar = localStorage.getItem("akini_my_avatar") || "🐱";
                   } else {
-                    senderName = otherContact ? (otherContact.name || a) : a;
                     senderAvatar = otherContact ? (otherContact.avatar || "🐰") : (localStorage.getItem("akini_ta_avatar") || "🐰");
                   }
                   if (avatarEl) {
@@ -10803,7 +10882,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (!avatarEl.innerHTML.trim()) avatarEl.innerHTML = "🐰";
                   }
                   if (nameEl) {
-                    nameEl.textContent = senderName;
+                    nameEl.textContent = a;
                   }
                   (o &&
                     ("sent" === e
@@ -12288,12 +12367,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260828ak 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260829ao 调整默认开关，删除旧默认值让 t() 重新写入
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260828ak") {
-            localStorage.setItem("akini_app_version", "20260828ak");
+          if (ver !== "20260829ao") {
+            localStorage.setItem("akini_app_version", "20260829ao");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
@@ -12434,7 +12513,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }),
         window._requestNotificationPermission(),
         t("quoteReplyToggle", !1),
-        t("readReceiptToggle", !0),
+        t("readReceiptToggle", !1),
         t("readNoReplyToggle", !1),
         t("emojiMixToggle", !1),
         t("contactEmojiToggle", !1),
@@ -12451,7 +12530,7 @@ document.addEventListener("DOMContentLoaded", function () {
         t("contactShopToggle", !1),
         t("contactFriendsToggle", !1),
         t("contactIcityToggle", !1),
-        t("timestampToggle", !0),
+        t("timestampToggle", !1),
         t("darkModeToggle", !1),
         document.querySelectorAll(".style-btn").forEach((t) => {
           a(t, function () {
@@ -13741,7 +13820,7 @@ document.addEventListener("DOMContentLoaded", function () {
           loginStatus: document.getElementById("musicLoginStatus"),
           songName: document.getElementById("musicSongName"),
           artist: document.getElementById("musicArtist"),
-          followBtn: document.getElementById("musicFollowBtn"),
+          listenTime: document.getElementById("musicPlayerListenTime"),
           leftAvatar: document.getElementById("musicLeftAvatar"),
           centerAvatar: document.getElementById("musicCenterAvatar"),
           rightAvatar: document.getElementById("musicRightAvatar"),
@@ -14099,12 +14178,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 try {
                   localStorage.removeItem("akini_music_exited");
                 } catch (e) {}
-                // 打开选人浮层时，若已退出或没有联系人，清空上次选择，避免旧数据导致人数不符
-                if (exited || !hasContacts) {
-                  T.length = 0;
+                // 保留已选联系人，退出一起听后也不清空，避免重新选人
+                if (hasContacts && T.length === 0) {
                   try {
-                    localStorage.removeItem("akini_music_selected_contacts");
-                  } catch (e) {}
+                    T = JSON.parse(
+                      localStorage.getItem("akini_music_selected_contacts") ||
+                        "[]",
+                    );
+                  } catch (e) {
+                    T = [];
+                  }
                   Ot();
                 }
                 Rt();
@@ -14908,8 +14991,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ) {
           var R = c[l];
           ((e.songName.textContent = R.title || "未知歌曲"),
-            (e.artist.textContent = R.artist || "未知歌手"),
-            (e.followBtn.style.display = "inline-block"));
+            (e.artist.textContent = R.artist || "未知歌手"));
           var F =
             R.cover ||
             "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
@@ -15232,13 +15314,29 @@ document.addEventListener("DOMContentLoaded", function () {
             (Q(), u && u.paused && u.play().catch(function () {})));
       }
       function lt() {
-        var t = I + (x ? Math.floor((Date.now() - x) / 1e3) : 0),
-          n = Math.floor(t / 60),
+        var selectedSeconds = 0;
+        if (T && T.length > 0) {
+          var nowDelta = x ? Math.floor((Date.now() - x) / 1e3) : 0;
+          T.forEach(function (ct) {
+            if (ct && ct.id) {
+              selectedSeconds += (listenMap[ct.id] || 0) + nowDelta;
+            }
+          });
+        }
+        var totalDisplay = selectedSeconds > 0 ? selectedSeconds : I + (x ? Math.floor((Date.now() - x) / 1e3) : 0);
+        var n = Math.floor(totalDisplay / 60),
           i = Math.floor(n / 60),
           a = "";
         i > 0 && (a += i + " 小时 ");
-        var o = "TA就在你身边 · 一起听了 " + (a += (n % 60) + " 分钟");
+        var names = "";
+        if (T && T.length > 0) {
+          names = T.map(function (ct) { return ct.name || "TA"; }).join("、");
+        } else {
+          names = "TA";
+        }
+        var o = "与 " + names + " 一起听了 " + (a += (n % 60) + " 分钟");
         e.distanceText && (e.distanceText.textContent = o);
+        e.listenTime && (e.listenTime.textContent = o);
       }
       function st() {
         var t = [
@@ -15403,6 +15501,15 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           localStorage.setItem("akini_music_index", String(l));
         } catch (t) {}
+        // 清理旧音频，避免切歌后仍播放上一首
+        if (u) {
+          try {
+            u.pause();
+            u.removeAttribute("src");
+            u.load();
+          } catch (t) {}
+        }
+        (E = null), (S = 0), (A = null);
         It();
       }
       function St(next) {
@@ -15640,7 +15747,10 @@ document.addEventListener("DOMContentLoaded", function () {
           try {
             a = localStorage.getItem("akini_netease_cookie") || "";
           } catch (t) {}
-        if (!n && !i && kt(e)) return Promise.resolve();
+        if (!n && !i && kt(e)) {
+          // 命中缓存时仍需把当前 URL 设置给音频，避免旧音频继续播放
+          return E && vt(E, i ? "fetch-retry" : "fetch"), Promise.resolve();
+        }
         var o = t + "/song/url?id=" + encodeURIComponent(String(e.id)) + "&cookie=" + encodeURIComponent(a || "");
         return fetch(o)
           .then(function (t) {
@@ -15725,8 +15835,7 @@ document.addEventListener("DOMContentLoaded", function () {
         _spLastTs = performance.now();
         ((k = bt(n.duration)),
           (e.songName.textContent = n.title || "未知歌曲"),
-          (e.artist.textContent = n.artist || "未知歌手"),
-          (e.followBtn.style.display = "inline-block"));
+          (e.artist.textContent = n.artist || "未知歌手"));
         var i =
           n.cover ||
           "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
