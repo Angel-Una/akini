@@ -3931,6 +3931,9 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
           else sig += "|" + (row.textContent || "").trim();
+          // 普通聊天消息加入时间戳/唯一 data-ts，避免相同内容被误吞
+          var _ts = row.getAttribute("data-ts");
+          if (_ts) sig += "|ts:" + _ts;
         }
         if (!seen.has(sig)) {
           seen.add(sig);
@@ -4698,18 +4701,16 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.getItem("akini_ta_avatar") ||
             localStorage.getItem("akini_icity_ta_avatar") ||
             "";
-          /* 无头像时先隐藏占位（不显示默认 🐰），避免闪烁；IDB 恢复后再显示 */
+          /* 无头像时不渲染默认 🐰，用透明占位，避免先闪默认头像 */
           if (!_curAv) {
-            n && (n.style.visibility = "hidden");
-            i && (i.style.visibility = "hidden");
+            n && ((n.style.visibility = "hidden"), (n.innerHTML = ""));
+            i && ((i.style.visibility = "hidden"), (i.innerHTML = ""));
           } else {
-            n && (n.style.visibility = "");
-            i && (i.style.visibility = "");
+            n && ((n.style.visibility = ""), (n.innerHTML = nt(_curAv, 38)));
+            i && ((i.style.visibility = ""), (i.innerHTML = nt(_curAv, 38)));
           }
-          (e && (e.textContent = t.name),
-            n && (n.innerHTML = nt(_curAv, 38)),
-            i && (i.innerHTML = nt(_curAv, 38)));
-          /* 头像仍为空时异步从 IDB 恢复后重绘，避免停留在默认 🐰 */
+          (e && (e.textContent = t.name));
+          /* 头像仍为空时异步从 IDB 恢复后重绘 */
           if (!_curAv && window._idbStore && window._idbStore.get) {
             _idbStore.get("akini_ta_avatar", function (_av) {
               if (
@@ -4722,8 +4723,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 } catch (_e) {}
                 var _n2 = document.getElementById("chatTaAvatar"),
                   _i2 = document.getElementById("taMsgAvatar");
-                (_n2 && (_n2.style.visibility = "", (_n2.innerHTML = nt(_av, 38))),
-                  _i2 && (_i2.style.visibility = "", (_i2.innerHTML = nt(_av, 38))));
+                (_n2 && ((_n2.style.visibility = ""), (_n2.innerHTML = nt(_av, 38))),
+                  _i2 && ((_i2.style.visibility = ""), (_i2.innerHTML = nt(_av, 38))));
               }
             });
           }
@@ -12690,12 +12691,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260830az 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260830ba 调整默认开关，删除旧默认值让 t() 重新写入
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830az") {
-            localStorage.setItem("akini_app_version", "20260830az");
+          if (ver !== "20260830ba") {
+            localStorage.setItem("akini_app_version", "20260830ba");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
@@ -13237,26 +13238,38 @@ document.addEventListener("DOMContentLoaded", function () {
       function i() {
         return localStorage.getItem("akini_icity_my_nick") || "我";
       }
+      function _pickIcityInteractor() {
+        if (!window.akiniContacts) return null;
+        var t = window.akiniContacts.getContacts();
+        if (!t.length) return null;
+        var e = t[Math.floor(Math.random() * t.length)],
+          n = getIcityContactProfile(e.id);
+        return {
+          id: e.id,
+          name: (n && n.name) || e.name || "对方",
+          avatar: (n && n.avatar) || e.avatar || "🐰",
+        };
+      }
       function a(t) {
         var postTs = t && t.ts ? t.ts : 0;
         if (Date.now() - postTs > 3 * 60 * 1e3) return !1;
         for (
-          var e = (function (t) {
-              var e = i(),
-                a = [];
-              if (t.authorId) {
-                var o = getIcityContactProfile(t.authorId);
-                o && o.name && a.push(o.name);
+          var e = (function () {
+              var t = i(),
+                e = [];
+              // 把我给每个联系人设置的 iCity 昵称都纳入“TA”，避免评论循环判断失效
+              if (window.akiniContacts) {
+                window.akiniContacts.getContacts().forEach(function (n) {
+                  var i = getIcityContactProfile(n.id);
+                  i && i.name && e.push(i.name);
+                  n.name && e.push(n.name);
+                });
               }
               return (
-                t.author &&
-                  "me" !== t.author &&
-                  "ta" !== t.author &&
-                  a.push(t.author),
-                a.push(n()),
-                { myName: e, taNames: a }
+                e.push(localStorage.getItem("akini_icity_ta_nick") || "对方"),
+                { myName: t, taNames: e }
               );
-            })(t),
+            })(),
             a = e.myName,
             o = e.taNames,
             r = t.comments || [],
@@ -13312,9 +13325,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     return e.id == t;
                   });
                 if (n && _isIcityUserAuthor(n) && Date.now() - (n.ts || 0) <= 3 * 60 * 1e3) {
-                  var i = o(n),
-                    a = i.name,
-                    c = i.avatar;
+                  var interactor = _pickIcityInteractor();
+                  if (!interactor) return;
+                  var a = interactor.name,
+                    c = interactor.avatar;
                   ((n.likers = n.likers || []),
                     n.likers.indexOf(a) < 0 &&
                       (n.likers.push(a),
@@ -13383,13 +13397,14 @@ document.addEventListener("DOMContentLoaded", function () {
                     i = Dn(1);
                   } catch (t) {}
                   if (i) {
-                    var c = o(n),
-                      l = c.name,
-                      s = c.avatar;
+                    var interactor = _pickIcityInteractor();
+                    if (!interactor) return;
+                    var l = interactor.name,
+                      s = interactor.avatar;
                     ((n.comments = n.comments || []),
                       n.comments.push({
                         author: l,
-                        authorId: n.authorId,
+                        authorId: interactor.id,
                         text: i,
                         avatar: s,
                         ts: Date.now(),
