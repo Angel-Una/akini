@@ -97,9 +97,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: fixed;
   inset: 0;
   transition: background 0.3s;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
   border-radius: 0 !important;
   box-shadow: none !important;
   z-index: 1;
@@ -158,6 +158,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   height: 160px;
   border-radius: 22px;
   background: #e6e6e6;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
   overflow: hidden;
   display: flex;
   justify-content: center;

@@ -12734,12 +12734,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260831bw 修复联系人行为/图标/音乐导入/红色弹窗等问题
+      // 版本迁移：20260831by 修复联系人行为/图标/音乐导入/红色弹窗等问题
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260831bw") {
-            localStorage.setItem("akini_app_version", "20260831bw");
+          if (ver !== "20260831by") {
+            localStorage.setItem("akini_app_version", "20260831by");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
