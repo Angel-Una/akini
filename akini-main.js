@@ -725,6 +725,54 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (e) {
       console.warn("[Akini] restoreAll error", e);
     }
+    // 定时器调度器：支持后台/冻结后恢复时追赶触发
+    (function () {
+      var jobs = {};
+      window._akiniTimer = {
+        schedule: function (name, fn, delayMs) {
+          try {
+            if (jobs[name]) clearTimeout(jobs[name]);
+            localStorage.setItem(
+              "akini_next_" + name,
+              String(Date.now() + delayMs),
+            );
+          } catch (e) {}
+          jobs[name] = setTimeout(function () {
+            try {
+              localStorage.setItem("akini_last_" + name, String(Date.now()));
+              localStorage.removeItem("akini_next_" + name);
+            } catch (e) {}
+            try {
+              fn();
+            } catch (e) {
+              console.warn("[AkiniTimer] " + name + " error", e);
+            }
+          }, Math.max(0, delayMs));
+        },
+        runIfDue: function (name, fn) {
+          try {
+            var next = parseFloat(
+              localStorage.getItem("akini_next_" + name) || "0",
+            );
+            if (next && Date.now() >= next) {
+              if (jobs[name]) clearTimeout(jobs[name]);
+              try {
+                localStorage.setItem("akini_last_" + name, String(Date.now()));
+                localStorage.removeItem("akini_next_" + name);
+              } catch (e) {}
+              fn();
+            }
+          } catch (e) {}
+        },
+        catchUp: function (actions) {
+          for (var name in actions) {
+            if (actions.hasOwnProperty(name) && "function" == typeof actions[name]) {
+              window._akiniTimer.runIfDue(name, actions[name]);
+            }
+          }
+        },
+      };
+    })();
     document.addEventListener("DOMContentLoaded", function() {
   setTimeout(function() {
     try {
@@ -2375,7 +2423,7 @@ document.addEventListener("DOMContentLoaded", function () {
         c = 1e3 * o,
         l = 1e3 * r,
         s = c + Math.random() * Math.max(0, l - c);
-      setTimeout(function () {
+      function replyAction() {
         if (!window.AKR.isInTimeRange("reply")) {
           hideTypingBubble(t);
           return;
@@ -2393,8 +2441,51 @@ document.addEventListener("DOMContentLoaded", function () {
             );
           });
         }
-      }, s);
+      }
+      window._akiniReplyAction = function () {
+        b(t);
+      };
+      window._akiniTimer.schedule("reply", replyAction, s);
     }
+    (function () {
+      var actions = {
+        activeMsg: function () {
+          window._akiniActiveMsgAction && window._akiniActiveMsgAction();
+        },
+        friendsPost: function () {
+          window._akiniFriendsPostAction && window._akiniFriendsPostAction();
+        },
+        friendsInteract: function () {
+          window._akiniFriendsInteractAction &&
+            window._akiniFriendsInteractAction();
+        },
+        mail: function () {
+          window._akiniMailAction && window._akiniMailAction();
+        },
+        icityPost: function () {
+          window._akiniIcityPostAction && window._akiniIcityPostAction();
+        },
+        reply: function () {
+          window._akiniReplyAction && window._akiniReplyAction();
+        },
+      };
+      document.addEventListener("visibilitychange", function () {
+        if (!document.hidden && window._akiniTimer) {
+          window._akiniTimer.catchUp(actions);
+        }
+      });
+      window.addEventListener("pageshow", function (e) {
+        if (e.persisted && window._akiniTimer) {
+          window._akiniTimer.catchUp(actions);
+        }
+      });
+      /* 首次加载也补一次，处理应用关闭期间错过的定时任务 */
+      setTimeout(function () {
+        try {
+          window._akiniTimer && window._akiniTimer.catchUp(actions);
+        } catch (e) {}
+      }, 3000);
+    })();
     window._akiniTransferAmount = e;
     window._akiniTransferNote = n;
     window.__akiniForceReply = function () {
@@ -4078,15 +4169,21 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       window.addEventListener("pagehide", function () {
         try {
+          V();
+        } catch (t) {}
+        try {
           flushAllData();
         } catch (t) {}
       }),
       document.addEventListener("visibilitychange", function () {
-        if (document.hidden)
+        if (document.hidden) {
+          try {
+            V();
+          } catch (t) {}
           try {
             flushAllData();
           } catch (t) {}
-        else if (U && window.akiniContacts) {
+        } else if (U && window.akiniContacts) {
           try {
             var e = window.akiniContacts.getActiveChatId();
             if (e && (!U.innerHTML || "" === U.innerHTML.trim())) {
@@ -4101,14 +4198,24 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }),
       window.addEventListener("pageshow", function (t) {
-        t.persisted &&
-          window._idbStore &&
-          window._idbStore.restoreAll &&
-          window._idbStore.restoreAll(function () {
-            window.akiniContacts &&
-              window.akiniContacts.tryRestoreFromBackup &&
-              window.akiniContacts.tryRestoreFromBackup(__akiniBootApp);
-          });
+        if (t.persisted) {
+          window._akiniCacheStore &&
+            window._akiniCacheStore.restoreAll &&
+            window._akiniCacheStore.restoreAll(function () {
+              window._idbStore &&
+                window._idbStore.restoreAll &&
+                window._idbStore.restoreAll(function () {
+                  window._akiniRestoreFromSnapshot &&
+                    window._akiniRestoreFromSnapshot(function () {
+                      window.akiniContacts &&
+                        window.akiniContacts.tryRestoreFromBackup &&
+                        window.akiniContacts.tryRestoreFromBackup(
+                          __akiniBootApp,
+                        );
+                    });
+                });
+            });
+        }
       }),
       // 定期备份到 IndexedDB：移动端 beforeunload/pagehide 不可靠，靠定时器保证数据落盘
       setInterval(function () {
@@ -4586,12 +4693,48 @@ document.addEventListener("DOMContentLoaded", function () {
           var e = document.getElementById("chatTaName"),
             n = document.getElementById("chatTaAvatar"),
             i = document.getElementById("taMsgAvatar");
+          var _curAv =
+            (t.avatar && t.avatar.trim()) ||
+            localStorage.getItem("akini_ta_avatar") ||
+            localStorage.getItem("akini_icity_ta_avatar") ||
+            "";
+          /* 无头像时先隐藏占位（不显示默认 🐰），避免闪烁；IDB 恢复后再显示 */
+          if (!_curAv) {
+            n && (n.style.visibility = "hidden");
+            i && (i.style.visibility = "hidden");
+          } else {
+            n && (n.style.visibility = "");
+            i && (i.style.visibility = "");
+          }
           (e && (e.textContent = t.name),
-            n && (n.innerHTML = nt(t.avatar, 38)),
-            i && (i.innerHTML = nt(t.avatar, 38)));
+            n && (n.innerHTML = nt(_curAv, 38)),
+            i && (i.innerHTML = nt(_curAv, 38)));
+          /* 头像仍为空时异步从 IDB 恢复后重绘，避免停留在默认 🐰 */
+          if (!_curAv && window._idbStore && window._idbStore.get) {
+            _idbStore.get("akini_ta_avatar", function (_av) {
+              if (
+                _av &&
+                window.akiniContacts.getActiveChatId() === t.id &&
+                (localStorage.getItem("akini_ta_avatar") || "") !== _av
+              ) {
+                try {
+                  localStorage.setItem("akini_ta_avatar", _av);
+                } catch (_e) {}
+                var _n2 = document.getElementById("chatTaAvatar"),
+                  _i2 = document.getElementById("taMsgAvatar");
+                (_n2 && (_n2.style.visibility = "", (_n2.innerHTML = nt(_av, 38))),
+                  _i2 && (_i2.style.visibility = "", (_i2.innerHTML = nt(_av, 38))));
+              }
+            });
+          }
           try {
-            (localStorage.setItem("akini_ta_avatar", t.avatar || ""),
-              u("ta", t.avatar || ""));
+            /* 只在 t.avatar 非空时覆盖本地缓存；避免空值把已恢复的头像清掉 */
+            (t.avatar && t.avatar.trim()
+              ? (localStorage.setItem("akini_ta_avatar", t.avatar),
+                u("ta", t.avatar))
+              : (localStorage.getItem("akini_ta_avatar") || "") === "" &&
+                  localStorage.setItem("akini_ta_avatar", ""),
+              t.avatar || "");
           } catch (e) {}
           var a = document.getElementById("inputTaName");
           a && (a.value = t.name);
@@ -10472,7 +10615,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     var e = a.querySelector(".icity-ta-bg-div");
                     e && t
                       ? ((e.style.backgroundImage = "url(" + t + ")"),
-                        (e.style.backgroundSize = "cover"))
+                        e.style.setProperty("background-size", "cover", "important"),
+                        e.style.setProperty("background-position", "center center", "important"),
+                        e.style.setProperty("background-repeat", "no-repeat", "important"))
                       : e &&
                         ((e.style.backgroundImage = ""),
                           (e.style.background =
@@ -11907,7 +12052,19 @@ document.addEventListener("DOMContentLoaded", function () {
             n = (t.type || "").toLowerCase();
           return "pat" !== e && "pat" !== n;
         });
-        if (!e.length) return "";
+        if (!e.length) {
+          var def = [
+            "今天天气真好，心情不错~",
+            "刚看完一部超好看的电影！",
+            "周末去了一家很棒的咖啡馆",
+            "最近在学做饭，感觉还不错",
+            "今天工作好忙啊，终于结束了",
+            "晚安，做个好梦🌙",
+            "刚跑完步，感觉整个人都轻松了",
+            "今天的晚霞太美了！",
+          ];
+          return def[Math.floor(Math.random() * def.length)];
+        }
         var n = e.slice().sort(function () {
             return Math.random() - 0.5;
           }),
@@ -11946,7 +12103,20 @@ document.addEventListener("DOMContentLoaded", function () {
               n = (t.type || "").toLowerCase();
             return "pat" !== e && "pat" !== n;
           });
-          if (0 === e.length) return "";
+          if (0 === e.length) {
+            /* 字卡库为空时使用默认内容，保证联系人仍能发朋友圈/iCity/信件 */
+            var def = [
+              "今天天气真好，心情不错~",
+              "刚看完一部超好看的电影！",
+              "周末去了一家很棒的咖啡馆",
+              "最近在学做饭，感觉还不错",
+              "今天工作好忙啊，终于结束了",
+              "晚安，做个好梦🌙",
+              "刚跑完步，感觉整个人都轻松了",
+              "今天的晚霞太美了！",
+            ];
+            return def[Math.floor(Math.random() * def.length)];
+          }
           var n = e.slice().sort(function () {
               return Math.random() - 0.5;
             }),
@@ -12159,7 +12329,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 localStorage.getItem("akini_num_friendsPostMax") || "90",
               ),
               i = 60 * (e + Math.random() * Math.max(0, n - e)) * 1e3;
-            setTimeout(function () {
+            function friendsPostAction() {
               if (!window.AKR.isInTimeRange("friends")) {
                 t();
                 return;
@@ -12221,7 +12391,9 @@ document.addEventListener("DOMContentLoaded", function () {
                   }),
                   t());
               } else t();
-            }, i);
+            }
+            window._akiniFriendsPostAction = friendsPostAction;
+            window._akiniTimer.schedule("friendsPost", friendsPostAction, i);
           })(),
           (function t() {
             var e =
@@ -12241,13 +12413,13 @@ document.addEventListener("DOMContentLoaded", function () {
                           "60",
                       ),
                   ));
-            setTimeout(function () {
+            function friendsInteractAction() {
               if ("1" !== localStorage.getItem("akini_toggle_contactFriendsToggle")) {
                 t();
                 return;
               }
-              const n = e.name,
-                i = nt(e.avatar, 40),
+              const n = r().name,
+                i = nt(r().avatar, 40),
                 a = localStorage.getItem("akini_my_name") || "我";
               let l = O();
               var now = Date.now(),
@@ -12299,7 +12471,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   }
                 }));
               const u = l.filter(function (t) {
-                if (t.author && (t.author === n || t.authorId === e.id))
+                if (t.author && (t.author === n || t.authorId === r().id))
                   return !1;
                 var postTs = t.ts || 0;
                 return now - postTs <= THREE_MIN;
@@ -12377,7 +12549,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
               }
               (s && (R(l), window._renderPosts && window._renderPosts()), t());
-            }, e);
+            }
+            window._akiniFriendsInteractAction = friendsInteractAction;
+            window._akiniTimer.schedule(
+              "friendsInteract",
+              friendsInteractAction,
+              e,
+            );
           })());
         ((function () {
           function t(t, e) {
@@ -12441,7 +12619,7 @@ document.addEventListener("DOMContentLoaded", function () {
               (isNaN(s) || s <= 0) && (s = 1),
               (isNaN(d) || d < s) && (d = s));
             var m = (s + Math.random() * (d - s)) * (u ? 36e5 : 6e4);
-            setTimeout(function () {
+            function mailAction() {
               if (!window.AKR.isInTimeRange("mail")) {
                 t();
                 return;
@@ -12506,19 +12684,24 @@ document.addEventListener("DOMContentLoaded", function () {
                 },
               }),
                 t());
-            }, m);
+            }
+            window._akiniMailAction = mailAction;
+            window._akiniTimer.schedule("mail", mailAction, m);
           })());
       })());
     ((function () {
-      // 版本迁移：20260829aq 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260830az 调整默认开关，删除旧默认值让 t() 重新写入
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260829aq") {
-            localStorage.setItem("akini_app_version", "20260829aq");
+          if (ver !== "20260830az") {
+            localStorage.setItem("akini_app_version", "20260830az");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
+            localStorage.removeItem("akini_toggle_contactFriendsToggle");
+            localStorage.removeItem("akini_toggle_contactIcityToggle");
+            localStorage.removeItem("akini_toggle_contactMailToggle");
           }
         } catch (e) {}
       })();
@@ -12668,11 +12851,11 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch(e){}
         })(),
         t("contactReplyToggle", !0),
-        t("contactMailToggle", !1),
+        t("contactMailToggle", !0),
         t("contactActiveMsgToggle", !1),
         t("contactShopToggle", !1),
-        t("contactFriendsToggle", !1),
-        t("contactIcityToggle", !1),
+        t("contactFriendsToggle", !0),
+        t("contactIcityToggle", !0),
         t("timestampToggle", !1),
         t("darkModeToggle", !1),
         document.querySelectorAll(".style-btn").forEach((t) => {
@@ -12873,7 +13056,7 @@ document.addEventListener("DOMContentLoaded", function () {
             l = 60 * r * 1e3;
           s = c + Math.random() * Math.max(0, l - c);
         }
-        setTimeout(function () {
+        window._akiniTimer.schedule("activeMsgReply", function () {
           I(t, e, n);
         }, s);
       }),
@@ -12900,7 +13083,7 @@ document.addEventListener("DOMContentLoaded", function () {
         i = 60 * e * 1e3,
         a = 60 * n * 1e3,
         o = i + Math.random() * Math.max(0, a - i);
-      setTimeout(function () {
+      function __amtAction() {
         try {
           if (!window.AKR || "function" != typeof window.AKR.isInTimeRange) {
             __amt();
@@ -12967,7 +13150,9 @@ document.addEventListener("DOMContentLoaded", function () {
           console.warn("[__amt] error", err);
           __amt();
         }
-      }, o);
+      }
+      window._akiniActiveMsgAction = __amtAction;
+      window._akiniTimer.schedule("activeMsg", __amtAction, o);
     })();
     (function () {
       !(function t() {
@@ -12978,65 +13163,65 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.getItem("akini_num_icityPostMax") || "90",
           ),
           i = 60 * (e + Math.random() * Math.max(0, n - e)) * 1e3;
-        setTimeout(function () {
-          {
-            if (!window.AKR.isInTimeRange("icity")) {
-              t();
-              return;
-            }
-            if ("1" !== localStorage.getItem("akini_toggle_contactIcityToggle")) {
-              t();
-              return;
-            }
-            var e = Dn(Math.floor(5 * Math.random()) + 1);
-            if ((e && (e = e.replace(/\n/g, " ")), e)) {
-              var n = window.akiniContacts
-                  ? window.akiniContacts.getContacts()
-                  : [],
-                i = n.length ? n[Math.floor(Math.random() * n.length)] : null;
-              if (!i) {
-                t();
-                return;
-              }
-              var a = i.id,
-                o = getIcityContactProfile(i.id),
-                c = o && o.name ? o.name : i.name,
-                l = o && o.avatar ? o.avatar : i.avatar,
-                s = q();
-              (s.push({
-                id: Date.now() + "_" + Math.floor(1e3 * Math.random()),
-                who: a,
-                author: c,
-                authorId: a,
-                text: e,
-                ts: Date.now(),
-                likes: 0,
-                likers: [],
-                comments: [],
-                liked: !1,
-              }),
-                j(s),
-                window._renderIcity && window._renderIcity(),
-                window.renderIcityProfileDiaries &&
-                  window.renderIcityProfileDiaries(
-                    "icityTaProfileDiaries",
-                    i.id,
-                  ),
-                "function" == typeof window.showInAppNotif &&
-                  window.showInAppNotif({
-                    app: "icity",
-                    avatar: l,
-                    name: c,
-                    fullContent: !0,
-                    msg: e,
-                    onTap: function () {
-                      r("icityArea");
-                    },
-                  }),
-                t());
-            } else t();
+        function icityPostAction() {
+          if (!window.AKR.isInTimeRange("icity")) {
+            t();
+            return;
           }
-        }, i);
+          if ("1" !== localStorage.getItem("akini_toggle_contactIcityToggle")) {
+            t();
+            return;
+          }
+          var e = Dn(Math.floor(5 * Math.random()) + 1);
+          if ((e && (e = e.replace(/\n/g, " ")), e)) {
+            var n = window.akiniContacts
+                ? window.akiniContacts.getContacts()
+                : [],
+              i = n.length ? n[Math.floor(Math.random() * n.length)] : null;
+            if (!i) {
+              t();
+              return;
+            }
+            var a = i.id,
+              o = getIcityContactProfile(i.id),
+              c = o && o.name ? o.name : i.name,
+              l = o && o.avatar ? o.avatar : i.avatar,
+              s = q();
+            (s.push({
+              id: Date.now() + "_" + Math.floor(1e3 * Math.random()),
+              who: a,
+              author: c,
+              authorId: a,
+              text: e,
+              ts: Date.now(),
+              likes: 0,
+              likers: [],
+              comments: [],
+              liked: !1,
+            }),
+              j(s),
+              window._renderIcity && window._renderIcity(),
+              window.renderIcityProfileDiaries &&
+                window.renderIcityProfileDiaries(
+                  "icityTaProfileDiaries",
+                  i.id,
+                ),
+              "function" == typeof window.showInAppNotif &&
+                window.showInAppNotif({
+                  app: "icity",
+                  avatar: l,
+                  name: c,
+                  fullContent: !0,
+                  msg: e,
+                  onTap: function () {
+                    r("icityArea");
+                  },
+                }),
+              t());
+          } else t();
+        }
+        window._akiniIcityPostAction = icityPostAction;
+        window._akiniTimer.schedule("icityPost", icityPostAction, i);
       })();
       var t = {};
       function e(t, e) {
@@ -13099,6 +13284,9 @@ document.addEventListener("DOMContentLoaded", function () {
         var e = window.akiniContacts.getContactById(t.authorId);
         return !!e;
       }
+      function _isIcityUserAuthor(t) {
+        return !t || !t.authorId || !_isIcityContactAuthor(t);
+      }
       function o(t) {
         if (t && t.authorId) {
           var e = getIcityContactProfile(t.authorId);
@@ -13123,7 +13311,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   n = e.find(function (e) {
                     return e.id == t;
                   });
-                if (n && _isIcityContactAuthor(n) && Date.now() - (n.ts || 0) <= 3 * 60 * 1e3) {
+                if (n && _isIcityUserAuthor(n) && Date.now() - (n.ts || 0) <= 3 * 60 * 1e3) {
                   var i = o(n),
                     a = i.name,
                     c = i.avatar;
@@ -13189,7 +13377,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   n = e.find(function (e) {
                     return e.id == t;
                   });
-                if (n && _isIcityContactAuthor(n) && a(n)) {
+                if (n && _isIcityUserAuthor(n) && a(n)) {
                   var i = "";
                   try {
                     i = Dn(1);
