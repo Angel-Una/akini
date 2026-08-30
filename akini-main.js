@@ -614,6 +614,36 @@ document.addEventListener("DOMContentLoaded", function () {
         },
       };
     })();
+    // 实时备份：拦截 localStorage.setItem/removeItem，每次数据变更后自动写入 IDB + Cache API
+    try {
+      (function () {
+        var origSetItem = localStorage.setItem;
+        var origRemoveItem = localStorage.removeItem;
+        var backupTimer = null;
+        function doBackup() {
+          if (backupTimer) return;
+          backupTimer = setTimeout(function () {
+            backupTimer = null;
+            try {
+              window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll();
+            } catch (e) {}
+            try {
+              window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
+            } catch (e) {}
+          }, 200);
+        }
+        localStorage.setItem = function (k, v) {
+          var r = origSetItem.apply(this, arguments);
+          if (k && String(k).indexOf("akini_") === 0) doBackup();
+          return r;
+        };
+        localStorage.removeItem = function (k) {
+          var r = origRemoveItem.apply(this, arguments);
+          if (k && String(k).indexOf("akini_") === 0) doBackup();
+          return r;
+        };
+      })();
+    } catch (e) {}
     try {
       window._akiniRestoreFromSnapshot = function (e) {
         function restoreFromSource(src) {
@@ -2485,6 +2515,12 @@ document.addEventListener("DOMContentLoaded", function () {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
       }, 3000);
+      /* 后台/低功耗设备可能丢定时器，周期性 catch-up 确保任务不遗漏 */
+      setInterval(function () {
+        try {
+          window._akiniTimer && window._akiniTimer.catchUp(actions);
+        } catch (e) {}
+      }, 15000);
     })();
     window._akiniTransferAmount = e;
     window._akiniTransferNote = n;
@@ -2932,10 +2968,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (window._restoringChatHistory || window._restoringData) return;
         var e = window.akiniContacts.getActiveChatId();
         var t = U.innerHTML;
-        var deduped = __akiniDeduplicateChatHTML(t);
-        if (deduped !== t) {
-          (U.innerHTML = deduped), (t = deduped);
-        }
         if (e) {
           var d = U.getAttribute("data-rendered-chat-id");
           if (d && d !== e && t && "" !== t.trim()) {
@@ -2946,9 +2978,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!t || "" === t.trim()) {
             var n = window.akiniContacts.getSession(e);
             if (n && n.messagesHTML && "" !== n.messagesHTML.trim()) {
-              U.innerHTML = __akiniDeduplicateChatHTML(n.messagesHTML);
+              U.innerHTML = n.messagesHTML;
               U.scrollTop = U.scrollHeight;
-              C(e, U.innerHTML);
             }
             return;
           }
@@ -3499,27 +3530,24 @@ document.addEventListener("DOMContentLoaded", function () {
             n.forEach(function (d) {
               if (d && d.id && map[d.id]) {
                 var old = map[d.id];
-                /* Merge comments by dedup: ts+text+author */ var oc =
-                  old.comments || [];
+                /* Merge comments: keep every unique comment by id, never drop by content */
+                var oc = old.comments || [];
                 var nc = d.comments || [];
-                var cm = {};
+                var cm = new Map();
                 oc.forEach(function (c) {
-                  var k =
-                    (c.ts || 0) + "_" + (c.text || "") + "_" + (c.author || "");
-                  cm[k] = c;
+                  if (!c || typeof c !== "object") return;
+                  if (!c.id) c.id = "c_" + Date.now() + "_" + Math.floor(Math.random() * 1e9);
+                  cm.set(c.id, c);
                 });
                 nc.forEach(function (c) {
-                  var k =
-                    (c.ts || 0) + "_" + (c.text || "") + "_" + (c.author || "");
-                  if (!cm[k]) cm[k] = c;
+                  if (!c || typeof c !== "object") return;
+                  if (!c.id) c.id = "c_" + Date.now() + "_" + Math.floor(Math.random() * 1e9);
+                  // 新数据覆盖旧数据（保留同 id 最新内容）
+                  cm.set(c.id, c);
                 });
-                d.comments = Object.keys(cm)
-                  .map(function (k) {
-                    return cm[k];
-                  })
-                  .sort(function (a, b) {
-                    return (a.ts || 0) - (b.ts || 0);
-                  });
+                d.comments = Array.from(cm.values()).sort(function (a, b) {
+                  return (a.ts || 0) - (b.ts || 0);
+                });
                 /* Merge likers by dedup */ var ol = old.likers || [];
                 var nl = d.likers || [];
                 var lm = {};
@@ -3886,74 +3914,9 @@ document.addEventListener("DOMContentLoaded", function () {
       if (allRows.length === 0) return longest;
       return allRows.join("");
     }
-    window.__akiniDeduplicateCache = window.__akiniDeduplicateCache || { html: "", out: "" };
+    // 去重已禁用：历史去重导致聊天记录/评论被误删，现在直接透传 HTML
     function __akiniDeduplicateChatHTML(html) {
-      if (!html || "string" != typeof html) return html;
-      if (window.__akiniDeduplicateCache && window.__akiniDeduplicateCache.html === html) return window.__akiniDeduplicateCache.out;
-      var div = document.createElement("div");
-      div.innerHTML = html;
-      var rows = Array.from(div.querySelectorAll(".msg-row")),
-        seen = new Set(),
-        keep = [];
-      // 先为历史问卷回复卡片补回 memberId，避免被误去重
-      try {
-        if (typeof window.loadSurveys === "function") window.loadSurveys();
-        var _surveys = window.surveys || [];
-        var _replyMap = {};
-        rows.forEach(function (row) {
-          var bubble = row.querySelector(".bubble");
-          if (!bubble) return;
-          var sid = bubble.getAttribute("data-survey-id");
-          if (!sid || bubble.getAttribute("data-survey-reply") !== "1" || bubble.getAttribute("data-member-id")) return;
-          var s = _surveys.find(function (x) { return x.id === sid; });
-          if (s && s.replies && s.replies.length > 0) {
-            _replyMap[sid] = _replyMap[sid] || 0;
-            var r = s.replies[_replyMap[sid]];
-            if (r && r.memberId) {
-              bubble.setAttribute("data-member-id", r.memberId);
-            }
-            _replyMap[sid]++;
-          }
-        });
-      } catch (e) {}
-      rows.forEach(function (row, _idx) {
-        var bubble = row.querySelector(".bubble"),
-          meta = row.querySelector(".msg-meta"),
-          sig = row.classList.contains("me") ? "me" : "other";
-        // 系统消息按内容去重，避免重复刷新
-        if (row.classList.contains("system")) {
-          sig = "system";
-          if (bubble) sig += "|" + (bubble.textContent || "").trim();
-          // 系统消息不附加 timestamp，避免相同内容因时间不同而无法去重
-        } else if (bubble && bubble.getAttribute("data-survey-id")) {
-          // 问卷卡片按 id+回复+成员唯一区分，避免不同问卷因卡片内容相同被误判为重复
-          sig += "|sid:" + bubble.getAttribute("data-survey-id");
-          sig += "|sr:" + (bubble.getAttribute("data-survey-reply") || "0");
-          var _mid = bubble.getAttribute("data-member-id");
-          if (_mid) sig += "|mid:" + _mid;
-        } else {
-          if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
-          else sig += "|" + (row.textContent || "").trim();
-          // 普通聊天消息加入时间戳/唯一 data-ts，避免相同内容被误吞
-          var _ts = row.getAttribute("data-ts");
-          if (_ts) sig += "|ts:" + _ts;
-          else sig += "|idx:" + _idx; // 无时间戳时用位置区分，绝不误删
-        }
-        if (!seen.has(sig)) {
-          seen.add(sig);
-          keep.push(row);
-        }
-      });
-      var out = html;
-      if (keep.length !== rows.length) {
-        div.innerHTML = "";
-        keep.forEach(function (row) {
-          div.appendChild(row);
-        });
-        out = div.innerHTML;
-      }
-      window.__akiniDeduplicateCache = { html: html, out: out };
-      return out;
+      return html;
     }
     function et() {
       function t(t) {
@@ -4626,7 +4589,7 @@ document.addEventListener("DOMContentLoaded", function () {
       function l(t) {
         U &&
           ((window._restoringChatHistory = !0),
-          (U.innerHTML = __akiniDeduplicateChatHTML(t || "")),
+          (U.innerHTML = t || ""),
           U.setAttribute &&
             U.setAttribute(
               "data-rendered-chat-id",
@@ -12323,25 +12286,28 @@ document.addEventListener("DOMContentLoaded", function () {
           return !document.hidden;
         };
         ((window._pickWordCardsForFriends = c),
-          (function t() {
+          (function t(isFirst) {
             const e = parseFloat(
                 localStorage.getItem("akini_num_friendsPostMin") || "1",
               ),
               n = parseFloat(
                 localStorage.getItem("akini_num_friendsPostMax") || "3",
-              ),
-              i = 60 * (e + Math.random() * Math.max(0, n - e)) * 1e3;
+              );
+            // 首次触发使用最小间隔，之后按随机范围
+            var delay = isFirst ? e : (e + Math.random() * Math.max(0, n - e));
+            var i = 60 * delay * 1e3;
+            console.log("[Akini 朋友圈] 下次调度：", delay.toFixed(1), "分钟后触发");
             function friendsPostAction() {
               if (!window.AKR.isInTimeRange("friends")) {
-                t();
+                t(false);
                 return;
               }
               if ("1" !== localStorage.getItem("akini_toggle_contactFriendsToggle")) {
-                t();
+                t(false);
                 return;
               }
               const e = r();
-              if (!e) return void t();
+              if (!e) return void t(false);
               const n = e.name,
                 i = nt(e.avatar, 40),
                 a = c(Math.floor(5 * Math.random()) + 1);
@@ -12383,12 +12349,12 @@ document.addEventListener("DOMContentLoaded", function () {
                       o("friends");
                     },
                   }),
-                  t());
-              } else t();
+                  t(false));
+              } else t(false);
             }
             window._akiniFriendsPostAction = friendsPostAction;
             window._akiniTimer.schedule("friendsPost", friendsPostAction, i);
-          })(),
+          })(true),
           (function t() {
             /* 互动检查间隔：20~50 秒，确保能在 1 分钟内点赞/评论 */
             var e = (20 + Math.floor(Math.random() * 31)) * 1e3;
@@ -12579,7 +12545,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   });
               }));
         })(),
-          (function t() {
+          (function t(isFirst) {
             const e = window.akiniContacts
                 ? window.akiniContacts.getContacts()
                 : [],
@@ -12609,18 +12575,30 @@ document.addEventListener("DOMContentLoaded", function () {
                 (u = !0)),
               (isNaN(s) || s <= 0) && (s = 1),
               (isNaN(d) || d < s) && (d = s));
-            var m = (s + Math.random() * (d - s)) * 6e4;
+            // 首次触发使用最小间隔，之后按随机范围；便于用户验证设置已生效
+            var delay = isFirst ? s : (s + Math.random() * (d - s));
+            var m = delay * 6e4;
+            console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "分钟后触发");
             function mailAction() {
+              // 主动写信/回信必须重新调度，无论本次是否执行成功
+              var __willRecurse = true;
+              function __recurse() {
+                if (!__willRecurse) return;
+                __willRecurse = !1;
+                t(false);
+              }
               if (!window.AKR.isInTimeRange("mail")) {
-                t();
-                return;
+                return __recurse();
               }
               if ("1" !== localStorage.getItem("akini_toggle_contactMailToggle")) {
-                t();
-                return;
+                return __recurse();
               }
+              // 每次执行时实时读取联系人，避免闭包捕获到空列表导致永远不写信
+              const liveContacts = window.akiniContacts
+                ? window.akiniContacts.getContacts()
+                : e;
               const wc = c(Math.floor(5 * Math.random()) + 1);
-              if (!wc) return void t();
+              if (!wc) return __recurse();
               var s = "",
                 d = null;
               if (l) {
@@ -12644,14 +12622,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 ((s = u.content || ""),
                   saveMailSent(freshSent),
                   (d =
-                    e.find(function (t) {
+                    liveContacts.find(function (t) {
                       return t.id === u.toId;
                     }) ||
-                    e[0] ||
+                    liveContacts[0] ||
                     null));
               } else
-                d = e.length ? e[Math.floor(Math.random() * e.length)] : null;
-              if (!d) return void t();
+                d = liveContacts.length ? liveContacts[Math.floor(Math.random() * liveContacts.length)] : null;
+              if (!d) return __recurse();
               var freshRecv = JSON.parse(
                 localStorage.getItem("akini_mail_received") || "[]",
               );
@@ -12674,19 +12652,19 @@ document.addEventListener("DOMContentLoaded", function () {
                   o("mail");
                 },
               }),
-                t());
+                __recurse());
             }
             window._akiniMailAction = mailAction;
             window._akiniTimer.schedule("mail", mailAction, m);
-          })());
+          })(true));
       })());
     ((function () {
-      // 版本迁移：20260830bh 重置旧默认值，让联系人行为按新节奏生效
+      // 版本迁移：20260830bl 修复联系人写信/图标/数据持久化问题
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830bh") {
-            localStorage.setItem("akini_app_version", "20260830bh");
+          if (ver !== "20260830bl") {
+            localStorage.setItem("akini_app_version", "20260830bl");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
@@ -12706,9 +12684,27 @@ document.addEventListener("DOMContentLoaded", function () {
             if (localStorage.getItem("akini_num_icityPostMax") === "90") {
               localStorage.setItem("akini_num_icityPostMax", "3");
             }
-            // 主动写信间隔统一按“分钟”读取，防止旧值按小时误算
-            localStorage.removeItem("akini_num_activeMailMin");
-            localStorage.removeItem("akini_num_activeMailMax");
+            // 主动写信/发消息/朋友圈/iCity 的旧“小时”单位值已废弃，改为按“分钟”读取；
+            // 不再清空用户当前设置，避免用户每次重新打开都被重置
+            [
+              "akini_num_activeMailMin",
+              "akini_num_activeMailMax",
+              "akini_num_activeMsgMin",
+              "akini_num_activeMsgMax",
+              "akini_num_friendsPostMin",
+              "akini_num_friendsPostMax",
+              "akini_num_icityPostMin",
+              "akini_num_icityPostMax",
+            ].forEach(function (k) {
+              var v = localStorage.getItem(k);
+              if (v) {
+                var fv = parseFloat(v);
+                // 旧值 > 10 默认按小时误存，这里改成分钟；若值已经很小则保留用户设置
+                if (!isNaN(fv) && fv > 10) {
+                  localStorage.setItem(k, String(Math.max(1, Math.round(fv / 60))));
+                }
+              }
+            });
           }
         } catch (e) {}
       })();
@@ -12888,10 +12884,10 @@ document.addEventListener("DOMContentLoaded", function () {
         { id: "activeMsgMax", key: "akini_num_activeMsgMax", def: "10" },
         { id: "activeMailMin", key: "akini_num_activeMailMin", def: "1" },
         { id: "activeMailMax", key: "akini_num_activeMailMax", def: "3" },
-        { id: "friendsPostMin", key: "akini_num_friendsPostMin", def: "60" },
-        { id: "friendsPostMax", key: "akini_num_friendsPostMax", def: "90" },
-        { id: "icityPostMin", key: "akini_num_icityPostMin", def: "60" },
-        { id: "icityPostMax", key: "akini_num_icityPostMax", def: "90" },
+        { id: "friendsPostMin", key: "akini_num_friendsPostMin", def: "1" },
+        { id: "friendsPostMax", key: "akini_num_friendsPostMax", def: "3" },
+        { id: "icityPostMin", key: "akini_num_icityPostMin", def: "1" },
+        { id: "icityPostMax", key: "akini_num_icityPostMax", def: "3" },
         {
           id: "meaningfulNumbersInput",
           key: "akini_meaningful_numbers",
@@ -12904,6 +12900,21 @@ document.addEventListener("DOMContentLoaded", function () {
         (null !== n && (e.value = n),
           e.addEventListener("change", function () {
             localStorage.setItem(t.key, this.value);
+            // 主动写信/发消息/朋友圈/iCity 间隔变化时立即重新调度，避免旧延迟导致长时间不触发
+            if (t.key === "akini_num_activeMailMin" || t.key === "akini_num_activeMailMax" || t.key === "akini_num_activeMsgMin" || t.key === "akini_num_activeMsgMax" || t.key === "akini_num_friendsPostMin" || t.key === "akini_num_friendsPostMax" || t.key === "akini_num_icityPostMin" || t.key === "akini_num_icityPostMax") {
+              if (window._akiniMailAction && window._akiniTimer && window._akiniTimer.schedule) {
+                window._akiniTimer.schedule("mail", window._akiniMailAction, 1000);
+              }
+              if (window._akiniActiveMsgAction && window._akiniTimer && window._akiniTimer.schedule) {
+                window._akiniTimer.schedule("activeMsg", window._akiniActiveMsgAction, 1000);
+              }
+              if (window._akiniFriendsPostAction && window._akiniTimer && window._akiniTimer.schedule) {
+                window._akiniTimer.schedule("friendsPost", window._akiniFriendsPostAction, 1000);
+              }
+              if (window._akiniIcityPostAction && window._akiniTimer && window._akiniTimer.schedule) {
+                window._akiniTimer.schedule("icityPost", window._akiniIcityPostAction, 1000);
+              }
+            }
           }),
           e.addEventListener("blur", function () {
             localStorage.setItem(t.key, this.value);
@@ -13088,22 +13099,26 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         return [];
       }));
-    !(function __amt() {
+    !(function __amt(isFirst) {
       const e = parseFloat(
           localStorage.getItem("akini_num_activeMsgMin") || "3",
         ),
-        n = parseFloat(localStorage.getItem("akini_num_activeMsgMax") || "10"),
-        i = 60 * e * 1e3,
-        a = 60 * n * 1e3,
-        o = i + Math.random() * Math.max(0, a - i);
+        n = parseFloat(localStorage.getItem("akini_num_activeMsgMax") || "10");
+      // 首次触发使用最小间隔，之后按随机范围
+      var delayMin = 60 * e * 1e3,
+        delayMax = 60 * n * 1e3,
+        o = isFirst
+          ? delayMin
+          : delayMin + Math.random() * Math.max(0, delayMax - delayMin);
+      console.log("[Akini 主动发消息] 下次调度：", (o / 6e4).toFixed(1), "分钟后触发");
       function __amtAction() {
         try {
           if (!window.AKR || "function" != typeof window.AKR.isInTimeRange) {
-            __amt();
+            __amt(false);
             return;
           }
           if (!window.AKR.isInTimeRange("activeMsg")) {
-            __amt();
+            __amt(false);
             return;
           }
           if (!we.active) {
@@ -13111,7 +13126,7 @@ document.addEventListener("DOMContentLoaded", function () {
               !window.akiniContacts ||
               "function" != typeof window.akiniContacts.getContacts
             ) {
-              __amt();
+              __amt(false);
               return;
             }
             var e = (function () {
@@ -13122,10 +13137,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? null
                 : n[Math.floor(Math.random() * n.length)].id;
             })();
-            if (!e) return void __amt();
+            if (!e) return void __amt(false);
             var n = window.akiniContacts.getChatTarget(e);
             if ("1" !== localStorage.getItem("akini_toggle_contactActiveMsgToggle")) {
-              __amt();
+              __amt(false);
               return;
             }
             if (Math.random() < window.AKR.getProb("groupCall") && n) {
@@ -13158,31 +13173,34 @@ document.addEventListener("DOMContentLoaded", function () {
             } else if ("function" == typeof window.triggerTaReplyOnce)
               window.triggerTaReplyOnce(e);
           }
-          __amt();
+          __amt(false);
         } catch (err) {
           console.warn("[__amt] error", err);
-          __amt();
+          __amt(false);
         }
       }
       window._akiniActiveMsgAction = __amtAction;
       window._akiniTimer.schedule("activeMsg", __amtAction, o);
-    })();
+    })(true);
     (function () {
-      !(function t() {
+      !(function t(isFirst) {
         const e = parseFloat(
             localStorage.getItem("akini_num_icityPostMin") || "1",
           ),
           n = parseFloat(
             localStorage.getItem("akini_num_icityPostMax") || "3",
-          ),
-          i = 60 * (e + Math.random() * Math.max(0, n - e)) * 1e3;
+          );
+        // 首次触发使用最小间隔，之后按随机范围
+        var delay = isFirst ? e : (e + Math.random() * Math.max(0, n - e));
+        var i = 60 * delay * 1e3;
+        console.log("[Akini iCity] 下次调度：", delay.toFixed(1), "分钟后触发");
         function icityPostAction() {
           if (!window.AKR.isInTimeRange("icity")) {
-            t();
+            t(false);
             return;
           }
           if ("1" !== localStorage.getItem("akini_toggle_contactIcityToggle")) {
-            t();
+            t(false);
             return;
           }
           var e = Dn(Math.floor(5 * Math.random()) + 1);
@@ -13192,7 +13210,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 : [],
               i = n.length ? n[Math.floor(Math.random() * n.length)] : null;
             if (!i) {
-              t();
+              t(false);
               return;
             }
             var a = i.id,
@@ -13230,12 +13248,12 @@ document.addEventListener("DOMContentLoaded", function () {
                     r("icityArea");
                   },
                 }),
-              t());
-          } else t();
+              t(false));
+          } else t(false);
         }
         window._akiniIcityPostAction = icityPostAction;
         window._akiniTimer.schedule("icityPost", icityPostAction, i);
-      })();
+      })(true);
       var t = {};
       function e(t, e) {
         return Math.floor(Math.random() * (e - t + 1)) + t;
@@ -16577,4 +16595,22 @@ document.addEventListener("DOMContentLoaded", function () {
       dbg("诊断错误:" + e.message);
     }
   })();
+
+  // 数据自动兜底保护：每 20 秒备份一次，切后台/关闭前也立即备份
+  try {
+    function _akiniImmediateBackup() {
+      try {
+        window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll();
+      } catch (e) {}
+      try {
+        window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
+      } catch (e) {}
+    }
+    setInterval(_akiniImmediateBackup, 20000);
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) _akiniImmediateBackup();
+    });
+    window.addEventListener("pagehide", _akiniImmediateBackup);
+    window.addEventListener("beforeunload", _akiniImmediateBackup);
+  } catch (e) {}
 });

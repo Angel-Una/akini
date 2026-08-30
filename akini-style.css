@@ -326,22 +326,52 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   font-size: 24px;
   color: #666;
   background: transparent;
-  padding: 4px;
+  padding: 2px;
   margin-bottom: 4px;
   overflow: hidden;
   pointer-events: none;
+  box-sizing: border-box;
 }
 .app-item .icon-wrap img {
-  border-radius: 10px !important;
+  border-radius: 0 !important;
   pointer-events: none;
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  display: block;
 }
-/* 商店图标：缩小并去掉白色底图 */
+/* 自定义图标：去除容器圆角/内边距/边框，避免图片被裁剪或压边 */
+.app-item .icon-wrap.custom-icon {
+  border-radius: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  overflow: visible;
+}
+.app-item .icon-wrap.custom-icon img {
+  border-radius: 0 !important;
+  object-fit: contain;
+}
+/* 自定义图标（底部 dock）也去掉容器圆角/内边距/边框，避免被裁剪 */
+.bottom-btn .icon-wrap.custom-icon {
+  border-radius: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  overflow: visible;
+}
+.bottom-btn .icon-wrap.custom-icon img {
+  border-radius: 0 !important;
+  object-fit: contain;
+}
+/* 商店图标：使用透明底灰色线条图，再次缩小一点 */
 #appBtnShop .icon-wrap {
   background: transparent !important;
   border: none !important;
-  padding: 2px !important;
-  width: 38px;
-  height: 38px;
+  padding: 0 !important;
+  width: 24px;
+  height: 24px;
+  overflow: visible;
 }
 #appBtnShop .icon-wrap img {
   border-radius: 0 !important;
@@ -4355,9 +4385,9 @@ body {
 .akini-icon-grid .akini-icon-cell .akini-icon-thumb img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
-  border-radius: 8px !important;
+  border-radius: 0 !important;
 }
 .akini-icon-grid .akini-icon-cell .akini-icon-name {
   font-size: 11px;
@@ -4382,9 +4412,9 @@ body {
 .akini-icon-preview img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
-  border-radius: 8px !important;
+  border-radius: 0 !important;
 }
 .akini-range {
   width: 100%;
