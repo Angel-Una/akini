@@ -364,13 +364,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   border-radius: 0 !important;
   object-fit: contain;
 }
-/* 商店图标：使用透明底灰色线条图，再次缩小一点 */
+/* 商店图标：保持与 iCity 等图标一致的大小，避免锯齿 */
 #appBtnShop .icon-wrap {
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
-  width: 24px;
-  height: 24px;
+  width: 44px;
+  height: 44px;
   overflow: visible;
 }
 #appBtnShop .icon-wrap img {

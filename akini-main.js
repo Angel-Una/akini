@@ -12659,12 +12659,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260830bl 修复联系人写信/图标/数据持久化问题
+      // 版本迁移：20260830bm 修复联系人写信/图标/数据持久化问题
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830bl") {
-            localStorage.setItem("akini_app_version", "20260830bl");
+          if (ver !== "20260830bm") {
+            localStorage.setItem("akini_app_version", "20260830bm");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
