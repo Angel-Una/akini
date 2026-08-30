@@ -12397,23 +12397,8 @@ document.addEventListener("DOMContentLoaded", function () {
             window._akiniTimer.schedule("friendsPost", friendsPostAction, i);
           })(),
           (function t() {
-            var e =
-              60 *
-              1e3 *
-              (parseFloat(
-                localStorage.getItem("akini_num_friendsPostMin") || "60",
-              ) +
-                Math.random() *
-                  Math.max(
-                    0,
-                    parseFloat(
-                      localStorage.getItem("akini_num_friendsPostMax") || "90",
-                    ) -
-                      parseFloat(
-                        localStorage.getItem("akini_num_friendsPostMin") ||
-                          "60",
-                      ),
-                  ));
+            /* 互动检查间隔：1~3 分钟，确保能在 3 分钟窗口内点赞/评论 */
+            var e = (60 + Math.floor(Math.random() * 121)) * 1e3;
             function friendsInteractAction() {
               if ("1" !== localStorage.getItem("akini_toggle_contactFriendsToggle")) {
                 t();
@@ -12691,12 +12676,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260830ba 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260830bb 调整默认开关，删除旧默认值让 t() 重新写入
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830ba") {
-            localStorage.setItem("akini_app_version", "20260830ba");
+          if (ver !== "20260830bb") {
+            localStorage.setItem("akini_app_version", "20260830bb");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
@@ -13363,21 +13348,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
               })(n);
             },
-            60 *
-              1e3 *
-              (parseFloat(
-                localStorage.getItem("akini_num_icityPostMin") || "60",
-              ) +
-                Math.random() *
-                  Math.max(
-                    0,
-                    parseFloat(
-                      localStorage.getItem("akini_num_icityPostMax") || "90",
-                    ) -
-                      parseFloat(
-                        localStorage.getItem("akini_num_icityPostMin") || "60",
-                      ),
-                  )),
+            e(2e3, 5e3),
           ));
       }
       function l(n) {
@@ -13435,21 +13406,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
               })(n);
             },
-            60 *
-              1e3 *
-              (parseFloat(
-                localStorage.getItem("akini_num_icityPostMin") || "60",
-              ) +
-                Math.random() *
-                  Math.max(
-                    0,
-                    parseFloat(
-                      localStorage.getItem("akini_num_icityPostMax") || "90",
-                    ) -
-                      parseFloat(
-                        localStorage.getItem("akini_num_icityPostMin") || "60",
-                      ),
-                  )),
+            e(2e3, 5e3),
           ));
       }
       ((window.replyToMyComment = function (t) {
