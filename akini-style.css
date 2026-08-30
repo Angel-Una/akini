@@ -141,7 +141,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .top-card {
   margin: calc(16px + env(safe-area-inset-top, 0px)) 16px 4px;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-radius: 26px;
@@ -475,8 +475,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   object-fit: cover;
 }
 .preview-bubble {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  width: fit-content;
+  max-width: 160px;
   background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -492,7 +494,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   user-select: text;
   cursor: text;
   word-break: break-word;
-  max-width: 160px;
 }
 .preview-bubble:focus {
   background: rgba(255, 255, 255, 0.75);
@@ -4045,6 +4046,8 @@ body.dark-mode #app-mail,
   background-repeat: no-repeat !important;
   width: 100% !important;
   height: 100% !important;
+  filter: blur(18px);
+  transform: scale(1.1);
 }
 #app-friends,
 #app-music {

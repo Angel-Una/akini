@@ -54,17 +54,17 @@ window.AKR = (function () {
   /* 概率默认值（可用 localStorage 覆盖：akini_prob_<name>，范围 0-100） */
   var DEFAULT_PROBS = {
     meaningfulNumber: 0.12,
-    quote: 0.15,
+    quote: 0.3,
     taTransfer: 0.08,
     groupTransferMe: 0.08,
     noReply: 0.05,
-    sticker: 0.22,
+    sticker: 0.3,
     incomingCall: 0.05,
     groupCall: 0.05,
     answerCall: 0.65,
     missCall: 0.30,
     refundTransfer: 0.1,
-    poke: 0.03,
+    poke: 0.15,
   };
   function getProb(name) {
     try {
@@ -502,6 +502,24 @@ document.addEventListener("DOMContentLoaded", function () {
                 e({});
               }
             else e({});
+          });
+        },
+        remove: function (e, i) {
+          n(function (n) {
+            if (n)
+              try {
+                var o = n.transaction(t, "readwrite");
+                (o.objectStore(t).delete(e),
+                  (o.oncomplete = function () {
+                    i && i();
+                  }),
+                  (o.onerror = function () {
+                    i && i();
+                  }));
+              } catch (t) {
+                i && i();
+              }
+            else i && i();
           });
         },
         clearAll: function (e) {
@@ -2807,7 +2825,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function mixEmojiToText(text) {
         if (!ex.emojiMix || !text) return text;
-        if (Math.random() >= 0.2) return text;
+        if (Math.random() >= 0.5) return text;
         var emojis = [];
         try {
           var wb = JSON.parse(localStorage.getItem("akini_wordbank") || "[]");
@@ -10407,7 +10425,7 @@ document.addEventListener("DOMContentLoaded", function () {
           (n.push(i),
             j(n),
             window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
-            window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),
+            // 联系人不得自己评论，仅点赞；用户评论后才会回复
             window.scheduleTaReplySoon && window.scheduleTaReplySoon(i.id),
             c && (c.value = ""));
           var a = document.getElementById("icityTab1"),
@@ -12283,10 +12301,10 @@ document.addEventListener("DOMContentLoaded", function () {
         ((window._pickWordCardsForFriends = c),
           (function t(isFirst) {
             const e = parseFloat(
-                localStorage.getItem("akini_num_friendsPostMin") || "1",
+                localStorage.getItem("akini_num_friendsPostMin") || "30",
               ),
               n = parseFloat(
-                localStorage.getItem("akini_num_friendsPostMax") || "3",
+                localStorage.getItem("akini_num_friendsPostMax") || "60",
               );
             // 首次触发使用最小间隔，之后按随机范围
             var delay = isFirst ? e : (e + Math.random() * Math.max(0, n - e));
@@ -12654,31 +12672,32 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260831bs 修复图标/数据持久化/页面循环加载问题
+      // 版本迁移：20260831bt 修复联系人行为/图标/音乐导入/红色弹窗等问题
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260831bs") {
-            localStorage.setItem("akini_app_version", "20260831bs");
+          if (ver !== "20260831bt") {
+            localStorage.setItem("akini_app_version", "20260831bt");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
             localStorage.removeItem("akini_toggle_contactIcityToggle");
             localStorage.removeItem("akini_toggle_contactMailToggle");
-            // 旧的 60/90 分钟默认改为 1-3 分钟，避免等待过久
-            if (localStorage.getItem("akini_num_friendsPostMin") === "60") {
-              localStorage.setItem("akini_num_friendsPostMin", "1");
-            }
-            if (localStorage.getItem("akini_num_friendsPostMax") === "90") {
-              localStorage.setItem("akini_num_friendsPostMax", "3");
-            }
-            if (localStorage.getItem("akini_num_icityPostMin") === "60") {
-              localStorage.setItem("akini_num_icityPostMin", "1");
-            }
-            if (localStorage.getItem("akini_num_icityPostMax") === "90") {
-              localStorage.setItem("akini_num_icityPostMax", "3");
-            }
+            // 朋友圈/iCity 默认改为 30-60 分钟；旧的小值（1-3）重置为新默认
+            var _resetPostRange = function (minKey, maxKey) {
+              var mn = parseFloat(localStorage.getItem(minKey) || "");
+              var mx = parseFloat(localStorage.getItem(maxKey) || "");
+              if ((isNaN(mn) || mn <= 3) && (isNaN(mx) || mx <= 3)) {
+                localStorage.setItem(minKey, "30");
+                localStorage.setItem(maxKey, "60");
+              }
+            };
+            _resetPostRange(
+              "akini_num_friendsPostMin",
+              "akini_num_friendsPostMax",
+            );
+            _resetPostRange("akini_num_icityPostMin", "akini_num_icityPostMax");
             // 主动写信/发消息/朋友圈/iCity 的旧“小时”单位值已废弃，改为按“分钟”读取；
             // 不再清空用户当前设置，避免用户每次重新打开都被重置
             [
@@ -12879,10 +12898,10 @@ document.addEventListener("DOMContentLoaded", function () {
         { id: "activeMsgMax", key: "akini_num_activeMsgMax", def: "10" },
         { id: "activeMailMin", key: "akini_num_activeMailMin", def: "1" },
         { id: "activeMailMax", key: "akini_num_activeMailMax", def: "3" },
-        { id: "friendsPostMin", key: "akini_num_friendsPostMin", def: "1" },
-        { id: "friendsPostMax", key: "akini_num_friendsPostMax", def: "3" },
-        { id: "icityPostMin", key: "akini_num_icityPostMin", def: "1" },
-        { id: "icityPostMax", key: "akini_num_icityPostMax", def: "3" },
+        { id: "friendsPostMin", key: "akini_num_friendsPostMin", def: "30" },
+        { id: "friendsPostMax", key: "akini_num_friendsPostMax", def: "60" },
+        { id: "icityPostMin", key: "akini_num_icityPostMin", def: "30" },
+        { id: "icityPostMax", key: "akini_num_icityPostMax", def: "60" },
         {
           id: "meaningfulNumbersInput",
           key: "akini_meaningful_numbers",
@@ -13180,10 +13199,10 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () {
       !(function t(isFirst) {
         const e = parseFloat(
-            localStorage.getItem("akini_num_icityPostMin") || "1",
+            localStorage.getItem("akini_num_icityPostMin") || "30",
           ),
           n = parseFloat(
-            localStorage.getItem("akini_num_icityPostMax") || "3",
+            localStorage.getItem("akini_num_icityPostMax") || "60",
           );
         // 首次触发使用最小间隔，之后按随机范围
         var delay = isFirst ? e : (e + Math.random() * Math.max(0, n - e));
@@ -13520,7 +13539,7 @@ document.addEventListener("DOMContentLoaded", function () {
               function () {
                 window.replyToMyComment(n);
               },
-              e(1e4, 4e4),
+              e(1e4, 5e4),
             ));
         }),
         (window.scheduleTaLikeSoon = function (n) {
@@ -13531,20 +13550,11 @@ document.addEventListener("DOMContentLoaded", function () {
               function () {
                 c(n);
               },
-              e(1e4, 6e4),
+              e(1e4, 5e4),
             ));
         }),
-        (window.scheduleTaCommentSoon = function (n) {
-          var i = "cmtSoon_" + n;
-          t[i] ||
-            ((t[i] = !0),
-            setTimeout(
-              function () {
-                l(n);
-              },
-              e(1e4, 6e4),
-            ));
-        }),
+        // 联系人不再自己评论，保留空函数避免调用报错
+        (window.scheduleTaCommentSoon = function () {}),
         function n() {
           /* 已禁用自动点赞/评论调度 */
         });
@@ -14664,6 +14674,50 @@ document.addEventListener("DOMContentLoaded", function () {
             e.playlistInput.addEventListener("keydown", function (t) {
               "Enter" === t.key && Tt("", B.cookie);
             }));
+        var songUrlInput = document.getElementById("musicSongUrlInput");
+        var songNameInput = document.getElementById("musicSongNameInput");
+        var importSongBtn = document.getElementById("musicImportSongBtn");
+        var importMp3 = function () {
+          var url = (songUrlInput ? songUrlInput.value : "").trim();
+          if (!url) {
+            alert("请输入 MP3 链接");
+            return;
+          }
+          var name = (songNameInput ? songNameInput.value : "").trim();
+          if (!name) {
+            name = url.split("/").pop().split("?")[0] || "自定义歌曲";
+          }
+          var track = {
+            id: "mp3_" + Date.now(),
+            title: name,
+            artist: "自定义",
+            cover: "",
+            url: url,
+            duration: 0,
+          };
+          var list = JSON.parse(
+            localStorage.getItem("akini_music_playlist") || "[]",
+          );
+          list.push(track);
+          localStorage.setItem("akini_music_playlist", JSON.stringify(list));
+          c = list;
+          l = list.length - 1;
+          localStorage.setItem("akini_music_index", l);
+          if (songUrlInput) songUrlInput.value = "";
+          if (songNameInput) songNameInput.value = "";
+          try {
+            Pt();
+          } catch (e) {}
+          wt(c[l], !1);
+          pt("已导入歌曲：" + name);
+          Bt();
+        };
+        importSongBtn &&
+          importSongBtn.addEventListener("click", importMp3);
+        songUrlInput &&
+          songUrlInput.addEventListener("keydown", function (t) {
+            "Enter" === t.key && importMp3();
+          });
         var musicMenuCloseBtn2 = document.getElementById("musicMenuCloseBtn");
         musicMenuCloseBtn2 &&
           musicMenuCloseBtn2.addEventListener("click", function (t) {
@@ -16090,6 +16144,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function wt(e, n, i) {
         if (!e || !e.id) return Promise.resolve();
+        // 自定义 MP3 链接歌曲：直接使用其 url，无需请求网易云接口
+        if (e.url) {
+          ((E = e.url), (S = Date.now()), (A = e.id), vt(e.url, i ? "fetch-retry" : "fetch"));
+          return Promise.resolve();
+        }
         var a = (B && B.cookie) || "";
         if (!a)
           try {
