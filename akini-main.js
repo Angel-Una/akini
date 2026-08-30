@@ -12324,10 +12324,10 @@ document.addEventListener("DOMContentLoaded", function () {
         ((window._pickWordCardsForFriends = c),
           (function t() {
             const e = parseFloat(
-                localStorage.getItem("akini_num_friendsPostMin") || "60",
+                localStorage.getItem("akini_num_friendsPostMin") || "1",
               ),
               n = parseFloat(
-                localStorage.getItem("akini_num_friendsPostMax") || "90",
+                localStorage.getItem("akini_num_friendsPostMax") || "3",
               ),
               i = 60 * (e + Math.random() * Math.max(0, n - e)) * 1e3;
             function friendsPostAction() {
@@ -12604,7 +12604,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 (u = !0)),
               (isNaN(s) || s <= 0) && (s = 1),
               (isNaN(d) || d < s) && (d = s));
-            var m = (s + Math.random() * (d - s)) * (u ? 36e5 : 6e4);
+            var m = (s + Math.random() * (d - s)) * 6e4;
             function mailAction() {
               if (!window.AKR.isInTimeRange("mail")) {
                 t();
@@ -12676,18 +12676,34 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260830bb 调整默认开关，删除旧默认值让 t() 重新写入
+      // 版本迁移：20260830bc 重置旧默认值，让联系人行为按新节奏生效
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830bb") {
-            localStorage.setItem("akini_app_version", "20260830bb");
+          if (ver !== "20260830bc") {
+            localStorage.setItem("akini_app_version", "20260830bc");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
             localStorage.removeItem("akini_toggle_contactIcityToggle");
             localStorage.removeItem("akini_toggle_contactMailToggle");
+            // 旧的 60/90 分钟默认改为 1-3 分钟，避免等待过久
+            if (localStorage.getItem("akini_num_friendsPostMin") === "60") {
+              localStorage.setItem("akini_num_friendsPostMin", "1");
+            }
+            if (localStorage.getItem("akini_num_friendsPostMax") === "90") {
+              localStorage.setItem("akini_num_friendsPostMax", "3");
+            }
+            if (localStorage.getItem("akini_num_icityPostMin") === "60") {
+              localStorage.setItem("akini_num_icityPostMin", "1");
+            }
+            if (localStorage.getItem("akini_num_icityPostMax") === "90") {
+              localStorage.setItem("akini_num_icityPostMax", "3");
+            }
+            // 主动写信间隔统一按“分钟”读取，防止旧值按小时误算
+            localStorage.removeItem("akini_num_activeMailMin");
+            localStorage.removeItem("akini_num_activeMailMax");
           }
         } catch (e) {}
       })();
@@ -13143,10 +13159,10 @@ document.addEventListener("DOMContentLoaded", function () {
     (function () {
       !(function t() {
         const e = parseFloat(
-            localStorage.getItem("akini_num_icityPostMin") || "60",
+            localStorage.getItem("akini_num_icityPostMin") || "1",
           ),
           n = parseFloat(
-            localStorage.getItem("akini_num_icityPostMax") || "90",
+            localStorage.getItem("akini_num_icityPostMax") || "3",
           ),
           i = 60 * (e + Math.random() * Math.max(0, n - e)) * 1e3;
         function icityPostAction() {
