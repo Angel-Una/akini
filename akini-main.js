@@ -12487,6 +12487,16 @@ document.addEventListener("DOMContentLoaded", function () {
                   return c.author === a && idx > lastContactIdx;
                 });
               });
+              var f0 = u.filter(function (t) {
+                var userComments = (t.comments || []).filter(function (c) {
+                  return c.author === a;
+                });
+                if (userComments.length > 0) return !1;
+                var contactComments = (t.comments || []).filter(function (c) {
+                  return c.author === n;
+                });
+                return contactComments.length === 0;
+              });
               var m = Math.random();
               if (m < 0.5 && likeCandidates.length > 0) {
                 var g = !1,
@@ -12508,17 +12518,19 @@ document.addEventListener("DOMContentLoaded", function () {
                       o("friends");
                     },
                   }));
-              } else if (f.length > 0) {
+              } else if (f.length > 0 || f0.length > 0) {
+                var allCommentCandidates = f.length > 0 ? f : f0,
+                  isInit = f.length === 0;
                 var y = c(1);
                 if (y) {
-                  var p = f[Math.floor(Math.random() * f.length)],
+                  var p = allCommentCandidates[Math.floor(Math.random() * allCommentCandidates.length)],
                     v = l.indexOf(p);
                   v >= 0 &&
                     ((l[v].comments = l[v].comments || []),
                     l[v].comments.push({
                       author: n,
                       text: y,
-                      replyTo: a,
+                      replyTo: isInit ? null : a,
                       ts: Date.now(),
                     }),
                     (s = !0),
@@ -12676,12 +12688,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })());
       })());
     ((function () {
-      // 版本迁移：20260830bc 重置旧默认值，让联系人行为按新节奏生效
+      // 版本迁移：20260830bg 重置旧默认值，让联系人行为按新节奏生效
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830bc") {
-            localStorage.setItem("akini_app_version", "20260830bc");
+          if (ver !== "20260830bg") {
+            localStorage.setItem("akini_app_version", "20260830bg");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
@@ -12709,7 +12721,13 @@ document.addEventListener("DOMContentLoaded", function () {
       })();
       function t(t, e) {
         const n = document.getElementById(t);
-        if (!n) return;
+        if (!n) {
+          const i = localStorage.getItem("akini_toggle_" + t);
+          if (null === i) {
+            localStorage.setItem("akini_toggle_" + t, e ? "1" : "0");
+          }
+          return;
+        }
         const i = localStorage.getItem("akini_toggle_" + t);
         if (null !== i) {
           "1" === i ? n.classList.add("on") : n.classList.remove("on");
@@ -13285,7 +13303,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           if (r[l].author === a) hasUserComment = !0;
         }
-        if (!hasUserComment) return !1;
+        if (!hasUserComment) return c < 0;
         if (c < 0) return !0;
         var s = r[c].author;
         for (l = c + 1; l < r.length; l++)
