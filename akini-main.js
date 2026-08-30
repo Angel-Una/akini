@@ -464,17 +464,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     v !== "undefined"
                   ) {
                     var cur = localStorage.getItem(k);
-                    // 仅当本地缺失，或本地数据明显更短时才用 IDB 恢复，避免旧快照覆盖新数据
-                    if (
-                      !cur ||
-                      cur === "" ||
-                      cur === "null" ||
-                      cur === "undefined" ||
-                      cur === "[]" ||
-                      cur === "{}" ||
-                      cur.length === 0 ||
-                      cur.length + 200 < (v || "").length
-                    ) {
+                    // 本地为空/空数组/空对象时直接恢复；本地有数据时只要 IDB 更长就恢复（合并更完整数据）
+                    var isLocalEmpty = !cur || cur === "" || cur === "null" || cur === "undefined" || cur === "[]" || cur === "{}" || cur.length === 0;
+                    if (isLocalEmpty || (v && v.length > (cur || "").length)) {
                       try {
                         localStorage.setItem(k, v);
                       } catch (x) {}
@@ -3053,9 +3045,12 @@ document.addEventListener("DOMContentLoaded", function () {
           e &&
           (/^akini_stickers_/.test(e) ||
             /^akini_chat_bg_/.test(e) ||
-            /^akini_icity_ta_bg_/.test(e))
+            /^akini_icity_ta_bg_/.test(e) ||
+            /^akini_app_icon_/.test(e))
         )
           try {
+            var v = localStorage.getItem(e);
+            v && _idbStore.set(e, v);
             localStorage.removeItem(e);
           } catch (t) {}
       }
@@ -12659,12 +12654,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260830bm 修复联系人写信/图标/数据持久化问题
+      // 版本迁移：20260830bq 修复图标/数据持久化/页面循环加载问题
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830bm") {
-            localStorage.setItem("akini_app_version", "20260830bm");
+          if (ver !== "20260830bq") {
+            localStorage.setItem("akini_app_version", "20260830bq");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
