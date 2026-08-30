@@ -12654,12 +12654,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260830bq 修复图标/数据持久化/页面循环加载问题
+      // 版本迁移：20260830br 修复图标/数据持久化/页面循环加载问题
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260830bq") {
-            localStorage.setItem("akini_app_version", "20260830bq");
+          if (ver !== "20260830br") {
+            localStorage.setItem("akini_app_version", "20260830br");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");

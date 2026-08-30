@@ -340,29 +340,21 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   height: 100%;
   display: block;
 }
-/* 自定义图标：去除容器圆角/内边距/边框，避免图片被裁剪或压边 */
-.app-item .icon-wrap.custom-icon {
-  border-radius: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  overflow: visible;
-}
+/* 自定义图标：保留容器圆角/边框/背景，仅替换内部图标 */
 .app-item .icon-wrap.custom-icon img {
-  border-radius: 0 !important;
-  object-fit: contain;
+  border-radius: 10px !important;
+  object-fit: cover;
 }
-/* 自定义图标（底部 dock）也去掉容器圆角/内边距/边框，避免被裁剪 */
-.bottom-btn .icon-wrap.custom-icon {
-  border-radius: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-  background: transparent !important;
-  overflow: visible;
+.app-item .icon-wrap.custom-icon span {
+  font-size: 26px;
 }
+/* 自定义图标（底部 dock）同样保留容器样式 */
 .bottom-btn .icon-wrap.custom-icon img {
-  border-radius: 0 !important;
-  object-fit: contain;
+  border-radius: 10px !important;
+  object-fit: cover;
+}
+.bottom-btn .icon-wrap.custom-icon span {
+  font-size: 26px;
 }
 /* 商店图标：保持与 iCity 等图标一致的大小，避免锯齿；再缩小一点点 */
 #appBtnShop .icon-wrap {
