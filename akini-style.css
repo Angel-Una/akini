@@ -335,6 +335,20 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   border-radius: 10px !important;
   pointer-events: none;
 }
+/* 商店图标：缩小并去掉白色底图 */
+#appBtnShop .icon-wrap {
+  background: transparent !important;
+  border: none !important;
+  padding: 2px !important;
+  width: 38px;
+  height: 38px;
+}
+#appBtnShop .icon-wrap img {
+  border-radius: 0 !important;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 .app-item .label {
   font-size: 13px;
   color: #666;
