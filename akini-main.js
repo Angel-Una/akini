@@ -12734,12 +12734,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260831by 修复联系人行为/图标/音乐导入/红色弹窗等问题
+      // 版本迁移：20260831ca 修复联系人行为/图标/音乐导入/默认值/样式等问题
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260831by") {
-            localStorage.setItem("akini_app_version", "20260831by");
+          if (ver !== "20260831ca") {
+            localStorage.setItem("akini_app_version", "20260831ca");
             localStorage.removeItem("akini_toggle_readReceiptToggle");
             localStorage.removeItem("akini_toggle_timestampToggle");
             localStorage.removeItem("akini_toggle_contactPokeToggle");
@@ -12762,6 +12762,16 @@ document.addEventListener("DOMContentLoaded", function () {
               "akini_num_friendsPostMax",
             );
             _resetPostRange("akini_num_icityPostMin", "akini_num_icityPostMax");
+            // 主动写信默认改为 3-6 小时，旧值（1-3）重置为 3-6
+            var _resetActiveMailRange = function (minKey, maxKey) {
+              var mn = parseFloat(localStorage.getItem(minKey) || "");
+              var mx = parseFloat(localStorage.getItem(maxKey) || "");
+              if ((isNaN(mn) || mn <= 3) && (isNaN(mx) || mx <= 3)) {
+                localStorage.setItem(minKey, "3");
+                localStorage.setItem(maxKey, "6");
+              }
+            };
+            _resetActiveMailRange("akini_num_activeMailMin", "akini_num_activeMailMax");
             // 主动写信/发消息/朋友圈/iCity 的旧“小时”单位值已废弃，改为按“分钟”读取；
             // 不再清空用户当前设置，避免用户每次重新打开都被重置
             [

@@ -432,27 +432,35 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
 }
 .chat-preview {
-  width: 140px;
+  width: 220px;
   padding: 8px 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   position: relative;
+  left: -80px;
   margin-left: 0;
-  transform: translateX(0);
 }
 .preview-row {
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  width: 100%;
+  gap: 8px;
 }
 .preview-row:nth-child(2) {
   justify-content: flex-end;
 }
+.preview-row:first-child {
+  transform: translateX(-20px);
+}
+.preview-row:first-child .preview-bubble {
+  margin-right: 50px;
+}
+.preview-row:nth-child(2) .preview-bubble {
+  margin-left: 50px;
+}
 .preview-avatar {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: #e8e8e8;
   display: flex;
@@ -468,17 +476,15 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   object-fit: cover;
 }
 .preview-bubble {
-  flex: 0 1 auto;
+  flex: 1;
   min-width: 0;
-  width: fit-content;
-  max-width: 140px;
   background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  border-radius: 16px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  padding: 6px 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
   color: #333;
   line-height: 1.5;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
@@ -487,6 +493,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   user-select: text;
   cursor: text;
   word-break: break-word;
+  max-width: 160px;
 }
 .preview-bubble:focus {
   background: rgba(255, 255, 255, 0.75);
@@ -826,9 +833,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   border-radius: 16px;
   padding: 16px 20px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-  background-size: cover !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
 }
 .beautify-card .card-title {
   font-size: 15px;
