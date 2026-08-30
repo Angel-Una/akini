@@ -12642,18 +12642,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 )),
                 (u = !1))
               : ((s = parseFloat(
-                  localStorage.getItem("akini_num_activeMailMin") || "1",
+                  localStorage.getItem("akini_num_activeMailMin") || "3",
                 )),
                 (d = parseFloat(
-                  localStorage.getItem("akini_num_activeMailMax") || "3",
+                  localStorage.getItem("akini_num_activeMailMax") || "6",
                 )),
                 (u = !0)),
               (isNaN(s) || s <= 0) && (s = 1),
               (isNaN(d) || d < s) && (d = s));
             // 首次触发使用最小间隔，之后按随机范围；便于用户验证设置已生效
             var delay = isFirst ? s : (s + Math.random() * (d - s));
-            var m = delay * 6e4;
-            console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "分钟后触发");
+            var m = delay * 3600 * 1000;
+            console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "小时后触发");
             function mailAction() {
               // 主动写信/回信必须重新调度，无论本次是否执行成功
               var __willRecurse = true;
@@ -12960,8 +12960,8 @@ document.addEventListener("DOMContentLoaded", function () {
         { id: "mailDelayMax", key: "akini_num_mailDelayMax", def: "3" },
         { id: "activeMsgMin", key: "akini_num_activeMsgMin", def: "3" },
         { id: "activeMsgMax", key: "akini_num_activeMsgMax", def: "10" },
-        { id: "activeMailMin", key: "akini_num_activeMailMin", def: "1" },
-        { id: "activeMailMax", key: "akini_num_activeMailMax", def: "3" },
+        { id: "activeMailMin", key: "akini_num_activeMailMin", def: "3" },
+        { id: "activeMailMax", key: "akini_num_activeMailMax", def: "6" },
         { id: "friendsPostMin", key: "akini_num_friendsPostMin", def: "30" },
         { id: "friendsPostMax", key: "akini_num_friendsPostMax", def: "60" },
         { id: "icityPostMin", key: "akini_num_icityPostMin", def: "30" },
