@@ -316,23 +316,24 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: scale(0.92);
 }
 .app-item .icon-wrap {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border: none;
   display: flex;
   justify-content: center;
   align-items: center;
   font-size: 24px;
   color: #666;
   background: transparent;
-  padding: 2px;
+  padding: 0;
   margin-bottom: 4px;
   overflow: hidden;
   pointer-events: none;
   box-sizing: border-box;
 }
-.app-item .icon-wrap img {
+.app-item .icon-wrap img,
+.app-item .icon-wrap svg {
   border-radius: 0 !important;
   pointer-events: none;
   object-fit: contain;
@@ -355,23 +356,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .bottom-btn .icon-wrap.custom-icon span {
   font-size: 26px;
-}
-/* 商店图标：保持与 iCity 等图标一致的大小，避免锯齿；再缩小一点点 */
-#appBtnShop .icon-wrap {
-  background: transparent !important;
-  border: none !important;
-  padding: 0 !important;
-  width: 32px;
-  height: 32px;
-  overflow: visible;
-}
-#appBtnShop .icon-wrap img,
-#appBtnShop .icon-wrap svg {
-  border-radius: 0 !important;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
 }
 .app-item .label {
   font-size: 13px;
@@ -545,21 +529,26 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: scale(0.92);
 }
 .bottom-btn .icon-wrap {
-  width: 46px;
-  height: 46px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: none;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 22px;
+  font-size: 24px;
   color: #666;
-  background: rgba(255, 255, 255, 0.18);
-  padding: 8px;
+  background: transparent;
+  padding: 0;
   overflow: hidden;
 }
-.bottom-btn .icon-wrap img {
-  border-radius: 8px !important;
+.bottom-btn .icon-wrap img,
+.bottom-btn .icon-wrap svg {
+  border-radius: 0 !important;
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 .bottom-btn .label {
   font-size: 13px;
