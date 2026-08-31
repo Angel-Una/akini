@@ -3507,12 +3507,35 @@ document.addEventListener("DOMContentLoaded", function () {
       var e = !1;
       return (
         (F = (F || []).map(function (t) {
-          return (
-            t.id ||
-              ((t.id = Date.now() + "_" + Math.floor(1e3 * Math.random())),
-              (e = !0)),
-            t
-          );
+          if (!t) return t;
+          t.id ||
+            ((t.id = Date.now() + "_" + Math.floor(1e3 * Math.random())),
+            (e = !0));
+          // 启动/刷新时去重评论，防止历史 bug 产生的重复评论再次显示
+          if (t.comments && t.comments.length > 0) {
+            var seen = new Map();
+            t.comments.forEach(function (c) {
+              if (!c || typeof c !== "object") return;
+              var k =
+                c.id ||
+                (c.author || "") +
+                  "_" +
+                  (c.replyTo || "") +
+                  "_" +
+                  (c.text || "") +
+                  "_" +
+                  (c.ts || 0);
+              if (!seen.has(k)) {
+                seen.set(k, c);
+              }
+            });
+            var deduped = Array.from(seen.values());
+            if (deduped.length !== t.comments.length) {
+              t.comments = deduped;
+              e = !0;
+            }
+          }
+          return t;
         })),
         e && j(F),
         F || []
@@ -3549,20 +3572,25 @@ document.addEventListener("DOMContentLoaded", function () {
             n.forEach(function (d) {
               if (d && d.id && map[d.id]) {
                 var old = map[d.id];
-                /* Merge comments: keep every unique comment by id, never drop by content */
+                /* Merge comments: deduplicate by stable id first, then by content key */
                 var oc = old.comments || [];
                 var nc = d.comments || [];
                 var cm = new Map();
+                function _commentKey(c) {
+                  if (!c || typeof c !== "object") return "";
+                  if (c.id) return "id_" + c.id;
+                  return "key_" + (c.author || "") + "_" + (c.replyTo || "") + "_" + (c.text || "") + "_" + (c.ts || 0);
+                }
                 oc.forEach(function (c) {
                   if (!c || typeof c !== "object") return;
-                  if (!c.id) c.id = "c_" + Date.now() + "_" + Math.floor(Math.random() * 1e9);
-                  cm.set(c.id, c);
+                  if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
+                  cm.set(_commentKey(c), c);
                 });
                 nc.forEach(function (c) {
                   if (!c || typeof c !== "object") return;
-                  if (!c.id) c.id = "c_" + Date.now() + "_" + Math.floor(Math.random() * 1e9);
-                  // 新数据覆盖旧数据（保留同 id 最新内容）
-                  cm.set(c.id, c);
+                  if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
+                  // 新数据覆盖旧数据（保留同 id 或同内容最新内容）
+                  cm.set(_commentKey(c), c);
                 });
                 d.comments = Array.from(cm.values()).sort(function (a, b) {
                   return (a.ts || 0) - (b.ts || 0);
@@ -13822,65 +13850,88 @@ document.addEventListener("DOMContentLoaded", function () {
           );
         a || (e.importBtn && (e.importBtn.textContent = "导入中…"));
         var playlistCookie = encodeURIComponent(i || "");
-        return fetch(t + "/playlist/detail?id=" + encodeURIComponent(String(n)) + "&cookie=" + playlistCookie)
-          .then(function (t) {
-            return t.json();
-          })
-          .then(function (t) {
-            console.log("[Akini Netease] /playlist/detail response", t);
-            if (t && t.code !== 200 && t.code !== 0)
-              throw new Error(
-                t.message || t.msg || "返回数据异常 (code:" + t.code + ")",
-              );
-            var playlist = t && t.playlist;
-            if (!playlist && t && t.data) playlist = t.data.playlist;
-            if (!playlist) throw new Error("返回数据异常：缺少 playlist");
-            var tracks = playlist.tracks || t.songs || [];
-            if (!tracks.length) throw new Error("歌单为空或需要登录");
-            var o = tracks.map(function (t) {
-              var artists = t.ar || t.artists || [];
-              var artistName =
-                artists
-                  .map(function (a) {
-                    return a.name;
-                  })
-                  .join("/") ||
-                t.artist ||
-                "未知歌手";
-              var cover =
-                t.al && t.al.picUrl
-                  ? t.al.picUrl
-                  : t.cover || (t.album && t.album.picUrl) || "";
-              return {
-                id: t.id,
-                title: t.name || t.title,
-                artist: artistName,
-                cover: cover,
-                duration: t.dt || t.duration || 0,
-              };
+        function _parseTracks(tracks, playlistName) {
+          if (!tracks || !tracks.length) return [];
+          return tracks.map(function (t) {
+            var artists = t.ar || t.artists || [];
+            var artistName =
+              artists
+                .map(function (a) {
+                  return a.name;
+                })
+                .join("/") ||
+              t.artist ||
+              "未知歌手";
+            var cover =
+              t.al && t.al.picUrl
+                ? t.al.picUrl
+                : t.cover || (t.album && t.album.picUrl) || "";
+            return {
+              id: t.id,
+              title: t.name || t.title,
+              artist: artistName,
+              cover: cover,
+              duration: t.dt || t.duration || 0,
+            };
+          });
+        }
+        function _fetchTrackAll() {
+          return fetch(t + "/playlist/track/all?id=" + encodeURIComponent(String(n)) + "&cookie=" + playlistCookie)
+            .then(function (r) { return r.json(); })
+            .then(function (r) {
+              console.log("[Akini Netease] /playlist/track/all response", r);
+              if (r && r.code !== 200 && r.code !== 0) throw new Error(r.message || r.msg || "track/all 返回异常");
+              var songs = r.songs || (r.data && r.data.songs) || [];
+              if (!songs.length) throw new Error("track/all 无歌曲");
+              return { tracks: songs, name: (r.playlist && r.playlist.name) || "" };
             });
-            return (
-              a ||
-                ((c = o),
-                localStorage.setItem("akini_music_playlist", JSON.stringify(c)),
-                (l = 0),
-                localStorage.setItem("akini_music_index", 0),
-                e.playlistInput && (e.playlistInput.value = ""),
-                Pt(),
-                wt(c[l], !1),
-                pt("已导入 " + c.length + " 首，点击播放按钮开始播放"),
-                Bt(),
-                e.playlistOverlay && (e.playlistOverlay.style.display = "flex"),
-                alert(
-                  "已导入「" +
-                    (playlist.name || "未知歌单") +
-                    "」共 " +
-                    c.length +
-                    " 首",
-                )),
-              o
-            );
-          })
+        }
+        function _fetchDetailFallback() {
+          return fetch(t + "/playlist/detail?id=" + encodeURIComponent(String(n)) + "&cookie=" + playlistCookie)
+            .then(function (r) { return r.json(); })
+            .then(function (r) {
+              console.log("[Akini Netease] /playlist/detail response", r);
+              if (r && r.code !== 200 && r.code !== 0)
+                throw new Error(
+                  r.message || r.msg || "返回数据异常 (code:" + r.code + ")",
+                );
+              var playlist = r && r.playlist;
+              if (!playlist && r && r.data) playlist = r.data.playlist;
+              if (!playlist) throw new Error("返回数据异常：缺少 playlist");
+              var tracks = playlist.tracks || r.songs || [];
+              return { tracks: tracks, name: playlist.name || "" };
+            });
+        }
+        return _fetchTrackAll().catch(function (err) {
+          console.warn("[Akini Netease] track/all failed, fallback to detail", err);
+          return _fetchDetailFallback();
+        }).then(function (res) {
+          var tracks = res.tracks;
+          var playlistName = res.name;
+          if (!tracks.length) throw new Error("歌单为空或需要登录");
+          var o = _parseTracks(tracks, playlistName);
+          return (
+            a ||
+              ((c = o),
+              localStorage.setItem("akini_music_playlist", JSON.stringify(c)),
+              (l = 0),
+              localStorage.setItem("akini_music_index", 0),
+              e.playlistInput && (e.playlistInput.value = ""),
+              Pt(),
+              wt(c[l], !1),
+              pt("已导入 " + c.length + " 首，点击播放按钮开始播放"),
+              Bt(),
+              e.playlistOverlay && (e.playlistOverlay.style.display = "flex"),
+              alert(
+                "已导入「" +
+                  (playlistName || "未知歌单") +
+                  "」共 " +
+                  c.length +
+                  " 首",
+              )),
+            o
+          );
+        })
           .catch(function (t) {
             throw (a || alert("导入失败：" + t.message), t);
           })
@@ -14241,9 +14292,19 @@ document.addEventListener("DOMContentLoaded", function () {
             (e.chatInput.value = ""));
         }
       }
-      const t =
-          "https://netease-cloud-music-api-murex-six.vercel.app",
-        e = {
+      var t =
+          (typeof window.AKINI_NETEASE_PROXY === "string" && window.AKINI_NETEASE_PROXY) ||
+          "https://netease-cloud-music-api-murex-six.vercel.app";
+      window._akiniSetMusicProxy = function (url) {
+        url = (url || "").trim();
+        if (!url) return;
+        try {
+          localStorage.setItem("akini_netease_proxy", url);
+        } catch (e) {}
+        window.AKINI_NETEASE_PROXY = url;
+        t = url;
+      };
+      var e = {
           page: document.getElementById("app-music"),
           bgLayer: document.getElementById("musicBgLayer"),
           backBtn: document.getElementById("musicBackBtn"),
@@ -15828,9 +15889,10 @@ document.addEventListener("DOMContentLoaded", function () {
         } else {
           names = "TA";
         }
-        var o = "TA就在你的身边 一起听了 " + (a += (n % 60) + " 分钟");
-        e.distanceText && (e.distanceText.textContent = o);
-        e.listenTime && (e.listenTime.textContent = o);
+        var timeText = "一起听了 " + (a += (n % 60) + " 分钟");
+        var fullText = "TA就在你的身边 " + timeText;
+        e.distanceText && (e.distanceText.textContent = fullText);
+        e.listenTime && (e.listenTime.textContent = timeText);
       }
       function st() {
         var t = [
@@ -16113,47 +16175,60 @@ document.addEventListener("DOMContentLoaded", function () {
                     try {
                       m = localStorage.getItem("akini_netease_cookie") || "";
                     } catch (i) {}
+                  // 防止同一首歌反复失败导致界面卡死
+                  if (!window._akiniAudioErrCounts) window._akiniAudioErrCounts = {};
+                  var errKey = String(c[l] && c[l].id || r || e || "_");
+                  window._akiniAudioErrCounts[errKey] = (window._akiniAudioErrCounts[errKey] || 0) + 1;
+                  if (window._akiniAudioErrCounts[errKey] > 3) {
+                    console.warn("[Akini Music] 同一首歌错误次数过多，停止重试", errKey);
+                    pt("该歌曲无法播放，自动切换下一首");
+                    window._akiniAudioErrCounts[errKey] = 0;
+                    setTimeout(function () { St(); }, 800);
+                    return;
+                  }
                   if ((4 === a || d) && r && "retry" !== n && "retry2" !== n) {
-                    if ("proxy" === n) return void vt(s, "retry");
-                    var f = t + "/song/url?id=" + encodeURIComponent(r);
+                    if ("proxy" === n) return void setTimeout(function(){ vt(s, "retry"); }, 200);
+                    var f = t + "/song/url?id=" + encodeURIComponent(r) + "&br=999000";
                     return (
                       m && (f += "&cookie=" + encodeURIComponent(m)),
-                      void vt(f, "proxy")
+                      f += "&realIP=" + encodeURIComponent(window._neteaseRealIp || "223.5.5.5"),
+                      void setTimeout(function(){ vt(f, "proxy"); }, 200)
                     );
                   }
                   if ("fetch" === n || "fetch-retry" === n) {
                     if (
                       ((f = r
-                        ? t + "/song/url?id=" + encodeURIComponent(r)
+                        ? t + "/song/url?id=" + encodeURIComponent(r) + "&br=999000"
                         : "") &&
                         m &&
                         (f += "&cookie=" + encodeURIComponent(m)),
+                      f && (f += "&realIP=" + encodeURIComponent(window._neteaseRealIp || "223.5.5.5")),
                       f)
                     )
-                      return void vt(f, "proxy");
+                      return void setTimeout(function(){ vt(f, "proxy"); }, 200);
                   } else if ("proxy" === n) {
-                    if (s) return void vt(s, "retry");
+                    if (s) return void setTimeout(function(){ vt(s, "retry"); }, 200);
                   } else if ("retry" === n) {
                     ((E = null), (S = 0), (A = null));
                     var g = c[l];
-                    if (g && g.id) return void wt(g, !0, !0);
+                    if (g && g.id) return void setTimeout(function(){ wt(g, !0, !0); }, 200);
                     if (e)
-                      return void vt(
+                      return void setTimeout(function(){ vt(
                         e +
                           (e.indexOf("?") > -1 ? "&" : "?") +
                           "_retry=" +
                           Date.now(),
                         "retry2",
-                      );
+                      ); }, 200);
                   } else {
                     if ("retry2" === n && e)
-                      return void vt(
+                      return void setTimeout(function(){ vt(
                         e +
                           (e.indexOf("?") > -1 ? "&" : "?") +
                           "_retry2=" +
                           Date.now(),
                         "retry3",
-                      );
+                      ); }, 200);
                     (pt("当前歌曲无法播放，自动切换下一首"),
                       setTimeout(function () {
                         St();
@@ -16193,6 +16268,10 @@ document.addEventListener("DOMContentLoaded", function () {
               }),
               u.addEventListener("playing", function () {
                 (et(), Q(), Y(), pt(""));
+                // 播放成功时重置错误计数
+                if (c[l] && c[l].id && window._akiniAudioErrCounts) {
+                  window._akiniAudioErrCounts[String(c[l].id)] = 0;
+                }
               })),
             u)
           ) {
@@ -16250,7 +16329,7 @@ document.addEventListener("DOMContentLoaded", function () {
           // 命中缓存时仍需把当前 URL 设置给音频，避免旧音频继续播放
           return E && vt(E, i ? "fetch-retry" : "fetch"), Promise.resolve();
         }
-        var o = t + "/song/url?id=" + encodeURIComponent(String(e.id)) + "&cookie=" + encodeURIComponent(a || "");
+        var o = t + "/song/url?id=" + encodeURIComponent(String(e.id)) + "&br=999000&cookie=" + encodeURIComponent(a || "") + "&realIP=" + encodeURIComponent((window._neteaseRealIp || "223.5.5.5"));
         return fetch(o)
           .then(function (t) {
             return t.json().catch(function () {

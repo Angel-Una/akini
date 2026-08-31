@@ -824,7 +824,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex: 1;
 }
 .beautify-body {
-  padding: 16px;
+  padding: 19px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -5249,3 +5249,14 @@ button.back-btn[type="button"] {
   visibility: visible !important;
   opacity: 1 !important;
 }
+
+/* v20260831: 首页播放器不再显示一起听面板，保持简洁 */
+.music-player-card {
+  justify-content: flex-start !important;
+}
+.music-player-info {
+  flex: 1 1 auto !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+/* 恢复首页播放器一起听面板显示，不再隐藏 */
