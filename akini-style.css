@@ -829,65 +829,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   gap: 16px;
 }
-.beautify-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 16px 20px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-}
-.beautify-card .card-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #222;
-  margin-bottom: 12px;
-}
-.beautify-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  gap: 10px;
-}
-.beautify-row .info {
-  flex: 1;
-}
-.beautify-row .info .label {
-  font-size: 14px;
-  color: #222;
-}
-.beautify-row .info .desc {
-  font-size: 12px;
-  color: #888;
-  margin-top: 2px;
-  line-height: 1.4;
-}
-.beautify-input {
-  width: 70px;
-  height: 36px;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  text-align: center;
-  font-size: 14px;
-  outline: 0;
-  background: #fafafa;
-  flex-shrink: 0;
-}
-.beautify-input:focus {
-  border-color: #4f7cff;
-}
-.beautify-input-full {
-  width: 100%;
-  height: 36px;
-  border: 1px solid #e0e0e0;
-  border-radius: 12px;
-  padding: 0 12px;
-  font-size: 14px;
-  outline: 0;
-  background: #fafafa;
-}
-.beautify-input-full:focus {
-  border-color: #4f7cff;
-}
+
 .beautify-img-btn {
   padding: 8px 12px;
   background: #fafafa;
@@ -4061,7 +4003,6 @@ body.dark-mode #wbSearchBar input {
   background: #2a2a2e !important;
   color: #e8e8e8 !important;
 }
-body.dark-mode .beautify-row label,
 body.dark-mode .bottom-row,
 body.dark-mode .bottom-btn-container,
 body.dark-mode .right-card,
@@ -5251,3 +5192,18 @@ button.back-btn[type="button"] {
   min-width: 0 !important;
 }
 /* 恢复首页播放器一起听面板显示，不再隐藏 */
+
+.settings-input-full {
+  width: 100%;
+  height: 36px;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 0 12px;
+  font-size: 14px;
+  outline: 0;
+  background: #fafafa;
+  box-sizing: border-box;
+}
+.settings-input-full:focus {
+  border-color: #4f7cff;
+}
