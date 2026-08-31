@@ -12796,6 +12796,23 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         } catch (e) {}
       })();
+      // v20260831cd：二次迁移，仅重置朋友圈/iCity 间隔（首次迁移可能因旧版本缓存未生效）
+      (function() {
+        try {
+          var ver2 = localStorage.getItem("akini_app_version");
+          if (ver2 !== "20260831cd") {
+            localStorage.setItem("akini_app_version", "20260831cd");
+            var _resetSmall = function(minKey, maxKey, minDef, maxDef) {
+              var mn = parseFloat(localStorage.getItem(minKey) || "");
+              var mx = parseFloat(localStorage.getItem(maxKey) || "");
+              if (isNaN(mn) || mn < 5) { localStorage.setItem(minKey, String(minDef)); }
+              if (isNaN(mx) || mx < 10) { localStorage.setItem(maxKey, String(maxDef)); }
+            };
+            _resetSmall("akini_num_friendsPostMin", "akini_num_friendsPostMax", 30, 60);
+            _resetSmall("akini_num_icityPostMin", "akini_num_icityPostMax", 30, 60);
+          }
+        } catch(e) {}
+      })();
       function t(t, e) {
         const n = document.getElementById(t);
         if (!n) {
