@@ -359,195 +359,178 @@ document.addEventListener("DOMContentLoaded", function () {
       document.body.appendChild(overlay);
     };
     window._idbStore = (function () {
-      var t = "imgs",
-        e = null;
-      function n(n) {
-        if (e) n(e);
-        else
-          try {
-            var i = indexedDB.open("akini_img_db", 1);
-            ((i.onupgradeneeded = function (e) {
-              e.target.result.createObjectStore(t);
-            }),
-              (i.onsuccess = function (t) {
-                ((e = t.target.result), n(e));
-              }),
-              (i.onerror = function () {
-                n(null);
-              }),
-              (i.onblocked = function () {
-                n(null);
-              }));
-          } catch (t) {
-            n(null);
-          }
+      var STORE = "imgs";
+      var DB_NAME = "akini_img_db";
+      var DB_VERSION = 1;
+      var db = null;
+      var queue = [];
+      var opening = false;
+
+      function fireReady(cbs, conn) {
+        for (var i = 0; i < cbs.length; i++) {
+          try { cbs[i](conn); } catch (e) {}
+        }
       }
-      return {
-        set: function (e, i, a) {
-          n(function (n) {
-            if (n) {
-              var o = n.transaction(t, "readwrite");
-              (o.objectStore(t).put(i, e),
-                (o.oncomplete = function () {
-                  a && a();
-                }),
-                (o.onerror = function () {
-                  try {
-                    T && T.call(localStorage, e, i);
-                  } catch (t) {}
-                  a && a();
-                }));
-            } else {
-              try {
-                T && T.call(localStorage, e, i);
-              } catch (t) {}
-              a && a();
+
+      function open(cb) {
+        if (db) { cb(db); return; }
+        queue.push(cb);
+        if (opening) return;
+        opening = true;
+        try {
+          var req = indexedDB.open(DB_NAME, DB_VERSION);
+          req.onupgradeneeded = function (e) {
+            var _db = e.target.result;
+            if (!_db.objectStoreNames.contains(STORE)) {
+              _db.createObjectStore(STORE);
             }
-          });
-        },
-        get: function (e, i) {
-          n(function (n) {
-            if (n) {
-              var a = n.transaction(t, "readonly").objectStore(t).get(e);
-              ((a.onsuccess = function () {
-                i(a.result || localStorage.getItem(e));
-              }),
-                (a.onerror = function () {
-                  i(localStorage.getItem(e));
-                }));
-            } else i(localStorage.getItem(e));
-          });
-        },
-        backupAll: function (e) {
-          n(function (n) {
-            if (n) {
-              try {
-                var tx = n.transaction(t, "readwrite"),
-                  store = tx.objectStore(t);
-                for (var o = 0; o < localStorage.length; o++) {
-                  var r = localStorage.key(o),
-                    c = localStorage.getItem(r);
-                  // 应用图标由自定义图标模块自行管理，不纳入通用备份，避免恢复默认后又被还原
-                  if (r && r.indexOf("akini_app_icon_") === 0) continue;
-                  // 不用空值/空数组/空对象覆盖 IDB 中已有的有效数据，避免把好数据备份成空
-                  if (r && null !== c && c !== "" && c !== "[]" && c !== "{}" && c !== "null" && c !== "undefined") {
-                    store.put(c, r);
-                  }
-                }
-                ((tx.oncomplete = function () {
-                  e && e();
-                }),
-                  (tx.onerror = function () {
-                    e && e();
-                  }));
-              } catch (err) {
-                e && e();
-              }
-            } else e && e();
-          });
-        },
-        restoreAll: function (e) {
-          n(function (n) {
-            if (!n) {
-              e && e();
-              return;
-            }
+          };
+          req.onsuccess = function (e) {
+            db = e.target.result;
             try {
-              var c = n.transaction(t, "readonly").openCursor();
-              c.onsuccess = function (a) {
-                var o = a.target.result;
-                if (o) {
-                  var k = o.key,
-                    v = o.value;
-                  if (
-                    k &&
-                    k.indexOf("akini_app_icon_") !== 0 &&
-                    v != null &&
-                    v !== "" &&
-                    v !== "[]" &&
-                    v !== "{}" &&
-                    v !== "null" &&
-                    v !== "undefined"
-                  ) {
-                    var cur = localStorage.getItem(k);
-                    var isChat = /^akini_chat_history_/.test(k);
-                    var isLocalEmpty = !cur || cur === "" || cur === "null" || cur === "undefined" || cur === "[]" || cur === "{}" || cur.length === 0;
-                    // 聊天记录取最长，其它设置类以 IDB 备份为准（避免默认值覆盖用户自定义）
-                    var shouldRestore = isLocalEmpty || !isChat || (v && v.length > (cur || "").length);
-                    if (shouldRestore) {
-                      try {
-                        localStorage.setItem(k, v);
-                      } catch (x) {}
-                    }
-                  }
-                  o.continue();
-                } else {
-                  e && e();
-                }
-              };
-              c.onerror = function () {
-                e && e();
-              };
-            } catch (l) {
-              e && e();
+              db.onclose = function () { db = null; };
+              db.onversionchange = function () { try { db.close(); } catch (_) {} db = null; };
+            } catch (_) {}
+            opening = false;
+            var q = queue; queue = [];
+            fireReady(q, db);
+          };
+          req.onerror = req.onblocked = function () {
+            opening = false;
+            var q = queue; queue = [];
+            fireReady(q, null);
+          };
+        } catch (err) {
+          opening = false;
+          var q = queue; queue = [];
+          fireReady(q, null);
+        }
+      }
+
+      function withDB(use, fail) {
+        open(function (conn) {
+          if (!conn) { if (fail) fail(); return; }
+          function tryUse(retrying) {
+            try {
+              use(conn);
+            } catch (err) {
+              if (
+                !retrying && err &&
+                (err.name === "InvalidStateError" ||
+                 err.name === "NotFoundError" ||
+                 (err.message && err.message.toLowerCase().indexOf("closing") >= 0))
+              ) {
+                try { db.close(); } catch (_) {}
+                db = null;
+                open(function (conn2) {
+                  if (conn2) {
+                    try { use(conn2); } catch (e2) { if (fail) fail(); }
+                  } else if (fail) fail();
+                });
+              } else {
+                if (fail) fail();
+              }
             }
-          });
+          }
+          tryUse(false);
+        });
+      }
+
+      function lsSet(k, v) {
+        try { if (typeof T !== "undefined" && T) T.call(localStorage, k, v); } catch (e) {}
+      }
+
+      return {
+        set: function (k, v, cb) {
+          var done = function () { if (typeof cb === "function") cb(); };
+          withDB(function (conn) {
+            var tx = conn.transaction(STORE, "readwrite");
+            tx.objectStore(STORE).put(v, k);
+            tx.oncomplete = done;
+            tx.onerror = function () { lsSet(k, v); done(); };
+            tx.onabort = function () { lsSet(k, v); done(); };
+          }, function () { lsSet(k, v); done(); });
         },
-        getAll: function (e) {
-          n(function (n) {
-            if (n)
-              try {
-                var i = {},
-                  a = n.transaction(t, "readonly").openCursor();
-                ((a.onsuccess = function (t) {
-                  var n = t.target.result;
-                  n ? ((i[n.key] = n.value), n.continue()) : e(i);
-                }),
-                  (a.onerror = function () {
-                    e(i);
-                  }));
-              } catch (t) {
-                e({});
+        get: function (k, cb) {
+          if (typeof cb !== "function") return;
+          withDB(function (conn) {
+            var req = conn.transaction(STORE, "readonly").objectStore(STORE).get(k);
+            req.onsuccess = function () { cb(req.result !== undefined ? req.result : localStorage.getItem(k)); };
+            req.onerror = function () { cb(localStorage.getItem(k)); };
+          }, function () { cb(localStorage.getItem(k)); });
+        },
+        backupAll: function (cb) {
+          var done = function () { if (typeof cb === "function") cb(); };
+          withDB(function (conn) {
+            var tx = conn.transaction(STORE, "readwrite");
+            var store = tx.objectStore(STORE);
+            for (var i = 0; i < localStorage.length; i++) {
+              var r = localStorage.key(i), c = localStorage.getItem(r);
+              if (r && r.indexOf("akini_app_icon_") === 0) continue;
+              if (r && null !== c && c !== "" && c !== "[]" && c !== "{}" && c !== "null" && c !== "undefined") {
+                store.put(c, r);
               }
-            else e({});
-          });
+            }
+            tx.oncomplete = done;
+            tx.onerror = done;
+          }, done);
         },
-        remove: function (e, i) {
-          n(function (n) {
-            if (n)
-              try {
-                var o = n.transaction(t, "readwrite");
-                (o.objectStore(t).delete(e),
-                  (o.oncomplete = function () {
-                    i && i();
-                  }),
-                  (o.onerror = function () {
-                    i && i();
-                  }));
-              } catch (t) {
-                i && i();
-              }
-            else i && i();
-          });
+        restoreAll: function (cb) {
+          var done = function () { if (typeof cb === "function") cb(); };
+          withDB(function (conn) {
+            var cursorReq = conn.transaction(STORE, "readonly").openCursor();
+            cursorReq.onsuccess = function (e) {
+              var o = e.target.result;
+              if (o) {
+                var k = o.key, v = o.value;
+                if (
+                  k && k.indexOf("akini_app_icon_") !== 0 &&
+                  v != null && v !== "" && v !== "[]" && v !== "{}" && v !== "null" && v !== "undefined"
+                ) {
+                  var cur = localStorage.getItem(k);
+                  var isChat = /^akini_chat_history_/.test(k);
+                  var isLocalEmpty = !cur || cur === "" || cur === "null" || cur === "undefined" || cur === "[]" || cur === "{}" || cur.length === 0;
+                  var shouldRestore = isLocalEmpty || !isChat || (v && v.length > (cur || "").length);
+                  if (shouldRestore) {
+                    try { localStorage.setItem(k, v); } catch (x) {}
+                  }
+                }
+                o.continue();
+              } else done();
+            };
+            cursorReq.onerror = done;
+          }, done);
         },
-        clearAll: function (e) {
-          n(function (n) {
-            if (n)
-              try {
-                var i = n.transaction(t, "readwrite");
-                (i.objectStore(t).clear(),
-                  (i.oncomplete = function () {
-                    e && e();
-                  }),
-                  (i.onerror = function () {
-                    e && e();
-                  }));
-              } catch (t) {
-                e && e();
-              }
-            else e && e();
-          });
+        getAll: function (cb) {
+          if (typeof cb !== "function") return;
+          withDB(function (conn) {
+            var out = {};
+            var req = conn.transaction(STORE, "readonly").openCursor();
+            req.onsuccess = function (e) {
+              var r = e.target.result;
+              if (r) { out[r.key] = r.value; r.continue(); } else cb(out);
+            };
+            req.onerror = function () { cb(out); };
+          }, function () { cb({}); });
         },
+        remove: function (k, cb) {
+          var done = function () { if (typeof cb === "function") cb(); };
+          withDB(function (conn) {
+            var tx = conn.transaction(STORE, "readwrite");
+            tx.objectStore(STORE).delete(k);
+            tx.oncomplete = done;
+            tx.onerror = done;
+          }, done);
+        },
+        clearAll: function (cb) {
+          var done = function () { if (typeof cb === "function") cb(); };
+          withDB(function (conn) {
+            var tx = conn.transaction(STORE, "readwrite");
+            tx.objectStore(STORE).clear();
+            tx.oncomplete = done;
+            tx.onerror = done;
+          }, done);
+        }
       };
     })();
     !(function () {
@@ -845,31 +828,55 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 ((window.onerror = function (t, e, n, i, a) {
       var o = document.getElementById("globalErrorBanner");
-      o ||
-        (((o = document.createElement("div")).id = "globalErrorBanner"),
-        (o.style.cssText =
-          "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;"),
-        document.body.appendChild(o));
+      if (!o) {
+        o = document.createElement("div");
+        o.id = "globalErrorBanner";
+        o.style.cssText =
+          "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;";
+        document.body.appendChild(o);
+        window.__akiniErrorHistory = [];
+        window.__akiniLastErrorTime = 0;
+      }
       var r = t + "";
-      return (
-        a && a.stack && (r += "\\n" + a.stack),
-        (o.textContent += "JS错误: " + r + " (line " + n + ")\\n"),
-        console.error("[Akini Error]", t, "line:" + n, "col:" + i, a),
-        !0
-      );
+      if (a && a.stack) r += "\\n" + a.stack;
+      var now = Date.now();
+      var hist = window.__akiniErrorHistory;
+      if (hist) {
+        hist.push({ type: "js", msg: r, line: n, time: now });
+        if (hist.length > 20) hist.shift();
+      }
+      if (now - (window.__akiniLastErrorTime || 0) > 2000) {
+        window.__akiniLastErrorTime = now;
+        o.textContent = "JS错误: " + r + " (line " + n + ")\\n";
+      }
+      console.error("[Akini Error]", t, "line:" + n, "col:" + i, a);
+      return !0;
     }),
       window.addEventListener("unhandledrejection", function (t) {
         var e = document.getElementById("globalErrorBanner");
-        e ||
-          (((e = document.createElement("div")).id = "globalErrorBanner"),
-          (e.style.cssText =
-            "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;"),
-          document.body.appendChild(e));
+        if (!e) {
+          e = document.createElement("div");
+          e.id = "globalErrorBanner";
+          e.style.cssText =
+            "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;";
+          document.body.appendChild(e);
+          window.__akiniErrorHistory = [];
+          window.__akiniLastErrorTime = 0;
+        }
         var n = t.reason,
           i = n && n.message ? n.message : String(n);
-        (n && n.stack && (i += "\\n" + n.stack),
-          (e.textContent += "Promise错误: " + i + "\\n"),
-          console.error("[Akini Promise Error]", n));
+        if (n && n.stack) i += "\\n" + n.stack;
+        var now = Date.now();
+        var hist = window.__akiniErrorHistory;
+        if (hist) {
+          hist.push({ type: "promise", msg: i, time: now });
+          if (hist.length > 20) hist.shift();
+        }
+        if (now - (window.__akiniLastErrorTime || 0) > 2000) {
+          window.__akiniLastErrorTime = now;
+          e.textContent = "Promise错误: " + i + "\\n";
+        }
+        console.error("[Akini Promise Error]", n);
       }));
     const t = [520, 1314, 9999, 10001, 13140, 5200, 52e3];
     function e() {
@@ -1268,7 +1275,10 @@ document.addEventListener("DOMContentLoaded", function () {
           var cur = i(t, []);
           if (Array.isArray(cur) && cur.length > 0) e = cur;
         }
-        ((d = e), localStorage.setItem(t, JSON.stringify(e)), c(t, e));
+        d = e;
+        // 即使 localStorage 超出配额导致写入失败，也优先把联系人完整写入 IndexedDB，避免头像等大数据丢失
+        try { localStorage.setItem(t, JSON.stringify(e)); } catch (err) { console.warn('[akiniContacts] save to localStorage failed', err); }
+        c(t, e);
         try { if(typeof window._snapshotCritical === 'function') window._snapshotCritical(); } catch(err){}
       }
       function y() {
@@ -2259,8 +2269,7 @@ document.addEventListener("DOMContentLoaded", function () {
               a +
               "</div>"
             : "") +
-          d("right")),
-        U.appendChild(o));
+          d("right")));
       var r = window.akiniContacts.getActiveChatId(),
         c = window.akiniContacts.getChatTarget(r);
       (__akiniAppendMessageHTML(r, o.outerHTML, {
@@ -2270,8 +2279,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
         S(),
         V(),
-        (K.value = ""),
-        (U.scrollTop = U.scrollHeight));
+        (K.value = ""));
       const __bh = _();
       if ("none" === __bh.type) return;
       const l = document.getElementById("typingIndicator");
@@ -4076,7 +4084,24 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     // 去重已禁用：历史去重导致聊天记录/评论被误删，现在直接透传 HTML
     function __akiniDeduplicateChatHTML(html) {
-      return html;
+      if (!html || typeof html !== 'string') return html || '';
+      var wrapper = document.createElement('div');
+      wrapper.innerHTML = html;
+      var rows = Array.from(wrapper.children).filter(function (el) {
+        return el.classList && (el.classList.contains('msg-row') || el.classList.contains('system'));
+      });
+      if (rows.length === 0) return html;
+      var seen = {}, kept = [];
+      rows.forEach(function (row) {
+        var key = row.outerHTML;
+        if (!seen[key]) {
+          seen[key] = true;
+          kept.push(row);
+        }
+      });
+      wrapper.innerHTML = '';
+      kept.forEach(function (row) { wrapper.appendChild(row); });
+      return wrapper.innerHTML;
     }
     function et() {
       function t(t) {
@@ -12468,6 +12493,14 @@ document.addEventListener("DOMContentLoaded", function () {
             var i = 60 * delay * 1e3;
             console.log("[Akini 朋友圈] 下次调度：", delay.toFixed(1), "分钟后触发");
             function friendsPostAction() {
+              // 防止短时间内多次发朋友圈
+              var _minGap = Math.max(1, e) * 60 * 1000 * 0.8;
+              var _lastRun = parseFloat(localStorage.getItem("akini_last_friendsPost_run") || "0");
+              if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
+                console.log("[Akini 朋友圈] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
+                t(false); return;
+              }
+              localStorage.setItem("akini_last_friendsPost_run", String(Date.now()));
               if (!window.AKR.isInTimeRange("friends")) {
                 t(false);
                 return;
@@ -12851,6 +12884,14 @@ document.addEventListener("DOMContentLoaded", function () {
             var m = delay * 3600 * 1000;
             console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "小时后触发");
             function mailAction() {
+              // 防止短时间内多次执行：距上次实际执行不足最小间隔则跳过
+              var _minGap = s * 3600 * 1000 * 0.9;
+              var _lastRun = parseFloat(localStorage.getItem("akini_last_mail_run") || "0");
+              if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
+                console.log("[Akini 信箱] 距上次执行太近，跳过本次，间隔不足", s.toFixed(1), "小时");
+                t(false); return;
+              }
+              localStorage.setItem("akini_last_mail_run", String(Date.now()));
               // 主动写信/回信必须重新调度，无论本次是否执行成功
               var __willRecurse = true;
               function __recurse() {
@@ -13414,6 +13455,14 @@ document.addEventListener("DOMContentLoaded", function () {
       console.log("[Akini 主动发消息] 下次调度：", (o / 6e4).toFixed(1), "分钟后触发");
       function __amtAction() {
         try {
+          // 防止短时间内多次主动发消息
+          var _minGap = Math.max(1, e) * 60 * 1000 * 0.8;
+          var _lastRun = parseFloat(localStorage.getItem("akini_last_activeMsg_run") || "0");
+          if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
+            console.log("[Akini 主动发消息] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
+            __amt(false); return;
+          }
+          localStorage.setItem("akini_last_activeMsg_run", String(Date.now()));
           if (!window.AKR || "function" != typeof window.AKR.isInTimeRange) {
             __amt(false);
             return;
@@ -13496,6 +13545,14 @@ document.addEventListener("DOMContentLoaded", function () {
         var i = 60 * delay * 1e3;
         console.log("[Akini iCity] 下次调度：", delay.toFixed(1), "分钟后触发");
         function icityPostAction() {
+          // 防止短时间内多次发 iCity
+          var _minGap = Math.max(1, e) * 60 * 1000 * 0.8;
+          var _lastRun = parseFloat(localStorage.getItem("akini_last_icityPost_run") || "0");
+          if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
+            console.log("[Akini iCity] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
+            t(false); return;
+          }
+          localStorage.setItem("akini_last_icityPost_run", String(Date.now()));
           if (!window.AKR.isInTimeRange("icity")) {
             t(false);
             return;
