@@ -3957,12 +3957,6 @@ body.dark-mode .sticker-manager-overlay .manage-panel .actions .close-btn {
   background: #3a3a3e !important;
   color: #e8e8e8 !important;
 }
-body.dark-mode .beautify-input,
-body.dark-mode .beautify-input-full,
-body.dark-mode .beautify-img-btn {
-  background: #3a3a3e !important;
-  color: #aaa !important;
-}
 body.dark-mode .tab-bar {
   background: #2a2a2e !important;
   border-color: #333 !important;
@@ -4067,7 +4061,6 @@ body.dark-mode #wbSearchBar input {
   background: #2a2a2e !important;
   color: #e8e8e8 !important;
 }
-body.dark-mode .beautify-body,
 body.dark-mode .beautify-row label,
 body.dark-mode .bottom-row,
 body.dark-mode .bottom-btn-container,

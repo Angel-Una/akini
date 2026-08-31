@@ -11697,17 +11697,12 @@ document.addEventListener("DOMContentLoaded", function () {
       if (isNaN(count) || count < 1) count = Math.floor(Math.random() * 5) + 1;
       const raw = window.pickWordCards(count);
       if (!raw) return "";
-      return (
-        raw
-          .split("\n")
-          .filter(function (s) {
-            return s && s.trim();
-          })
-          .map(function (s) {
-            return s.replace(/[。，,.!?！？…]+$/g, "");
-          })
-          .join("。") + "。"
-      );
+      return raw
+        .split("\n")
+        .filter(function (s) {
+          return s && s.trim();
+        })
+        .join("\n");
     }
     (Mn,
       Ln,
@@ -13860,8 +13855,12 @@ document.addEventListener("DOMContentLoaded", function () {
             ((o = e.playlistInput ? e.playlistInput.value : ""),
             (n =
               (r = (o = String(o).trim()).match(
-                /(?:playlist\?id=|\/playlist\/)(\d+)/,
-              )) || (r = o.match(/(\d{5,})/))
+                /(?:playlist\?id=|\/playlist\/)(\d+)/i,
+              )) ||
+              (r = o.match(/[?&]id=(\d{5,})/)) ||
+              (r = o.match(/id=(\d{5,})/)) ||
+              (r = o.match(/\/(\d{5,})(?:\?|#|\/|$)/)) ||
+              (r = o.match(/(\d{5,})/))
                 ? r[1]
                 : "")),
           !n)
@@ -13955,7 +13954,15 @@ document.addEventListener("DOMContentLoaded", function () {
           );
         })
           .catch(function (t) {
-            throw (a || alert("导入失败：" + t.message), t);
+            var msg = t.message || "";
+            if (msg.indexOf("歌单不存在") !== -1 || msg.indexOf("404") !== -1) {
+              msg = "歌单不存在或无法访问。请检查：\n1. 是否粘贴了 music.163.com 开头的完整链接；\n2. 歌单是否被删除或设为私密；\n3. 第三方短链接需要先在外部浏览器打开，再复制真实链接。";
+            }
+            if (!a) {
+              alert("导入失败：" + msg);
+              return Promise.reject(t);
+            }
+            return Promise.reject(t);
           })
           .finally(function () {
             a || (e.importBtn && (e.importBtn.textContent = "导入"));
@@ -14843,11 +14850,11 @@ document.addEventListener("DOMContentLoaded", function () {
             }),
           e.importBtn &&
             e.importBtn.addEventListener("click", function () {
-              Tt("", B.cookie);
+              Tt("", B.cookie).catch(function(){});
             }),
           e.playlistInput &&
             e.playlistInput.addEventListener("keydown", function (t) {
-              "Enter" === t.key && Tt("", B.cookie);
+              "Enter" === t.key && Tt("", B.cookie).catch(function(){});
             }));
         var songUrlInput = document.getElementById("musicSongUrlInput");
         var songNameInput = document.getElementById("musicSongNameInput");
