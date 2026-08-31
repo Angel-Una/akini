@@ -2185,15 +2185,11 @@ document.addEventListener("DOMContentLoaded", function () {
             .join(" ")),
           Math.random() < window.AKR.getProb("noReply") && (h = !0));
         if (l && U)
-          (U.appendChild(p),
-            window.akiniContacts.updateSession(t, {
+          (__akiniAppendMessageHTML(t, p.outerHTML, {
               lastMsg: v,
-              lastTime: Date.now(),
               lastSenderAvatar: c.avatar,
               lastSenderName: c.name,
-              messagesHTML: U.innerHTML,
             }),
-            C(t, U.innerHTML),
             S(),
             (U.scrollTop = U.scrollHeight));
         else {
@@ -2266,14 +2262,11 @@ document.addEventListener("DOMContentLoaded", function () {
         U.appendChild(o));
       var r = window.akiniContacts.getActiveChatId(),
         c = window.akiniContacts.getChatTarget(r);
-      (window.akiniContacts.updateSession(r, {
+      (__akiniAppendMessageHTML(r, o.outerHTML, {
         lastMsg: t,
-        lastTime: Date.now(),
         lastSenderAvatar: f() || "👤",
         lastSenderName: g() || "我",
       }),
-        window.akiniContacts.updateSession(r, { messagesHTML: U.innerHTML }),
-        C(r, U.innerHTML),
         S(),
         V(),
         (K.value = ""),
@@ -2879,17 +2872,12 @@ document.addEventListener("DOMContentLoaded", function () {
           "";
         if (a && U) {
           const n = document.createElement("div");
-          ((n.innerHTML = p),
-            U.appendChild(n.firstChild),
-            (U.scrollTop = U.scrollHeight),
-            S(),
-            window.akiniContacts.updateSession(t, {
-              messagesHTML: U.innerHTML,
+          (__akiniAppendMessageHTML(t, p, {
               lastMsg: f,
-              lastTime: Date.now(),
               lastSenderAvatar: e.avatar,
               lastSenderName: e.name,
-            }));
+            }),
+            S());
         } else {
           var v;
           ((c =
@@ -2990,67 +2978,154 @@ document.addEventListener("DOMContentLoaded", function () {
       if (U && window.akiniContacts) {
         if (window._restoringChatHistory || window._restoringData) return;
         var e = window.akiniContacts.getActiveChatId();
-        var t = U.innerHTML;
         if (e) {
           var d = U.getAttribute("data-rendered-chat-id");
-          if (d && d !== e && t && "" !== t.trim()) {
-            (C(d, t),
-              window.akiniContacts.updateSession(d, { messagesHTML: t }));
+          // 切换会话时，用会话里的完整记录保存，不要用截断后的 DOM HTML
+          if (d && d !== e) {
+            var oldSess = window.akiniContacts.getSession(d);
+            if (oldSess && oldSess.messagesHTML) {
+              C(d, oldSess.messagesHTML);
+            }
           }
           U.setAttribute("data-rendered-chat-id", e);
-          if (!t || "" === t.trim()) {
-            var n = window.akiniContacts.getSession(e);
-            if (n && n.messagesHTML && "" !== n.messagesHTML.trim()) {
-              U.innerHTML = n.messagesHTML;
-              U.scrollTop = U.scrollHeight;
-            }
-            return;
+          var n = window.akiniContacts.getSession(e);
+          if (n && n.messagesHTML && "" !== n.messagesHTML.trim()) {
+            C(e, n.messagesHTML);
           }
-          (C(e, t), window.akiniContacts.updateSession(e, { messagesHTML: t }));
         }
       }
     }
-    function __akiniCompactChatHTML(e, n) {
-      n = n || 200;
-      if (!e || e.length < 50000) return e;
-      var count = 0, idx = e.length;
-      while ((idx = e.lastIndexOf('class="msg-row', idx - 1)) !== -1) {
+    var AKINI_CHAT_BATCH_SIZE = 100;
+    function __akiniCountMsgRows(html) {
+      if (!html) return 0;
+      var m = html.match(/<div[^>]*class="msg-row/g);
+      return m ? m.length : 0;
+    }
+    function __akiniSliceLastMsgRows(html, n) {
+      if (!html || n <= 0) return html || "";
+      var total = __akiniCountMsgRows(html);
+      if (total <= n) return html;
+      // 找到倒数第 n+1 条消息的起始位置，从它之后截取
+      var count = 0, idx = html.length;
+      while ((idx = html.lastIndexOf('<div class="msg-row', idx - 1)) !== -1) {
         count++;
-        if (count >= n) return e.slice(idx);
+        if (count === n + 1) {
+          return html.slice(idx);
+        }
       }
-      return e;
+      return html;
+    }
+    function __akiniGetMsgRowsHTML(html, start, end) {
+      // 按 msg-row 切片（start/end 为消息索引）
+      var rows = [];
+      var i = 0;
+      while ((i = html.indexOf('<div class="msg-row', i)) !== -1) {
+        var next = html.indexOf('<div class="msg-row', i + 1);
+        rows.push(html.slice(i, next === -1 ? html.length : next));
+        i = next === -1 ? html.length : next;
+      }
+      return rows.slice(start, end).join("");
+    }
+    function __akiniCreateLoadMoreBtn(chatId) {
+      var div = document.createElement("div");
+      div.className = "msg-load-more";
+      div.style.cssText = "text-align:center;padding:12px 0;font-size:13px;color:#888;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;";
+      div.innerHTML = '<span class="load-more-text">↑ 加载更多聊天记录</span>';
+      div.addEventListener("click", function () {
+        __akiniLoadMoreHistory(chatId);
+      });
+      return div;
+    }
+    function __akiniRenderChatBody(fullHTML, chatId) {
+      if (!U) return;
+      var total = __akiniCountMsgRows(fullHTML);
+      if (total <= AKINI_CHAT_BATCH_SIZE) {
+        U.innerHTML = fullHTML;
+      } else {
+        var batchHTML = __akiniSliceLastMsgRows(fullHTML, AKINI_CHAT_BATCH_SIZE);
+        U.innerHTML = batchHTML;
+        U.appendChild(__akiniCreateLoadMoreBtn(chatId));
+      }
+      try {
+        U.setAttribute(
+          "data-rendered-chat-id",
+          window.akiniContacts ? window.akiniContacts.getActiveChatId() : "",
+        );
+      } catch (e) {}
+      U.scrollTop = U.scrollHeight;
+      __akiniSetupChatMetaObserver();
+    }
+    function __akiniLoadMoreHistory(chatId) {
+      if (!U) return;
+      var sess = window.akiniContacts.getSession(chatId) || {};
+      var fullHTML = sess.messagesHTML || "";
+      var total = __akiniCountMsgRows(fullHTML);
+      var currentRows = U.querySelectorAll('.msg-row').length;
+      var newCount = Math.min(total, currentRows + AKINI_CHAT_BATCH_SIZE);
+      if (newCount <= currentRows) return;
+      var newHTML = __akiniSliceLastMsgRows(fullHTML, newCount);
+      // 记录旧高度，避免加载后滚动位置跳到底部
+      var oldHeight = U.scrollHeight, oldTop = U.scrollTop;
+      U.innerHTML = newHTML;
+      U.appendChild(__akiniCreateLoadMoreBtn(chatId));
+      U.scrollTop = oldTop + (U.scrollHeight - oldHeight);
+      __akiniSetupChatMetaObserver();
+    }
+    function __akiniAppendMessageHTML(chatId, html, meta) {
+      // meta: {lastMsg, lastSenderAvatar, lastSenderName}
+      if (!chatId || !html) return;
+      var sess = window.akiniContacts.getSession(chatId) || {};
+      var fullHTML = (sess.messagesHTML || "") + html;
+      window.akiniContacts.updateSession(chatId, Object.assign({
+        messagesHTML: fullHTML,
+        lastTime: Date.now()
+      }, meta || {}));
+      C(chatId, fullHTML);
+      // 若当前正在看该聊天，把新消息追加到 DOM（同时保持虚拟滚动）
+      if (U && window.akiniContacts.getActiveChatId() === chatId) {
+        var total = __akiniCountMsgRows(fullHTML);
+        // 如果当前 DOM 里已经展示了全部消息，直接追加；否则只追加到末尾（用户仍在底部时可见）
+        var visibleRows = U.querySelectorAll('.msg-row').length;
+        if (total - visibleRows <= 1) {
+          var loadMore = U.querySelector('.msg-load-more');
+          var temp = document.createElement('div'); temp.innerHTML = html;
+          while (temp.firstChild) {
+            U.insertBefore(temp.firstChild, loadMore || null);
+          }
+          U.scrollTop = U.scrollHeight;
+        }
+      }
     }
     function C(t, e) {
       if (!t || "string" != typeof e) return;
-      var compact = __akiniCompactChatHTML(e, 200);
-      E[t] = compact;
+      E[t] = e;
       var key = "akini_chat_history_" + t;
       var backup = "akini_chat_history_backup_" + t;
-      // 大聊天记录只写入 IndexedDB，避免 localStorage 配额崩溃
-      if (compact.length <= 60000) {
+      // 小记录同时写入 localStorage，大记录只写 IndexedDB，防止 localStorage 超限崩溃
+      if (e.length <= 60000) {
         try {
-          localStorage.setItem(key, compact);
+          localStorage.setItem(key, e);
         } catch (i) {
           B();
           try {
-            localStorage.setItem(key, compact);
+            localStorage.setItem(key, e);
           } catch (i) {}
         }
         try {
-          localStorage.setItem(backup, compact);
+          localStorage.setItem(backup, e);
         } catch (i) {
           B();
           try {
-            localStorage.setItem(backup, compact);
+            localStorage.setItem(backup, e);
           } catch (i) {}
         }
       }
       // IndexedDB 是主存储，持久化大记录
       try {
-        _idbStore.set(key, compact);
+        _idbStore.set(key, e);
       } catch (e) {}
       try {
-        _idbStore.set(backup, compact);
+        _idbStore.set(backup, e);
       } catch (e) {}
       try {
         window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
@@ -3835,18 +3910,17 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           })(function (t) {
             if (t) {
-              U.innerHTML = __akiniDeduplicateChatHTML(t);
-              try {
-                U.setAttribute(
-                  "data-rendered-chat-id",
-                  window.akiniContacts
-                    ? window.akiniContacts.getActiveChatId()
-                    : "",
-                );
-              } catch (e) {}
+              var clean = __akiniDeduplicateChatHTML(t);
+              // 把完整记录存回会话，但只渲染最近一批，避免 DOM 过大崩溃
+              if (clean !== t) {
+                try {
+                  window.akiniContacts.updateSession(e, { messagesHTML: clean });
+                  C(e, clean);
+                } catch (x) {}
+              }
+              __akiniRenderChatBody(clean, e);
             }
             requestAnimationFrame(function () {
-              U && (U.scrollTop = U.scrollHeight);
               __akiniSetupChatMetaObserver();
             });
           });
@@ -3944,6 +4018,13 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (0 === t.length) return "";
       if (1 === t.length) return t[0];
+      // 数据量过大时跳过复杂去重，直接返回最长记录，避免解析 HTML 导致卡顿/崩溃
+      var longest = t.reduce(function (a, b) {
+        return a.length >= b.length ? a : b;
+      });
+      if (longest.length > 300000 || __akiniCountMsgRows(longest) > 2000) {
+        return longest;
+      }
       function __akRows(html) {
         var div = document.createElement("div");
         div.innerHTML = html;
@@ -4237,9 +4318,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (e && (!U.innerHTML || "" === U.innerHTML.trim())) {
               var sess = window.akiniContacts.getSession(e);
               if (sess && sess.messagesHTML && "" !== sess.messagesHTML.trim()) {
-                U.innerHTML = __akiniDeduplicateChatHTML(sess.messagesHTML);
-                U.setAttribute("data-rendered-chat-id", e);
-                U.scrollTop = U.scrollHeight;
+                __akiniRenderChatBody(__akiniDeduplicateChatHTML(sess.messagesHTML), e);
               }
             }
           } catch (t) {}
@@ -4284,25 +4363,21 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!U || !window.akiniContacts) return;
           var e = window.akiniContacts.getActiveChatId();
           if (!e) return;
-          var html = U.innerHTML || "";
-          if (html.trim()) {
-            var dedupedHtml = __akiniDeduplicateChatHTML(html);
-            if (dedupedHtml !== html) {
-              (U.innerHTML = dedupedHtml), (html = dedupedHtml);
+          var sess = window.akiniContacts.getSession(e);
+          var fullHtml = (sess && sess.messagesHTML) || "";
+          if (fullHtml.trim()) {
+            var dedupedHtml = __akiniDeduplicateChatHTML(fullHtml);
+            if (dedupedHtml !== fullHtml) {
+              fullHtml = dedupedHtml;
+              window.akiniContacts.updateSession(e, { messagesHTML: fullHtml });
             }
             if (!window._restoringChatHistory) {
-                (C(e, html),
-                  window.akiniContacts.updateSession(e, {
-                    messagesHTML: html,
-                  }));
+              C(e, fullHtml);
             }
-            return;
-          }
-          var sess = window.akiniContacts.getSession(e);
-          if (sess && sess.messagesHTML && "" !== sess.messagesHTML.trim()) {
-            U.innerHTML = __akiniDeduplicateChatHTML(sess.messagesHTML);
-            U.setAttribute("data-rendered-chat-id", e);
-            U.scrollTop = U.scrollHeight;
+            // 若当前 DOM 为空则渲染最近一批
+            if (!U.innerHTML || "" === U.innerHTML.trim()) {
+              __akiniRenderChatBody(fullHtml, e);
+            }
             return;
           }
           _idbStore.get("akini_chat_history_" + e, function (t) {
@@ -4310,9 +4385,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (window.akiniContacts.getActiveChatId() !== e) return;
             if (window._restoringChatHistory) return;
             if (U.innerHTML && "" !== U.innerHTML.trim()) return;
-            U.innerHTML = __akiniDeduplicateChatHTML(t);
-            U.setAttribute("data-rendered-chat-id", e);
-            U.scrollTop = U.scrollHeight;
+            __akiniRenderChatBody(__akiniDeduplicateChatHTML(t), e);
             window.akiniContacts.updateSession(e, { messagesHTML: t });
           });
         } catch (e) {}
@@ -4667,14 +4740,7 @@ document.addEventListener("DOMContentLoaded", function () {
       function l(t) {
         U &&
           ((window._restoringChatHistory = !0),
-          (U.innerHTML = t || ""),
-          U.setAttribute &&
-            U.setAttribute(
-              "data-rendered-chat-id",
-              window.akiniContacts
-                ? window.akiniContacts.getActiveChatId()
-                : "",
-            ),
+          __akiniRenderChatBody(t || "", window.akiniContacts ? window.akiniContacts.getActiveChatId() : ""),
           requestAnimationFrame(function () {
             U.scrollTop = U.scrollHeight;
           }),
@@ -11778,12 +11844,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const r =
           "<div class=bubble>" + (a + (e || "拍了拍你")) + "</div>";
         if (t === window.akiniContacts.getActiveChatId() && U) {
-          const t = document.createElement("div");
-          ((t.className = "msg-row system"),
-            (t.innerHTML = r),
-            U.appendChild(t),
-            (U.scrollTop = U.scrollHeight),
-            S());
+          __akiniAppendMessageHTML(t, '<div class="msg-row system">' + r + "</div>", {
+            lastMsg: a + (e || "拍了拍你"),
+            lastSenderAvatar: n.avatar,
+            lastSenderName: n.name,
+          });
+          S();
         } else {
           var c = window.akiniContacts.getSession(t),
             l =
