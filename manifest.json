@@ -1,7 +1,7 @@
 {
   "name": "Akini",
   "short_name": "Akini",
-  "start_url": "akini.html?v=20260831ca",
+  "start_url": "index.html?v=20260831cd",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
