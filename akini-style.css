@@ -824,13 +824,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex: 1;
 }
 .beautify-body {
-  padding: 19px 20px 16px;
+  padding: 19px 16px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 .beautify-body .settings-card {
-  padding: 14px 18px;
+  padding: 16px 20px;
 }
 
 .beautify-img-btn {

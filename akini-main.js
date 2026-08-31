@@ -469,9 +469,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     v !== "undefined"
                   ) {
                     var cur = localStorage.getItem(k);
-                    // 本地为空/空数组/空对象时直接恢复；本地有数据时只要 IDB 更长就恢复（合并更完整数据）
+                    var isChat = /^akini_chat_history_/.test(k);
                     var isLocalEmpty = !cur || cur === "" || cur === "null" || cur === "undefined" || cur === "[]" || cur === "{}" || cur.length === 0;
-                    if (isLocalEmpty || (v && v.length > (cur || "").length)) {
+                    // 聊天记录取最长，其它设置类以 IDB 备份为准（避免默认值覆盖用户自定义）
+                    var shouldRestore = isLocalEmpty || !isChat || (v && v.length > (cur || "").length);
+                    if (shouldRestore) {
                       try {
                         localStorage.setItem(k, v);
                       } catch (x) {}
@@ -3008,34 +3010,47 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
     }
+    function __akiniCompactChatHTML(e, n) {
+      n = n || 200;
+      if (!e || e.length < 50000) return e;
+      var count = 0, idx = e.length;
+      while ((idx = e.lastIndexOf('class="msg-row', idx - 1)) !== -1) {
+        count++;
+        if (count >= n) return e.slice(idx);
+      }
+      return e;
+    }
     function C(t, e) {
       if (!t || "string" != typeof e) return;
-      E[t] = e;
+      var compact = __akiniCompactChatHTML(e, 200);
+      E[t] = compact;
       var key = "akini_chat_history_" + t;
       var backup = "akini_chat_history_backup_" + t;
-      // 立即同步写入 localStorage（主存储），确保刷新不丢
-      try {
-        localStorage.setItem(key, e);
-      } catch (i) {
-        B();
+      // 大聊天记录只写入 IndexedDB，避免 localStorage 配额崩溃
+      if (compact.length <= 60000) {
         try {
-          localStorage.setItem(key, e);
-        } catch (i) {}
-      }
-      try {
-        localStorage.setItem(backup, e);
-      } catch (i) {
-        B();
+          localStorage.setItem(key, compact);
+        } catch (i) {
+          B();
+          try {
+            localStorage.setItem(key, compact);
+          } catch (i) {}
+        }
         try {
-          localStorage.setItem(backup, e);
-        } catch (i) {}
+          localStorage.setItem(backup, compact);
+        } catch (i) {
+          B();
+          try {
+            localStorage.setItem(backup, compact);
+          } catch (i) {}
+        }
       }
-      // 异步写入 IndexedDB 作为备份
+      // IndexedDB 是主存储，持久化大记录
       try {
-        _idbStore.set(key, e);
+        _idbStore.set(key, compact);
       } catch (e) {}
       try {
-        _idbStore.set(backup, e);
+        _idbStore.set(backup, compact);
       } catch (e) {}
       try {
         window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
@@ -3044,11 +3059,6 @@ document.addEventListener("DOMContentLoaded", function () {
     function __akiniSaveChatHistory(t, e) {
       if (!t || "string" != typeof e) return;
       C(t, e);
-      try {
-        _idbStore.set("akini_chat_history_" + t, e, function () {
-          _idbStore.set("akini_chat_history_backup_" + t, e);
-        });
-      } catch (e) {}
     }
     function B() {
       [
@@ -3355,6 +3365,22 @@ document.addEventListener("DOMContentLoaded", function () {
     ((Storage.prototype.setItem = function (t, e) {
       if (this !== localStorage && this !== sessionStorage)
         return T.apply(this, arguments);
+      // 聊天记录过大时只写 IndexedDB，避免 localStorage 超限崩溃
+      if (
+        this === localStorage &&
+        t &&
+        "string" == typeof t &&
+        /^akini_chat_history_/.test(t) &&
+        e &&
+        e.length > 60000
+      ) {
+        try {
+          window._idbStore &&
+            window._idbStore.set &&
+            window._idbStore.set(t, e);
+        } catch (n) {}
+        return;
+      }
       try {
         var a = T.call(this, t, e);
         if (
@@ -14335,14 +14361,9 @@ document.addEventListener("DOMContentLoaded", function () {
       var t =
           (typeof window.AKINI_NETEASE_PROXY === "string" && window.AKINI_NETEASE_PROXY) ||
           "https://api.mc666.org.cn";
+      // 自定义代理已禁用，固定使用官方代理，避免用户配置被封控代理
       window._akiniSetMusicProxy = function (url) {
-        url = (url || "").trim();
-        if (!url) return;
-        try {
-          localStorage.setItem("akini_netease_proxy", url);
-        } catch (e) {}
-        window.AKINI_NETEASE_PROXY = url;
-        t = url;
+        window.AKINI_NETEASE_PROXY = t;
       };
       var e = {
           page: document.getElementById("app-music"),
