@@ -7066,7 +7066,7 @@ document.addEventListener("DOMContentLoaded", function () {
         D("akini_cover_img", function (e) {
           if (e) {
             ((t.style.backgroundImage = `url(${e})`),
-              (t.style.backgroundSize = "cover"),
+              (t.style.backgroundSize = "contain"),
               (t.style.backgroundPosition = "center"),
               (t.textContent = ""));
           }
@@ -7076,7 +7076,7 @@ document.addEventListener("DOMContentLoaded", function () {
         D("akini_bg_img", function (t) {
           t &&
             ((n.style.backgroundImage = `url(${t})`),
-            (n.style.backgroundSize = "cover"),
+            (n.style.backgroundSize = "contain"),
             (n.style.backgroundPosition = "center"));
         });
     })();
@@ -9427,8 +9427,27 @@ document.addEventListener("DOMContentLoaded", function () {
             n.length && t.comments && t.comments.length ? "block" : "none");
         var c = document.getElementById("icityDetailComments");
         if (c) {
-          var l = t.comments || [],
-            s =
+          var l = t.comments || [];
+          // 评论去重：相同作者+内容+回复对象+同一秒内只保留一条
+          (function () {
+            var seen = new Map();
+            l.forEach(function (c) {
+              if (!c) return;
+              var key =
+                (c.author || "") +
+                "|" +
+                (c.text || "") +
+                "|" +
+                (c.replyTo || "") +
+                "|" +
+                Math.floor((c.ts || 0) / 1000);
+              seen.set(key, c);
+            });
+            l = Array.from(seen.values()).sort(function (a, b) {
+              return (a.ts || 0) - (b.ts || 0);
+            });
+          })();
+          var s =
               localStorage.getItem("akini_icity_my_nick") ||
               localStorage.getItem("akini_my_name") ||
               "我",
@@ -9640,6 +9659,9 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           function y() {
             if (e && e._currentDiaryId && u) {
+              var now = Date.now();
+              if (y.__lock && now - y.__lock < 600) return;
+              y.__lock = now;
               var i = u.value.trim();
               if (i) {
                 var a = q(),
@@ -14294,7 +14316,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       var t =
           (typeof window.AKINI_NETEASE_PROXY === "string" && window.AKINI_NETEASE_PROXY) ||
-          "https://netease-cloud-music-api-murex-six.vercel.app";
+          "https://api.mc666.org.cn";
       window._akiniSetMusicProxy = function (url) {
         url = (url || "").trim();
         if (!url) return;
