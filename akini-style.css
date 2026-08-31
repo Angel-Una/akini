@@ -834,9 +834,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   border-radius: 16px;
   padding: 16px 20px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
-  background-size: cover !important;
-  background-position: center !important;
-  background-repeat: no-repeat !important;
 }
 .beautify-card .card-title {
   font-size: 15px;

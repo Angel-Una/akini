@@ -1110,6 +1110,7 @@ document.addEventListener("DOMContentLoaded", function () {
       document.getElementById("cameraBtn");
       const n = document.getElementById("mailComposeFab");
       (n && (n.style.display = "mail" === t ? "flex" : "none"),
+        "mail" === t && window.__renderMail && window.__renderMail(),
         "chat" === t &&
           U &&
           (window.akiniContacts &&
@@ -12796,12 +12797,12 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         } catch (e) {}
       })();
-      // v20260831ce：二次迁移，仅重置朋友圈/iCity 间隔（首次迁移可能因旧版本缓存未生效）
+      // v20260831cg：二次迁移，仅重置朋友圈/iCity 间隔（首次迁移可能因旧版本缓存未生效）
       (function() {
         try {
           var ver2 = localStorage.getItem("akini_app_version");
-          if (ver2 !== "20260831ce") {
-            localStorage.setItem("akini_app_version", "20260831ce");
+          if (ver2 !== "20260831cg") {
+            localStorage.setItem("akini_app_version", "20260831cg");
             var _resetSmall = function(minKey, maxKey, minDef, maxDef) {
               var mn = parseFloat(localStorage.getItem(minKey) || "");
               var mx = parseFloat(localStorage.getItem(maxKey) || "");
