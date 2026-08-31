@@ -468,6 +468,27 @@
     var lsRaw = (data && data.localStorage) || {};
     var idbRaw = (data && data.indexedDB) || {};
     var mediaStore = (data && data.mediaStore) || {};
+    var backupKeyCount = Object.keys(lsRaw).length + Object.keys(idbRaw).length;
+    if (backupKeyCount === 0) {
+      window._restoringData = false;
+      if (errCb) errCb("备份文件为空，未导入任何数据");
+      return;
+    }
+
+    // 先拍回滚快照，导入失败时可恢复
+    var rollback = {};
+    try {
+      for (var ri = 0; ri < localStorage.length; ri++) {
+        var rk = localStorage.key(ri);
+        if (rk) rollback[rk] = localStorage.getItem(rk);
+      }
+    } catch (e) {}
+    function restoreRollback() {
+      try { localStorage.clear(); } catch (e) {}
+      for (var k in rollback) {
+        try { localStorage.setItem(k, rollback[k]); } catch (e) {}
+      }
+    }
 
     function writeAll() {
       var count = 0;
@@ -519,13 +540,15 @@
     if (window._idbStore && window._idbStore.clearAll) {
       try {
         window._idbStore.clearAll(function () {
-          writeAll();
+          try { writeAll(); } catch (e) { restoreRollback(); window._restoringData = false; if (errCb) errCb("导入写入失败：" + e.message); }
         });
       } catch (e) {
-        writeAll();
+        restoreRollback();
+        window._restoringData = false;
+        if (errCb) errCb("清空旧数据失败：" + e.message);
       }
     } else {
-      writeAll();
+      try { writeAll(); } catch (e) { restoreRollback(); window._restoringData = false; if (errCb) errCb("导入写入失败：" + e.message); }
     }
   }
 

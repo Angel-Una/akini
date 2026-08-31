@@ -1,4 +1,118 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
+/* 图片压缩：所有 FileReader 读取的图片统一压缩，避免 base64 过大撑爆 localStorage 配额导致数据丢失 */
+(function () {
+  if (window.__akiniFRCompress) return;
+  window.__akiniFRCompress = true;
+  if (typeof FileReader === "undefined" || !FileReader.prototype) return;
+  var orig = FileReader.prototype.readAsDataURL;
+  FileReader.prototype.readAsDataURL = function (blob) {
+    var self = this;
+    try {
+      var type = (blob && blob.type) || "";
+      if (type.indexOf("image/") !== 0) return orig.call(self, blob);
+      var url = URL.createObjectURL(blob);
+      var img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(url);
+        try {
+          var w = img.naturalWidth || img.width;
+          var h = img.naturalHeight || img.height;
+          if (!w || !h) { orig.call(self, blob); return; }
+          var maxDim = 480;
+          if (w > maxDim || h > maxDim) {
+            var s = Math.min(maxDim / w, maxDim / h);
+            w = Math.round(w * s);
+            h = Math.round(h * s);
+          }
+          var cv = document.createElement("canvas");
+          cv.width = w;
+          cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          var q = 0.72;
+          var dataUrl = cv.toDataURL("image/jpeg", q);
+          var guard = 0;
+          while (dataUrl.length > 40000 && q > 0.18 && guard < 6) {
+            q -= 0.1;
+            guard++;
+            dataUrl = cv.toDataURL("image/jpeg", q);
+          }
+          try {
+            Object.defineProperty(self, "result", { value: dataUrl, configurable: true, writable: true, enumerable: true });
+          } catch (_) {
+            self.result = dataUrl;
+          }
+          try { self.dispatchEvent(new Event("load")); } catch (_) {}
+          try { self.dispatchEvent(new Event("loadend")); } catch (_) {}
+        } catch (e) {
+          orig.call(self, blob);
+        }
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        orig.call(self, blob);
+      };
+      img.src = url;
+    } catch (e) {
+      orig.call(self, blob);
+    }
+  };
+})();
+
+/* 启动迁移：把 localStorage 中已存在的超大 base64 图片就地压缩，腾出配额 */
+window.__akiniCompressExistingImages = function (done) {
+  var keys = [];
+  try {
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("akini_") === 0) keys.push(k);
+    }
+  } catch (e) {}
+  var dataUrlRe = /data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]{2000,}/g;
+  var candidates = [];
+  keys.forEach(function (k) {
+    var v;
+    try { v = localStorage.getItem(k); } catch (e) { return; }
+    if (!v || v.length < 50000) return;
+    var matches = v.match(dataUrlRe);
+    if (matches && matches.length) candidates.push({ key: k, val: v, matches: matches });
+  });
+  if (!candidates.length) { if (done) done(0); return; }
+  var pending = candidates.length;
+  candidates.forEach(function (c) {
+    var replaced = c.val;
+    var left = c.matches.length;
+    c.matches.forEach(function (du) {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var maxDim = 480, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+          if (w > maxDim || h > maxDim) { var s = Math.min(maxDim / w, maxDim / h); w = Math.round(w * s); h = Math.round(h * s); }
+          var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          var q = 0.6, nd = cv.toDataURL("image/jpeg", q);
+          while (nd.length > 30000 && q > 0.2) { q -= 0.1; nd = cv.toDataURL("image/jpeg", q); }
+          replaced = replaced.split(du).join(nd);
+        } catch (e) {}
+        left--;
+        if (left === 0) {
+          try { localStorage.setItem(c.key, replaced); } catch (e) {}
+          pending--;
+          if (pending === 0 && done) done(candidates.length);
+        }
+      };
+      img.onerror = function () {
+        left--;
+        if (left === 0) {
+          try { localStorage.setItem(c.key, replaced); } catch (e) {}
+          pending--;
+          if (pending === 0 && done) done(candidates.length);
+        }
+      };
+      img.src = du;
+    });
+  });
+};
+try { window.__akiniCompressExistingImages(); } catch (e) {}
 function setHtmlKeepInput(t, e) {
   if (t) {
     var n = t.querySelector('input[type="file"]'),
@@ -827,56 +941,17 @@ document.addEventListener("DOMContentLoaded", function () {
   }, 100);
 });
 ((window.onerror = function (t, e, n, i, a) {
-      var o = document.getElementById("globalErrorBanner");
-      if (!o) {
-        o = document.createElement("div");
-        o.id = "globalErrorBanner";
-        o.style.cssText =
-          "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;";
-        document.body.appendChild(o);
-        window.__akiniErrorHistory = [];
-        window.__akiniLastErrorTime = 0;
-      }
       var r = t + "";
       if (a && a.stack) r += "\\n" + a.stack;
-      var now = Date.now();
-      var hist = window.__akiniErrorHistory;
-      if (hist) {
-        hist.push({ type: "js", msg: r, line: n, time: now });
-        if (hist.length > 20) hist.shift();
-      }
-      if (now - (window.__akiniLastErrorTime || 0) > 2000) {
-        window.__akiniLastErrorTime = now;
-        o.textContent = "JS错误: " + r + " (line " + n + ")\\n";
-      }
       console.error("[Akini Error]", t, "line:" + n, "col:" + i, a);
       return !0;
     }),
       window.addEventListener("unhandledrejection", function (t) {
-        var e = document.getElementById("globalErrorBanner");
-        if (!e) {
-          e = document.createElement("div");
-          e.id = "globalErrorBanner";
-          e.style.cssText =
-            "position:fixed;top:0;left:0;width:100%;background:#ff4444;color:#fff;padding:10px 14px;font-size:13px;z-index:999999;max-height:120px;overflow:auto;white-space:normal;word-break:break-all;";
-          document.body.appendChild(e);
-          window.__akiniErrorHistory = [];
-          window.__akiniLastErrorTime = 0;
-        }
         var n = t.reason,
           i = n && n.message ? n.message : String(n);
         if (n && n.stack) i += "\\n" + n.stack;
-        var now = Date.now();
-        var hist = window.__akiniErrorHistory;
-        if (hist) {
-          hist.push({ type: "promise", msg: i, time: now });
-          if (hist.length > 20) hist.shift();
-        }
-        if (now - (window.__akiniLastErrorTime || 0) > 2000) {
-          window.__akiniLastErrorTime = now;
-          e.textContent = "Promise错误: " + i + "\\n";
-        }
         console.error("[Akini Promise Error]", n);
+        try { t.preventDefault(); } catch (_) {}
       }));
     const t = [520, 1314, 9999, 10001, 13140, 5200, 52e3];
     function e() {
@@ -13151,7 +13226,18 @@ document.addEventListener("DOMContentLoaded", function () {
       var o = window.showInAppNotif,
         r = Date.now();
       ((window.showInAppNotif = function (t) {
-        o && o(t);
+        if (!t) return;
+        var rawMsg = String(t.msg || "").trim();
+        var title = String(t.name || t.app || "Akini").trim();
+        var body = rawMsg.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        if (!body) {
+          if (t.app === "mail" && t.name) body = "你收到一封信";
+          else if (t.app === "friends") body = "新的朋友圈动态";
+          else if (t.app === "icity") body = "新的日记";
+          else body = "新消息";
+        }
+        var sanitized = { app: t.app || "Akini", name: title, msg: body, onTap: t.onTap, groupName: t.groupName };
+        o && o(sanitized);
         var e = document.getElementById("pushNotifyToggle"),
           n =
             e &&
@@ -13161,14 +13247,12 @@ document.addEventListener("DOMContentLoaded", function () {
             document.hidden;
         if (n)
           try {
-            var i = t.app || "Akini";
-            t.groupName && t.name
-              ? (i += " · " + t.groupName + "·" + t.name)
-              : t.name
-                ? (i += " · " + t.name)
-                : t.groupName && (i += " · " + t.groupName);
-            var a = (t.msg || "").trim();
-            var body = a;
+            var i = sanitized.app || "Akini";
+            sanitized.groupName && sanitized.name
+              ? (i += " · " + sanitized.groupName + "·" + sanitized.name)
+              : sanitized.name
+                ? (i += " · " + sanitized.name)
+                : sanitized.groupName && (i += " · " + sanitized.groupName);
             var d = new Notification(i, { body: body, icon: "./favicon.png" });
             d.onclick = function () {
               (window.focus && window.focus(), d.close(), t.onTap && t.onTap());
