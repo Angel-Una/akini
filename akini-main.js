@@ -763,6 +763,11 @@ document.addEventListener("DOMContentLoaded", function () {
                         if (activeId) window.openChat(activeId, true);
                       }
                     } catch (e) {}
+                    // 数据恢复完成后重新加载歌单，避免恢复前已读取空 localStorage 导致歌单空白
+                    try {
+                      if (typeof window._akiniMusicReloadPlaylist === "function")
+                        window._akiniMusicReloadPlaylist();
+                    } catch (e) {}
                   } catch (e) {}
                 });
             });
@@ -13935,6 +13940,12 @@ document.addEventListener("DOMContentLoaded", function () {
             a ||
               ((c = o),
               localStorage.setItem("akini_music_playlist", JSON.stringify(c)),
+              (function () {
+                try {
+                  window._idbStore &&
+                    window._idbStore.set("akini_music_playlist", JSON.stringify(c));
+                } catch (t) {}
+              })(),
               (l = 0),
               localStorage.setItem("akini_music_index", 0),
               e.playlistInput && (e.playlistInput.value = ""),
@@ -16471,7 +16482,19 @@ document.addEventListener("DOMContentLoaded", function () {
           function loadLyric(retryCount) {
             if (!e) return Promise.resolve();
             console.log("[Akini lyric] loading id", e);
-            return fetch(t + "/lyric?id=" + encodeURIComponent(String(e)))
+            var lyricCookie = (B && B.cookie) || "";
+          try {
+            lyricCookie = lyricCookie || localStorage.getItem("akini_netease_cookie") || "";
+          } catch (x) {}
+          return fetch(
+            t +
+            "/lyric?id=" +
+            encodeURIComponent(String(e)) +
+            "&cookie=" +
+            encodeURIComponent(lyricCookie) +
+            "&realIP=" +
+            encodeURIComponent(window._neteaseRealIp || "223.5.5.5")
+          )
               .then(function (t) {
                 return t.json();
               })
@@ -16556,6 +16579,20 @@ document.addEventListener("DOMContentLoaded", function () {
         })(n.id);
         window._renderPlaylist = Bt;
         window.Bt = Bt;
+        window._akiniMusicReloadPlaylist = function () {
+          try {
+            var saved = localStorage.getItem("akini_music_playlist");
+            if (saved) {
+              var parsed = JSON.parse(saved);
+              if (parsed && parsed.length > 0) {
+                c = parsed;
+                Bt();
+              }
+            }
+          } catch (e) {
+            console.warn("[Akini music] reload playlist after restore failed", e);
+          }
+        };
         window._TtNetease = Tt;
         window._importAllNeteasePlaylists = _importAllNeteasePlaylists;
         window._startNeteaseQr = function () {

@@ -824,10 +824,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex: 1;
 }
 .beautify-body {
-  padding: 19px 16px 16px;
+  padding: 19px 20px 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+.beautify-body .settings-card {
+  padding: 14px 18px;
 }
 
 .beautify-img-btn {
@@ -4714,6 +4717,14 @@ button.back-btn[type="button"] {
   position: relative;
   overflow: hidden;
 }
+@keyframes disc-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 .music-player-disc {
   width: 96px;
   height: 96px;
@@ -4729,6 +4740,8 @@ button.back-btn[type="button"] {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 8px #1a1a1a;
+  animation: disc-spin 10s linear infinite;
+  animation-play-state: paused;
 }
 .music-player-cover {
   width: 64px;
