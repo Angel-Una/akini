@@ -719,8 +719,9 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) {
         console.warn("[Akini] sync snapshot restore error", e);
       }
-      // 同步快照恢复完成后即认为数据已就绪，允许实时备份；后台 IDB/Cache 恢复只回填缺失键，不会覆盖
-      window._akiniDataRestored = true;
+      // 同步快照恢复完成后仍不立即允许实时备份，需等待异步 IDB/Cache 恢复与 __akiniBootApp 完成，
+      // 防止默认值在异步恢复前覆盖 IDB 里的真实数据
+      window._akiniSyncRestored = true;
     })();
     !(function () {
         SNAPSHOT_KEY = "akini_localstorage_snapshot";
@@ -940,39 +941,8 @@ document.addEventListener("DOMContentLoaded", function () {
               window._akiniRestoreFromSnapshot &&
                 window._akiniRestoreFromSnapshot(function () {
                   console.log("[Akini] cache+idb+snapshot restoreAll done");
-                  // 恢复完成后：清掉可能已缓存的空数据，重新读取并渲染
-                  try {
-                    window._akiniDataRestored = true;
-                    // 清联系人/会话内存缓存，让下次读取从已恢复的 localStorage 取
-                    if (window.akiniContacts && window.akiniContacts.resetCache)
-                      window.akiniContacts.resetCache();
-                    // 清 iCity 日记同步缓存并重新读取
-                    try {
-                      if ("function" == typeof window._akiniClearDiaryCache)
-                        window._akiniClearDiaryCache();
-                    } catch (e) {}
-                    // 重绘聊天列表和 iCity
-                    if ("function" == typeof window.renderChatList)
-                      window.renderChatList();
-                    if ("function" == typeof window._renderIcity)
-                      window._renderIcity();
-                    // 若当前正在聊天界面，重新打开当前会话以加载恢复的聊天记录
-                    try {
-                      if (
-                        window.akiniContacts &&
-                        window.location.hash === "#chat" &&
-                        "function" == typeof window.openChat
-                      ) {
-                        var activeId = window.akiniContacts.getActiveChatId();
-                        if (activeId) window.openChat(activeId, true);
-                      }
-                    } catch (e) {}
-                    // 数据恢复完成后重新加载歌单，避免恢复前已读取空 localStorage 导致歌单空白
-                    try {
-                      if (typeof window._akiniMusicReloadPlaylist === "function")
-                        window._akiniMusicReloadPlaylist();
-                    } catch (e) {}
-                  } catch (e) {}
+                  // 恢复完成后的渲染与 _akiniDataRestored 开关统一交给 __akiniBootApp，
+                  // 避免此处过早打开备份闸门导致空 localStorage 覆盖 IDB/Cache 真实数据
                 });
             });
         });
@@ -1019,28 +989,33 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch (e) {}
         },
         catchUp: function (actions) {
+          var dueNames = [];
           for (var name in actions) {
             if (actions.hasOwnProperty(name) && "function" == typeof actions[name]) {
-              window._akiniTimer.runIfDue(name, actions[name]);
+              try {
+                var next = parseFloat(localStorage.getItem("akini_next_" + name) || "0");
+                if (next && Date.now() >= next) dueNames.push(name);
+              } catch (e) {}
             }
           }
+          // 多个任务同时到期时随机打散到 0~30 秒，避免“连发”
+          dueNames.forEach(function (name, idx) {
+            var delay = Math.floor(Math.random() * 30000) + idx * 2000;
+            setTimeout(function () {
+              if (actions[name]) window._akiniTimer.runIfDue(name, actions[name]);
+            }, delay);
+          });
         },
       };
     })();
     document.addEventListener("DOMContentLoaded", function() {
+  // 恢复流程统一交给 __akiniBootApp；此处不再单独 set _akiniDataRestored 或 resetCache，
+  // 避免与 4550 行的 IDB→tryRestoreFromBackup→__akiniBootApp 路径竞争导致数据被空值覆盖
   setTimeout(function() {
     try {
-      window._akiniCacheStore && window._akiniCacheStore.restoreAll && window._akiniCacheStore.restoreAll(function() {
-        window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll(function() {
-          window._akiniRestoreFromSnapshot && window._akiniRestoreFromSnapshot(function() {
-            window._akiniDataRestored = true;
-            if (window.akiniContacts && window.akiniContacts.resetCache) window.akiniContacts.resetCache();
-            try { if ("function" == typeof window._akiniClearDiaryCache) window._akiniClearDiaryCache(); } catch(e){}
-            if ("function" == typeof window.renderChatList) window.renderChatList();
-            if ("function" == typeof window._renderIcity) window._renderIcity();
-          });
-        });
-      });
+      window._akiniCacheStore && window._akiniCacheStore.restoreAll && window._akiniCacheStore.restoreAll();
+      window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll();
+      window._akiniRestoreFromSnapshot && window._akiniRestoreFromSnapshot();
     } catch(e){}
   }, 100);
 });
@@ -1807,6 +1782,36 @@ document.addEventListener("DOMContentLoaded", function () {
               f();
             });
           }
+          function restoreAvatars() {
+            var avatarKeys = [
+              "akini_my_avatar",
+              "akini_ta_avatar",
+              "akini_icity_my_avatar",
+              "akini_icity_ta_avatar",
+            ];
+            avatarKeys.forEach(function (k) {
+              u++;
+              l(k, function (v) {
+                if (
+                  v &&
+                  "string" == typeof v &&
+                  v.trim() &&
+                  v !== "null" &&
+                  v !== "undefined"
+                ) {
+                  try {
+                    var cur = localStorage.getItem(k) || "";
+                    if (!cur || cur === "null" || cur === "undefined") {
+                      localStorage.setItem(k, v);
+                      d = !0;
+                    }
+                  } catch (e) {}
+                }
+                u--;
+                f();
+              });
+            });
+          }
           (u++,
             l(t, function (idbC) {
               // 始终合并本地与 IDB 联系人（按 id 取并集），任何一方存在的联系人都不会丢失
@@ -1836,6 +1841,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 (t && t.length > 0 && (p(t), (d = !0)), u--, f());
               })),
             restoreSessions(),
+            restoreAvatars(),
             0 === u && m());
         },
         backupToIDB: c,
@@ -1843,18 +1849,30 @@ document.addEventListener("DOMContentLoaded", function () {
       };
     })();
     try {
-      window.akiniContacts.migrateContacts();
-      var __contacts = window.akiniContacts.getContacts();
-      __contacts.forEach(function (e) {
-        if (e && !e.note && window.pickWordCards)
-          e.note = window.pickWordCards(1);
-      });
-      window.akiniContacts.saveContacts(__contacts);
+      // 恢复期间禁止写入空联系人，防止异步恢复完成前空数组覆盖 localStorage
+      if (!window._restoringData) {
+        window.akiniContacts.migrateContacts();
+        var __contacts = window.akiniContacts.getContacts();
+        __contacts.forEach(function (e) {
+          if (e && !e.note && window.pickWordCards)
+            e.note = window.pickWordCards(1);
+        });
+        window.akiniContacts.saveContacts(__contacts);
+      }
     } catch (e) {
       console.error("[Akini] contact note init error", e);
     }
     window.akiniContacts.tryRestoreFromBackup(function (restored) {
       console.log("[Akini] contacts/chat restore from backup", restored);
+      // 头像可能已从 IDB 恢复，立即刷新所有 DOM 头像
+      if (restored || window.__akiniAvatarCache) {
+        try {
+          "function" == typeof et && et();
+        } catch (e) {}
+        try {
+          "function" == typeof Tn && Tn();
+        } catch (e) {}
+      }
     });
     requestAnimationFrame(function t() {
       var e = document.getElementById("dayNumber");
@@ -4175,7 +4193,19 @@ document.addEventListener("DOMContentLoaded", function () {
     function __akiniBootApp(t) {
       setTimeout(function () {
         window._restoringData = !1;
-      }, 3000);
+        window._akiniDataRestored = !0;
+        console.log("[Akini] boot complete, data restore gate open");
+        // 恢复完成后统一刷新界面，避免多条恢复路径重复 resetCache
+        if (window.akiniContacts && window.akiniContacts.resetCache) window.akiniContacts.resetCache();
+        // 恢复完成后执行一次联系人迁移，首次使用时会创建默认联系人
+        try {
+          window.akiniContacts && window.akiniContacts.migrateContacts && window.akiniContacts.migrateContacts();
+        } catch (e) {}
+        try { if ("function" == typeof window._akiniClearDiaryCache) window._akiniClearDiaryCache(); } catch(e){}
+        if ("function" == typeof window.renderChatList) window.renderChatList();
+        if ("function" == typeof window._renderIcity) window._renderIcity();
+        if ("function" == typeof window.updatePreview) window.updatePreview();
+      }, 300);
       if (
         (window.__akiniAvatarCache &&
           ((window.__akiniAvatarCache.my = ""),
@@ -12854,7 +12884,7 @@ document.addEventListener("DOMContentLoaded", function () {
               if (!e) return void t(false);
               const n = e.name,
                 i = nt(e.avatar, 40),
-                a = c(1);
+                a = c(Math.floor(Math.random() * 5) + 1);
               if (a) {
                 var l = O();
                 var post = {
@@ -12897,6 +12927,7 @@ document.addEventListener("DOMContentLoaded", function () {
               } else t(false);
             }
             window._akiniFriendsPostAction = friendsPostAction;
+            window._akiniRescheduleFriendsPost = function () { t(false); };
             window._akiniTimer.schedule("friendsPost", friendsPostAction, i);
           })(true),
           (function t() {
@@ -13250,7 +13281,7 @@ document.addEventListener("DOMContentLoaded", function () {
               const liveContacts = window.akiniContacts
                 ? window.akiniContacts.getContacts()
                 : e;
-              const wc = c(1);
+              const wc = c(Math.floor(Math.random() * 8) + 8);
               if (!wc) return __recurse();
               var s = "",
                 d = null;
@@ -13308,16 +13339,17 @@ document.addEventListener("DOMContentLoaded", function () {
                 __recurse());
             }
             window._akiniMailAction = mailAction;
+            window._akiniRescheduleMail = function () { t(false); };
             window._akiniTimer.schedule("mail", mailAction, m);
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260901ec 修复数据丢失、头像画质、emoji 默认与美化界面样式
+      // 版本迁移：20260901el 修复数据丢失、头像恢复、定时器连发、字卡数量与默认间隔
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260901ec") {
-            localStorage.setItem("akini_app_version", "20260901ec");
+          if (ver !== "20260901el") {
+            localStorage.setItem("akini_app_version", "20260901el");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
@@ -13359,6 +13391,20 @@ document.addEventListener("DOMContentLoaded", function () {
               }
             };
             _resetActiveMailRange("akini_num_activeMailMin", "akini_num_activeMailMax");
+            // 主动发消息默认改为 3-6 小时；旧版本均为分钟单位，统一按小时重置
+            var _resetActiveMsgRange = function (minKey, maxKey) {
+              var mn = parseFloat(localStorage.getItem(minKey) || "");
+              var mx = parseFloat(localStorage.getItem(maxKey) || "");
+              // 只要存在旧值（无论 3/10 分钟还是 180/360 分钟），都重置为 3-6 小时
+              if (!isNaN(mn) || !isNaN(mx)) {
+                localStorage.setItem(minKey, "3");
+                localStorage.setItem(maxKey, "6");
+                return;
+              }
+              localStorage.setItem(minKey, "3");
+              localStorage.setItem(maxKey, "6");
+            };
+            _resetActiveMsgRange("akini_num_activeMsgMin", "akini_num_activeMsgMax");
             // 主动写信/发消息/朋友圈/iCity 的旧“小时”单位值已废弃，改为按“分钟”读取；
             // 不再清空用户当前设置，避免用户每次重新打开都被重置
             [
@@ -13590,17 +13636,18 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.setItem(t.key, this.value);
             // 主动写信/发消息/朋友圈/iCity 间隔变化时立即重新调度，避免旧延迟导致长时间不触发
             if (t.key === "akini_num_activeMailMin" || t.key === "akini_num_activeMailMax" || t.key === "akini_num_activeMsgMin" || t.key === "akini_num_activeMsgMax" || t.key === "akini_num_friendsPostMin" || t.key === "akini_num_friendsPostMax" || t.key === "akini_num_icityPostMin" || t.key === "akini_num_icityPostMax") {
-              if (window._akiniMailAction && window._akiniTimer && window._akiniTimer.schedule) {
-                window._akiniTimer.schedule("mail", window._akiniMailAction, 1000);
+              // 设置变更时用对应任务自身的随机间隔重新调度，避免 1 秒后集中到期导致连发
+              if (typeof window._akiniRescheduleMail === "function") {
+                try { window._akiniRescheduleMail(); } catch (e) {}
               }
-              if (window._akiniActiveMsgAction && window._akiniTimer && window._akiniTimer.schedule) {
-                window._akiniTimer.schedule("activeMsg", window._akiniActiveMsgAction, 1000);
+              if (typeof window._akiniRescheduleActiveMsg === "function") {
+                try { window._akiniRescheduleActiveMsg(); } catch (e) {}
               }
-              if (window._akiniFriendsPostAction && window._akiniTimer && window._akiniTimer.schedule) {
-                window._akiniTimer.schedule("friendsPost", window._akiniFriendsPostAction, 1000);
+              if (typeof window._akiniRescheduleFriendsPost === "function") {
+                try { window._akiniRescheduleFriendsPost(); } catch (e) {}
               }
-              if (window._akiniIcityPostAction && window._akiniTimer && window._akiniTimer.schedule) {
-                window._akiniTimer.schedule("icityPost", window._akiniIcityPostAction, 1000);
+              if (typeof window._akiniRescheduleIcityPost === "function") {
+                try { window._akiniRescheduleIcityPost(); } catch (e) {}
               }
             }
           }),
@@ -13762,10 +13809,10 @@ document.addEventListener("DOMContentLoaded", function () {
               localStorage.getItem("akini_num_activeMsgMin") || "3",
             ),
             r = parseFloat(
-              localStorage.getItem("akini_num_activeMsgMax") || "10",
+              localStorage.getItem("akini_num_activeMsgMax") || "6",
             ),
-            c = 60 * o * 1e3,
-            l = 60 * r * 1e3;
+            c = 3600 * o * 1e3,
+            l = 3600 * r * 1e3;
           s = c + Math.random() * Math.max(0, l - c);
         }
         window._akiniTimer.schedule("activeMsgReply", function () {
@@ -13791,21 +13838,21 @@ document.addEventListener("DOMContentLoaded", function () {
       const e = parseFloat(
           localStorage.getItem("akini_num_activeMsgMin") || "3",
         ),
-        n = parseFloat(localStorage.getItem("akini_num_activeMsgMax") || "10");
+        n = parseFloat(localStorage.getItem("akini_num_activeMsgMax") || "6");
       // 首次触发使用最小间隔，之后按随机范围
-      var delayMin = 60 * e * 1e3,
-        delayMax = 60 * n * 1e3,
+      var delayMin = 3600 * e * 1e3,
+        delayMax = 3600 * n * 1e3,
         o = isFirst
           ? delayMin
           : delayMin + Math.random() * Math.max(0, delayMax - delayMin);
-      console.log("[Akini 主动发消息] 下次调度：", (o / 6e4).toFixed(1), "分钟后触发");
+      console.log("[Akini 主动发消息] 下次调度：", (o / 36e5).toFixed(1), "小时后触发");
       function __amtAction() {
         try {
           // 防止短时间内多次主动发消息
-          var _minGap = Math.max(1, e) * 60 * 1000 * 0.8;
+          var _minGap = Math.max(1, e) * 3600 * 1000 * 0.8;
           var _lastRun = parseFloat(localStorage.getItem("akini_last_activeMsg_run") || "0");
           if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
-            console.log("[Akini 主动发消息] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
+            console.log("[Akini 主动发消息] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "小时");
             __amt(false); return;
           }
           localStorage.setItem("akini_last_activeMsg_run", String(Date.now()));
@@ -13876,6 +13923,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       window._akiniActiveMsgAction = __amtAction;
+      window._akiniRescheduleActiveMsg = function () { __amt(false); };
       window._akiniTimer.schedule("activeMsg", __amtAction, o);
     })(true);
     (function () {
@@ -13907,7 +13955,7 @@ document.addEventListener("DOMContentLoaded", function () {
             t(false);
             return;
           }
-          var e = Dn(1);
+          var e = Dn(0);
           if ((e && (e = e.replace(/\n/g, " ")), e)) {
             var n = window.akiniContacts
                 ? window.akiniContacts.getContacts()
@@ -13956,6 +14004,7 @@ document.addEventListener("DOMContentLoaded", function () {
           } else t(false);
         }
         window._akiniIcityPostAction = icityPostAction;
+        window._akiniRescheduleIcityPost = function () { t(false); };
         window._akiniTimer.schedule("icityPost", icityPostAction, i);
       })(true);
       var t = {};
