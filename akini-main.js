@@ -3815,20 +3815,16 @@ document.addEventListener("DOMContentLoaded", function () {
           var r = new Set(a.map(function (x) { return JSON.stringify(x); }));
           o.forEach(function (x) { r.add(JSON.stringify(x)); });
           e.likes = Array.from(r).map(function (x) { try { return JSON.parse(x); } catch (err) { return x; } });
-          // 合并评论：按稳定内容 key 去重保留最新，避免随机 id 导致同内容重复
+          // 合并评论：不再去重，直接按时间戳拼接排序，避免误删用户数据
           var c = e.comments || [],
             l = t.comments || [];
-          var s = new Map();
-          function _ck(c) {
-            if (!c || typeof c !== "object") return "";
-            return "key_" + (c.author || "") + "_" + (c.replyTo || "") + "_" + (c.text || "") + "_" + (c.ts || 0);
-          }
-          c.concat(l).forEach(function (c) {
+          var allComments = c.slice();
+          l.forEach(function (c) {
             if (!c || typeof c !== "object") return;
             if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
-            s.set(_ck(c), c);
+            allComments.push(c);
           });
-          e.comments = Array.from(s.values()).sort(function (a, b) {
+          e.comments = allComments.sort(function (a, b) {
             return (a.ts || 0) - (b.ts || 0);
           });
         });
@@ -3956,26 +3952,13 @@ document.addEventListener("DOMContentLoaded", function () {
           t.id ||
             ((t.id = Date.now() + "_" + Math.floor(1e3 * Math.random())),
             (e = !0));
-          // 启动/刷新时去重评论，使用稳定内容 key，避免随机 id 导致重复
+          // 评论不再去重，避免误删用户数据；只过滤掉非对象项
           if (t.comments && t.comments.length > 0) {
-            var seen = new Map();
-            t.comments.forEach(function (c) {
-              if (!c || typeof c !== "object") return;
-              var k =
-                (c.author || "") +
-                "_" +
-                (c.replyTo || "") +
-                "_" +
-                (c.text || "") +
-                "_" +
-                (c.ts || 0);
-              if (!seen.has(k)) {
-                seen.set(k, c);
-              }
+            var filtered = t.comments.filter(function (c) {
+              return c && typeof c === "object";
             });
-            var deduped = Array.from(seen.values());
-            if (deduped.length !== t.comments.length) {
-              t.comments = deduped;
+            if (filtered.length !== t.comments.length) {
+              t.comments = filtered;
               e = !0;
             }
           }
@@ -4016,27 +3999,17 @@ document.addEventListener("DOMContentLoaded", function () {
             n.forEach(function (d) {
               if (d && d.id && map[d.id]) {
                 var old = map[d.id];
-                /* Merge comments: deduplicate by stable id first, then by content key */
+                // 合并评论：不再去重，直接按时间戳拼接后排序，确保一条都不丢
                 var oc = old.comments || [];
                 var nc = d.comments || [];
-                var cm = new Map();
-                function _commentKey(c) {
-                  if (!c || typeof c !== "object") return "";
-                  // 使用稳定内容 key，避免随机 id 导致同内容评论重复
-                  return "key_" + (c.author || "") + "_" + (c.replyTo || "") + "_" + (c.text || "") + "_" + (c.ts || 0);
-                }
-                oc.forEach(function (c) {
-                  if (!c || typeof c !== "object") return;
-                  if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
-                  cm.set(_commentKey(c), c);
-                });
+                var allComments = oc.slice();
                 nc.forEach(function (c) {
                   if (!c || typeof c !== "object") return;
+                  // 给无 id 评论补 id 便于调试，但不用于去重
                   if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
-                  // 新数据覆盖旧数据（保留同 id 或同内容最新内容）
-                  cm.set(_commentKey(c), c);
+                  allComments.push(c);
                 });
-                d.comments = Array.from(cm.values()).sort(function (a, b) {
+                d.comments = allComments.sort(function (a, b) {
                   return (a.ts || 0) - (b.ts || 0);
                 });
                 /* Merge likers by dedup */ var ol = old.likers || [];
@@ -4362,56 +4335,23 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (0 === t.length) return "";
       if (1 === t.length) return t[0];
-      // 数据量过大时跳过复杂去重，直接返回最长记录，避免解析 HTML 导致卡顿/崩溃
+      // 数据量过大时直接返回最长记录
       var longest = t.reduce(function (a, b) {
         return a.length >= b.length ? a : b;
       });
       if (longest.length > 300000 || __akiniCountMsgRows(longest) > 2000) {
         return longest;
       }
-      function __akRows(html) {
-        var div = document.createElement("div");
-        div.innerHTML = html;
-        return Array.from(div.querySelectorAll(".msg-row")).map(function (r) {
-          return r.outerHTML;
-        });
-      }
+      // 聊天记录一条都不能丢：仅按完整 outerHTML 去重，保留所有不同消息
       var allRows = [],
-        seen = new Set(),
-        longest = t.reduce(function (a, b) {
-          return a.length >= b.length ? a : b;
-        });
+        seen = new Set();
       t.forEach(function (src) {
         var div = document.createElement("div");
         div.innerHTML = src;
-        Array.from(div.querySelectorAll(".msg-row")).forEach(function (row) {
-          if (row.classList.contains("system")) {
-            var sysBubble = row.querySelector(".bubble");
-            var sysText = (sysBubble ? sysBubble.textContent : row.textContent) || "";
-            var sysSig = "system|" + sysText.trim();
-            if (!seen.has(sysSig)) {
-              seen.add(sysSig);
-              allRows.push(row.outerHTML);
-            }
-            return;
-          }
-          var bubble = row.querySelector(".bubble"),
-            meta = row.querySelector(".msg-meta"),
-            sig = row.classList.contains("me") ? "me" : "other";
-          // 问卷卡片按 id+回复+成员唯一区分，避免不同问卷因卡片内容相同被误判为重复
-          if (bubble && bubble.getAttribute("data-survey-id")) {
-            sig += "|sid:" + bubble.getAttribute("data-survey-id");
-            sig += "|sr:" + (bubble.getAttribute("data-survey-reply") || "0");
-            var _mid = bubble.getAttribute("data-member-id");
-            if (_mid) sig += "|mid:" + _mid;
-          } else {
-            if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
-            else sig += "|" + (row.textContent || "").trim();
-          }
-          // 加入时间戳，避免相同内容不同时间的消息被过度去重
-          if (meta) sig += "|" + (meta.textContent || "").trim();
-          if (!seen.has(sig)) {
-            seen.add(sig);
+        Array.from(div.querySelectorAll(".msg-row, .timestamp-row, .system")).forEach(function (row) {
+          var key = row.outerHTML;
+          if (!seen.has(key)) {
+            seen.add(key);
             allRows.push(row.outerHTML);
           }
         });
@@ -9945,26 +9885,12 @@ document.addEventListener("DOMContentLoaded", function () {
             n.length && t.comments && t.comments.length ? "block" : "none");
         var c = document.getElementById("icityDetailComments");
         if (c) {
-          var l = t.comments || [];
-          // 评论去重：相同作者+内容+回复对象+完整时间戳只保留一条，避免秒级精度误删
-          (function () {
-            var seen = new Map();
-            l.forEach(function (c) {
-              if (!c) return;
-              var key =
-                (c.author || "") +
-                "|" +
-                (c.text || "") +
-                "|" +
-                (c.replyTo || "") +
-                "|" +
-                (c.ts || 0);
-              seen.set(key, c);
-            });
-            l = Array.from(seen.values()).sort(function (a, b) {
-              return (a.ts || 0) - (b.ts || 0);
-            });
-          })();
+          // 评论不再去重，按时间顺序渲染，避免任何评论被误删
+          var l = (t.comments || []).filter(function (c) {
+            return c && typeof c === "object";
+          }).sort(function (a, b) {
+            return (a.ts || 0) - (b.ts || 0);
+          });
           var s =
               localStorage.getItem("akini_icity_my_nick") ||
               localStorage.getItem("akini_my_name") ||
@@ -13368,12 +13294,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260902 修复评论去重/回复延迟/聊天背景/字卡兜底
+      // 版本迁移：20260903 修复评论去重/回复延迟/聊天背景/字卡兜底
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260902") {
-            localStorage.setItem("akini_app_version", "20260902");
+          if (ver !== "20260903") {
+            localStorage.setItem("akini_app_version", "20260903");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
