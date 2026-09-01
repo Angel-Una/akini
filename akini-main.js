@@ -18,7 +18,7 @@
           var w = img.naturalWidth || img.width;
           var h = img.naturalHeight || img.height;
           if (!w || !h) { orig.call(self, blob); return; }
-          var maxDim = 480;
+          var maxDim = 1024;
           if (w > maxDim || h > maxDim) {
             var s = Math.min(maxDim / w, maxDim / h);
             w = Math.round(w * s);
@@ -27,11 +27,14 @@
           var cv = document.createElement("canvas");
           cv.width = w;
           cv.height = h;
-          cv.getContext("2d").drawImage(img, 0, 0, w, h);
-          var q = 0.72;
+          var ctx = cv.getContext("2d");
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = "high";
+          ctx.drawImage(img, 0, 0, w, h);
+          var q = 0.85;
           var dataUrl = cv.toDataURL("image/jpeg", q);
           var guard = 0;
-          while (dataUrl.length > 40000 && q > 0.18 && guard < 6) {
+          while (dataUrl.length > 120000 && q > 0.3 && guard < 6) {
             q -= 0.1;
             guard++;
             dataUrl = cv.toDataURL("image/jpeg", q);
@@ -85,12 +88,12 @@ window.__akiniCompressExistingImages = function (done) {
       var img = new Image();
       img.onload = function () {
         try {
-          var maxDim = 480, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+          var maxDim = 1024, w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
           if (w > maxDim || h > maxDim) { var s = Math.min(maxDim / w, maxDim / h); w = Math.round(w * s); h = Math.round(h * s); }
           var cv = document.createElement("canvas"); cv.width = w; cv.height = h;
           cv.getContext("2d").drawImage(img, 0, 0, w, h);
-          var q = 0.6, nd = cv.toDataURL("image/jpeg", q);
-          while (nd.length > 30000 && q > 0.2) { q -= 0.1; nd = cv.toDataURL("image/jpeg", q); }
+          var q = 0.8, nd = cv.toDataURL("image/jpeg", q);
+          while (nd.length > 100000 && q > 0.3) { q -= 0.1; nd = cv.toDataURL("image/jpeg", q); }
           replaced = replaced.split(du).join(nd);
         } catch (e) {}
         left--;
@@ -210,17 +213,23 @@ window.AKR = (function () {
     } catch (e) {}
     return !0;
   }
-  /* 一次回复的消息条数 */
+  /* 一次回复的消息条数：读取设置页私聊/群聊字卡数量范围 */
   function getCardCount(type) {
     try {
-      var cfg = parseInt(
-        localStorage.getItem("akini_num_cardCount") || "",
-        10,
-      );
-      if (!isNaN(cfg) && cfg > 0) return Math.max(1, Math.min(20, cfg));
-    } catch (e) {}
-    var r = Math.random();
-    return r < 0.55 ? 1 : r < 0.88 ? 2 : 3;
+      var isGroup = type === "group";
+      var minKey = isGroup ? "akini_num_replyCardCountGroupMin" : "akini_num_replyCardCountMin";
+      var maxKey = isGroup ? "akini_num_replyCardCountGroupMax" : "akini_num_replyCardCountMax";
+      var mn = parseInt(localStorage.getItem(minKey) || "", 10);
+      var mx = parseInt(localStorage.getItem(maxKey) || "", 10);
+      if (isNaN(mn) || mn < 1) mn = 1;
+      if (isNaN(mx) || mx < mn) mx = mn;
+      mn = Math.max(1, Math.min(20, mn));
+      mx = Math.max(1, Math.min(20, mx));
+      return mn >= mx ? mn : Math.floor(Math.random() * (mx - mn + 1)) + mn;
+    } catch (e) {
+      var r = Math.random();
+      return r < 0.55 ? 1 : r < 0.88 ? 2 : 3;
+    }
   }
   /* 回复行为：未开“已读不回”时必回；开启后才按概率已读不回；3% 概率触发拍一拍 */
   function pickReplyBehavior() {
@@ -575,22 +584,56 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         backupAll: function (cb) {
           var done = function () { if (typeof cb === "function") cb(); };
+          function isEmpty(v) {
+            return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
+          }
+          function isSnapKey(k) {
+            return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
+          }
+          // 收集 localStorage 中需要备份的键值，但写入 IDB 前必须确认 IDB 中无该键，
+          // 防止用可能已过期/被系统清空的 localStorage 数据覆盖 IDB 主存储。
+          var lsItems = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var r = localStorage.key(i), c = localStorage.getItem(r);
+            if (!r || r.indexOf("akini_app_icon_") === 0 || isSnapKey(r)) continue;
+            if (isEmpty(c)) continue;
+            lsItems.push({ k: r, v: c });
+          }
           withDB(function (conn) {
             var tx = conn.transaction(STORE, "readwrite");
             var store = tx.objectStore(STORE);
-            for (var i = 0; i < localStorage.length; i++) {
-              var r = localStorage.key(i), c = localStorage.getItem(r);
-              if (r && r.indexOf("akini_app_icon_") === 0) continue;
-              if (r && null !== c && c !== "" && c !== "[]" && c !== "{}" && c !== "null" && c !== "undefined") {
-                store.put(c, r);
+            var existing = {};
+            var cursorReq = store.openCursor();
+            cursorReq.onsuccess = function (e) {
+              var cursor = e.target.result;
+              if (cursor) {
+                existing[cursor.key] = cursor.value;
+                cursor.continue();
+              } else {
+                for (var j = 0; j < lsItems.length; j++) {
+                  var item = lsItems[j];
+                  var idbVal = existing[item.k];
+                  var idbLen = idbVal === undefined || idbVal === null ? 0 : String(idbVal).length;
+                  // 只在新于 IDB 时才覆盖：聊天记录由 C() 直接维护，通常 IDB >= localStorage；
+                  // 设置类只在 localStorage 更新且更长时才同步到 IDB，避免过期快照覆盖最新数据。
+                  if (idbLen < String(item.v).length) {
+                    store.put(item.v, item.k);
+                  }
+                }
               }
-            }
+            };
+            cursorReq.onerror = function () {
+              // 无法枚举已有键时宁可不写入，也不覆盖 IDB 中可能更新、更完整的数据
+            };
             tx.oncomplete = done;
             tx.onerror = done;
           }, done);
         },
         restoreAll: function (cb) {
           var done = function () { if (typeof cb === "function") cb(); };
+          function isEmpty(v) {
+            return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
+          }
           withDB(function (conn) {
             var cursorReq = conn.transaction(STORE, "readonly").openCursor();
             cursorReq.onsuccess = function (e) {
@@ -599,13 +642,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 var k = o.key, v = o.value;
                 if (
                   k && k.indexOf("akini_app_icon_") !== 0 &&
-                  v != null && v !== "" && v !== "[]" && v !== "{}" && v !== "null" && v !== "undefined"
+                  k.indexOf("akini_localstorage_snapshot") !== 0 &&
+                  !isEmpty(v)
                 ) {
                   var cur = localStorage.getItem(k);
-                  var isChat = /^akini_chat_history_/.test(k);
-                  var isLocalEmpty = !cur || cur === "" || cur === "null" || cur === "undefined" || cur === "[]" || cur === "{}" || cur.length === 0;
-                  var shouldRestore = isLocalEmpty || !isChat || (v && v.length > (cur || "").length);
-                  if (shouldRestore) {
+                  // 绝不覆盖本地已有数据：只在本地为空/占位时才用 IDB 回填（milk 思路：IDB 是兜底，不是权威覆盖）
+                  if (isEmpty(cur)) {
                     try { localStorage.setItem(k, v); } catch (x) {}
                   }
                 }
@@ -647,21 +689,59 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       };
     })();
+    // 同步紧急恢复：在应用任何代码读取 localStorage 之前，先从 localStorage 快照同步回填，
+    // 确保启动瞬间 localStorage 已有数据，避免读到空默认值后再写回覆盖（参照 milk 的紧急备份思路）
+    (function () {
+      function isSnapKey(k) {
+        return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
+      }
+      function isEmpty(v) {
+        return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
+      }
+      try {
+        var keys = ["akini_localstorage_snapshot", "akini_localstorage_snapshot_backup"];
+        for (var ki = 0; ki < keys.length; ki++) {
+          var raw = localStorage.getItem(keys[ki]);
+          if (!raw) continue;
+          var data = JSON.parse(raw);
+          if (!data || typeof data !== "object") continue;
+          for (var k in data) {
+            if (!data.hasOwnProperty(k)) continue;
+            if (k.indexOf("akini_") !== 0 || k.indexOf("akini_app_icon_") === 0) continue;
+            if (isSnapKey(k)) continue;
+            try {
+              var cur = localStorage.getItem(k);
+              if (isEmpty(cur)) localStorage.setItem(k, data[k]);
+            } catch (x) {}
+          }
+          break; // 优先用主快照
+        }
+      } catch (e) {
+        console.warn("[Akini] sync snapshot restore error", e);
+      }
+      // 同步快照恢复完成后即认为数据已就绪，允许实时备份；后台 IDB/Cache 恢复只回填缺失键，不会覆盖
+      window._akiniDataRestored = true;
+    })();
     !(function () {
-      var CACHE_NAME = "akini-data-v1",
         SNAPSHOT_KEY = "akini_localstorage_snapshot";
       window._akiniCacheStore = {
         backupAll: function (e) {
           try {
             if ("undefined" == typeof caches || !caches.open) return void (e && e());
+            function isEmpty(v) {
+              return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
+            }
+            function isSnapKey(k) {
+              return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
+            }
             var data = {};
             for (var i = 0; i < localStorage.length; i++) {
               var k = localStorage.key(i);
-              if (k && k.indexOf("akini_") === 0 && k.indexOf("akini_app_icon_") !== 0) {
-                try {
-                  data[k] = localStorage.getItem(k);
-                } catch (t) {}
-              }
+              if (!k || k.indexOf("akini_") !== 0 || k.indexOf("akini_app_icon_") === 0 || isSnapKey(k)) continue;
+              try {
+                var v = localStorage.getItem(k);
+                if (!isEmpty(v)) data[k] = v;
+              } catch (t) {}
             }
             caches
               .open(CACHE_NAME)
@@ -735,10 +815,34 @@ document.addEventListener("DOMContentLoaded", function () {
         var origSetItem = localStorage.setItem;
         var origRemoveItem = localStorage.removeItem;
         var backupTimer = null;
+        function isSnapshotKey(k) {
+          return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
+        }
+        function isEmptyValue(v) {
+          return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
+        }
+        function snapshotLs() {
+          try {
+            var snap = {};
+            for (var i = 0; i < localStorage.length; i++) {
+              var kk = localStorage.key(i);
+              if (kk && kk.indexOf("akini_app_icon_") !== 0 && !isSnapshotKey(kk)) {
+                var vv = localStorage.getItem(kk);
+                if (!isEmptyValue(vv)) snap[kk] = vv;
+              }
+            }
+            var json = JSON.stringify(snap);
+            localStorage.setItem("akini_localstorage_snapshot", json);
+            localStorage.setItem("akini_localstorage_snapshot_backup", json);
+          } catch (e) {}
+        }
         function doBackup() {
           if (backupTimer) return;
+          // 启动恢复完成前不触发备份，避免用可能不完整的 localStorage 覆盖 IDB/Cache 里的完整数据
+          if (!window._akiniDataRestored) return;
           backupTimer = setTimeout(function () {
             backupTimer = null;
+            snapshotLs();
             try {
               window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll();
             } catch (e) {}
@@ -1675,7 +1779,20 @@ document.addEventListener("DOMContentLoaded", function () {
             var merged = {};
             for (var k in cur) cur.hasOwnProperty(k) && (merged[k] = cur[k]);
             for (var k in idb)
-              idb.hasOwnProperty(k) && !merged[k] && (merged[k] = idb[k]);
+              if (idb.hasOwnProperty(k)) {
+                if (!merged[k]) merged[k] = idb[k];
+                else {
+                  // 同一会话：聊天记录取更长的一方，其他元数据保留较新
+                  var cH = (merged[k].messagesHTML || "").length;
+                  var iH = (idb[k].messagesHTML || "").length;
+                  if (iH > cH) {
+                    var longer = idb[k].messagesHTML;
+                    var newer = (idb[k].lastTime || 0) >= (merged[k].lastTime || 0) ? idb[k] : merged[k];
+                    merged[k] = newer;
+                    merged[k].messagesHTML = longer;
+                  }
+                }
+              }
             return merged;
           }
           function restoreSessions() {
@@ -3185,31 +3302,33 @@ document.addEventListener("DOMContentLoaded", function () {
       E[t] = e;
       var key = "akini_chat_history_" + t;
       var backup = "akini_chat_history_backup_" + t;
-      // 小记录同时写入 localStorage，大记录只写 IndexedDB，防止 localStorage 超限崩溃
-      if (e.length <= 60000) {
-        try {
-          localStorage.setItem(key, e);
-        } catch (i) {
-          B();
-          try {
-            localStorage.setItem(key, e);
-          } catch (i) {}
-        }
-        try {
-          localStorage.setItem(backup, e);
-        } catch (i) {
-          B();
-          try {
-            localStorage.setItem(backup, e);
-          } catch (i) {}
-        }
-      }
-      // IndexedDB 是主存储，持久化大记录
+      // 1) IndexedDB 作为主存储：容量大、在微信/系统后台回收时比 localStorage 更不容易被清空
       try {
         _idbStore.set(key, e);
       } catch (e) {}
       try {
         _idbStore.set(backup, e);
+      } catch (e) {}
+      // 2) localStorage 作为同步热备份，便于快速恢复；超限则清理图片后再试
+      try {
+        localStorage.setItem(key, e);
+      } catch (i) {
+        B();
+        try {
+          localStorage.setItem(key, e);
+        } catch (i) {}
+      }
+      try {
+        localStorage.setItem(backup, e);
+      } catch (i) {
+        B();
+        try {
+          localStorage.setItem(backup, e);
+        } catch (i) {}
+      }
+      // 3) 精简应急备份（最后 200 条），确保 localStorage 满后仍有兜底
+      try {
+        __akiniBackupCriticalChatData(t, e);
       } catch (e) {}
       try {
         window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
@@ -3218,6 +3337,20 @@ document.addEventListener("DOMContentLoaded", function () {
     function __akiniSaveChatHistory(t, e) {
       if (!t || "string" != typeof e) return;
       C(t, e);
+    }
+    function __akiniBackupCriticalChatData(t, e) {
+      if (!t || "string" != typeof e || !e.trim()) return;
+      try {
+        var compact = __akiniSliceLastMsgRows(e, 200);
+        localStorage.setItem("akini_chat_critical_" + t, compact);
+      } catch (e) {}
+    }
+    function __akiniRecoverCriticalChatData(t) {
+      try {
+        return localStorage.getItem("akini_chat_critical_" + t) || "";
+      } catch (e) {
+        return "";
+      }
     }
     function B() {
       [
@@ -3616,6 +3749,24 @@ document.addEventListener("DOMContentLoaded", function () {
       return z;
     }
     function R(t, e) {
+      // 加固：若传入数组是过滤副本（如 filter 掉 icity），先合并回内存 z 中的 icity 帖子
+      // 防止朋友圈评论/点赞把 iCity 同步到朋友圈的帖子从 akini_posts 中挤掉
+      try {
+        if (Array.isArray(t) && z && z.length) {
+          var hasIcity = !1;
+          for (var i = 0; i < t.length; i++)
+            if (t[i] && t[i].source === "icity") { hasIcity = !0; break; }
+          if (!hasIcity) {
+            var idxMap = {};
+            t.forEach(function (p) { p && p.id && (idxMap[p.id] = 1); });
+            var merged = t.slice();
+            z.forEach(function (p) {
+              if (p && p.source === "icity" && !idxMap[p.id]) merged.push(p);
+            });
+            t = merged;
+          }
+        }
+      } catch (err) {}
       z = t || [];
       var n = JSON.stringify(z);
       try {
@@ -3631,14 +3782,96 @@ document.addEventListener("DOMContentLoaded", function () {
             e();
           }, 0));
     }
+    function __akiniMergeFriendsPostsFromIDB(t) {
+      if (!t) return;
+      try {
+        var e = JSON.parse(t);
+        if (!Array.isArray(e)) return;
+        var n = O();
+        if (!e.length && !n.length) return;
+        var i = {};
+        n.forEach(function (t) {
+          if (t && t.id) i[t.id] = t;
+        });
+        e.forEach(function (t) {
+          if (!t || !t.id) return;
+          var e = i[t.id];
+          if (!e) {
+            i[t.id] = t;
+            return;
+          }
+          // 合并点赞：去重
+          var a = e.likes || [],
+            o = t.likes || [];
+          var r = new Set(a.map(function (x) { return JSON.stringify(x); }));
+          o.forEach(function (x) { r.add(JSON.stringify(x)); });
+          e.likes = Array.from(r).map(function (x) { try { return JSON.parse(x); } catch (err) { return x; } });
+          // 合并评论：按 id/内容去重保留最新
+          var c = e.comments || [],
+            l = t.comments || [];
+          var s = new Map();
+          function _ck(c) {
+            if (!c || typeof c !== "object") return "";
+            if (c.id) return "id_" + c.id;
+            return "key_" + (c.author || "") + "_" + (c.replyTo || "") + "_" + (c.text || "") + "_" + (c.ts || 0);
+          }
+          c.concat(l).forEach(function (c) {
+            if (!c || typeof c !== "object") return;
+            if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
+            s.set(_ck(c), c);
+          });
+          e.comments = Array.from(s.values()).sort(function (a, b) {
+            return (a.ts || 0) - (b.ts || 0);
+          });
+        });
+        var a = Object.values(i);
+        a.sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+        if (a.length !== n.length || JSON.stringify(a) !== JSON.stringify(n)) {
+          R(a);
+          if ("function" == typeof window._renderPosts) window._renderPosts();
+        }
+      } catch (e) {}
+    }
     !(function () {
-      function t(t, e) {
+      // 按帖子 id 合并本地与 IDB（评论/点赞也按内容取更全的一方），任何一方帖子都不丢
+      function mergePosts(a, b) {
+        var map = {};
+        function put(p) {
+          if (!p || !p.id) return;
+          var ex = map[p.id];
+          if (!ex) { map[p.id] = p; return; }
+          // 评论数多的为准，再把对方独有评论补进来
+          var ac = (ex.comments = ex.comments || []), bc = (p.comments = p.comments || []);
+          var seen = {};
+          ac.forEach(function (c) { c && c.ts && (seen[c.ts + "_" + (c.author || "") + "_" + (c.text || "").slice(0, 16)] = 1); });
+          bc.forEach(function (c) {
+            var k = c && c.ts ? c.ts + "_" + (c.author || "") + "_" + (c.text || "").slice(0, 16) : "";
+            if (c && k && !seen[k]) { ac.push(c); seen[k] = 1; }
+          });
+          if ((p.likes || []).length > (ex.likes || []).length) ex.likes = p.likes;
+          if (p.liked) ex.liked = !0;
+        }
+        (a || []).forEach(put);
+        (b || []).forEach(put);
+        var out = Object.keys(map).map(function (k) { return map[k]; });
+        out.sort(function (x, y) { return (y.ts || 0) - (x.ts || 0); });
+        return out;
+      }
+      function t(t) {
         if (!t) return !1;
         try {
           var n = JSON.parse(t);
           if (!Array.isArray(n)) return !1;
-          var i = (z && z.length) || 0;
-          if (e || n.length > i) return ((z = n), !0);
+          if (z && z.length) {
+            var merged = mergePosts(z, n);
+            if (merged.length > z.length || JSON.stringify(merged) !== JSON.stringify(z)) {
+              z = merged;
+              return !0;
+            }
+            return !1;
+          }
+          z = n;
+          return !0;
         } catch (t) {}
         return !1;
       }
@@ -3651,11 +3884,25 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         (_idbStore.set("akini_posts", e),
           _idbStore.set("akini_posts_backup", e));
+        // 本地也对比一次 IDB，把备份里本地没有的帖子找回来
+        _idbStore.get("akini_posts", function (idbV) {
+          if (idbV && t(idbV)) {
+            try { R(z); } catch (err) {}
+            if ("function" == typeof window._renderPosts) window._renderPosts();
+          } else {
+            _idbStore.get("akini_posts_backup", function (idbB) {
+              if (idbB && t(idbB)) {
+                try { R(z); } catch (err) {}
+                if ("function" == typeof window._renderPosts) window._renderPosts();
+              }
+            });
+          }
+        });
       } else {
         _idbStore.get("akini_posts", function (e) {
-          t(e, !0) ||
+          t(e) ||
             _idbStore.get("akini_posts_backup", function (e) {
-              t(e, !0) || z || (z = []);
+              t(e) || z || (z = []);
             });
         });
       }
@@ -3878,40 +4125,21 @@ document.addEventListener("DOMContentLoaded", function () {
       var e = window.akiniContacts.getChatTarget(t);
       return e && "contact" === e.type ? e.id : null;
     }
+    // 图片读取：依赖全局 FileReader 拦截做统一高质量压缩（1024px / JPEG 0.85），
+    // 此处不再二次压缩，避免把头像/图片压到 360px 0.4 导致模糊（参考 milk 头像保留策略）
     function G(t, e) {
       var n = new FileReader();
-      ((n.onload = function (t) {
-        var n = new Image();
-        ((n.onload = function () {
-          var i = document.createElement("canvas"),
-            a = i.getContext("2d"),
-            o = 360,
-            r = n.width,
-            c = n.height;
-          (r > c && r > o
-            ? ((c = Math.round((c * o) / r)), (r = o))
-            : c >= r && c > o && ((r = Math.round((r * o) / c)), (c = o)),
-            (i.width = r),
-            (i.height = c),
-            a.drawImage(n, 0, 0, r, c));
-          try {
-            var l = i.toDataURL("image/jpeg", 0.8);
-            (l.length > 6e4 && (l = i.toDataURL("image/jpeg", 0.55)),
-              l.length > 6e4 && (l = i.toDataURL("image/jpeg", 0.4)),
-              e(l));
-          } catch (n) {
-            e(t.target.result);
-          }
-        }),
-          (n.onerror = function () {
-            e(t.target.result);
-          }),
-          (n.src = t.target.result));
-      }),
-        (n.onerror = function () {
-          e("");
-        }),
-        n.readAsDataURL(t));
+      n.onload = function (t) {
+        e(t.target.result || "");
+      };
+      n.onerror = function () {
+        e("");
+      };
+      try {
+        n.readAsDataURL(t);
+      } catch (err) {
+        e("");
+      }
     }
     (_idbStore.get("akini_icity_diaries", function (t) {
       var e = !1,
@@ -3930,6 +4158,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }),
       _idbStore.get("akini_icity_diaries_backup", function (t) {
         $(t, !0) && "function" == typeof renderIcity && renderIcity();
+      }),
+      // 朋友圈/评论从 IDB 兜底恢复，防止 localStorage 清空导致数据丢失
+      _idbStore.get("akini_posts", function (t) {
+        __akiniMergeFriendsPostsFromIDB(t);
+      }),
+      _idbStore.get("akini_posts_backup", function (t) {
+        __akiniMergeFriendsPostsFromIDB(t);
       }),
       (window.getCurrentStickerContactId = J));
     const U = document.getElementById("chatBody"),
@@ -3968,7 +4203,11 @@ document.addEventListener("DOMContentLoaded", function () {
               (n && window.akiniContacts.updateSession(e, { messagesHTML: n }),
                 t && t(n || ""));
             }
-            var r = tt(i, a, "");
+            var lsCrit = "";
+            try {
+              lsCrit = localStorage.getItem("akini_chat_critical_" + e) || "";
+            } catch (e) {}
+            var r = tt(i, a, lsCrit, "");
             r && o(r);
             // 优先从 localStorage 恢复（同步写入，最可靠）
             try {
@@ -3976,18 +4215,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 localStorage.getItem("akini_chat_history_" + e) ||
                 localStorage.getItem("akini_chat_history_backup_" + e);
               if (lsMain) {
-                var best = tt(i, a, lsMain);
+                var best = tt(i, a, lsMain, lsCrit);
                 best && best.length > (r ? r.length : 0) && o(best);
               }
             } catch (e) {}
             _idbStore.get("akini_chat_history_" + e, function (t) {
               if (window.akiniContacts.getActiveChatId() !== e) return;
-              var n = tt(i, a, t || "");
+              var n = tt(i, a, t || "", lsCrit);
               n && n.length > (r ? r.length : 0)
                 ? o(n)
                 : _idbStore.get("akini_chat_history_backup_" + e, function (t) {
                     if (window.akiniContacts.getActiveChatId() !== e) return;
-                    (n = tt(i, a, t || "")) && n.length > (r ? r.length : 0)
+                    (n = tt(i, a, t || "", lsCrit)) && n.length > (r ? r.length : 0)
                       ? o(n)
                       : r || o("");
                   });
@@ -4798,26 +5037,33 @@ document.addEventListener("DOMContentLoaded", function () {
         bt();
         // 优先合并内存会话、本地 localStorage 备份和内存缓存，取最长非空聊天记录
         var ls1 = "",
-          ls2 = "";
+          ls2 = "",
+          lsCrit = "";
         try {
           ls1 = localStorage.getItem("akini_chat_history_" + t) || "";
         } catch (e) {}
         try {
           ls2 = localStorage.getItem("akini_chat_history_backup_" + t) || "";
         } catch (e) {}
+        try {
+          lsCrit = localStorage.getItem("akini_chat_critical_" + t) || "";
+        } catch (e) {}
         var r = tt(
           window.akiniContacts.getSession(t).messagesHTML || "",
           E[t] || "",
           ls1,
           ls2,
+          lsCrit,
         );
+        // 同步源为空时，先保留旧 DOM/内存内容，避免空白闪烁；IDB 恢复后再更新
+        var _prevHTML = U ? U.innerHTML : "";
         (r
           ? (window.akiniContacts.updateSession(t, { messagesHTML: r }), l(r))
-          : l(""),
+          : (_prevHTML ? l(_prevHTML) : l("")),
           Tn(),
           _idbStore.get("akini_chat_history_" + t, function (a) {
             if (window.akiniContacts.getActiveChatId() !== t) return;
-            var o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", a || "");
+            var o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", a || "", lsCrit);
             if (o && o.length > (r ? r.length : 0))
               return (
                 window.akiniContacts.updateSession(t, { messagesHTML: o }),
@@ -4825,7 +5071,7 @@ document.addEventListener("DOMContentLoaded", function () {
               );
             _idbStore.get("akini_chat_history_backup_" + t, function (a) {
               if (window.akiniContacts.getActiveChatId() !== t) return;
-              (o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", a || "")) &&
+              (o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", a || "", lsCrit)) &&
                 o.length > (r ? r.length : 0) &&
                 (window.akiniContacts.updateSession(t, { messagesHTML: o }),
                 l(o));
@@ -9143,23 +9389,43 @@ document.addEventListener("DOMContentLoaded", function () {
           }),
         document.getElementById("ctxDelete").addEventListener("click", function () {
             if (!n) return void a();
-            n.remove();
-            const t = document.getElementById("chatBody");
-            if (t && window.akiniContacts) {
-              try {
-                var activeId = window.akiniContacts.getActiveChatId();
-                var html = t.innerHTML;
-                window.akiniContacts.updateSession(activeId, { messagesHTML: html });
-                if (typeof C === "function") C(activeId, html);
-                else {
-                  try { localStorage.setItem("akini_chat_history_" + activeId, html); } catch (e) {}
-                  try { localStorage.setItem("akini_chat_history_backup_" + activeId, html); } catch (e) {}
-                  try { _idbStore.set("akini_chat_history_" + activeId, html); } catch (e) {}
-                  try { _idbStore.set("akini_chat_history_backup_" + activeId, html); } catch (e) {}
+            // 先从内存完整历史中按消息特征精确移除，绝不能用截断后的 DOM HTML 覆盖
+            try {
+              var activeId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+              if (activeId) {
+                var sess = window.akiniContacts.getSession(activeId) || {};
+                var fullHTML = sess.messagesHTML || E[activeId] || "";
+                if (fullHTML) {
+                  var rowOpen = n.outerHTML;
+                  var at = fullHTML.indexOf(rowOpen);
+                  if (at >= 0) {
+                    fullHTML = fullHTML.slice(0, at) + fullHTML.slice(at + rowOpen.length);
+                  } else {
+                    // 兜底：按消息内容摘要定位
+                    var bubble = n.querySelector(".bubble");
+                    var key = bubble ? (bubble.innerText || "").trim().slice(0, 30) : "";
+                    if (key) {
+                      var tmp = document.createElement("div");
+                      tmp.innerHTML = fullHTML;
+                      var rows = tmp.querySelectorAll(".msg-row");
+                      var removed = !1;
+                      rows.forEach(function (r) {
+                        if (!removed && r.textContent && r.textContent.indexOf(key) >= 0) {
+                          r.remove();
+                          removed = !0;
+                        }
+                      });
+                      if (removed) fullHTML = tmp.innerHTML;
+                    }
+                  }
+                  window.akiniContacts.updateSession(activeId, { messagesHTML: fullHTML });
+                  E[activeId] = fullHTML;
+                  if (typeof C === "function") C(activeId, fullHTML);
+                  try { _idbStore.set("akini_chat_history", fullHTML); } catch (e) {}
                 }
-                try { _idbStore.set("akini_chat_history", html); } catch (t) {}
-              } catch (t) {}
-            }
+              }
+            } catch (e) {}
+            n.remove();
             a();
           }));
     })();
@@ -11906,7 +12172,7 @@ document.addEventListener("DOMContentLoaded", function () {
         .filter(function (s) {
           return s && s.trim();
         })
-        .join("\n");
+        .join(" ");
     }
     (Mn,
       Ln,
@@ -12362,7 +12628,7 @@ document.addEventListener("DOMContentLoaded", function () {
               return t.text || t.content || "";
             })
             .filter(Boolean)
-            .join("\n");
+            .join(" ");
         }
         (document.addEventListener("visibilitychange", function () {}),
           (window.showInAppNotif = function (i) {
@@ -13046,25 +13312,29 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260831ca 修复联系人行为/图标/音乐导入/默认值/样式等问题
+      // 版本迁移：20260901ec 修复数据丢失、头像画质、emoji 默认与美化界面样式
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260831ca") {
-            localStorage.setItem("akini_app_version", "20260831ca");
-            localStorage.removeItem("akini_toggle_readReceiptToggle");
-            localStorage.removeItem("akini_toggle_timestampToggle");
+          if (ver !== "20260901ec") {
+            localStorage.setItem("akini_app_version", "20260901ec");
+            // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
             localStorage.removeItem("akini_toggle_contactIcityToggle");
             localStorage.removeItem("akini_toggle_contactMailToggle");
-            if (localStorage.getItem("akini_toggle_emojiMixToggle") === null)
-              localStorage.setItem("akini_toggle_emojiMixToggle", "1");
-            // 朋友圈/iCity 默认改为 30-60 分钟；旧的小值（1-3）重置为新默认
+            // emoji 融入消息默认关闭（旧版本误设为开启则重置）
+            localStorage.setItem("akini_toggle_emojiMixToggle", "0");
+            // 朋友圈/iCity 默认改为 30-60 分钟；任何一项异常（<=3、>=1000、乱填、min>max）都重置为新默认
             var _resetPostRange = function (minKey, maxKey) {
               var mn = parseFloat(localStorage.getItem(minKey) || "");
               var mx = parseFloat(localStorage.getItem(maxKey) || "");
-              if ((isNaN(mn) || mn <= 3) && (isNaN(mx) || mx <= 3)) {
+              if (
+                isNaN(mn) || isNaN(mx) ||
+                mn <= 3 || mx <= 3 ||
+                mn >= 1000 || mx >= 1000 ||
+                mn > mx
+              ) {
                 localStorage.setItem(minKey, "30");
                 localStorage.setItem(maxKey, "60");
               }
@@ -13074,11 +13344,16 @@ document.addEventListener("DOMContentLoaded", function () {
               "akini_num_friendsPostMax",
             );
             _resetPostRange("akini_num_icityPostMin", "akini_num_icityPostMax");
-            // 主动写信默认改为 3-6 小时，旧值（1-3）重置为 3-6
+            // 主动写信默认改为 3-6 小时，任何异常都重置为 3-6
             var _resetActiveMailRange = function (minKey, maxKey) {
               var mn = parseFloat(localStorage.getItem(minKey) || "");
               var mx = parseFloat(localStorage.getItem(maxKey) || "");
-              if ((isNaN(mn) || mn <= 3) && (isNaN(mx) || mx <= 3)) {
+              if (
+                isNaN(mn) || isNaN(mx) ||
+                mn <= 0 || mx <= 0 ||
+                mn >= 1000 || mx >= 1000 ||
+                mn > mx
+              ) {
                 localStorage.setItem(minKey, "3");
                 localStorage.setItem(maxKey, "6");
               }
@@ -13107,23 +13382,6 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           }
         } catch (e) {}
-      })();
-      // v20260831cg：二次迁移，仅重置朋友圈/iCity 间隔（首次迁移可能因旧版本缓存未生效）
-      (function() {
-        try {
-          var ver2 = localStorage.getItem("akini_app_version");
-          if (ver2 !== "20260831cg") {
-            localStorage.setItem("akini_app_version", "20260831cg");
-            var _resetSmall = function(minKey, maxKey, minDef, maxDef) {
-              var mn = parseFloat(localStorage.getItem(minKey) || "");
-              var mx = parseFloat(localStorage.getItem(maxKey) || "");
-              if (isNaN(mn) || mn < 5) { localStorage.setItem(minKey, String(minDef)); }
-              if (isNaN(mx) || mx < 10) { localStorage.setItem(maxKey, String(maxDef)); }
-            };
-            _resetSmall("akini_num_friendsPostMin", "akini_num_friendsPostMax", 30, 60);
-            _resetSmall("akini_num_icityPostMin", "akini_num_icityPostMax", 30, 60);
-          }
-        } catch(e) {}
       })();
       function t(t, e) {
         const n = document.getElementById(t);
@@ -13236,7 +13494,7 @@ document.addEventListener("DOMContentLoaded", function () {
           else if (t.app === "icity") body = "新的日记";
           else body = "新消息";
         }
-        var sanitized = { app: t.app || "Akini", name: title, msg: body, onTap: t.onTap, groupName: t.groupName };
+        var sanitized = { app: t.app || "Akini", name: title, msg: body, onTap: t.onTap, groupName: t.groupName, avatar: t.avatar || t.appIcon || "", appIcon: t.appIcon || "", chatId: t.chatId || "", ts: t.ts || Date.now(), fullContent: t.fullContent };
         o && o(sanitized);
         var e = document.getElementById("pushNotifyToggle"),
           n =
@@ -13276,7 +13534,7 @@ document.addEventListener("DOMContentLoaded", function () {
         t("quoteReplyToggle", !1),
         t("readReceiptToggle", !1),
         t("readNoReplyToggle", !1),
-        t("emojiMixToggle", !0),
+        t("emojiMixToggle", !1),
         t("contactEmojiToggle", !1),
         t("contactPokeToggle", !0),
         t("contactTransferToggle", !1),
@@ -13304,6 +13562,10 @@ document.addEventListener("DOMContentLoaded", function () {
       ([
         { id: "replyDelayMin", key: "akini_num_replyDelayMin", def: "2" },
         { id: "replyDelayMax", key: "akini_num_replyDelayMax", def: "5" },
+        { id: "replyCardCountMin", key: "akini_num_replyCardCountMin", def: "1" },
+        { id: "replyCardCountMax", key: "akini_num_replyCardCountMax", def: "3" },
+        { id: "replyCardCountGroupMin", key: "akini_num_replyCardCountGroupMin", def: "1" },
+        { id: "replyCardCountGroupMax", key: "akini_num_replyCardCountGroupMax", def: "3" },
         { id: "mailDelayMin", key: "akini_num_mailDelayMin", def: "1" },
         { id: "mailDelayMax", key: "akini_num_mailDelayMax", def: "3" },
         { id: "activeMsgMin", key: "akini_num_activeMsgMin", def: "3" },
@@ -17171,6 +17433,24 @@ document.addEventListener("DOMContentLoaded", function () {
   // 数据自动兜底保护：每 20 秒备份一次，切后台/关闭前也立即备份
   try {
     function _akiniImmediateBackup() {
+      // 先把内存中所有聊天记录同步刷到 IDB/localStorage，防止页面被系统回收时丢失
+      // 注意：DOM 只渲染最近 100 条（防卡顿），严禁用 U.innerHTML 覆盖完整历史
+      // 必须从 session.messagesHTML（内存全量）保存，与 milk 的内存数据源一致
+      try {
+        if (window.akiniContacts && typeof E === "object") {
+          var activeId = window.akiniContacts.getActiveChatId();
+          if (activeId) {
+            var sess = window.akiniContacts.getSession(activeId);
+            if (sess && sess.messagesHTML && sess.messagesHTML.trim()) {
+              E[activeId] = sess.messagesHTML;
+              C(activeId, sess.messagesHTML);
+            }
+          }
+          Object.keys(E).forEach(function (k) {
+            if (E[k] && typeof E[k] === "string") C(k, E[k]);
+          });
+        }
+      } catch (e) {}
       try {
         window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll();
       } catch (e) {}
@@ -17184,5 +17464,92 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     window.addEventListener("pagehide", _akiniImmediateBackup);
     window.addEventListener("beforeunload", _akiniImmediateBackup);
+
+    // ===== milk 核心防丢机制：页面重新可见时，对比备份与内存数据，备份更完整则自动恢复 =====
+    // 防止移动端系统回收内存后（微信内置浏览器长时间后台），内存数据被清空导致聊天记录丢失
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) return;
+      if (window._restoringData || window._restoringChatHistory) return;
+      try {
+        if (window.akiniContacts && window.akiniContacts.getContacts) {
+          var contactsEmpty = window.akiniContacts.getContacts().length === 0;
+          var sessions = window.akiniContacts.getSessions ? window.akiniContacts.getSessions() : {};
+          var anyMsg = !1;
+          for (var sid in sessions)
+            if (sessions.hasOwnProperty(sid) && sessions[sid] && sessions[sid].messagesHTML && sessions[sid].messagesHTML.trim()) { anyMsg = !0; break; }
+          if (contactsEmpty || (!anyMsg && Object.keys(sessions).length === 0)) {
+            // 内存数据疑似被回收清空：从 IDB 恢复
+            window._restoringData = !0;
+            window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll(function () {
+              window.akiniContacts && window.akiniContacts.tryRestoreFromBackup && window.akiniContacts.tryRestoreFromBackup(function () {
+                window.akiniContacts.resetCache && window.akiniContacts.resetCache();
+                window._akiniRestoreFromSnapshot && window._akiniRestoreFromSnapshot(function () {
+                  window._restoringData = !1;
+                  if ("function" == typeof __akiniBootApp) { try { __akiniBootApp(); } catch (e) {} }
+                  if ("function" == typeof window._renderPosts) window._renderPosts();
+                  if ("function" == typeof window._renderIcity) window._renderIcity();
+                });
+              });
+            });
+          } else if (!anyMsg && Object.keys(sessions).length > 0) {
+            // 有会话但聊天记录全空：逐会话从 IDB 兜底找回（内存 chat HTML 缓存 E 的 key 对应记录）
+            Object.keys(sessions).forEach(function (sid) {
+              var ok = !1;
+              try {
+                if (E[sid] && E[sid].length) ok = !0;
+              } catch (e) {}
+              if (!ok) {
+                _idbStore.get("akini_chat_history_" + sid, function (v) {
+                  if (v && v.trim()) {
+                    window.akiniContacts.updateSession(sid, { messagesHTML: v });
+                    E[sid] = v;
+                    var cur = window.akiniContacts.getActiveChatId();
+                    if (cur === sid) {
+                      var body = document.getElementById("chatBody");
+                      if (body && (!body.innerHTML || !body.innerHTML.trim())) {
+                        __akiniRenderChatBody(__akiniDeduplicateChatHTML(v), sid);
+                      }
+                    }
+                  }
+                });
+              }
+            });
+          }
+        }
+        // 朋友圈/iCity 内存缓存被回收时对比恢复
+        try {
+          if (typeof O === "function" && (!z || z.length === 0)) {
+            var pv = localStorage.getItem("akini_posts");
+            if (pv) {
+              var pa = JSON.parse(pv);
+              Array.isArray(pa) && pa.length && R(pa);
+              "function" == typeof window._renderPosts && window._renderPosts();
+            }
+          }
+        } catch (e) {}
+        try {
+          if (typeof q === "function" && (!F || F.length === 0)) {
+            var dv = localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
+            if (dv) {
+              var da = JSON.parse(dv);
+              Array.isArray(da) && da.length && j(da);
+              "function" == typeof window._renderIcity && window._renderIcity();
+            }
+          }
+        } catch (e) {}
+      } catch (e) {}
+    });
+
+    // ===== milk 每 3 分钟全量保存：即使所有生命周期事件都失效，数据也会定期落盘 =====
+    setInterval(function () {
+      try {
+        if (document.hidden || window._restoringData || window._restoringChatHistory) return;
+        _akiniImmediateBackup();
+        if ("function" == typeof flushAllData) flushAllData();
+        // 朋友圈 / iCity 定期落盘（milk saveData 等价物）
+        try { if (typeof R === "function" && z && z.length) R(z); } catch (e) {}
+        try { if (typeof j === "function" && F && F.length) j(F); } catch (e) {}
+      } catch (e) {}
+    }, 180000);
   } catch (e) {}
 });
