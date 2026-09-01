@@ -2997,17 +2997,7 @@ document.addEventListener("DOMContentLoaded", function () {
           return "pat" !== e && "pat" !== n;
         });
         if (0 === _wb.length) {
-          var _ac = window.akiniContacts
-            ? window.akiniContacts.getActiveChatId()
-            : "";
-          if (t === _ac || r === _ac) {
-            var _sys =
-              '<div class="msg-row system"><div class="bubble">字卡库为空，请先添加字卡</div></div>';
-            if (U) {
-              U.insertAdjacentHTML("beforeend", _sys);
-              U.scrollTop = U.scrollHeight;
-            }
-          }
+          // 字卡库为空时不应触发任何自动回复/系统提示
           return;
         }
         picked = "";
@@ -3825,13 +3815,12 @@ document.addEventListener("DOMContentLoaded", function () {
           var r = new Set(a.map(function (x) { return JSON.stringify(x); }));
           o.forEach(function (x) { r.add(JSON.stringify(x)); });
           e.likes = Array.from(r).map(function (x) { try { return JSON.parse(x); } catch (err) { return x; } });
-          // 合并评论：按 id/内容去重保留最新
+          // 合并评论：按稳定内容 key 去重保留最新，避免随机 id 导致同内容重复
           var c = e.comments || [],
             l = t.comments || [];
           var s = new Map();
           function _ck(c) {
             if (!c || typeof c !== "object") return "";
-            if (c.id) return "id_" + c.id;
             return "key_" + (c.author || "") + "_" + (c.replyTo || "") + "_" + (c.text || "") + "_" + (c.ts || 0);
           }
           c.concat(l).forEach(function (c) {
@@ -3967,20 +3956,19 @@ document.addEventListener("DOMContentLoaded", function () {
           t.id ||
             ((t.id = Date.now() + "_" + Math.floor(1e3 * Math.random())),
             (e = !0));
-          // 启动/刷新时去重评论，防止历史 bug 产生的重复评论再次显示
+          // 启动/刷新时去重评论，使用稳定内容 key，避免随机 id 导致重复
           if (t.comments && t.comments.length > 0) {
             var seen = new Map();
             t.comments.forEach(function (c) {
               if (!c || typeof c !== "object") return;
               var k =
-                c.id ||
                 (c.author || "") +
-                  "_" +
-                  (c.replyTo || "") +
-                  "_" +
-                  (c.text || "") +
-                  "_" +
-                  (c.ts || 0);
+                "_" +
+                (c.replyTo || "") +
+                "_" +
+                (c.text || "") +
+                "_" +
+                (c.ts || 0);
               if (!seen.has(k)) {
                 seen.set(k, c);
               }
@@ -4034,7 +4022,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 var cm = new Map();
                 function _commentKey(c) {
                   if (!c || typeof c !== "object") return "";
-                  if (c.id) return "id_" + c.id;
+                  // 使用稳定内容 key，避免随机 id 导致同内容评论重复
                   return "key_" + (c.author || "") + "_" + (c.replyTo || "") + "_" + (c.text || "") + "_" + (c.ts || 0);
                 }
                 oc.forEach(function (c) {
@@ -4420,6 +4408,8 @@ document.addEventListener("DOMContentLoaded", function () {
             if (bubble) sig += "|" + (bubble.innerHTML || "").trim();
             else sig += "|" + (row.textContent || "").trim();
           }
+          // 加入时间戳，避免相同内容不同时间的消息被过度去重
+          if (meta) sig += "|" + (meta.textContent || "").trim();
           if (!seen.has(sig)) {
             seen.add(sig);
             allRows.push(row.outerHTML);
@@ -5245,19 +5235,36 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function st(t) {
       const e = document.getElementById("chatBody");
-      e &&
-        window.loadBgFromStorage &&
-        window.loadBgFromStorage("akini_chat_bg_" + t, function (t) {
-          t
-            ? ((e.style.backgroundImage = "url(" + t + ")"),
-              (e.style.backgroundSize = "cover"),
-              (e.style.backgroundPosition = "center"),
-              (e.style.backgroundRepeat = "no-repeat"))
-            : ((e.style.backgroundImage = ""),
-              (e.style.backgroundSize = ""),
-              (e.style.backgroundPosition = ""),
-              (e.style.backgroundRepeat = ""));
-        });
+      if (!e || !window.loadBgFromStorage) return;
+      window.loadBgFromStorage("akini_chat_bg_" + t, function (n) {
+        if (!n) {
+          e.style.backgroundImage = "";
+          e.style.backgroundSize = "";
+          e.style.backgroundPosition = "";
+          e.style.backgroundRepeat = "";
+          e.setAttribute("data-current-bg", "");
+          return;
+        }
+        // 当前已是同一张背景则不再重置，避免闪烁
+        if (e.getAttribute("data-current-bg") === n) return;
+        var img = new Image();
+        img.onload = function () {
+          if (window.akiniContacts && window.akiniContacts.getActiveChatId() !== t) return;
+          e.style.backgroundImage = "url(" + n + ")";
+          e.style.backgroundSize = "cover";
+          e.style.backgroundPosition = "center";
+          e.style.backgroundRepeat = "no-repeat";
+          e.setAttribute("data-current-bg", n);
+        };
+        img.onerror = function () {
+          e.style.backgroundImage = "";
+          e.style.backgroundSize = "";
+          e.style.backgroundPosition = "";
+          e.style.backgroundRepeat = "";
+          e.setAttribute("data-current-bg", "");
+        };
+        img.src = n;
+      });
     }
     ((window.openChat = ct),
       (window.refreshChatHeader = lt),
@@ -9939,7 +9946,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var c = document.getElementById("icityDetailComments");
         if (c) {
           var l = t.comments || [];
-          // 评论去重：相同作者+内容+回复对象+同一秒内只保留一条
+          // 评论去重：相同作者+内容+回复对象+完整时间戳只保留一条，避免秒级精度误删
           (function () {
             var seen = new Map();
             l.forEach(function (c) {
@@ -9951,7 +9958,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "|" +
                 (c.replyTo || "") +
                 "|" +
-                Math.floor((c.ts || 0) / 1000);
+                (c.ts || 0);
               seen.set(key, c);
             });
             l = Array.from(seen.values()).sort(function (a, b) {
@@ -12942,8 +12949,15 @@ document.addEventListener("DOMContentLoaded", function () {
             window._akiniTimer.schedule("friendsPost", friendsPostAction, i);
           })(true),
           (function t() {
-            /* 互动检查间隔：50~60 秒，确保在 1 分钟内响应点赞/评论/回复 */
-            var e = (50 + Math.floor(Math.random() * 11)) * 1e3;
+            /* 互动检查间隔：按消息回复延迟配置，确保联系人在设定时间后互动 */
+            function getFriendsReplyDelayMs() {
+              var min = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2");
+              var max = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
+              if (isNaN(min)) min = 2;
+              if (isNaN(max) || max < min) max = min;
+              return Math.floor(1e3 * (min + Math.random() * Math.max(0, max - min)));
+            }
+            var e = getFriendsReplyDelayMs();
             function friendsInteractAction() {
               if ("1" !== localStorage.getItem("akini_toggle_contactFriendsToggle")) {
                 t();
@@ -12955,7 +12969,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 myId = r().id;
               let l = O();
               var now = Date.now(),
-                ONE_MIN = 60 * 1e3;
+                replyMin = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
+                replyMax = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
+              isNaN(replyMin) && (replyMin = 2);
+              (isNaN(replyMax) || replyMax < replyMin) && (replyMax = replyMin);
+              var replyDelayMs = 1e3 * (replyMin + Math.random() * Math.max(0, replyMax - replyMin));
               var s = !1,
                 d = window._pendingFriendsReplies || [];
               if (d.length > 0) {
@@ -12963,7 +12981,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 var e = l.find(function (e) {
                   return e.ts === t.ts;
                 });
-                if (e && Date.now() - (e.ts || 0) <= ONE_MIN) {
+                if (e && now - (e.ts || 0) >= replyDelayMs) {
                   var r = (e.comments || [])
                     .slice()
                     .reverse()
@@ -13024,34 +13042,28 @@ document.addEventListener("DOMContentLoaded", function () {
                       },
                     });
                   }
+                } else if (e && now - (e.ts || 0) < replyDelayMs) {
+                  // 还未到消息回复延迟时间，先把该回复放回队列前端，下次再处理
+                  d.unshift(t);
                 }
                 if (s) {
                   R(l);
                   window._renderPosts && window._renderPosts();
                 }
-                var replyMin = parseFloat(
-                    localStorage.getItem("akini_num_replyDelayMin") || "2",
-                  ),
-                  replyMax = parseFloat(
-                    localStorage.getItem("akini_num_replyDelayMax") || "5",
-                  );
-                isNaN(replyMin) && (replyMin = 2);
-                (isNaN(replyMax) || replyMax < replyMin) && (replyMax = replyMin);
-                var nextReplyMs =
-                  1e3 * (replyMin + Math.random() * Math.max(0, replyMax - replyMin));
                 window._akiniTimer.schedule(
                   "friendsInteract",
                   friendsInteractAction,
-                  nextReplyMs,
+                  replyDelayMs,
                 );
                 return;
               }
 
-              // 1. 用户自己的动态：联系人要在 1 分钟内点赞 + 评论
+              // 1. 用户自己的动态：联系人在消息回复延迟后点赞/评论
               const userPosts = l.filter(function (t) {
                 if (t.author && (t.author === n || t.authorId === myId)) return !1;
                 var postTs = t.ts || 0;
-                return now - postTs <= ONE_MIN;
+                var age = now - postTs;
+                return age >= replyDelayMs && age <= replyDelayMs + 60 * 1e3;
               });
               var likeCandidates = userPosts.filter(function (t) {
                 return (t.likes || []).indexOf(n) < 0;
@@ -13084,12 +13096,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 return contactComments.length === 0;
               });
 
-              // 2. 联系人自己的动态：用户评论后，联系人在 1 分钟内回复；用户未评论则绝对不主动评论
+              // 2. 联系人自己的动态：用户评论后，联系人在消息回复延迟后回复；用户未评论则绝对不主动评论
               const contactPosts = l.filter(function (t) {
                 if (!t.authorId) return !1;
                 if (t.authorId !== myId) return !1;
                 var postTs = t.ts || 0;
-                return now - postTs <= ONE_MIN;
+                var age = now - postTs;
+                return age >= replyDelayMs && age <= replyDelayMs + 60 * 1e3;
               });
               var replyOnContactPosts = contactPosts.filter(function (t) {
                 var userComments = (t.comments || []).filter(function (c) {
@@ -13355,12 +13368,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260901em 修复数据丢失、头像恢复、定时器连发、字卡数量与默认间隔
+      // 版本迁移：20260902 修复评论去重/回复延迟/聊天背景/字卡兜底
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260901em") {
-            localStorage.setItem("akini_app_version", "20260901em");
+          if (ver !== "20260902") {
+            localStorage.setItem("akini_app_version", "20260902");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
@@ -14027,6 +14040,13 @@ document.addEventListener("DOMContentLoaded", function () {
       function e(t, e) {
         return Math.floor(Math.random() * (e - t + 1)) + t;
       }
+      function getReplyDelayMs() {
+        var min = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2");
+        var max = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
+        if (isNaN(min)) min = 2;
+        if (isNaN(max) || max < min) max = min;
+        return Math.floor(1e3 * (min + Math.random() * Math.max(0, max - min)));
+      }
       function n() {
         return (
           localStorage.getItem("akini_icity_ta_nick") ||
@@ -14050,8 +14070,6 @@ document.addEventListener("DOMContentLoaded", function () {
         };
       }
       function a(t) {
-        var postTs = t && t.ts ? t.ts : 0;
-        if (Date.now() - postTs > 60 * 1e3) return !1;
         for (
           var e = (function () {
               var t = i(),
@@ -14123,7 +14141,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   n = e.find(function (e) {
                     return e.id == t;
                   });
-                if (n && _isIcityUserAuthor(n) && Date.now() - (n.ts || 0) <= 60 * 1e3) {
+                if (n && _isIcityUserAuthor(n)) {
                   var interactor = _pickIcityInteractor();
                   if (!interactor) return;
                   var a = interactor.name,
@@ -14294,7 +14312,7 @@ document.addEventListener("DOMContentLoaded", function () {
               function () {
                 window.replyToMyComment(n);
               },
-              e(5e4, 6e4),
+              getReplyDelayMs(),
             ));
         }),
         (window.scheduleTaLikeSoon = function (n) {
@@ -14305,7 +14323,7 @@ document.addEventListener("DOMContentLoaded", function () {
               function () {
                 c(n);
               },
-              e(5e4, 6e4),
+              getReplyDelayMs(),
             ));
         }),
         // 联系人不再自己评论，保留空函数避免调用报错
