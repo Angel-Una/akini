@@ -854,12 +854,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         localStorage.setItem = function (k, v) {
           var r = origSetItem.apply(this, arguments);
-          if (k && String(k).indexOf("akini_") === 0) doBackup();
+          // 快照键自身的写入不再触发备份，否则会形成 snapshotLs→setItem→doBackup→snapshotLs 的无限循环
+          if (k && String(k).indexOf("akini_") === 0 && !isSnapshotKey(k)) doBackup();
           return r;
         };
         localStorage.removeItem = function (k) {
           var r = origRemoveItem.apply(this, arguments);
-          if (k && String(k).indexOf("akini_") === 0) doBackup();
+          if (k && String(k).indexOf("akini_") === 0 && !isSnapshotKey(k)) doBackup();
           return r;
         };
       })();
@@ -4191,6 +4192,8 @@ document.addEventListener("DOMContentLoaded", function () {
     var Y = document.getElementById("chatMenuOverlay"),
       Q = document.getElementById("menuBg");
     function __akiniBootApp(t) {
+      if (window.__akiniBooted) return;
+      window.__akiniBooted = !0;
       setTimeout(function () {
         window._restoringData = !1;
         window._akiniDataRestored = !0;
@@ -4523,6 +4526,14 @@ document.addEventListener("DOMContentLoaded", function () {
         : t || e;
     }
     ((window._restoringData = !0),
+      // 安全兜底：无论异步恢复链是否正常回调，最多 6 秒后强制打开恢复门，
+      // 防止 tryRestoreFromBackup 异常导致 _restoringData 永久卡住、数据无法读写
+      setTimeout(function () {
+        if (window._restoringData) {
+          console.warn("[Akini] restore timeout, force opening data gate");
+          __akiniBootApp();
+        }
+      }, 6000),
       window._idbStore.restoreAll(function () {
         window.akiniContacts && window.akiniContacts.tryRestoreFromBackup
           ? window.akiniContacts.tryRestoreFromBackup(__akiniBootApp)
@@ -13344,12 +13355,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260901el 修复数据丢失、头像恢复、定时器连发、字卡数量与默认间隔
+      // 版本迁移：20260901em 修复数据丢失、头像恢复、定时器连发、字卡数量与默认间隔
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260901el") {
-            localStorage.setItem("akini_app_version", "20260901el");
+          if (ver !== "20260901em") {
+            localStorage.setItem("akini_app_version", "20260901em");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
@@ -13405,25 +13416,30 @@ document.addEventListener("DOMContentLoaded", function () {
               localStorage.setItem(maxKey, "6");
             };
             _resetActiveMsgRange("akini_num_activeMsgMin", "akini_num_activeMsgMax");
-            // 主动写信/发消息/朋友圈/iCity 的旧“小时”单位值已废弃，改为按“分钟”读取；
-            // 不再清空用户当前设置，避免用户每次重新打开都被重置
+            // 主动写信/发消息 之前按“分钟”单位存储，现在改为按“小时”读取，需要把旧值除以 60。
+            // 朋友圈/iCity 本来就是按“分钟”读取，不参与此次转换，避免 30 分钟被误转成 1 分钟。
             [
               "akini_num_activeMailMin",
               "akini_num_activeMailMax",
               "akini_num_activeMsgMin",
               "akini_num_activeMsgMax",
-              "akini_num_friendsPostMin",
-              "akini_num_friendsPostMax",
-              "akini_num_icityPostMin",
-              "akini_num_icityPostMax",
             ].forEach(function (k) {
               var v = localStorage.getItem(k);
               if (v) {
                 var fv = parseFloat(v);
-                // 旧值 > 10 默认按小时误存，这里改成分钟；若值已经很小则保留用户设置
+                // 旧值 > 10 时认为是按分钟误存，转换为小时；小数值保留用户设置
                 if (!isNaN(fv) && fv > 10) {
                   localStorage.setItem(k, String(Math.max(1, Math.round(fv / 60))));
                 }
+              }
+            });
+            // 朋友圈/iCity 统一做一次兜底：若仍因历史 bug 变成 <=3 分钟，则恢复为 30-60 分钟
+            ["akini_num_friendsPost", "akini_num_icityPost"].forEach(function (prefix) {
+              var mn = parseFloat(localStorage.getItem(prefix + "Min") || "");
+              var mx = parseFloat(localStorage.getItem(prefix + "Max") || "");
+              if (isNaN(mn) || isNaN(mx) || mn <= 3 || mn > mx || mx > 1000) {
+                localStorage.setItem(prefix + "Min", "30");
+                localStorage.setItem(prefix + "Max", "60");
               }
             });
           }
