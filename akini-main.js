@@ -3308,9 +3308,19 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function C(t, e) {
       if (!t || "string" != typeof e) return;
-      E[t] = e;
       var key = "akini_chat_history_" + t;
       var backup = "akini_chat_history_backup_" + t;
+      // 关键防护：如果新记录比现有记录短，不覆盖任何备份，防止恢复时选错源导致数据被截断
+      var existingRows = 0;
+      try {
+        existingRows = __akiniCountMsgRows(localStorage.getItem(key) || "");
+      } catch (err) {}
+      var newRows = __akiniCountMsgRows(e);
+      if (newRows < existingRows) {
+        console.warn("[C] 拒绝用更短的聊天记录覆盖：" + key + " (" + newRows + " < " + existingRows + ")");
+        return;
+      }
+      E[t] = e;
       // 1) IndexedDB 作为主存储：容量大、在微信/系统后台回收时比 localStorage 更不容易被清空
       try {
         _idbStore.set(key, e);
@@ -3815,14 +3825,26 @@ document.addEventListener("DOMContentLoaded", function () {
           var r = new Set(a.map(function (x) { return JSON.stringify(x); }));
           o.forEach(function (x) { r.add(JSON.stringify(x)); });
           e.likes = Array.from(r).map(function (x) { try { return JSON.parse(x); } catch (err) { return x; } });
-          // 合并评论：不再去重，直接按时间戳拼接排序，避免误删用户数据
+          // 合并评论：按稳定 key 去重，只删除完全相同的备份，保留时间不同的合法重复
           var c = e.comments || [],
             l = t.comments || [];
           var allComments = c.slice();
+          var seen = {};
+          function _friendCommentKey(c) {
+            return (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "").slice(0, 30) + "|" + (c.ts || 0);
+          }
+          c.forEach(function (c) {
+            if (!c || typeof c !== "object") return;
+            seen[_friendCommentKey(c)] = !0;
+          });
           l.forEach(function (c) {
             if (!c || typeof c !== "object") return;
             if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
-            allComments.push(c);
+            var k = _friendCommentKey(c);
+            if (!seen[k]) {
+              seen[k] = !0;
+              allComments.push(c);
+            }
           });
           e.comments = allComments.sort(function (a, b) {
             return (a.ts || 0) - (b.ts || 0);
@@ -3844,12 +3866,13 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!p || !p.id) return;
           var ex = map[p.id];
           if (!ex) { map[p.id] = p; return; }
-          // 评论数多的为准，再把对方独有评论补进来
+          // 评论数多的为准，再把对方独有评论补进来（按稳定 key 去重，只删除完全相同的备份）
           var ac = (ex.comments = ex.comments || []), bc = (p.comments = p.comments || []);
           var seen = {};
-          ac.forEach(function (c) { c && c.ts && (seen[c.ts + "_" + (c.author || "") + "_" + (c.text || "").slice(0, 16)] = 1); });
+          function _postCommentKey(c) { return (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "").slice(0, 30) + "|" + (c.ts || 0); }
+          ac.forEach(function (c) { c && c.ts && (seen[_postCommentKey(c)] = 1); });
           bc.forEach(function (c) {
-            var k = c && c.ts ? c.ts + "_" + (c.author || "") + "_" + (c.text || "").slice(0, 16) : "";
+            var k = c && c.ts ? _postCommentKey(c) : "";
             if (c && k && !seen[k]) { ac.push(c); seen[k] = 1; }
           });
           if ((p.likes || []).length > (ex.likes || []).length) ex.likes = p.likes;
@@ -3952,13 +3975,25 @@ document.addEventListener("DOMContentLoaded", function () {
           t.id ||
             ((t.id = Date.now() + "_" + Math.floor(1e3 * Math.random())),
             (e = !0));
-          // 评论不再去重，避免误删用户数据；只过滤掉非对象项
+          // 评论按稳定 key 去重：只删除完全相同的备份（author+replyTo+text+ts），保留时间不同的合法重复
           if (t.comments && t.comments.length > 0) {
-            var filtered = t.comments.filter(function (c) {
-              return c && typeof c === "object";
+            var seen = {},
+              deduped = [];
+            t.comments.forEach(function (c) {
+              if (!c || typeof c !== "object") {
+                e = !0;
+                return;
+              }
+              var k = (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0);
+              if (!seen[k]) {
+                seen[k] = !0;
+                deduped.push(c);
+              } else {
+                e = !0;
+              }
             });
-            if (filtered.length !== t.comments.length) {
-              t.comments = filtered;
+            if (deduped.length !== t.comments.length) {
+              t.comments = deduped;
               e = !0;
             }
           }
@@ -3999,15 +4034,25 @@ document.addEventListener("DOMContentLoaded", function () {
             n.forEach(function (d) {
               if (d && d.id && map[d.id]) {
                 var old = map[d.id];
-                // 合并评论：不再去重，直接按时间戳拼接后排序，确保一条都不丢
+                // 合并评论：按稳定 key 去重，只删除完全相同的备份，保留时间不同的合法重复
                 var oc = old.comments || [];
                 var nc = d.comments || [];
                 var allComments = oc.slice();
+                var seen = {};
+                oc.forEach(function (c) {
+                  if (!c || typeof c !== "object") return;
+                  var k = (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0);
+                  seen[k] = !0;
+                });
                 nc.forEach(function (c) {
                   if (!c || typeof c !== "object") return;
-                  // 给无 id 评论补 id 便于调试，但不用于去重
+                  // 给无 id 评论补 id 便于调试
                   if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
-                  allComments.push(c);
+                  var k = (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0);
+                  if (!seen[k]) {
+                    seen[k] = !0;
+                    allComments.push(c);
+                  }
                 });
                 d.comments = allComments.sort(function (a, b) {
                   return (a.ts || 0) - (b.ts || 0);
@@ -4342,43 +4387,22 @@ document.addEventListener("DOMContentLoaded", function () {
       if (longest.length > 300000 || __akiniCountMsgRows(longest) > 2000) {
         return longest;
       }
-      // 聊天记录一条都不能丢：仅按完整 outerHTML 去重，保留所有不同消息
-      var allRows = [],
-        seen = new Set();
-      t.forEach(function (src) {
-        var div = document.createElement("div");
-        div.innerHTML = src;
-        Array.from(div.querySelectorAll(".msg-row, .timestamp-row, .system")).forEach(function (row) {
-          var key = row.outerHTML;
-          if (!seen.has(key)) {
-            seen.add(key);
-            allRows.push(row.outerHTML);
-          }
-        });
-      });
-      if (allRows.length === 0) return longest;
-      return allRows.join("");
-    }
-    // 去重已禁用：历史去重导致聊天记录/评论被误删，现在直接透传 HTML
-    function __akiniDeduplicateChatHTML(html) {
-      if (!html || typeof html !== 'string') return html || '';
-      var wrapper = document.createElement('div');
-      wrapper.innerHTML = html;
-      var rows = Array.from(wrapper.children).filter(function (el) {
-        return el.classList && (el.classList.contains('msg-row') || el.classList.contains('system'));
-      });
-      if (rows.length === 0) return html;
-      var seen = {}, kept = [];
-      rows.forEach(function (row) {
-        var key = row.outerHTML;
-        if (!seen[key]) {
-          seen[key] = true;
-          kept.push(row);
+      // 聊天记录一条都不能丢：不再跨来源合并去重，直接选择消息行数最多的完整来源
+      // 用户连续发送的相同内容消息 outerHTML 完全相同，合并去重会误删为一条
+      var best = t[0],
+        bestRows = __akiniCountMsgRows(best);
+      for (var i = 1; i < t.length; i++) {
+        var rows = __akiniCountMsgRows(t[i]);
+        if (rows > bestRows) {
+          best = t[i];
+          bestRows = rows;
         }
-      });
-      wrapper.innerHTML = '';
-      kept.forEach(function (row) { wrapper.appendChild(row); });
-      return wrapper.innerHTML;
+      }
+      return best;
+    }
+    // 聊天 HTML 透传：一条都不能丢，不再去重
+    function __akiniDeduplicateChatHTML(html) {
+      return html || "";
     }
     function et() {
       function t(t) {
@@ -9885,7 +9909,7 @@ document.addEventListener("DOMContentLoaded", function () {
             n.length && t.comments && t.comments.length ? "block" : "none");
         var c = document.getElementById("icityDetailComments");
         if (c) {
-          // 评论不再去重，按时间顺序渲染，避免任何评论被误删
+          // 评论按时间顺序渲染，q/$ 已完成去重，这里只过滤非对象
           var l = (t.comments || []).filter(function (c) {
             return c && typeof c === "object";
           }).sort(function (a, b) {
@@ -12265,14 +12289,15 @@ document.addEventListener("DOMContentLoaded", function () {
               (__row.innerHTML = m),
               U.appendChild(__row),
               (U.scrollTop = U.scrollHeight),
-              S(),
-              window.akiniContacts.updateSession(__chatId, {
-                messagesHTML: U.innerHTML,
-                lastMsg: r,
-                lastTime: Date.now(),
-                lastSenderAvatar: n.avatar,
-                lastSenderName: n.name,
-              }));
+              S());
+            var __fullHTML = (window.akiniContacts.getSession(__chatId).messagesHTML || "") + __row.outerHTML;
+            window.akiniContacts.updateSession(__chatId, {
+              messagesHTML: __fullHTML,
+              lastMsg: r,
+              lastTime: Date.now(),
+              lastSenderAvatar: n.avatar,
+              lastSenderName: n.name,
+            });
           } else {
             var l = window.akiniContacts.getSession(t),
               s =
@@ -13294,12 +13319,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260903 修复评论去重/回复延迟/聊天背景/字卡兜底
+      // 版本迁移：20260904 修复评论去重/回复延迟/聊天背景/字卡兜底
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260903") {
-            localStorage.setItem("akini_app_version", "20260903");
+          if (ver !== "20260904") {
+            localStorage.setItem("akini_app_version", "20260904");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
