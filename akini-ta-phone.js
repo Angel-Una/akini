@@ -10,12 +10,12 @@
 (function () {
   'use strict';
 
-  var CHAT_CHANCE = 0.02;           // 聊天实时收藏概率 2%
-  var MOMENTS_CHANCE = 0.10;        // 朋友圈实时收藏概率 10%
-  var ICITY_CHANCE = 0.10;          // iCity 实时收藏概率 10%（与朋友圈一致）
-  var CHAT_HISTORY_CHANCE = 0.03;   // 历史聊天收藏概率 3%
-  var MOMENTS_HISTORY_CHANCE = 0.05;// 历史朋友圈收藏概率 5%
-  var ICITY_HISTORY_CHANCE = 0.05;  // 历史 iCity 收藏概率 5%
+  var CHAT_CHANCE = 0.01;           // 聊天实时收藏概率 1%（原2%减半）
+  var MOMENTS_CHANCE = 0.05;        // 朋友圈实时收藏概率 5%（原10%减半）
+  var ICITY_CHANCE = 0.05;          // iCity 实时收藏概率 5%（原10%减半）
+  var CHAT_HISTORY_CHANCE = 0.015;  // 历史聊天收藏概率 1.5%（原3%减半）
+  var MOMENTS_HISTORY_CHANCE = 0.025;// 历史朋友圈收藏概率 2.5%（原5%减半）
+  var ICITY_HISTORY_CHANCE = 0.025; // 历史 iCity 收藏概率 2.5%（原5%减半）
 
   // 当前查看的联系人 id
   var currentContactId = null;
@@ -153,10 +153,12 @@
       var posts = (typeof window.__akiniGetPosts === 'function') ? window.__akiniGetPosts() : [];
       if (Array.isArray(posts)) {
         var myName = localStorage.getItem('akini_my_name') || '我';
+        // 历史扫描时，每条内容归属到用户当前选中的联系人（严格模式，不回退到第一个）
+        var _strictCid = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null;
         posts.forEach(function (post) {
           if (!post || !post.text || !post.text.trim()) return;
           if (post.author && post.author !== myName) return;
-          var cid = currentContactId || (contacts[0] && contacts[0].id);
+          var cid = _strictCid || currentContactId;
           if (!cid) return;
           if (post.source === 'icity') {
             if (Math.random() < ICITY_HISTORY_CHANCE) addCollection(cid, 'icity', post.text, post.ts || Date.now());

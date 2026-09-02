@@ -1609,6 +1609,11 @@ document.addEventListener("DOMContentLoaded", function () {
       function x() {
         return localStorage.getItem(a) || (f()[0] || {}).id || null;
       }
+      // 严格模式：仅返回用户真正选中的联系人，不回退到第一个联系人
+      // 用于收藏归属判断，避免未选中联系人时错误归到第一个联系人
+      function xStrict() {
+        return localStorage.getItem(a) || null;
+      }
       function E() {
         var t = i(o, {});
         var e = f();
@@ -1656,6 +1661,7 @@ document.addEventListener("DOMContentLoaded", function () {
         getSession: b,
         updateSession: I,
         getActiveChatId: x,
+        getActiveChatIdStrict: xStrict,
         resetCache: function () {
           // 注意：不清 sessCache，sessions 内存缓存是最新权威数据；
           // 恢复链路通过 _(merged) 更新缓存，清空会导致读回 localStorage 陈旧版本
@@ -1963,18 +1969,15 @@ document.addEventListener("DOMContentLoaded", function () {
             ];
             avatarKeys.forEach(function (k) {
               u++;
-              l(k, function (v) {
-                if (
-                  v &&
-                  "string" == typeof v &&
-                  v.trim() &&
-                  v !== "null" &&
-                  v !== "undefined"
-                ) {
+              // 头像值是原始字符串（data URI 或 emoji），不能 JSON.parse，直接用 _idbStore.get 取原始值
+              _idbStore.get(k, function (v) {
+                if (v && "string" == typeof v && v.trim() && v !== "null" && v !== "undefined") {
                   try {
                     var cur = localStorage.getItem(k) || "";
-                    if (!cur || cur === "null" || cur === "undefined") {
+                    // IDB 为权威主存储：有值时直接覆盖本地（防止本地写满残留旧头像）
+                    if (!cur || cur === "null" || cur === "undefined" || cur !== v) {
                       localStorage.setItem(k, v);
+                      if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(k, v);
                       d = !0;
                     }
                   } catch (e) {}
@@ -2007,8 +2010,11 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (!c.hasOwnProperty(key)) continue;
                     var newVal = c[key];
                     var oldVal = existing[key];
-                    // 头像/名字/备注等字段：IDB 有值且本地为空时补回
-                    if (newVal != null && newVal !== "" && (oldVal == null || oldVal === "")) {
+                    if (newVal == null || newVal === "") continue;
+                    // IDB 为权威主存储：头像/名字字段 IDB 有值时，无论本地是否为空都用 IDB 的值（防止本地写满残留旧值）
+                    if (key === "avatar" || key === "name") {
+                      if (String(oldVal) !== String(newVal)) { existing[key] = newVal; fieldUpdated = !0; }
+                    } else if (oldVal == null || oldVal === "") {
                       existing[key] = newVal;
                       fieldUpdated = !0;
                     }
@@ -7794,7 +7800,7 @@ document.addEventListener("DOMContentLoaded", function () {
           // TA的手机：按概率自动收藏用户发布的朋友圈
           try {
             if (window.akiniTaPhoneCollectMoment) {
-              var _cid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
+              var _cid = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null;
               window.akiniTaPhoneCollectMoment(_cid, e, o.ts);
             }
           } catch (e2) {}
@@ -11358,7 +11364,7 @@ document.addEventListener("DOMContentLoaded", function () {
               });
           (n.push(i),
             j(n),
-            (function(){ try { if (window.akiniTaPhoneCollectIcity) { var _icid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null; window.akiniTaPhoneCollectIcity(_icid, e, i.ts); } } catch (_e) {} })(),
+            (function(){ try { if (window.akiniTaPhoneCollectIcity) { var _icid = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null; window.akiniTaPhoneCollectIcity(_icid, e, i.ts); } } catch (_e) {} })(),
             window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
             // 联系人主动评论用户发布的日记（replyToMyComment 仅回复用户已有评论，发布新日记时无评论故改用主动评论）
             window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),
