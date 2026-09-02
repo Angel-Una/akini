@@ -1,64 +1,29 @@
 /*
  * akini-moments-engine.js
- * syy 风格的朋友圈 / iCity 自动评论 + 自动点赞引擎
- * - 发布动态后延迟随机时间触发：多联系人按概率独立评论 + 80% 概率自动点赞
- * - 评论内容仅取用户字卡库（akini_wordbank_*），无任何兜底句库（syy 逻辑）
- * - 数据写入走 akini-main 的 R()/j()（已优先 IndexedDB，彻底解决数据消失）
+ * 朋友圈 / iCity 自动点赞/评论引擎（对齐 syy 用户定制逻辑）
+ * - 用户发布动态后，按"消息回复延迟"等待，随后所有联系人 100% 点赞 + 100% 评论
+ * - 每个联系人只评论 1 条文字，评论内容仅来自用户字卡库，无兜底句库/表情
+ * - 用户回复某联系人评论后，该联系人再回复 1 条（同样延迟）
+ * - 联系人自己发朋友圈时，有 8% 概率附带用户给 TA 添加的表情包（仅朋友圈贴文，非评论）
  */
 (function () {
   'use strict';
   if (window.__akiniMomentsEngineReady) return;
   window.__akiniMomentsEngineReady = true;
 
-  // 联系人只能使用用户字卡库内容，无任何兜底句库/表情（syy 逻辑）
-
-  function getWordbankReplies() {
-    var out = [];
-    try {
-      var keys = Object.keys(localStorage);
-      keys.forEach(function (k) {
-        if (k.indexOf('akini_wordbank_') === 0) {
-          var raw = localStorage.getItem(k);
-          if (raw) {
-            var arr = JSON.parse(raw);
-            if (Array.isArray(arr)) {
-              arr.forEach(function (item) {
-                var t = typeof item === 'string' ? item : (item && item.text);
-                if (t && String(t).trim()) out.push(String(t).trim());
-              });
-            }
-          }
-        }
-      });
-    } catch (e) {}
-    return out;
-  }
-
-  function getContactStickers() {
-    var out = [];
-    try {
-      var st = JSON.parse(localStorage.getItem('akini_contact_stickers') || '{}');
-      if (st && typeof st === 'object') {
-        Object.keys(st).forEach(function (cid) {
-          var arr = st[cid];
-          if (Array.isArray(arr)) arr.forEach(function (s) { if (s) out.push(s); });
-        });
-      }
-    } catch (e) {}
-    return out;
-  }
+  // ========== 工具函数 ==========
 
   function getContacts() {
     return (window.akiniContacts && window.akiniContacts.getContacts) ? window.akiniContacts.getContacts() : [];
   }
 
-  function getContactAvatar(contact) {
-    if (!contact) return '🐰';
-    if (window.akiniContacts && window.akiniContacts.getContactById) {
-      var p = window.getIcityContactProfile ? window.getIcityContactProfile(contact.id) : null;
-      if (p && p.avatar) return p.avatar;
+  function getContactById(id) {
+    if (!id) return null;
+    var contacts = getContacts();
+    for (var i = 0; i < contacts.length; i++) {
+      if (contacts[i].id === id || String(contacts[i].id) === String(id)) return contacts[i];
     }
-    return contact.avatar || '🐰';
+    return null;
   }
 
   function getContactName(contact) {
@@ -70,20 +35,46 @@
     return contact.name || '对方';
   }
 
-  function getWordbankEmojis() {
+  function getContactAvatar(contact) {
+    if (!contact) return '🐰';
+    if (window.getIcityContactProfile) {
+      var p = window.getIcityContactProfile(contact.id);
+      if (p && p.avatar) return p.avatar;
+    }
+    return contact.avatar || '🐰';
+  }
+
+  // 读取该联系人的专属表情包（akini_stickers_<contactId>）
+  function getContactStickers(contactId) {
+    if (!contactId) return [];
+    try {
+      var raw = localStorage.getItem('akini_stickers_' + contactId);
+      if (raw) {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return arr.filter(function (s) { return s && String(s).trim(); });
+      }
+    } catch (e) {}
+    return [];
+  }
+
+  // 从字卡库取可用文字（排除拍一拍 pat）
+  function getWordbankTexts() {
     var out = [];
     try {
       var keys = Object.keys(localStorage);
       keys.forEach(function (k) {
-        if (k.indexOf('akini_wordbank_') === 0) {
+        if (k.indexOf('akini_wordbank') === 0) {
           var raw = localStorage.getItem(k);
           if (raw) {
             var arr = JSON.parse(raw);
             if (Array.isArray(arr)) {
               arr.forEach(function (item) {
-                var tab = (item && item.tab || '').toLowerCase();
                 var t = typeof item === 'string' ? item : (item && item.text);
-                if (t && String(t).trim() && tab === 'emoji') out.push(String(t).trim());
+                if (!t || !String(t).trim()) return;
+                var tab = ((item && item.tab) || '').toLowerCase();
+                var type = ((item && item.type) || '').toLowerCase();
+                if (tab === 'pat' || type === 'pat') return;
+                out.push(String(t).trim());
               });
             }
           }
@@ -98,43 +89,30 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
-  function getReplyDelay() {
+  // 使用与聊天回复相同的消息回复延迟
+  function getMessageReplyDelay() {
     var min = parseFloat(localStorage.getItem('akini_num_replyDelayMin') || '2');
     var max = parseFloat(localStorage.getItem('akini_num_replyDelayMax') || '5');
-    if (isNaN(min)) min = 2;
+    if (isNaN(min) || min < 0) min = 2;
     if (isNaN(max) || max < min) max = min;
     return Math.floor(1000 * (min + Math.random() * Math.max(0, max - min)));
   }
 
-  function buildReplyText(replies, kaomoji) {
-    // 仅使用字卡库内容，无兜底
-    var useKaomoji = (!replies.length) || (kaomoji.length > 0 && Math.random() < 0.3);
-    var text = '';
-    if (useKaomoji && kaomoji.length) {
-      text = pickRandom(kaomoji);
-    } else if (replies.length) {
-      text = pickRandom(replies);
+  // ========== 数据读写 ==========
+
+  function getData(app) {
+    if (app === 'icity') {
+      return window.__akiniGetIcity ? window.__akiniGetIcity() : [];
     }
-    if (!text) return '';
-    // 25% 概率混入颜文字
-    if (!useKaomoji && kaomoji.length > 0 && Math.random() < 0.25) {
-      var k = pickRandom(kaomoji);
-      text = Math.random() < 0.5 ? (k + ' ' + text) : (text + ' ' + k);
-    }
-    return text;
+    return window.__akiniGetPosts ? window.__akiniGetPosts() : [];
   }
 
-  function notify(app, name, avatar, msg) {
+  function saveData(app, data) {
     try {
-      if (window.showInAppNotif) {
-        window.showInAppNotif({
-          app: app === 'icity' ? 'icity' : '朋友圈',
-          avatar: avatar,
-          name: name,
-          fullContent: true,
-          msg: msg,
-          onTap: function () {}
-        });
+      if (app === 'icity') {
+        if (window.__akiniSaveIcity) window.__akiniSaveIcity(data);
+      } else {
+        if (window.__akiniSavePosts) window.__akiniSavePosts(data);
       }
     } catch (e) {}
   }
@@ -153,135 +131,165 @@
     } catch (e) {}
   }
 
-  /**
-   * syy 风格自动回复：多联系人按概率独立评论 + 自动点赞
-   * @param {string} momentId 动态 id
-   * @param {string} app 'friends' | 'icity'
-   */
-  function triggerAutoReply(momentId, app) {
-    var contacts = getContacts();
-    if (!contacts.length) return;
-
-    var replies = getWordbankReplies();
-    var kaomoji = getWordbankEmojis();
-    var stickers = getContactStickers();
-    var hasContent = replies.length > 0 || kaomoji.length > 0;
-
-    // 回复数量：默认 1~3 条随机
-    var replyCount = Math.random() < 0.7 ? 1 : (Math.random() < 0.9 ? 2 : 3);
-
-    // 打乱联系人顺序，每个联系人 60% 概率回复
-    var shuffled = contacts.slice().sort(function () { return Math.random() - 0.5; });
-    var repliers = [];
-    shuffled.forEach(function (c) {
-      if (Math.random() < 0.6) {
-        repliers.push(c);
-      }
-    });
-    // 保证至少一个回复者
-    if (!repliers.length) repliers.push(contacts[0]);
-
-    // 分配回复数量
-    var remaining = replyCount;
-    var plan = [];
-    for (var i = 0; i < repliers.length && remaining > 0; i++) {
-      var cnt = (i === repliers.length - 1) ? remaining : (Math.random() < 0.5 ? 1 : Math.min(2, remaining));
-      plan.push({ contact: repliers[i], count: cnt });
-      remaining -= cnt;
+  function findMoment(data, momentId) {
+    if (!data || !data.length) return null;
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i].id) === String(momentId)) return data[i];
     }
+    return null;
+  }
 
-    // 读取动态数据
-    var data, saveFn;
-    if (app === 'icity') {
-      data = window.__akiniGetIcity ? window.__akiniGetIcity() : [];
-      saveFn = window.__akiniSaveIcity || function (d) { if (window.__akiniSaveIcity) window.__akiniSaveIcity(d); };
-    } else {
-      data = window.__akiniGetPosts ? window.__akiniGetPosts() : [];
-      saveFn = window.__akiniSavePosts || function (d) { if (window.__akiniSavePosts) window.__akiniSavePosts(d); };
-    }
-    if (!data || !data.length) return;
-
-    var moment = null;
-    for (var j = 0; j < data.length; j++) {
-      if (String(data[j].id) === String(momentId)) { moment = data[j]; break; }
-    }
-    if (!moment) return;
-
-    var myName = localStorage.getItem('akini_my_name') || '我';
-
-    // 执行评论
-    plan.forEach(function (p) {
-      var name = getContactName(p.contact);
-      var avatar = getContactAvatar(p.contact);
-      for (var k = 0; k < p.count; k++) {
-        // 20% 概率发表情包（有表情包时）
-        var sendSticker = stickers.length > 0 && Math.random() < 0.2;
-        if (sendSticker) {
-          moment.comments = moment.comments || [];
-          moment.comments.push({
-            author: name,
-            authorId: p.contact.id,
-            text: '',
-            sticker: pickRandom(stickers),
-            replyTo: null,
-            ts: Date.now()
-          });
-          notify(app, name, avatar, '[表情包]');
-          continue;
-        }
-        var text = buildReplyText(replies, kaomoji);
-        // 无字卡库内容时不评论（无兜底，syy 逻辑）
-        if (!text) continue;
-        moment.comments = moment.comments || [];
-        moment.comments.push({
-          author: name,
-          authorId: p.contact.id,
-          text: text,
-          replyTo: null,
-          ts: Date.now()
+  function notify(app, name, avatar, msg) {
+    try {
+      if (window.showInAppNotif) {
+        window.showInAppNotif({
+          app: app === 'icity' ? 'icity' : '朋友圈',
+          avatar: avatar,
+          name: name,
+          fullContent: true,
+          msg: msg,
+          onTap: function () {}
         });
-        notify(app, name, avatar, '评论了你的动态：' + text.slice(0, 20));
       }
-    });
+    } catch (e) {}
+  }
 
-    // 自动点赞：80% 概率，每个联系人 50% 概率独立点赞
-    var didLike = false;
-    if (Math.random() < 0.8) {
-      contacts.forEach(function (c) {
-        if (Math.random() < 0.5) {
-          if (app === 'icity') {
-            moment.likers = moment.likers || [];
-            var ln = getContactName(c);
-            if (moment.likers.indexOf(ln) < 0) {
-              moment.likers.push(ln);
-              moment.likes = (moment.likes || 0) + 1;
-              didLike = true;
-            }
-          } else {
-            moment.likes = moment.likes || [];
-            var fn = getContactName(c);
-            if (moment.likes.indexOf(fn) < 0) {
-              moment.likes.push(fn);
-              didLike = true;
-            }
-          }
-        }
-      });
-    }
+  // ========== 点赞/评论核心 ==========
 
-    // 保存并渲染
-    try { saveFn(data); } catch (e) {}
-    render(app);
-
-    if (didLike && plan.length) {
-      var last = plan[plan.length - 1].contact;
-      notify(app, getContactName(last), getContactAvatar(last), '点赞了你的动态');
+  function likeMoment(moment, contact, app) {
+    var name = getContactName(contact);
+    if (app === 'icity') {
+      moment.likers = moment.likers || [];
+      if (moment.likers.indexOf(name) < 0) {
+        moment.likers.push(name);
+        moment.likes = (moment.likes || 0) + 1;
+      }
+    } else {
+      moment.likes = moment.likes || [];
+      if (moment.likes.indexOf(name) < 0) {
+        moment.likes.push(name);
+      }
     }
   }
 
-  // 暴露
-  window.akiniTriggerMomentAutoReply = triggerAutoReply;
-  window.akiniGetMomentReplyDelay = getReplyDelay;
+  function commentMoment(moment, contact, replyTo, app) {
+    var texts = getWordbankTexts();
+    if (!texts.length) return false;
+    var text = pickRandom(texts);
+    if (!text) return false;
 
-  console.log('[akini-moments-engine] syy 风格自动评论/点赞引擎已加载');
+    var name = getContactName(contact);
+    var avatar = getContactAvatar(contact);
+    var comment = {
+      author: name,
+      authorId: contact.id,
+      text: text,
+      ts: Date.now()
+    };
+    if (replyTo) comment.replyTo = replyTo;
+    if (app === 'icity') comment.avatar = avatar;
+
+    moment.comments = moment.comments || [];
+    moment.comments.push(comment);
+    return true;
+  }
+
+  // ========== 初始点赞/评论 ==========
+
+  function doInitialReply(momentId, app) {
+    var data = getData(app);
+    var moment = findMoment(data, momentId);
+    if (!moment) return;
+
+    var contacts = getContacts();
+    if (!contacts.length) return;
+
+    var myName = localStorage.getItem('akini_my_name') || '我';
+    var didAnything = false;
+
+    contacts.forEach(function (contact) {
+      likeMoment(moment, contact, app);
+      didAnything = true;
+    });
+
+    // 每个联系人评论一条文字（无表情包）
+    contacts.forEach(function (contact) {
+      if (commentMoment(moment, contact, null, app)) {
+        didAnything = true;
+        notify(app, getContactName(contact), getContactAvatar(contact), '评论了你的动态：' + moment.comments[moment.comments.length - 1].text.slice(0, 20));
+      }
+    });
+
+    if (didAnything) {
+      saveData(app, data);
+      render(app);
+    }
+  }
+
+  // ========== 用户回复后再回复 ==========
+
+  function doReplyToUser(momentId, contactId, replyToName, app) {
+    var data = getData(app);
+    var moment = findMoment(data, momentId);
+    if (!moment) return;
+
+    var contact = getContactById(contactId);
+    if (!contact) return;
+
+    if (commentMoment(moment, contact, replyToName, app)) {
+      saveData(app, data);
+      render(app);
+      var text = moment.comments[moment.comments.length - 1].text;
+      notify(app, getContactName(contact), getContactAvatar(contact), '回复了你的评论：' + text.slice(0, 20));
+    }
+  }
+
+  // ========== 联系人自己发朋友圈时，8% 概率带表情包 ==========
+
+  function maybeAttachSticker(contactId) {
+    var stickers = getContactStickers(contactId);
+    if (!stickers.length) return null;
+    if (Math.random() >= 0.08) return null;
+    return pickRandom(stickers);
+  }
+
+  // ========== 暴露接口 ==========
+
+  window.akiniTriggerMomentAutoReply = function (momentId, app) {
+    var delay = getMessageReplyDelay();
+    setTimeout(function () {
+      doInitialReply(momentId, app);
+    }, delay);
+  };
+
+  // 用户回复了某条联系人评论后调用
+  // momentId: 动态 id
+  // contactIdOrName: 被回复的联系人 id 或名字
+  // app: 'friends' | 'icity'
+  window.akiniOnMomentUserReply = function (momentId, contactIdOrName, app) {
+    if (!momentId || !contactIdOrName) return;
+    var contact = getContactById(contactIdOrName);
+    if (!contact) {
+      // 尝试按名字查找
+      var contacts = getContacts();
+      for (var i = 0; i < contacts.length; i++) {
+        if (getContactName(contacts[i]) === contactIdOrName) {
+          contact = contacts[i];
+          break;
+        }
+      }
+    }
+    if (!contact) return;
+
+    var myName = localStorage.getItem('akini_my_name') || '我';
+    var delay = getMessageReplyDelay();
+    setTimeout(function () {
+      doReplyToUser(momentId, contact.id, myName, app);
+    }, delay);
+  };
+
+  window.akiniMomentMaybeAttachSticker = maybeAttachSticker;
+  window.akiniMomentEngineActive = true;
+
+  console.log('[akini-moments-engine] 朋友圈/iCity 点赞/评论引擎已加载（100% 全联系人，仅文字评论，延迟=消息回复延迟）');
 })();

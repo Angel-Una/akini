@@ -645,8 +645,12 @@ document.addEventListener("DOMContentLoaded", function () {
                   k.indexOf("akini_localstorage_snapshot") !== 0 &&
                   !isEmpty(v)
                 ) {
+                  // 把 IDB 权威数据同步到内存缓存，避免 localStorage 满后读不到最新数据
+                  if (window.akiniStore && window.akiniStore.memorySet) {
+                    window.akiniStore.memorySet(k, v);
+                  }
                   var cur = localStorage.getItem(k);
-                  // 绝不覆盖本地已有数据：只在本地为空/占位时才用 IDB 回填（milk 思路：IDB 是兜底，不是权威覆盖）
+                  // 只在本地为空/占位时才用 IDB 回填；已有数据不覆盖，防止旧数据覆盖新数据
                   if (isEmpty(cur)) {
                     try { localStorage.setItem(k, v); } catch (x) {}
                   }
@@ -1061,10 +1065,17 @@ document.addEventListener("DOMContentLoaded", function () {
       const e = t[Math.floor(Math.random() * t.length)];
       return (e.text || e.content || "").trim() || "";
     }
+    // 同步读取：先读内存缓存（IDB 预加载/写入同步），再读 localStorage
     function i(t, e) {
       try {
+        if (window.akiniStore && window.akiniStore.memoryGet) {
+          var cached = window.akiniStore.memoryGet(t);
+          if (cached !== null) return JSON.parse(cached);
+        }
+      } catch (n) {}
+      try {
         var n = localStorage.getItem(t);
-        return n ? JSON.parse(n) : e;
+        return n !== null ? JSON.parse(n) : e;
       } catch (n) {
         return (console.warn("localStorage JSON解析失败:", t, n), e);
       }
@@ -1598,10 +1609,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       window.pickWordCards = function (count) {
         count = Math.max(1, parseInt(count) || 1);
-        var wb = [];
-        try {
-          wb = JSON.parse(localStorage.getItem("akini_wordbank") || "[]");
-        } catch (e) {}
+        var wb = i("akini_wordbank", []);
         if (!wb.length) return "";
         var valid = wb.filter(function (t) {
           var e = (t.tab || "").toLowerCase(),
@@ -3094,7 +3102,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (Math.random() >= 0.2) return text;
         var emojis = [];
         try {
-          var wb = JSON.parse(localStorage.getItem("akini_wordbank") || "[]");
+          var wb = i("akini_wordbank", []);
           emojis = wb
             .filter(function (it) {
               var tab = (it.tab || "").toLowerCase();
@@ -3831,9 +3839,8 @@ document.addEventListener("DOMContentLoaded", function () {
             _applyPosts(parsed);
           }
         });
-        // 同步先返回 localStorage 兜底，避免渲染空
-        var lsNow = localStorage.getItem("akini_posts");
-        try { z = lsNow ? JSON.parse(lsNow) : []; } catch (e) { z = []; }
+        // 同步先返回内存/LocalStorage 兜底，避免渲染空
+        z = i("akini_posts", []);
       }
       z || (z = []);
       var e = !1;
@@ -4066,14 +4073,8 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           });
         }
-        var t =
-          localStorage.getItem("akini_icity_diaries") ||
-          localStorage.getItem("akini_icity_diaries_backup");
-        try {
-          F = t ? JSON.parse(t) : [];
-        } catch (t) {
-          F = [];
-        }
+        // 同步先返回内存/LocalStorage 兜底
+        F = i("akini_icity_diaries", []);
       }
       try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] q() READ diaries:', _dbg); } catch(x){}
       var e = !1;
@@ -4696,22 +4697,10 @@ document.addEventListener("DOMContentLoaded", function () {
               "akini_chat_sessions",
               window.akiniContacts.getSessions(),
             ));
-          var i = null;
-          try {
-            i = JSON.parse(localStorage.getItem("akini_wordbank") || "[]");
-          } catch (t) {
-            i = [];
-          }
-          window.akiniContacts.backupToIDB("akini_wordbank", i);
-          var a = null;
-          try {
-            a = JSON.parse(
-              localStorage.getItem("akini_wb_groups_main") || "[]",
-            );
-          } catch (t) {
-            a = [];
-          }
-          window.akiniContacts.backupToIDB("akini_wb_groups", a);
+          var _wb = i("akini_wordbank", []);
+          window.akiniContacts.backupToIDB("akini_wordbank", _wb);
+          var _wbg = i("akini_wb_groups_main", []);
+          window.akiniContacts.backupToIDB("akini_wb_groups", _wbg);
         }
       }, 10000));
     function flushAllData() {
@@ -7241,22 +7230,12 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
               R(r);
             } catch (_e) {}
-            if (
-              !(c.comments || []).some(function (t) {
-                return t.author === o && !t.repliedByMe;
-              })
-            ) {
-              var t = Dn(1);
-              t &&
-                ((window._pendingFriendsReplies =
-                  window._pendingFriendsReplies || []),
-                window._pendingFriendsReplies.push({
-                  ts: c.ts,
-                  text: t,
-                  replyTo: a,
-                  type: "reply",
-                }));
-            }
+            // 通知朋友圈引擎：用户回复了某联系人，该联系人将再回复一条
+            try {
+              if (window.akiniOnMomentUserReply) {
+                window.akiniOnMomentUserReply(c.ts, l.author, "friends");
+              }
+            } catch (_e2) {}
           } else if (_commentPidx !== null) {
             var e = r[_commentPidx];
             if (!e) return closeCommentModal();
@@ -7270,22 +7249,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 window._idbStore.set("akini_posts_backup", _pc);
               }
             } catch (e) {}
-            if (
-              !(e.comments || []).some(function (t) {
-                return t.author === o && !t.repliedByMe;
-              })
-            ) {
-              var t = Dn(1);
-              t &&
-                ((window._pendingFriendsReplies =
-                  window._pendingFriendsReplies || []),
-                window._pendingFriendsReplies.push({
-                  ts: e.ts,
-                  text: t,
-                  replyTo: a,
-                  type: "reply",
-                }));
-            }
+            // 用户直接评论自己朋友圈（非回复联系人）不触发联系人再回复
           }
           (R(r),
             window._renderPosts && window._renderPosts(),
@@ -10345,11 +10309,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     n("icityTaProfileDiaries", "ta"),
                     o(a[r]));
                   var s = localStorage.getItem("akini_icity_ta_nick") || "对方";
-                  (l.replyTo === s &&
-                    (delete _taPending["cmt_" + e._currentDiaryId],
-                    delete _taPending["reply_" + e._currentDiaryId]),
-                    window.scheduleTaReplySoon &&
-                      window.scheduleTaReplySoon(e._currentDiaryId));
+                  if (l.replyTo === s) {
+                    delete _taPending["cmt_" + e._currentDiaryId];
+                    delete _taPending["reply_" + e._currentDiaryId];
+                    // 用户回复了 TA 的 iCity 日记，通知引擎让该联系人再回复一条
+                    window.akiniOnMomentUserReply &&
+                      window.akiniOnMomentUserReply(e._currentDiaryId, s, "icity");
+                  }
                 }
               }
             }
@@ -12790,26 +12756,14 @@ document.addEventListener("DOMContentLoaded", function () {
             ? null
             : t[Math.floor(Math.random() * t.length)];
         }
+        // 联系人发朋友圈/iCity/信件的内容只能从用户字卡库取，绝无兜底内容
         function c(t) {
           var e = i("akini_wordbank", []).filter(function (t) {
             var e = (t.tab || "").toLowerCase(),
               n = (t.type || "").toLowerCase();
             return "pat" !== e && "pat" !== n;
           });
-          if (0 === e.length) {
-            /* 字卡库为空时使用默认内容，保证联系人仍能发朋友圈/iCity/信件 */
-            var def = [
-              "今天天气真好，心情不错~",
-              "刚看完一部超好看的电影！",
-              "周末去了一家很棒的咖啡馆",
-              "最近在学做饭，感觉还不错",
-              "今天工作好忙啊，终于结束了",
-              "晚安，做个好梦🌙",
-              "刚跑完步，感觉整个人都轻松了",
-              "今天的晚霞太美了！",
-            ];
-            return def[Math.floor(Math.random() * def.length)];
-          }
+          if (0 === e.length) return "";
           var n = e.slice().sort(function () {
               return Math.random() - 0.5;
             }),
@@ -12820,7 +12774,7 @@ document.addEventListener("DOMContentLoaded", function () {
               return t.text || t.content || "";
             })
             .filter(Boolean)
-            .join(" ");
+            .join("\n");
         }
         (document.addEventListener("visibilitychange", function () {}),
           (window.showInAppNotif = function (i) {
@@ -13058,17 +13012,13 @@ document.addEventListener("DOMContentLoaded", function () {
                   likes: [],
                   comments: [],
                 };
+                // 联系人发朋友圈时，8% 概率附带用户给该联系人添加的表情包
                 if (Math.random() < 0.08) {
-                  var stickers = [];
-                  try {
-                    var st = JSON.parse(
-                      localStorage.getItem("akini_contact_stickers") || "{}",
-                    );
-                    if (st && st[e.id]) stickers = st[e.id];
-                  } catch (err) {}
+                  var stickers = window.getContactStickersSync
+                    ? window.getContactStickersSync(e.id)
+                    : [];
                   if (stickers.length > 0) {
-                    post.img =
-                      stickers[Math.floor(Math.random() * stickers.length)];
+                    post.img = stickers[Math.floor(Math.random() * stickers.length)];
                   }
                   // 无表情包则不带图，绝不私自添加任何图片
                 }
@@ -13202,43 +13152,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 return;
               }
 
-              // 1. 用户自己的动态：联系人在消息回复延迟后点赞/评论
-              const userPosts = l.filter(function (t) {
-                if (t.author && (t.author === n || t.authorId === myId)) return !1;
-                var postTs = t.ts || 0;
-                var age = now - postTs;
-                return age >= replyDelayMs && age <= replyDelayMs + 60 * 1e3;
-              });
-              var likeCandidates = userPosts.filter(function (t) {
-                return (t.likes || []).indexOf(n) < 0;
-              });
-              var replyOnUserPosts = userPosts.filter(function (t) {
-                var userComments = (t.comments || []).filter(function (c) {
-                  return c.author === a;
-                });
-                if (userComments.length === 0) return !1;
-                var lastContactComment = (t.comments || [])
-                  .slice()
-                  .reverse()
-                  .find(function (c) {
-                    return c.author === n;
-                  });
-                if (!lastContactComment) return !0;
-                var lastContactIdx = (t.comments || []).indexOf(lastContactComment);
-                return (t.comments || []).some(function (c, idx) {
-                  return c.author === a && idx > lastContactIdx;
-                });
-              });
-              var initCommentOnUserPosts = userPosts.filter(function (t) {
-                var userComments = (t.comments || []).filter(function (c) {
-                  return c.author === a;
-                });
-                if (userComments.length > 0) return !1;
-                var contactComments = (t.comments || []).filter(function (c) {
-                  return c.author === n;
-                });
-                return contactComments.length === 0;
-              });
+              // 用户自己的动态由 akini-moments-engine.js 统一处理（100% 全联系人点赞/评论）
+              // 此处只保留联系人自己的动态回复逻辑
+              const userPosts = [];
+              var likeCandidates = [],
+                replyOnUserPosts = [],
+                initCommentOnUserPosts = [];
 
               // 2. 联系人自己的动态：用户评论后，联系人在消息回复延迟后回复；用户未评论则绝对不主动评论
               const contactPosts = l.filter(function (t) {
@@ -13266,59 +13185,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
               });
 
-              // 点赞
-              if (likeCandidates.length > 0) {
-                var likePost =
-                    likeCandidates[Math.floor(Math.random() * likeCandidates.length)],
-                  likeIdx = l.indexOf(likePost);
-                if (likeIdx >= 0) {
-                  l[likeIdx].likes = l[likeIdx].likes || [];
-                  Array.isArray(l[likeIdx].likes) || (l[likeIdx].likes = []);
-                  l[likeIdx].likes.push(n);
-                  s = !0;
-                  window.showInAppNotif({
-                    app: "朋友圈",
-                    avatar: i,
-                    name: n,
-                    fullContent: !0,
-                    msg: "点赞了你的动态",
-                    onTap: function () {
-                      o("friends");
-                    },
-                  });
-                }
-              }
-
-              // 评论用户动态
-              var allCommentCandidates = replyOnUserPosts.length > 0 ? replyOnUserPosts : initCommentOnUserPosts,
-                isUserReply = replyOnUserPosts.length > 0;
-              if (allCommentCandidates.length > 0) {
-                var y = c(1);
-                if (y) {
-                  var p = allCommentCandidates[Math.floor(Math.random() * allCommentCandidates.length)],
-                    v = l.indexOf(p);
-                  if (v >= 0) {
-                    l[v].comments = l[v].comments || [];
-                    l[v].comments.push({
-                      author: n,
-                      text: y,
-                      replyTo: isUserReply ? a : null,
-                      ts: Date.now(),
-                    });
-                    s = !0;
-                    window.showInAppNotif({
-                      app: "朋友圈",
-                      avatar: i,
-                      name: n,
-                      fullContent: !0,
-                      msg: isUserReply ? "回复了你的评论：" + y : "评论了你的动态：" + y,
-                      onTap: function () {
-                        o("friends");
-                      },
-                    });
-                  }
-                }
-              }
+              // 点赞用户动态已由朋友圈引擎处理，此处跳过
+              // 评论用户动态已由朋友圈引擎处理，此处跳过
 
               // 回复用户在自己动态下的评论（必须由用户触发，不能自己继续）
               if (replyOnContactPosts.length > 0) {
@@ -14448,32 +14316,10 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
       }),
-        (window.scheduleTaReplySoon = function (n) {
-          var i = "reply_" + n;
-          t[i] ||
-            ((t[i] = !0),
-            setTimeout(
-              function () {
-                window.replyToMyComment(n);
-              },
-              getReplyDelayMs(),
-            ));
-        }),
-        (window.scheduleTaLikeSoon = function (n) {
-          var i = "likeSoon_" + n;
-          t[i] ||
-            ((t[i] = !0),
-            setTimeout(
-              function () {
-                c(n);
-              },
-              getReplyDelayMs(),
-            ));
-        }),
-        // 联系人主动评论用户发布的日记
-        (window.scheduleTaCommentSoon = function (n) {
-          l(n);
-        }),
+        // iCity 点赞/评论/回复统一由 akini-moments-engine.js 处理（100% 全联系人）
+        (window.scheduleTaReplySoon = function (n) {}),
+        (window.scheduleTaLikeSoon = function (n) {}),
+        (window.scheduleTaCommentSoon = function (n) {}),
         function n() {
           /* 已禁用自动点赞/评论调度 */
         });

@@ -40,6 +40,7 @@
     'akini_chat_pins_backup'
   ];
   var CHAT_HISTORY_RE = /^akini_chat_history_/;
+  var WB_GROUPS_RE = /^akini_wb_groups_/;
 
   function getIDB() { return window._idbStore; }
 
@@ -47,6 +48,7 @@
     if (!k) return false;
     if (CRITICAL_KEYS.indexOf(k) >= 0) return true;
     if (CHAT_HISTORY_RE.test(k)) return true;
+    if (WB_GROUPS_RE.test(k)) return true;
     return false;
   }
 
@@ -69,6 +71,21 @@
 
   function lsRemove(k) {
     try { localStorage.removeItem(k); } catch (e) { return false; }
+  }
+
+  // 内存缓存：作为 IDB 与 localStorage 之上的同步读取层，避免 localStorage 写满后读不到最新数据
+  var memoryCache = {};
+
+  function memGet(k) {
+    return memoryCache.hasOwnProperty(k) ? memoryCache[k] : null;
+  }
+
+  function memSet(k, v) {
+    memoryCache[k] = v;
+  }
+
+  function memRemove(k) {
+    delete memoryCache[k];
   }
 
   function idbGet(k, cb) {
@@ -117,12 +134,16 @@
     });
   }
 
+  // 同步读取：优先内存缓存（IDB 权威数据会预加载到这里），再读 localStorage
   function akiniGetSync(k) {
+    var mem = memGet(k);
+    if (mem !== null) return mem;
     return lsGet(k);
   }
 
   function akiniSet(k, v, cb) {
     if (typeof v !== 'string') v = String(v);
+    memSet(k, v);
     if (!isCriticalKey(k)) {
       var ok = lsSet(k, v);
       if (cb) cb(ok);
@@ -139,6 +160,7 @@
   }
 
   function akiniRemove(k, cb) {
+    memRemove(k);
     lsRemove(k);
     lsRemove(k + '_backup');
     idbRemove(k, cb);
@@ -157,6 +179,7 @@
   function restoreOneKey(k) {
     akiniGet(k, function (v) {
       if (v == null) return;
+      memSet(k, v);
       var ls = lsGet(k);
       if (v.length > (ls ? ls.length : 0)) {
         try { localStorage.setItem(k, v); } catch (e) {}
@@ -197,7 +220,10 @@
     setJson: akiniSetJson,
     isCritical: isCriticalKey,
     restoreCriticalFromIdb: restoreCriticalFromIdb,
-    restoreChatHistoryFromIdb: restoreChatHistoryFromIdb
+    restoreChatHistoryFromIdb: restoreChatHistoryFromIdb,
+    memoryGet: memGet,
+    memorySet: memSet,
+    memoryRemove: memRemove
   };
 
   // 监听 _idbStore 出现后立即恢复一次关键数据
@@ -250,6 +276,7 @@
     return out;
   })() : [];
   var CHAT_HISTORY_RE = /^akini_chat_history_/;
+  var WB_GROUPS_RE2 = /^akini_wb_groups_/;
   var pendingWrites = [];
   var pendingTimer = null;
 
@@ -257,6 +284,7 @@
     if (!k) return false;
     if (CRITICAL_KEYS.indexOf(k) >= 0) return true;
     if (CHAT_HISTORY_RE.test(k)) return true;
+    if (WB_GROUPS_RE2.test(k)) return true;
     return false;
   }
 
@@ -302,6 +330,8 @@
   var origRemoveItem = localStorage.removeItem;
 
   localStorage.setItem = function (k, v) {
+    // 关键 key 同步到内存缓存，确保即使 localStorage 写满也能读到最新值
+    if (isCritical(k)) memSet(k, String(v));
     // 先执行原 localStorage 写入（保持同步语义）
     try { origSetItem.call(localStorage, k, v); } catch (e) {}
     if (isCritical(k)) {
@@ -321,6 +351,7 @@
   localStorage.removeItem = function (k) {
     try { origRemoveItem.call(localStorage, k); } catch (e) {}
     if (isCritical(k)) {
+      memRemove(k);
       var IDB = window._idbStore;
       if (IDB && IDB.remove) {
         try { IDB.remove(k); IDB.remove(k + '_backup'); } catch (e) {}
