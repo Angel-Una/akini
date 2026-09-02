@@ -5236,22 +5236,3 @@ button.back-btn[type="button"] {
   border-color: #4f7cff;
 }
 
-/* 小卡片图片呼吸式动态 */
-@keyframes akini-breathe {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.045); }
-}
-.top-card .cover-img img,
-.top-card .dual-avatar-wrap .avatar-left img,
-.top-card .dual-avatar-wrap .avatar-right img,
-.music-player-disc img,
-.shop-card-icon img,
-.shop-card-bubble .shop-card-bubble-img img,
-.preview-avatar img,
-.icity-diary-avatar img,
-.contact-avatar img,
-.call-avatar-stack img,
-.call-mini-avatar img {
-  animation: akini-breathe 3.2s ease-in-out infinite;
-  transform-origin: center center;
-}

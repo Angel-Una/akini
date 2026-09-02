@@ -3828,7 +3828,7 @@ document.addEventListener("DOMContentLoaded", function () {
         "string" == typeof t &&
         /^akini_chat_history_/.test(t) &&
         e &&
-        e.length > 60000
+        e.length > 50000
       ) {
         try {
           window._idbStore &&
@@ -4445,7 +4445,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window.__akiniSplashProgress = 0;
     window.__akiniSplashDone = !1;
     window.__akiniSplashStartAt = Date.now();
-    window.__akiniSplashMinMs = 2800; // 最少显示 2.8s，避免进度条一闪而过
+    window.__akiniSplashMinMs = 5000; // 固定 5s 引导加载，确保所有数据准备完成
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
@@ -4464,13 +4464,12 @@ document.addEventListener("DOMContentLoaded", function () {
         if (bar) bar.style.width = window.__akiniSplashProgress + "%";
         var st = document.getElementById("akiniSplashStatus");
         if (st) {
-          if (statusText) st.textContent = statusText;
-          else if (window.__akiniSplashProgress >= 100) st.textContent = "已准备好";
-          else st.textContent = "正在进入";
+          if (window.__akiniSplashProgress >= 100) st.textContent = "已准备好";
+          else st.textContent = statusText || "正在进入";
         }
         var btn = document.getElementById("akiniSplashEnterBtn");
         if (btn && window.__akiniSplashProgress >= 100) {
-          btn.style.display = "inline-block";
+          btn.disabled = !1;
           btn.textContent = "进入";
         }
       } catch (e) {}
@@ -4482,8 +4481,8 @@ document.addEventListener("DOMContentLoaded", function () {
         window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
         var el = document.getElementById("akiniSplash");
         if (!el) return;
-        el.style.opacity = "0";
-        setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 420);
+        el.classList.add("hidden");
+        setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 520);
       } catch (e) {}
     };
     // 绑定手动进入按钮：加载完成前不隐藏，点击后才进入主界面
@@ -4513,9 +4512,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if ("function" == typeof window._renderIcity) window._renderIcity();
         if ("function" == typeof window.updatePreview) window.updatePreview();
         // 开屏动画：关键数据与界面渲染完成后，给头像/聊天记录等异步恢复预留时间，再显示「进入」
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(92, "正在加载头像与聊天记录");
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(92);
         setTimeout(function () {
-          window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100, "已准备好");
+          window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
         }, 900);
         // 不自动调用 __akiniHideSplash，等待用户点击 #akiniSplashEnterBtn
       }, 300);
@@ -4791,10 +4790,10 @@ document.addEventListener("DOMContentLoaded", function () {
           console.warn("[Akini] restore timeout, force opening data gate");
           __akiniBootApp();
         }
-      }, 6000),
-      window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30, "正在连接存储"),
+      }, 5000),
+      window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30),
       window._idbStore.restoreAll(function () {
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(68, "正在恢复联系人");
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(68);
         window.akiniContacts && window.akiniContacts.tryRestoreFromBackup
           ? window.akiniContacts.tryRestoreFromBackup(__akiniBootApp)
           : __akiniBootApp();
