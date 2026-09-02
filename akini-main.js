@@ -2543,6 +2543,8 @@ document.addEventListener("DOMContentLoaded", function () {
         S(),
         V(),
         (K.value = ""));
+      // TA的手机：按概率自动收藏用户发送的聊天消息
+      try { if (window.akiniTaPhoneCollectChat && r) window.akiniTaPhoneCollectChat(r, t, Date.now()); } catch (e) {}
       const __bh = _();
       if ("none" === __bh.type) return;
       const l = document.getElementById("typingIndicator");
@@ -7514,6 +7516,13 @@ document.addEventListener("DOMContentLoaded", function () {
             R(i),
             n && ((n.style.display = "none"), n.classList.remove("show")),
             t());
+          // TA的手机：按概率自动收藏用户发布的朋友圈
+          try {
+            if (window.akiniTaPhoneCollectMoment) {
+              var _cid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
+              window.akiniTaPhoneCollectMoment(_cid, e, o.ts);
+            }
+          } catch (e2) {}
         }));
       const u = document.getElementById("friendsHeader");
       (D("akini_friends_bg", function (t) {
@@ -7525,6 +7534,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
         t(),
         (window._renderPosts = t),
+        (window.__akiniGetPosts = O),
         (function () {
           var e = document.createElement("div");
           ((e.id = "postDeleteConfirm"),
@@ -11048,6 +11058,7 @@ document.addEventListener("DOMContentLoaded", function () {
               });
           (n.push(i),
             j(n),
+            (function(){ try { if (window.akiniTaPhoneCollectIcity) { var _icid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null; window.akiniTaPhoneCollectIcity(_icid, e, i.ts); } } catch (_e) {} })(),
             window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
             // 联系人主动评论用户发布的日记（replyToMyComment 仅回复用户已有评论，发布新日记时无评论故改用主动评论）
             window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),
@@ -13419,12 +13430,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260908 修复评论去重/回复延迟/聊天背景/字卡兜底
+      // 版本迁移：20260913 修复评论去重/回复延迟/聊天背景/字卡兜底
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260908") {
-            localStorage.setItem("akini_app_version", "20260908");
+          if (ver !== "20260913") {
+            localStorage.setItem("akini_app_version", "20260913");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
