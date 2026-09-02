@@ -1808,11 +1808,31 @@ document.addEventListener("DOMContentLoaded", function () {
                 // 合并基线必须用 k()（内存权威缓存）而不是恢复时读到的 localStorage 陈旧副本 s
                 var baseline = k();
                 var merged = mergeSessions(baseline, t);
-                JSON.stringify(merged) !== JSON.stringify(baseline) &&
-                  (_(merged), (d = !0));
+                // sessions 已分离存储 messagesHTML：逐会话从 IDB 的 akini_chat_history_* 兜底找回聊天记录
+                var pending = 0, done = !1;
+                function finish() {
+                  if (done) return; done = !0;
+                  JSON.stringify(merged) !== JSON.stringify(baseline) && (_(merged), (d = !0));
+                  u--;
+                  f();
+                }
+                var sids = Object.keys(merged);
+                if (!sids.length) { finish(); return; }
+                pending = sids.length;
+                sids.forEach(function (sid) {
+                  if ((merged[sid].messagesHTML || "").trim()) { if (--pending === 0) finish(); return; }
+                  l("akini_chat_history_" + sid, function (v) {
+                    if (v && "string" == typeof v && v.trim()) {
+                      merged[sid].messagesHTML = v;
+                      E[sid] = v;
+                    }
+                    if (--pending === 0) finish();
+                  });
+                });
+              } else {
+                u--;
+                f();
               }
-              u--;
-              f();
             });
           }
           function restoreAvatars() {
@@ -11029,8 +11049,8 @@ document.addEventListener("DOMContentLoaded", function () {
           (n.push(i),
             j(n),
             window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
-            // 联系人不得自己评论，仅点赞；用户评论后才会回复
-            window.scheduleTaReplySoon && window.scheduleTaReplySoon(i.id),
+            // 联系人主动评论用户发布的日记（replyToMyComment 仅回复用户已有评论，发布新日记时无评论故改用主动评论）
+            window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),
             c && (c.value = ""));
           var a = document.getElementById("icityTab1"),
             o = document.getElementById("icityTab2"),
@@ -13399,12 +13419,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260907 修复评论去重/回复延迟/聊天背景/字卡兜底
+      // 版本迁移：20260908 修复评论去重/回复延迟/聊天背景/字卡兜底
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260907") {
-            localStorage.setItem("akini_app_version", "20260907");
+          if (ver !== "20260908") {
+            localStorage.setItem("akini_app_version", "20260908");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
@@ -14357,8 +14377,10 @@ document.addEventListener("DOMContentLoaded", function () {
               getReplyDelayMs(),
             ));
         }),
-        // 联系人不再自己评论，保留空函数避免调用报错
-        (window.scheduleTaCommentSoon = function () {}),
+        // 联系人主动评论用户发布的日记
+        (window.scheduleTaCommentSoon = function (n) {
+          l(n);
+        }),
         function n() {
           /* 已禁用自动点赞/评论调度 */
         });
