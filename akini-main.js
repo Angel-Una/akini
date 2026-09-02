@@ -1433,17 +1433,21 @@ document.addEventListener("DOMContentLoaded", function () {
           if (window._restoringData) return (d = []);
           e = [];
         }
-        // 头像兜底：联系人 avatar 为空时，从 localStorage 的对方/我的头像回填，
+        // 头像兜底：联系人 avatar 为空时，从 localStorage / 内存缓存的对方/我的头像回填，
         // 避免 localStorage 写满或旧版数据导致刷新后头像变默认 emoji
         if (Array.isArray(e) && e.length > 0) {
-          var _taAv =
-            localStorage.getItem("akini_ta_avatar") ||
-            localStorage.getItem("akini_icity_ta_avatar") ||
-            "";
-          var _myAv =
-            localStorage.getItem("akini_my_avatar") ||
-            localStorage.getItem("akini_icity_my_avatar") ||
-            "";
+          function _memOrLs(key1, key2) {
+            var mem = "";
+            try {
+              if (window.akiniStore && window.akiniStore.memoryGet)
+                mem = window.akiniStore.memoryGet(key1) || "";
+              if (!mem && window.akiniStore && window.akiniStore.memoryGet)
+                mem = window.akiniStore.memoryGet(key2) || "";
+            } catch (e) {}
+            return mem || localStorage.getItem(key1) || localStorage.getItem(key2) || "";
+          }
+          var _taAv = _memOrLs("akini_ta_avatar", "akini_icity_ta_avatar");
+          var _myAv = _memOrLs("akini_my_avatar", "akini_icity_my_avatar");
           e.forEach(function (c) {
             if (c && (!c.avatar || !String(c.avatar).trim())) {
               if (c.isDefault) c.avatar = _taAv || "🐰";
@@ -7533,7 +7537,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 window._idbStore.set("akini_posts_backup", _pc);
               }
             } catch (e) {}
-            // 用户评论朋友圈（含自己动态）都触发联系人再回复：优先回复者为动态作者，否则随机联系人
+            // 用户评论朋友圈（含自己动态）都触发联系人再回复：优先回复者为动态作者
             var postAuthor = e.author || o;
             _triggerContactReply(e.id || e.ts, postAuthor);
           }
@@ -8222,8 +8226,19 @@ document.addEventListener("DOMContentLoaded", function () {
         d = document.getElementById("callNameFull"),
         u = document.getElementById("callAvatarStack"),
         m = document.getElementById("callMemberStatus");
-      if ((d && r && (d.innerText = r), m && (m.innerText = ""), u))
-        if (((u.innerHTML = ""), e))
+      if ((d && r && (d.innerText = r), m && (m.innerText = ""), u)) {
+        u.innerHTML = "";
+        if (n.isGroupCall && n.selectedMembers && n.selectedMembers.length)
+          n.selectedMembers.forEach(function (t) {
+            var e = document.createElement("div");
+            ((e.className = "call-avatar"),
+              e.setAttribute("data-call-member-id", t.id || ""),
+              (e.style.cssText =
+                "width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:40px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
+              (e.innerHTML = nt(t.avatar, 80)),
+              u.appendChild(e));
+          });
+        else if (e && i && i.length)
           i.forEach(function (t) {
             var e = document.createElement("div");
             ((e.className = "call-avatar"),
@@ -8233,14 +8248,7 @@ document.addEventListener("DOMContentLoaded", function () {
               (e.innerHTML = nt(t.avatar, 80)),
               u.appendChild(e));
           });
-        else if (n.groupAvatar) {
-          var f = document.createElement("div");
-          ((f.className = "call-avatar"),
-            (f.style.cssText =
-              "width:100px;height:100px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:50px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
-            (f.innerHTML = nt(n.groupAvatar, 100)),
-            u.appendChild(f));
-        } else {
+        else {
           var singleAvatar = document.createElement("div");
           ((singleAvatar.className = "call-avatar"),
             (singleAvatar.style.cssText =
@@ -8248,9 +8256,10 @@ document.addEventListener("DOMContentLoaded", function () {
             (singleAvatar.innerHTML = nt(o, 100)),
             u.appendChild(singleAvatar));
         }
+      }
       (l &&
-        (n.groupAvatar
-          ? (l.innerHTML = nt(n.groupAvatar, 58))
+        (n.isGroupCall && n.selectedMembers && n.selectedMembers[0]
+          ? (l.innerHTML = nt(n.selectedMembers[0].avatar, 58))
           : e && i[0]
             ? (l.innerHTML = nt(i[0].avatar, 58))
             : (l.innerHTML = nt(o, 58))),
@@ -8472,47 +8481,38 @@ document.addEventListener("DOMContentLoaded", function () {
       he && (he.innerText = "通话中");
       const t = document.getElementById("callStatusFull");
       t && (t.innerText = "通话中");
-      if (we.isGroupCall && we.selectedMembers) {
-        var answered = we.selectedMembers.filter(function (m) {
-          return m.answered;
-        });
-        if (answered.length > 0) {
-          const e = document.getElementById("callNameFull"),
-            n = document.getElementById("callAvatarStack");
-          e && (e.innerText = we.groupName || we.callerName || "群聊");
-          if (n) {
-            n.innerHTML = "";
-            answered.forEach(function (m) {
-              var d = document.createElement("div");
-              ((d.className = "call-avatar"),
-                d.setAttribute("data-call-member-id", m.id || ""),
-                (d.style.cssText =
-                  "width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:40px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
-                (d.innerHTML = nt(m.avatar, 80)),
-                n.appendChild(d));
-            });
-            if (we.groupAvatar && answered.length > 1) {
-              var mainDiv = document.createElement("div");
-              ((mainDiv.className = "call-avatar"),
-                (mainDiv.style.cssText =
-                  "width:100px;height:100px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:50px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
-                (mainDiv.innerHTML = nt(we.groupAvatar, 100)),
-                n.insertBefore(mainDiv, n.firstChild));
-            }
-          }
-        } else if (we.activeMember) {
-          const e = document.getElementById("callNameFull"),
-            n = document.getElementById("callAvatarStack");
-          e && (e.innerText = we.activeMember.name || we.callerName || "群聊");
-          if (n) {
-            n.innerHTML = "";
-            var leAvatarDiv = document.createElement("div");
-            ((leAvatarDiv.className = "call-avatar"),
-              (leAvatarDiv.style.cssText =
-                "width:100px;height:100px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:50px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
-              (leAvatarDiv.innerHTML = nt(we.activeMember.avatar, 100)),
-              n.appendChild(leAvatarDiv));
-          }
+      if (we.isGroupCall && we.selectedMembers && we.selectedMembers.length) {
+        const e = document.getElementById("callNameFull"),
+          n = document.getElementById("callAvatarStack");
+        e && (e.innerText = we.groupName || we.callerName || "群聊");
+        if (n) {
+          n.innerHTML = "";
+          we.selectedMembers.forEach(function (m) {
+            var d = document.createElement("div");
+            ((d.className = "call-avatar"),
+              d.setAttribute("data-call-member-id", m.id || ""),
+              (d.style.cssText =
+                "width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:40px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;opacity:" +
+                (m.answered ? 1 : 0.45) +
+                ";filter:grayscale(" +
+                (m.answered ? 0 : 0.5) +
+                ");transition:opacity .3s,filter .3s;"),
+              (d.innerHTML = nt(m.avatar, 80)),
+              n.appendChild(d));
+          });
+        }
+      } else if (we.activeMember) {
+        const e = document.getElementById("callNameFull"),
+          n = document.getElementById("callAvatarStack");
+        e && (e.innerText = we.activeMember.name || we.callerName || "群聊");
+        if (n) {
+          n.innerHTML = "";
+          var leAvatarDiv = document.createElement("div");
+          ((leAvatarDiv.className = "call-avatar"),
+            (leAvatarDiv.style.cssText =
+              "width:100px;height:100px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:50px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
+            (leAvatarDiv.innerHTML = nt(we.activeMember.avatar, 100)),
+            n.appendChild(leAvatarDiv));
         }
       }
       const e = document.getElementById("callAnswerBtnFull");
@@ -10566,6 +10566,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   (e._replyTo && (l.replyTo = e._replyTo),
                     a[r].comments.push(l),
                     j(a),
+                    setTimeout(function () { if (window._icitySafetyMerge) window._icitySafetyMerge(); }, 800),
                     (u.value = ""),
                     (e._replyTo = ""),
                     (u.placeholder = "我要评论"),

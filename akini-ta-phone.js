@@ -53,6 +53,15 @@
     return null;
   }
 
+  // 随机选择一个“创建的联系人”（排除系统 me/my），用于收藏归属
+  function pickRandomCreatedContact() {
+    var list = getContacts().filter(function (c) {
+      return c && c.id && c.id !== 'me' && c.id !== 'my';
+    });
+    if (!list.length) return null;
+    return list[Math.floor(Math.random() * list.length)];
+  }
+
   function avatarHtml(c, size) {
     size = size || 48;
     var av = (c && c.avatar) || '👤';
@@ -94,8 +103,12 @@
   }
 
   function addCollection(contactId, type, content, originalTime) {
-    if (!contactId || !content || !content.trim()) return false;
-    var data = loadCollections(contactId);
+    if (!content || !content.trim()) return false;
+    // 收藏随机归属到我创建的联系人
+    var randomContact = pickRandomCreatedContact();
+    var targetId = (randomContact && randomContact.id) || contactId;
+    if (!targetId) return false;
+    var data = loadCollections(targetId);
     var dup = false;
     for (var i = 0; i < data[type].length; i++) {
       if (data[type][i].content === content.trim() && data[type][i].originalTime === originalTime) { dup = true; break; }
@@ -107,7 +120,7 @@
       originalTime: originalTime || Date.now(),
       collectedTime: Date.now()
     });
-    saveCollections(contactId, data);
+    saveCollections(targetId, data);
     return true;
   }
 

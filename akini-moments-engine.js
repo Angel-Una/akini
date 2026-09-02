@@ -275,34 +275,47 @@
     }, delay);
   };
 
-  // 用户回复了某条联系人评论后调用
+  // 用户评论/回复了朋友圈/iCity 后调用
   // momentId: 动态 id
-  // contactIdOrName: 被回复的联系人 id 或名字
+  // contactIdOrName: 被回复的联系人 id 或名字；若是动态作者则表示这是一条新评论
   // app: 'friends' | 'icity'
   window.akiniOnMomentUserReply = function (momentId, contactIdOrName, app) {
     if (!momentId) return;
     var targetName = contactIdOrName || '';
-    var contact = null;
     var contacts = getContacts();
-    if (targetName) {
-      contact = getContactById(targetName);
-      if (!contact) {
-        // 尝试按名字查找
-        for (var i = 0; i < contacts.length; i++) {
-          if (getContactName(contacts[i]) === targetName) {
-            contact = contacts[i];
-            break;
-          }
+    if (!contacts.length) return;
+
+    var data = getData(app);
+    var moment = findMoment(data, momentId);
+    var authorName = moment ? (moment.author || '') : '';
+    var myName = localStorage.getItem('akini_my_name') || '我';
+
+    // 判断是否是“单独回复某条联系人评论”：targetName 不是动态作者，视为单独回复
+    var isTopLevelComment = !targetName || (authorName && targetName === authorName);
+
+    if (isTopLevelComment) {
+      // 新评论动态：所有联系人（排除“我”）都回复用户
+      contacts.forEach(function (contact, idx) {
+        if (!contact || contact.id === 'me' || contact.id === 'my') return;
+        setTimeout(function () {
+          doReplyToUser(momentId, contact.id, myName, app);
+        }, idx * 600 + Math.floor(Math.random() * 300));
+      });
+      return;
+    }
+
+    // 单独回复某联系人评论：只有被回复的联系人回复
+    var contact = getContactById(targetName);
+    if (!contact) {
+      for (var i = 0; i < contacts.length; i++) {
+        if (getContactName(contacts[i]) === targetName) {
+          contact = contacts[i];
+          break;
         }
       }
     }
-    // 如果目标不是联系人（比如回复自己/用户自己），随机选一个联系人来回复
-    if (!contact && contacts.length) {
-      contact = contacts[Math.floor(Math.random() * contacts.length)];
-    }
     if (!contact) return;
 
-    var myName = localStorage.getItem('akini_my_name') || '我';
     var delay = getMessageReplyDelay();
     setTimeout(function () {
       doReplyToUser(momentId, contact.id, myName, app);
