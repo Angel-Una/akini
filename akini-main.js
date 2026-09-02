@@ -1976,7 +1976,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
                 var changed = !1;
                 idbC.forEach(function (c) {
-                  c && c.id && !byId[c.id] && ((byId[c.id] = c), (changed = !0));
+                  if (!c || !c.id) return;
+                  var existing = byId[c.id];
+                  if (!existing) {
+                    byId[c.id] = c;
+                    changed = !0;
+                    return;
+                  }
+                  // 同联系人按字段互补：解决 localStorage 写满/旧版导致头像等字段丢失的问题
+                  var fieldUpdated = !1;
+                  for (var key in c) {
+                    if (!c.hasOwnProperty(key)) continue;
+                    var newVal = c[key];
+                    var oldVal = existing[key];
+                    // 头像/名字/备注等字段：IDB 有值且本地为空时补回
+                    if (newVal != null && newVal !== "" && (oldVal == null || oldVal === "")) {
+                      existing[key] = newVal;
+                      fieldUpdated = !0;
+                    }
+                  }
+                  if (fieldUpdated) changed = !0;
                 });
                 if (changed) {
                   var merged = Object.keys(byId).map(function (k) {
@@ -4436,6 +4455,84 @@ document.addEventListener("DOMContentLoaded", function () {
         __akiniMergeFriendsPostsFromIDB(t);
       }),
       (window.getCurrentStickerContactId = J));
+    // ===== iCity 评论终极保险：从 内存 / localStorage / IDB(主+备份) 全部来源合并评论，
+    // 每篇日记取评论并集（按 id 去重），彻底杜绝刷新后评论丢失。延迟执行确保异步加载完成。
+    function _icitySafetyMerge() {
+      function parseArr(v) {
+        try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+      }
+      function cmtKey(c) {
+        if (!c || typeof c !== "object") return null;
+        return c.id || ((c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0));
+      }
+      function reconcile(sources) {
+        var diaries = {};
+        sources.forEach(function (arr) {
+          (arr || []).forEach(function (d) {
+            if (!d || !d.id) return;
+            if (!diaries[d.id]) diaries[d.id] = Object.assign({}, d, { comments: [] });
+            var tgt = diaries[d.id];
+            (d.comments || []).forEach(function (c) {
+              var k = cmtKey(c);
+              if (!k) return;
+              var exists = tgt.comments.some(function (x) { return cmtKey(x) === k; });
+              if (!exists) tgt.comments.push(c);
+            });
+            if (d.likers && d.likers.length) {
+              tgt.likers = tgt.likers || [];
+              d.likers.forEach(function (l) { if (tgt.likers.indexOf(l) < 0) tgt.likers.push(l); });
+            }
+            if (typeof d.likes === "number") tgt.likes = Math.max(tgt.likes || 0, d.likes);
+          });
+        });
+        return Object.keys(diaries).map(function (k) {
+          var d = diaries[k];
+          d.comments = d.comments.sort(function (a, b) { return (a.ts || 0) - (b.ts || 0); });
+          return d;
+        });
+      }
+      function persistAndRender() {
+        var sources = [F];
+        try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries"))); } catch (e) {}
+        try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries_backup"))); } catch (e) {}
+        var merged = reconcile(sources);
+        var before = 0; (F || []).forEach(function (d) { d && d.comments && (before += d.comments.length); });
+        var after = 0; merged.forEach(function (d) { d && d.comments && (after += d.comments.length); });
+        if (after < before) return; // 不变量：评论不得减少
+        F = merged;
+        var json = JSON.stringify(F);
+        try { localStorage.setItem("akini_icity_diaries", json); localStorage.setItem("akini_icity_diaries_backup", json); } catch (e) {}
+        if (window._idbStore && window._idbStore.set) {
+          window._idbStore.set("akini_icity_diaries", json);
+          window._idbStore.set("akini_icity_diaries_backup", json);
+        }
+        if (typeof window._renderIcity === "function") window._renderIcity();
+      }
+      if (window._idbStore && window._idbStore.get) {
+        window._idbStore.get("akini_icity_diaries", function (v) {
+          window._idbStore.get("akini_icity_diaries_backup", function (v2) {
+            var sources = [F, parseArr(v), parseArr(v2)];
+            try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries"))); } catch (e) {}
+            try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries_backup"))); } catch (e) {}
+            var merged = reconcile(sources);
+            var before = 0; (F || []).forEach(function (d) { d && d.comments && (before += d.comments.length); });
+            var after = 0; merged.forEach(function (d) { d && d.comments && (after += d.comments.length); });
+            if (after < before) return;
+            F = merged;
+            var json = JSON.stringify(F);
+            try { localStorage.setItem("akini_icity_diaries", json); localStorage.setItem("akini_icity_diaries_backup", json); } catch (e) {}
+            if (window._idbStore && window._idbStore.set) {
+              window._idbStore.set("akini_icity_diaries", json);
+              window._idbStore.set("akini_icity_diaries_backup", json);
+            }
+            if (typeof window._renderIcity === "function") window._renderIcity();
+          });
+        });
+      } else {
+        persistAndRender();
+      }
+    }
+    [1500, 3000, 6000].forEach(function (d) { setTimeout(_icitySafetyMerge, d); });
     const U = document.getElementById("chatBody"),
       K = document.getElementById("msgInput"),
       X = document.getElementById("sendBtn");
@@ -12838,17 +12935,8 @@ document.addEventListener("DOMContentLoaded", function () {
           return "pat" !== e && "pat" !== n;
         });
         if (!e.length) {
-          var def = [
-            "今天天气真好，心情不错~",
-            "刚看完一部超好看的电影！",
-            "周末去了一家很棒的咖啡馆",
-            "最近在学做饭，感觉还不错",
-            "今天工作好忙啊，终于结束了",
-            "晚安，做个好梦🌙",
-            "刚跑完步，感觉整个人都轻松了",
-            "今天的晚霞太美了！",
-          ];
-          return def[Math.floor(Math.random() * def.length)];
+          // 用户明确要求删除默认字卡，没有自定义字卡时直接返回空字符串
+          return "";
         }
         var n = e.slice().sort(function () {
             return Math.random() - 0.5;
