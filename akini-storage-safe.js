@@ -188,21 +188,31 @@
     akiniSet(k, s, cb);
   }
 
-  function restoreOneKey(k) {
+  function restoreOneKey(k, cb) {
     akiniGet(k, function (v) {
-      if (v == null) return;
-      memSet(k, v);
-      var ls = lsGet(k);
-      if (v.length > (ls ? ls.length : 0)) {
-        try { localStorage.setItem(k, v); } catch (e) {}
+      if (v != null) {
+        memSet(k, v);
+        var ls = lsGet(k);
+        if (v.length > (ls ? ls.length : 0)) {
+          try { localStorage.setItem(k, v); } catch (e) {}
+        }
       }
+      if (typeof cb === 'function') cb();
     });
   }
 
   function restoreCriticalFromIdb() {
-    CRITICAL_KEYS.forEach(function (k) {
-      if (k.indexOf('_backup') >= 0) return;
-      restoreOneKey(k);
+    var keys = CRITICAL_KEYS.filter(function (k) { return k.indexOf('_backup') < 0; });
+    var remaining = keys.length;
+    function fireRestored() {
+      try { if (typeof window.__akiniOnCriticalRestored === 'function') window.__akiniOnCriticalRestored(); } catch (e) {}
+    }
+    if (!remaining) { fireRestored(); return; }
+    keys.forEach(function (k) {
+      restoreOneKey(k, function () {
+        remaining--;
+        if (remaining <= 0) fireRestored();
+      });
     });
   }
 

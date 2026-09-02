@@ -1452,6 +1452,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (c && (!c.avatar || !String(c.avatar).trim())) {
               if (c.isDefault) c.avatar = _taAv || "🐰";
               else if (c.id === "me" || c.id === "my") c.avatar = _myAv || "🐱";
+              else c.avatar = _taAv || "🐰"; // 用户创建的联系人头像丢失时也用对方头像兜底
             }
           });
         }
@@ -4920,6 +4921,15 @@ document.addEventListener("DOMContentLoaded", function () {
             '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
         : t || e;
     }
+    // 关键数据从 IDB 异步恢复完成后，强制刷新所有界面（联系人/聊天/iCity/预览），
+    // 确保启动竞态期间读到空/缺头像快照后，恢复完成时能重新读到完整数据
+    window.__akiniOnCriticalRestored = function () {
+      try { if (window.akiniContacts && window.akiniContacts.resetCache) window.akiniContacts.resetCache(); } catch (e) {}
+      try { F = null; } catch (e) {}
+      try { if (typeof window.renderChatList === 'function') window.renderChatList(); } catch (e) {}
+      try { if (typeof window._renderIcity === 'function') window._renderIcity(); } catch (e) {}
+      try { if (typeof window.updatePreview === 'function') window.updatePreview(); } catch (e) {}
+    };
     ((window._restoringData = !0),
       // 安全兜底：无论异步恢复链是否正常回调，最多 6 秒后强制打开恢复门，
       // 防止 tryRestoreFromBackup 异常导致 _restoringData 永久卡住、数据无法读写
