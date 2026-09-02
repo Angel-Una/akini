@@ -1433,6 +1433,24 @@ document.addEventListener("DOMContentLoaded", function () {
           if (window._restoringData) return (d = []);
           e = [];
         }
+        // 头像兜底：联系人 avatar 为空时，从 localStorage 的对方/我的头像回填，
+        // 避免 localStorage 写满或旧版数据导致刷新后头像变默认 emoji
+        if (Array.isArray(e) && e.length > 0) {
+          var _taAv =
+            localStorage.getItem("akini_ta_avatar") ||
+            localStorage.getItem("akini_icity_ta_avatar") ||
+            "";
+          var _myAv =
+            localStorage.getItem("akini_my_avatar") ||
+            localStorage.getItem("akini_icity_my_avatar") ||
+            "";
+          e.forEach(function (c) {
+            if (c && (!c.avatar || !String(c.avatar).trim())) {
+              if (c.isDefault) c.avatar = _taAv || "🐰";
+              else if (c.id === "me" || c.id === "my") c.avatar = _myAv || "🐱";
+            }
+          });
+        }
         return ((d = e), e);
       }
       function g(e) {
@@ -4240,13 +4258,18 @@ document.addEventListener("DOMContentLoaded", function () {
     function j(t, e) {
       F = t || [];
       var n = JSON.stringify(F);
-      // iCity 评论持久化：直接套用朋友圈保存模板，主存/备份/LocalStorage 三写，确保刷新不丢
-      if (window._idbStore && window._idbStore.set) {
+      // iCity 评论持久化：主存/备份/LocalStorage 三写 + akiniStore 统一路径，确保刷新不丢
+      if (window.akiniStore && window.akiniStore.set) {
+        window.akiniStore.set("akini_icity_diaries", n);
+        window.akiniStore.set("akini_icity_diaries_backup", n);
+      } else if (window._idbStore && window._idbStore.set) {
         window._idbStore.set("akini_icity_diaries", n);
         window._idbStore.set("akini_icity_diaries_backup", n);
+        try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
+      } else {
+        try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
       }
-      try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
-      // 同时走 akiniStore 内存缓存，保证本地读取一致
+      // 内存缓存兜底，保证同步读取一致
       if (window.akiniStore && window.akiniStore.memorySet) {
         window.akiniStore.memorySet("akini_icity_diaries", n);
       }
