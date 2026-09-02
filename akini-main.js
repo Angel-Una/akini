@@ -1504,11 +1504,15 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           : null;
       }
+      var sessCache = null;
       function k() {
+        if (sessCache) return sessCache;
         var t = i(n, {});
-        return "object" == typeof t && null !== t ? t : {};
+        return (sessCache =
+          "object" == typeof t && null !== t ? t : {}), sessCache;
       }
       function _(t) {
+        sessCache = t || {};
         try {
           localStorage.setItem(n, JSON.stringify(t));
         } catch (t) {
@@ -1527,15 +1531,39 @@ document.addEventListener("DOMContentLoaded", function () {
       function I(t, e) {
         var n = k(),
           i = b(t);
+        // 关键修复：messagesHTML 不再写入 sessions 的 localStorage（避免大对象超配额失败、
+        // 避免返回聊天时用 sessions 里的陈旧 messagesHTML 覆盖 akini_chat_history_* 完整记录）。
+        // messagesHTML 只通过 C() 独立持久化到 akini_chat_history_*，内存里仍保留用于即时渲染。
+        var htmlToSave = null;
+        if (
+          e &&
+          e.hasOwnProperty("messagesHTML") &&
+          "string" == typeof e.messagesHTML
+        ) {
+          htmlToSave = e.messagesHTML;
+          // 聊天记录只增不减：防止陈旧会话数据用短的 messagesHTML 覆盖内存中的完整记录
+          if (i.messagesHTML && "string" == typeof i.messagesHTML) {
+            var newRows = __akiniCountMsgRows(e.messagesHTML);
+            var oldRows = __akiniCountMsgRows(i.messagesHTML);
+            if (newRows < oldRows) {
+              console.warn("[I] 拒绝用更短的聊天记录更新会话：" + t + " (" + newRows + " < " + oldRows + ")");
+              delete e.messagesHTML;
+              htmlToSave = null;
+            }
+          }
+        }
         for (var a in e) e.hasOwnProperty(a) && (i[a] = e[a]);
+        // 内存中保留 messagesHTML 用于即时渲染，但不随 sessions 写入 localStorage
+        var memHtml = i.messagesHTML;
+        delete i.messagesHTML;
         return (
           (n[t] = i),
           _(n),
-          e.messagesHTML &&
-            "string" == typeof e.messagesHTML &&
-            e.messagesHTML.trim().length > 0 &&
+          (i.messagesHTML = memHtml),
+          htmlToSave &&
+            htmlToSave.trim().length > 0 &&
             "function" == typeof C &&
-            C(t, e.messagesHTML),
+            C(t, htmlToSave),
           i
         );
       }
@@ -1593,6 +1621,8 @@ document.addEventListener("DOMContentLoaded", function () {
         updateSession: I,
         getActiveChatId: x,
         resetCache: function () {
+          // 注意：不清 sessCache，sessions 内存缓存是最新权威数据；
+          // 恢复链路通过 _(merged) 更新缓存，清空会导致读回 localStorage 陈旧版本
           ((d = null), (m = null));
         },
         setActiveChatId: function (t) {
@@ -1775,8 +1805,10 @@ document.addEventListener("DOMContentLoaded", function () {
             u++;
             l(n, function (t) {
               if (t && "object" == typeof t && Object.keys(t).length > 0) {
-                var merged = mergeSessions(s, t);
-                JSON.stringify(merged) !== JSON.stringify(s) &&
+                // 合并基线必须用 k()（内存权威缓存）而不是恢复时读到的 localStorage 陈旧副本 s
+                var baseline = k();
+                var merged = mergeSessions(baseline, t);
+                JSON.stringify(merged) !== JSON.stringify(baseline) &&
                   (_(merged), (d = !0));
               }
               u--;
@@ -3311,23 +3343,38 @@ document.addEventListener("DOMContentLoaded", function () {
       var key = "akini_chat_history_" + t;
       var backup = "akini_chat_history_backup_" + t;
       // 关键防护：如果新记录比现有记录短，不覆盖任何备份，防止恢复时选错源导致数据被截断
+      // 注意：大记录(>60KB)只存 IDB 不存 localStorage，因此必须同时对比内存 E[t] 与 localStorage
       var existingRows = 0;
       try {
         existingRows = __akiniCountMsgRows(localStorage.getItem(key) || "");
       } catch (err) {}
+      var memRows = E[t] ? __akiniCountMsgRows(E[t]) : 0;
+      if (memRows > existingRows) existingRows = memRows;
       var newRows = __akiniCountMsgRows(e);
       if (newRows < existingRows) {
         console.warn("[C] 拒绝用更短的聊天记录覆盖：" + key + " (" + newRows + " < " + existingRows + ")");
         return;
       }
       E[t] = e;
-      // 1) IndexedDB 作为主存储：容量大、在微信/系统后台回收时比 localStorage 更不容易被清空
+      // IDB 复核：先读 IDB 现有记录，行数更多时不覆盖，防止陈旧会话数据截断完整记录
+      // 注意：必须只在此异步回调内写 IDB，否则立即写会让复核读到刚写入的短版本而失效
+      var idbWriteDone = function () {
+        try { _idbStore.set(key, e); } catch (err) {}
+        try { _idbStore.set(backup, e); } catch (err) {}
+      };
       try {
-        _idbStore.set(key, e);
-      } catch (e) {}
-      try {
-        _idbStore.set(backup, e);
-      } catch (e) {}
+        _idbStore.get(key, function (idbExisting) {
+          var idbRows = idbExisting ? __akiniCountMsgRows(String(idbExisting)) : 0;
+          if (newRows >= idbRows) {
+            idbWriteDone();
+          } else {
+            console.warn("[C] IDB 复核拒绝覆盖：" + key + " (" + newRows + " < " + idbRows + ")");
+          }
+        });
+      } catch (err) {
+        // IDB 读取异常时直接写，保底不丢数据
+        idbWriteDone();
+      }
       // 2) localStorage 作为同步热备份，便于快速恢复；超限则清理图片后再试
       try {
         localStorage.setItem(key, e);
@@ -4026,6 +4073,15 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!Array.isArray(n)) return !1;
         var i = (F && F.length) || 0;
         if (e || n.length > i) {
+          // 不变量保护：合并前后评论总数只增不减，任何一侧的评论都不允许丢失
+          var _cmtTotal = function (arr) {
+            var s = 0;
+            (arr || []).forEach(function (d) {
+              d && d.comments && (s += d.comments.length);
+            });
+            return s;
+          };
+          var fBefore = _cmtTotal(F);
           if (F && F.length) {
             var map = {};
             F.forEach(function (d) {
@@ -4101,6 +4157,12 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           }
           F = n;
+          // 不变量校验：合并后评论总数不得少于合并前，否则放弃本次合并结果，保留内存 F
+          var fAfter = _cmtTotal(F);
+          if (fAfter < fBefore) {
+            console.warn("[icity merge] 合并后评论数减少 (" + fBefore + " -> " + fAfter + ")，放弃合并保留内存数据");
+            return !1;
+          }
           try {
             localStorage.setItem("akini_icity_diaries", JSON.stringify(F));
             localStorage.setItem(
@@ -4172,10 +4234,22 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         n = localStorage.getItem("akini_icity_diaries");
       } catch (t) {}
+      // localStorage 版本只有在比当前内存 F（可能已含用户新评论）评论更多时才使用，
+      // 防止慢速 IDB 回调返回时用旧版 localStorage 覆盖内存中的新评论
       if (n)
         try {
           var i = JSON.parse(n);
-          Array.isArray(i) && i.length > 0 && ((F = i), (e = !0));
+          if (Array.isArray(i) && i.length > 0) {
+            var fCmtCount = 0;
+            if (F && F.length)
+              F.forEach(function (d) { d && d.comments && (fCmtCount += d.comments.length); });
+            var nCmtCount = 0;
+            i.forEach(function (d) { d && d.comments && (nCmtCount += d.comments.length); });
+            if (!F || !F.length || nCmtCount > fCmtCount) {
+              F = i;
+              e = !0;
+            }
+          }
         } catch (t) {}
       ($(t, !0) && (e = !0),
         F || (F = q()),
@@ -4210,7 +4284,8 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           window.akiniContacts && window.akiniContacts.migrateContacts && window.akiniContacts.migrateContacts();
         } catch (e) {}
-        try { if ("function" == typeof window._akiniClearDiaryCache) window._akiniClearDiaryCache(); } catch(e){}
+        // 不调用 _akiniClearDiaryCache()：清空 F 会让 q() 重新从 localStorage 读旧数据，
+        // 而此时 IDB 异步恢复回调可能尚未完成，会用缺少新评论的旧版本覆盖内存中的最新状态
         if ("function" == typeof window.renderChatList) window.renderChatList();
         if ("function" == typeof window._renderIcity) window._renderIcity();
         if ("function" == typeof window.updatePreview) window.updatePreview();
@@ -13319,12 +13394,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260904 修复评论去重/回复延迟/聊天背景/字卡兜底
+      // 版本迁移：20260906 修复评论去重/回复延迟/聊天背景/字卡兜底
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260904") {
-            localStorage.setItem("akini_app_version", "20260904");
+          if (ver !== "20260906") {
+            localStorage.setItem("akini_app_version", "20260906");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
