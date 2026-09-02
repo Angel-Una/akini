@@ -1431,9 +1431,13 @@ document.addEventListener("DOMContentLoaded", function () {
           if (Array.isArray(cur) && cur.length > 0) e = cur;
         }
         d = e;
-        // 即使 localStorage 超出配额导致写入失败，也优先把联系人完整写入 IndexedDB，避免头像等大数据丢失
-        try { localStorage.setItem(t, JSON.stringify(e)); } catch (err) { console.warn('[akiniContacts] save to localStorage failed', err); }
-        c(t, e);
+        // IndexedDB 优先；localStorage 仅作热备，超配额不抛错
+        if (window.akiniStore && window.akiniStore.setJson) {
+          window.akiniStore.setJson(t, e);
+        } else {
+          try { localStorage.setItem(t, JSON.stringify(e)); } catch (err) { console.warn('[akiniContacts] save to localStorage failed', err); }
+          c(t, e);
+        }
         try { if(typeof window._snapshotCritical === 'function') window._snapshotCritical(); } catch(err){}
       }
       function y() {
@@ -1446,7 +1450,13 @@ document.addEventListener("DOMContentLoaded", function () {
           var cur = i(e, []);
           if (Array.isArray(cur) && cur.length > 0) t = cur;
         }
-        ((m = t), localStorage.setItem(e, JSON.stringify(t)), c(e, t));
+        m = t;
+        if (window.akiniStore && window.akiniStore.setJson) {
+          window.akiniStore.setJson(e, t);
+        } else {
+          try { localStorage.setItem(e, JSON.stringify(t)); } catch (err) {}
+          c(e, t);
+        }
         try { if(typeof window._snapshotCritical === 'function') window._snapshotCritical(); } catch(err){}
       }
       function v(t) {
@@ -1513,12 +1523,12 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function _(t) {
         sessCache = t || {};
-        try {
-          localStorage.setItem(n, JSON.stringify(t));
-        } catch (t) {
-          console.warn("saveSessions localStorage error:", t);
+        if (window.akiniStore && window.akiniStore.setJson) {
+          window.akiniStore.setJson(n, t || {});
+        } else {
+          try { localStorage.setItem(n, JSON.stringify(t)); } catch (t) { console.warn("saveSessions localStorage error:", t); }
+          c(n, t);
         }
-        c(n, t);
       }
       function b(t) {
         var e = k();
@@ -3379,42 +3389,32 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       E[t] = e;
       // IDB 复核：先读 IDB 现有记录，行数更多时不覆盖，防止陈旧会话数据截断完整记录
-      // 注意：必须只在此异步回调内写 IDB，否则立即写会让复核读到刚写入的短版本而失效
-      var idbWriteDone = function () {
-        try { _idbStore.set(key, e); } catch (err) {}
-        try { _idbStore.set(backup, e); } catch (err) {}
+      var doWrite = function () {
+        // 使用安全存储层：优先写 IDB，同时尝试写 localStorage 热备
+        if (window.akiniStore && window.akiniStore.set) {
+          window.akiniStore.set(key, e);
+          window.akiniStore.set(backup, e);
+        } else {
+          try { _idbStore.set(key, e); } catch (err) {}
+          try { _idbStore.set(backup, e); } catch (err) {}
+          try { localStorage.setItem(key, e); } catch (i) {}
+          try { localStorage.setItem(backup, e); } catch (i) {}
+        }
       };
       try {
         _idbStore.get(key, function (idbExisting) {
           var idbRows = idbExisting ? __akiniCountMsgRows(String(idbExisting)) : 0;
           if (newRows >= idbRows) {
-            idbWriteDone();
+            doWrite();
           } else {
             console.warn("[C] IDB 复核拒绝覆盖：" + key + " (" + newRows + " < " + idbRows + ")");
           }
         });
       } catch (err) {
         // IDB 读取异常时直接写，保底不丢数据
-        idbWriteDone();
+        doWrite();
       }
-      // 2) localStorage 作为同步热备份，便于快速恢复；超限则清理图片后再试
-      try {
-        localStorage.setItem(key, e);
-      } catch (i) {
-        B();
-        try {
-          localStorage.setItem(key, e);
-        } catch (i) {}
-      }
-      try {
-        localStorage.setItem(backup, e);
-      } catch (i) {
-        B();
-        try {
-          localStorage.setItem(backup, e);
-        } catch (i) {}
-      }
-      // 3) 精简应急备份（最后 200 条），确保 localStorage 满后仍有兜底
+      // 精简应急备份（最后 200 条），确保 localStorage 满后仍有兜底
       try {
         __akiniBackupCriticalChatData(t, e);
       } catch (e) {}
@@ -3818,13 +3818,37 @@ document.addEventListener("DOMContentLoaded", function () {
     }),
       (window.loadBgFromStorage = D));
     var z = null;
+    var _postsIdbLoaded = false;
     function O() {
       if (z) return z;
-      var t = localStorage.getItem("akini_posts");
-      try {
-        z = t ? JSON.parse(t) : [];
-      } catch (t) {
-        z = [];
+      // 优先从 IndexedDB 读取（容量大，不受 localStorage 5MB 限制）
+      if (!_postsIdbLoaded && window._idbStore && window._idbStore.get) {
+        _postsIdbLoaded = true;
+        _idbStore.get("akini_posts", function (idbVal) {
+          var parsed = null;
+          if (idbVal) {
+            try { parsed = JSON.parse(idbVal); } catch (e) { parsed = null; }
+          }
+          if (!parsed) {
+            // IDB 无数据则尝试 backup
+            _idbStore.get("akini_posts_backup", function (bkVal) {
+              if (bkVal) {
+                try { parsed = JSON.parse(bkVal); } catch (e) { parsed = null; }
+              }
+              if (!parsed) {
+                // 最后兜底 localStorage
+                var ls = localStorage.getItem("akini_posts");
+                if (ls) { try { parsed = JSON.parse(ls); } catch (e) { parsed = null; } }
+              }
+              _applyPosts(parsed);
+            });
+          } else {
+            _applyPosts(parsed);
+          }
+        });
+        // 同步先返回 localStorage 兜底，避免渲染空
+        var lsNow = localStorage.getItem("akini_posts");
+        try { z = lsNow ? JSON.parse(lsNow) : []; } catch (e) { z = []; }
       }
       z || (z = []);
       var e = !1;
@@ -3835,6 +3859,12 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       e && R(z);
       return z;
+    }
+    function _applyPosts(parsed) {
+      if (Array.isArray(parsed) && parsed.length) {
+        z = parsed;
+        if ("function" == typeof window._renderPosts) window._renderPosts();
+      }
     }
     function R(t, e) {
       // 加固：若传入数组是过滤副本（如 filter 掉 icity），先合并回内存 z 中的 icity 帖子
@@ -3857,14 +3887,18 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (err) {}
       z = t || [];
       var n = JSON.stringify(z);
+      // 优先写入 IndexedDB（容量大，不受 localStorage 配额限制，彻底解决数据消失）
+      _idbStore.set("akini_posts", n);
+      _idbStore.set("akini_posts_backup", n);
+      // localStorage 作为兜底，配额超限时静默失败不影响 IDB 主存储
       try {
         localStorage.setItem("akini_posts", n);
-      } catch (t) {}
-      (_idbStore.set("akini_posts_backup", n),
-        _idbStore.set("akini_posts", n),
-        window._idbStore &&
-          window._idbStore.backupAll &&
-          window._idbStore.backupAll(),
+      } catch (t) {
+        console.warn("[Akini] akini_posts 写入 localStorage 失败（配额超限），已存入 IndexedDB", t && t.name);
+      }
+      (window._idbStore &&
+        window._idbStore.backupAll &&
+        window._idbStore.backupAll(),
         e &&
           setTimeout(function () {
             e();
@@ -4028,6 +4062,29 @@ document.addEventListener("DOMContentLoaded", function () {
     function q() {
       // F 为空时重新读取；注意：不因 F.length===0 就重读，避免空数组覆盖内存最新数据
       if (!F) {
+        // 优先从 IndexedDB 读取（容量大，不受 localStorage 5MB 限制）
+        if (window._idbStore && window._idbStore.get) {
+          _idbStore.get("akini_icity_diaries", function (idbVal) {
+            var parsed = null;
+            if (idbVal) { try { parsed = JSON.parse(idbVal); } catch (e) { parsed = null; } }
+            if (!parsed) {
+              _idbStore.get("akini_icity_diaries_backup", function (bkVal) {
+                if (bkVal) { try { parsed = JSON.parse(bkVal); } catch (e) { parsed = null; } }
+                if (!parsed) {
+                  var ls = localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
+                  if (ls) { try { parsed = JSON.parse(ls); } catch (e) { parsed = null; } }
+                }
+                if (Array.isArray(parsed) && parsed.length) {
+                  F = parsed;
+                  if ("function" == typeof window._renderIcity) window._renderIcity();
+                }
+              });
+            } else if (Array.isArray(parsed) && parsed.length) {
+              F = parsed;
+              if ("function" == typeof window._renderIcity) window._renderIcity();
+            }
+          });
+        }
         var t =
           localStorage.getItem("akini_icity_diaries") ||
           localStorage.getItem("akini_icity_diaries_backup");
@@ -4077,14 +4134,15 @@ document.addEventListener("DOMContentLoaded", function () {
       F = t || [];
       var n = JSON.stringify(F);
       try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] j() SAVE diaries:', _dbg); } catch(x){}
+      // 优先写入 IndexedDB（容量大，不受 localStorage 配额限制，彻底解决数据消失）
+      _idbStore.set("akini_icity_diaries", n);
+      _idbStore.set("akini_icity_diaries_backup", n);
       try {
         localStorage.setItem("akini_icity_diaries", n);
-      } catch (t) { console.warn('[icity-debug] j() localStorage SET FAILED:', t && t.name); }
-      (_idbStore.set("akini_icity_diaries", n),
-        _idbStore.set("akini_icity_diaries_backup", n),
-        window._idbStore &&
-          window._idbStore.backupAll &&
-          window._idbStore.backupAll(),
+      } catch (t) { console.warn('[icity-debug] j() localStorage SET FAILED（配额超限），已存入 IndexedDB:', t && t.name); }
+      (window._idbStore &&
+        window._idbStore.backupAll &&
+        window._idbStore.backupAll(),
         e &&
           setTimeout(function () {
             e();
@@ -4213,22 +4271,19 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function W(t, e) {
       var n = JSON.stringify(t || []);
-      try {
-        localStorage.setItem("akini_stickers", n);
-      } catch (t) {}
-      try {
-        var i = localStorage.getItem("akini_stickers_idx") || "0";
-        localStorage.setItem("akini_stickers_idx", i);
-      } catch (t) {}
-      (_idbStore.set("akini_stickers_backup", n),
-        _idbStore.set("akini_stickers", n),
-        window._idbStore &&
-          window._idbStore.backupAll &&
-          window._idbStore.backupAll(),
-        e &&
-          setTimeout(function () {
-            e();
-          }, 0));
+      if (window.akiniStore && window.akiniStore.set) {
+        window.akiniStore.set("akini_stickers", n);
+        try {
+          var i = localStorage.getItem("akini_stickers_idx") || "0";
+          window.akiniStore.set("akini_stickers_idx", i);
+        } catch (t) {}
+      } else {
+        try { localStorage.setItem("akini_stickers", n); } catch (t) {}
+        _idbStore.set("akini_stickers", n);
+        _idbStore.set("akini_stickers_backup", n);
+      }
+      window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll();
+      e && setTimeout(function () { e(); }, 0);
     }
     function J() {
       if (!window.akiniContacts) return null;
@@ -4837,9 +4892,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
     function _akPinSet(t) {
-      try {
-        localStorage.setItem("akini_chat_pins", JSON.stringify(t || []));
-      } catch (t) {}
+      if (window.akiniStore && window.akiniStore.setJson) {
+        window.akiniStore.setJson("akini_chat_pins", t || []);
+      } else {
+        try { localStorage.setItem("akini_chat_pins", JSON.stringify(t || [])); } catch (t) {}
+      }
     }
     function _akPinRemove(t) {
       var e = _akPinGet();
@@ -6313,19 +6370,26 @@ document.addEventListener("DOMContentLoaded", function () {
           return i("akini_wordbank", []);
         }
         function s(t) {
-          (localStorage.setItem("akini_wordbank", JSON.stringify(t)),
-            window.akiniContacts &&
-              window.akiniContacts.backupToIDB &&
-              window.akiniContacts.backupToIDB("akini_wordbank", t));
+          if (window.akiniStore && window.akiniStore.setJson) {
+            window.akiniStore.setJson("akini_wordbank", t);
+          } else {
+            try { localStorage.setItem("akini_wordbank", JSON.stringify(t)); } catch (e) {}
+            window.akiniContacts && window.akiniContacts.backupToIDB &&
+              window.akiniContacts.backupToIDB("akini_wordbank", t);
+          }
         }
         function d() {
           return i("akini_wb_groups_" + t, []);
         }
         function u(g) {
-          (localStorage.setItem("akini_wb_groups_" + t, JSON.stringify(g)),
-            window.akiniContacts &&
-              window.akiniContacts.backupToIDB &&
-              window.akiniContacts.backupToIDB("akini_wb_groups_" + t, g));
+          var k = "akini_wb_groups_" + t;
+          if (window.akiniStore && window.akiniStore.setJson) {
+            window.akiniStore.setJson(k, g);
+          } else {
+            try { localStorage.setItem(k, JSON.stringify(g)); } catch (e) {}
+            window.akiniContacts && window.akiniContacts.backupToIDB &&
+              window.akiniContacts.backupToIDB(k, g);
+          }
         }
         function m() {
           const e = document.getElementById("wbGroupFilter");
@@ -7523,6 +7587,15 @@ document.addEventListener("DOMContentLoaded", function () {
               window.akiniTaPhoneCollectMoment(_cid, e, o.ts);
             }
           } catch (e2) {}
+          // syy 风格：发布后延迟随机时间，多联系人按概率自动评论 + 自动点赞
+          try {
+            if (window.akiniTriggerMomentAutoReply) {
+              var _delay = window.akiniGetMomentReplyDelay ? window.akiniGetMomentReplyDelay() : (2000 + Math.random() * 5000);
+              setTimeout(function () {
+                window.akiniTriggerMomentAutoReply(o.id, "friends");
+              }, _delay);
+            }
+          } catch (e3) {}
         }));
       const u = document.getElementById("friendsHeader");
       (D("akini_friends_bg", function (t) {
@@ -7535,6 +7608,7 @@ document.addEventListener("DOMContentLoaded", function () {
         t(),
         (window._renderPosts = t),
         (window.__akiniGetPosts = O),
+        (window.__akiniSavePosts = R),
         (function () {
           var e = document.createElement("div");
           ((e.id = "postDeleteConfirm"),
@@ -10142,6 +10216,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       ((window._renderIcityContactProfiles = e),
         (window._renderIcity = t),
+        (window.__akiniGetIcity = q),
+        (window.__akiniSaveIcity = j),
         (window.renderIcityProfileDiaries = n),
         (window.togglePinDiary = function (t) {
           var e = q(),
@@ -11062,6 +11138,17 @@ document.addEventListener("DOMContentLoaded", function () {
             window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
             // 联系人主动评论用户发布的日记（replyToMyComment 仅回复用户已有评论，发布新日记时无评论故改用主动评论）
             window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),
+            // syy 风格：发布后延迟随机时间，多联系人按概率自动评论 + 自动点赞
+            (function(){
+              try {
+                if (window.akiniTriggerMomentAutoReply) {
+                  var _delay = window.akiniGetMomentReplyDelay ? window.akiniGetMomentReplyDelay() : (2000 + Math.random() * 5000);
+                  setTimeout(function () {
+                    window.akiniTriggerMomentAutoReply(i.id, "icity");
+                  }, _delay);
+                }
+              } catch (_e) {}
+            })(),
             c && (c.value = ""));
           var a = document.getElementById("icityTab1"),
             o = document.getElementById("icityTab2"),
@@ -11885,25 +11972,25 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function saveMailSent(t) {
       var e = JSON.stringify(t || []);
-      try {
-        localStorage.setItem("akini_mail_sent", e);
-      } catch (t) {}
-      window._idbStore &&
-        window._idbStore.set &&
-        (window._idbStore.set("akini_mail_sent", e),
-        window._idbStore.set("akini_mail_sent_backup", e),
-        window._idbStore.backupAll && window._idbStore.backupAll());
+      if (window.akiniStore && window.akiniStore.set) {
+        window.akiniStore.set("akini_mail_sent", e);
+      } else {
+        try { localStorage.setItem("akini_mail_sent", e); } catch (t) {}
+        window._idbStore && window._idbStore.set &&
+          (window._idbStore.set("akini_mail_sent", e),
+          window._idbStore.set("akini_mail_sent_backup", e));
+      }
     }
     function saveMailReceived(t) {
       var e = JSON.stringify(t || []);
-      try {
-        localStorage.setItem("akini_mail_received", e);
-      } catch (t) {}
-      window._idbStore &&
-        window._idbStore.set &&
-        (window._idbStore.set("akini_mail_received", e),
-        window._idbStore.set("akini_mail_received_backup", e),
-        window._idbStore.backupAll && window._idbStore.backupAll());
+      if (window.akiniStore && window.akiniStore.set) {
+        window.akiniStore.set("akini_mail_received", e);
+      } else {
+        try { localStorage.setItem("akini_mail_received", e); } catch (t) {}
+        window._idbStore && window._idbStore.set &&
+          (window._idbStore.set("akini_mail_received", e),
+          window._idbStore.set("akini_mail_received_backup", e));
+      }
     }
     function bn(t) {
       kn = t;
