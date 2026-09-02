@@ -2291,8 +2291,12 @@ document.addEventListener("DOMContentLoaded", function () {
     function u(t, e) {
       e &&
         "string" == typeof e &&
-        ("my" === t && (window.__akiniAvatarCache.my = e),
-        "ta" === t && (window.__akiniAvatarCache.ta = e));
+        ("my" === t && (window.__akiniAvatarCache.my = e,
+          window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet("akini_my_avatar", e),
+          window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet("akini_icity_my_avatar", e)),
+        "ta" === t && (window.__akiniAvatarCache.ta = e,
+          window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet("akini_ta_avatar", e),
+          window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet("akini_icity_ta_avatar", e)));
     }
     function m(t, e, n) {
       _idbStore.get(e, function (i) {
@@ -2335,8 +2339,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       });
     }
+    function _memGet(k){try{if(window.akiniStore&&window.akiniStore.memoryGet)return window.akiniStore.memoryGet(k);}catch(e){}return null;}
     function f() {
+      // 优先读内存缓存（IDB 预加载/写入同步），再读 localStorage，避免 localStorage 写满后刷新丢头像
       var n =
+        _memGet("akini_my_avatar") ||
+        _memGet("akini_icity_my_avatar") ||
         localStorage.getItem("akini_my_avatar") ||
         localStorage.getItem("akini_icity_my_avatar");
       if (n) {
@@ -2368,8 +2376,10 @@ document.addEventListener("DOMContentLoaded", function () {
             window.__akiniAvatarCache.ta = ct.avatar;
             return it(ct.avatar, "🐰");
           }
-          // 联系人对象无头像时，回退到本地保存的对方头像，避免直接显示 emoji 兜底
+          // 联系人对象无头像时，回退到内存缓存/本地保存的对方头像，避免直接显示 emoji 兜底
           var _lsTa =
+            _memGet("akini_ta_avatar") ||
+            _memGet("akini_icity_ta_avatar") ||
             localStorage.getItem("akini_ta_avatar") ||
             localStorage.getItem("akini_icity_ta_avatar");
           if (_lsTa) {
@@ -2384,6 +2394,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       var n =
+        _memGet("akini_ta_avatar") ||
+        _memGet("akini_icity_ta_avatar") ||
         localStorage.getItem("akini_ta_avatar") ||
         localStorage.getItem("akini_icity_ta_avatar");
       if (n) {
@@ -4268,21 +4280,17 @@ document.addEventListener("DOMContentLoaded", function () {
     function j(t, e) {
       F = t || [];
       var n = JSON.stringify(F);
-      // iCity 评论持久化：主存/备份/LocalStorage 三写 + akiniStore 统一路径，确保刷新不丢
+      // iCity 评论持久化：内存缓存 + 主存/备份/LocalStorage 三写，确保刷新不丢
+      if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet("akini_icity_diaries", n);
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_icity_diaries", n);
         window.akiniStore.set("akini_icity_diaries_backup", n);
       } else if (window._idbStore && window._idbStore.set) {
         window._idbStore.set("akini_icity_diaries", n);
         window._idbStore.set("akini_icity_diaries_backup", n);
-        try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
-      } else {
-        try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
       }
-      // 内存缓存兜底，保证同步读取一致
-      if (window.akiniStore && window.akiniStore.memorySet) {
-        window.akiniStore.memorySet("akini_icity_diaries", n);
-      }
+      try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
+      try { localStorage.setItem("akini_icity_diaries_backup", n); } catch (x) {}
       (window._idbStore &&
         window._idbStore.backupAll &&
         window._idbStore.backupAll(),
@@ -8258,11 +8266,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       (l &&
-        (n.isGroupCall && n.selectedMembers && n.selectedMembers[0]
-          ? (l.innerHTML = nt(n.selectedMembers[0].avatar, 58))
-          : e && i[0]
-            ? (l.innerHTML = nt(i[0].avatar, 58))
-            : (l.innerHTML = nt(o, 58))),
+        (n.isGroupCall && n.groupAvatar
+          ? (l.innerHTML = nt(n.groupAvatar, 58))
+          : n.isGroupCall && n.selectedMembers && n.selectedMembers[0]
+            ? (l.innerHTML = nt(n.selectedMembers[0].avatar, 58))
+            : e && i[0]
+              ? (l.innerHTML = nt(i[0].avatar, 58))
+              : (l.innerHTML = nt(o, 58))),
         (we.active = !0),
         (we.answered = !1),
         (we.isMinimized = !1),
@@ -10462,6 +10472,15 @@ document.addEventListener("DOMContentLoaded", function () {
         (window.openIcityDetail = function (t) {
           var e = document.getElementById("icityDetailModal");
           if (e && t) {
+            // 用最新数据重新查找日记，避免使用卡片渲染时的快照（评论可能已更新）
+            var fresh = null;
+            try {
+              var all = q();
+              for (var fi = 0; fi < all.length; fi++) {
+                if (all[fi] && all[fi].id === t.id) { fresh = all[fi]; break; }
+              }
+            } catch (_e) {}
+            if (fresh) t = fresh;
             ((e._currentDiaryId = t.id),
               (e._currentWho = t.who || t.author || "me"),
               (e._replyTo = ""));
