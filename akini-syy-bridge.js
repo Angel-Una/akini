@@ -222,10 +222,22 @@
   const originalRemoveItem = localStorage.removeItem.bind(localStorage);
 
   localStorage.setItem = function (key, value) {
+    // 关键：同步更新内存缓存，保证即使 localStorage 写满也能读到最新值
+    // （本层覆盖了 akini-storage-safe.js 的 setItem，必须手动维护内存缓存）
+    try {
+      if (window.akiniStore && window.akiniStore.memorySet && key && String(key).indexOf('akini_') === 0) {
+        window.akiniStore.memorySet(key, String(value));
+      }
+    } catch (e) {}
     originalSetItem(key, value);
     syncAkiniKeyToSyy(key, value);
   };
   localStorage.removeItem = function (key) {
+    try {
+      if (window.akiniStore && window.akiniStore.memoryRemove && key && String(key).indexOf('akini_') === 0) {
+        window.akiniStore.memoryRemove(key);
+      }
+    } catch (e) {}
     originalRemoveItem(key);
     syncAkiniKeyRemove(key);
   };
