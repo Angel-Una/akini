@@ -4004,8 +4004,8 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
       }));
     function q() {
-      // F 为空（含首次读取时本地尚未恢复）时重新读取，避免把空数组永久缓存导致数据丢失
-      if (!F || F.length === 0) {
+      // F 为空时重新读取；注意：不因 F.length===0 就重读，避免空数组覆盖内存最新数据
+      if (!F) {
         var t =
           localStorage.getItem("akini_icity_diaries") ||
           localStorage.getItem("akini_icity_diaries_backup");
@@ -4015,6 +4015,7 @@ document.addEventListener("DOMContentLoaded", function () {
           F = [];
         }
       }
+      try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] q() READ diaries:', _dbg); } catch(x){}
       var e = !1;
       return (
         (F = (F || []).map(function (t) {
@@ -4053,9 +4054,10 @@ document.addEventListener("DOMContentLoaded", function () {
     function j(t, e) {
       F = t || [];
       var n = JSON.stringify(F);
+      try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] j() SAVE diaries:', _dbg); } catch(x){}
       try {
         localStorage.setItem("akini_icity_diaries", n);
-      } catch (t) {}
+      } catch (t) { console.warn('[icity-debug] j() localStorage SET FAILED:', t && t.name); }
       (_idbStore.set("akini_icity_diaries", n),
         _idbStore.set("akini_icity_diaries_backup", n),
         window._idbStore &&
@@ -4157,6 +4159,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           }
           F = n;
+          try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] $() MERGE result:', _dbg, '(before total:'+fBefore+')'); } catch(x){}
           // 不变量校验：合并后评论总数不得少于合并前，否则放弃本次合并结果，保留内存 F
           var fAfter = _cmtTotal(F);
           if (fAfter < fBefore) {
@@ -9962,6 +9965,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       function o(t) {
+        console.log('[icity-debug] o() RENDER diary:', t && t.id, 'comments:', ((t && t.comments) || []).length);
         var e = localStorage.getItem("akini_icity_my_nick") || "我",
           n = t.likers || [],
           i = t.liked || n.indexOf(e) >= 0,
@@ -10229,6 +10233,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     ts: Date.now(),
                   };
                   (e._replyTo && (l.replyTo = e._replyTo),
+                    console.log('[icity-debug] y() SEND comment diary', e._currentDiaryId, 'count:', (a[r].comments||[]).length),
                     a[r].comments.push(l),
                     j(a),
                     (u.value = ""),
@@ -13394,12 +13399,12 @@ document.addEventListener("DOMContentLoaded", function () {
           })(true));
       })());
     ((function () {
-      // 版本迁移：20260906 修复评论去重/回复延迟/聊天背景/字卡兜底
+      // 版本迁移：20260907 修复评论去重/回复延迟/聊天背景/字卡兜底
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260906") {
-            localStorage.setItem("akini_app_version", "20260906");
+          if (ver !== "20260907") {
+            localStorage.setItem("akini_app_version", "20260907");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.removeItem("akini_toggle_contactPokeToggle");
             localStorage.removeItem("akini_toggle_contactFriendsToggle");
@@ -17638,12 +17643,21 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
         try {
           if (typeof q === "function" && (!F || F.length === 0)) {
-            var dv = localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
-            if (dv) {
-              var da = JSON.parse(dv);
-              Array.isArray(da) && da.length && j(da);
-              "function" == typeof window._renderIcity && window._renderIcity();
-            }
+            // 内存缓存被回收：优先从 IDB 恢复（IDB 是权威源，localStorage 可能因配额写入失败而陈旧）
+            window._idbStore && window._idbStore.get && window._idbStore.get("akini_icity_diaries", function (dv) {
+              var src = dv || localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
+              if (src) {
+                try {
+                  var da = JSON.parse(src);
+                  if (Array.isArray(da) && da.length) {
+                    // 用合并函数恢复，保证评论只增不减，避免旧数据覆盖
+                    if (typeof $ === "function") { $(src, !0); }
+                    else { j(da); }
+                  }
+                } catch (e) {}
+                "function" == typeof window._renderIcity && window._renderIcity();
+              }
+            });
           }
         } catch (e) {}
       } catch (e) {}
