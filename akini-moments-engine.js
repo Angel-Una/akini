@@ -193,6 +193,7 @@
     var name = getContactName(contact);
     var avatar = getContactAvatar(contact);
     var comment = {
+      id: 'c_' + Math.random().toString(36).slice(2) + '_' + Date.now(),
       author: name,
       authorId: contact.id,
       text: text,

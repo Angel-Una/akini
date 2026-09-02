@@ -4441,14 +4441,30 @@ document.addEventListener("DOMContentLoaded", function () {
     // ========== 开屏动画：进度条 + 收尾隐藏 ==========
     window.__akiniSplashProgress = 0;
     window.__akiniSplashDone = !1;
-    window.__akiniSetSplashProgress = function (p) {
+    window.__akiniSplashStartAt = Date.now();
+    window.__akiniSplashMinMs = 2800; // 最少显示 2.8s，避免进度条一闪而过
+    window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
-        window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(100, p));
+        if (p >= 100) {
+          var elapsed = Date.now() - (window.__akiniSplashStartAt || Date.now());
+          var remain = Math.max(0, (window.__akiniSplashMinMs || 0) - elapsed);
+          if (remain > 0 && !window.__akiniSplashPendingDone) {
+            window.__akiniSplashPendingDone = !0;
+            setTimeout(function () { window.__akiniSetSplashProgress(100, statusText); }, remain);
+            return;
+          }
+        }
+        window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(99, p));
+        if (p >= 100) window.__akiniSplashProgress = 100;
         var bar = document.getElementById("akiniSplashBar");
         if (bar) bar.style.width = window.__akiniSplashProgress + "%";
         var st = document.getElementById("akiniSplashStatus");
-        if (st) st.textContent = window.__akiniSplashProgress >= 100 ? "已准备好" : "正在进入";
+        if (st) {
+          if (statusText) st.textContent = statusText;
+          else if (window.__akiniSplashProgress >= 100) st.textContent = "已准备好";
+          else st.textContent = "正在进入";
+        }
         var btn = document.getElementById("akiniSplashEnterBtn");
         if (btn && window.__akiniSplashProgress >= 100) {
           btn.style.display = "inline-block";
@@ -4493,8 +4509,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if ("function" == typeof window.renderChatList) window.renderChatList();
         if ("function" == typeof window._renderIcity) window._renderIcity();
         if ("function" == typeof window.updatePreview) window.updatePreview();
-        // 开屏动画：加载完成后显示「进入」按钮，由用户手动点击进入，不自动跳转
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
+        // 开屏动画：关键数据与界面渲染完成后，给头像/聊天记录等异步恢复预留时间，再显示「进入」
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(92, "正在加载头像与聊天记录");
+        setTimeout(function () {
+          window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100, "已准备好");
+        }, 900);
         // 不自动调用 __akiniHideSplash，等待用户点击 #akiniSplashEnterBtn
       }, 300);
       if (
@@ -4770,9 +4789,9 @@ document.addEventListener("DOMContentLoaded", function () {
           __akiniBootApp();
         }
       }, 6000),
-      window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30),
+      window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30, "正在连接存储"),
       window._idbStore.restoreAll(function () {
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(70);
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(68, "正在恢复联系人");
         window.akiniContacts && window.akiniContacts.tryRestoreFromBackup
           ? window.akiniContacts.tryRestoreFromBackup(__akiniBootApp)
           : __akiniBootApp();
@@ -7372,7 +7391,7 @@ document.addEventListener("DOMContentLoaded", function () {
               R(r);
             } catch (_e) {}
             // 通知朋友圈引擎：用户回复了某联系人，该联系人将再回复一条
-            _triggerContactReply(c.ts, l.author);
+            _triggerContactReply(c.id || c.ts, l.author);
           } else if (_commentPidx !== null) {
             var e = r[_commentPidx];
             if (!e) return closeCommentModal();
@@ -7388,7 +7407,7 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (e) {}
             // 用户评论朋友圈（含自己动态）都触发联系人再回复：优先回复者为动态作者，否则随机联系人
             var postAuthor = e.author || o;
-            _triggerContactReply(e.ts, postAuthor);
+            _triggerContactReply(e.id || e.ts, postAuthor);
           }
           (R(r),
             window._renderPosts && window._renderPosts(),
