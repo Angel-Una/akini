@@ -68,8 +68,11 @@
 
   function loadCollections(contactId) {
     try {
-      var saved = localStorage.getItem(storageKey(contactId));
-      if (saved) {
+      // 统一走 akiniStore（内存缓存+IDB+localStorage），与朋友圈数据持久化逻辑一致
+      var saved = window.akiniStore && window.akiniStore.getSync
+        ? window.akiniStore.getSync(storageKey(contactId), null)
+        : localStorage.getItem(storageKey(contactId));
+      if (saved && typeof saved === 'string') {
         var parsed = JSON.parse(saved);
         return {
           chat: Array.isArray(parsed.chat) ? parsed.chat : [],
@@ -82,7 +85,12 @@
   }
 
   function saveCollections(contactId, data) {
-    try { localStorage.setItem(storageKey(contactId), JSON.stringify(data)); } catch (e) {}
+    var n = JSON.stringify(data);
+    if (window.akiniStore && window.akiniStore.set) {
+      window.akiniStore.set(storageKey(contactId), n);
+    } else {
+      try { localStorage.setItem(storageKey(contactId), n); } catch (e) {}
+    }
   }
 
   function addCollection(contactId, type, content, originalTime) {

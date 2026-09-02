@@ -4073,10 +4073,9 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           });
         }
-        // 同步先返回内存/LocalStorage 兜底
+        // 同步先返回内存缓存（akiniStore.memoryGet，IDB 预加载/写入同步），再读 localStorage 兜底
         F = i("akini_icity_diaries", []);
       }
-      try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] q() READ diaries:', _dbg); } catch(x){}
       var e = !1;
       return (
         (F = (F || []).map(function (t) {
@@ -4129,13 +4128,15 @@ document.addEventListener("DOMContentLoaded", function () {
     function j(t, e) {
       F = t || [];
       var n = JSON.stringify(F);
-      try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] j() SAVE diaries:', _dbg); } catch(x){}
-      // 优先写入 IndexedDB（容量大，不受 localStorage 配额限制，彻底解决数据消失）
-      _idbStore.set("akini_icity_diaries", n);
-      _idbStore.set("akini_icity_diaries_backup", n);
-      try {
-        localStorage.setItem("akini_icity_diaries", n);
-      } catch (t) { console.warn('[icity-debug] j() localStorage SET FAILED（配额超限），已存入 IndexedDB:', t && t.name); }
+      // 统一走 akiniStore：同步写入内存缓存（消除刷新后读空导致的闪烁），
+      // 并异步落盘 IndexedDB（主存储，容量大）+ localStorage（热备），彻底解决数据消失
+      if (window.akiniStore && window.akiniStore.set) {
+        window.akiniStore.set("akini_icity_diaries", n);
+      } else {
+        _idbStore.set("akini_icity_diaries", n);
+        _idbStore.set("akini_icity_diaries_backup", n);
+        try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
+      }
       (window._idbStore &&
         window._idbStore.backupAll &&
         window._idbStore.backupAll(),
@@ -4235,7 +4236,6 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           }
           F = n;
-          try { var _dbg = (F||[]).map(function(d){return (d.id||'?')+':'+((d.comments||[]).length);}).join(','); console.log('[icity-debug] $() MERGE result:', _dbg, '(before total:'+fBefore+')'); } catch(x){}
           // 不变量校验：合并后评论总数不得少于合并前，否则放弃本次合并结果，保留内存 F
           var fAfter = _cmtTotal(F);
           if (fAfter < fBefore) {
@@ -4347,6 +4347,30 @@ document.addEventListener("DOMContentLoaded", function () {
       X = document.getElementById("sendBtn");
     var Y = document.getElementById("chatMenuOverlay"),
       Q = document.getElementById("menuBg");
+    // ========== 开屏动画：进度条 + 收尾隐藏 ==========
+    window.__akiniSplashProgress = 0;
+    window.__akiniSplashDone = !1;
+    window.__akiniSetSplashProgress = function (p) {
+      try {
+        if (window.__akiniSplashDone) return;
+        window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(100, p));
+        var bar = document.getElementById("akiniSplashBar");
+        if (bar) bar.style.width = window.__akiniSplashProgress + "%";
+        var st = document.getElementById("akiniSplashStatus");
+        if (st) st.textContent = window.__akiniSplashProgress >= 100 ? "已准备好" : "正在进入";
+      } catch (e) {}
+    };
+    window.__akiniHideSplash = function () {
+      try {
+        if (window.__akiniSplashDone) return;
+        window.__akiniSplashDone = !0;
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
+        var el = document.getElementById("akiniSplash");
+        if (!el) return;
+        el.style.opacity = "0";
+        setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 420);
+      } catch (e) {}
+    };
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
       window.__akiniBooted = !0;
@@ -4365,6 +4389,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if ("function" == typeof window.renderChatList) window.renderChatList();
         if ("function" == typeof window._renderIcity) window._renderIcity();
         if ("function" == typeof window.updatePreview) window.updatePreview();
+        // 开屏动画收尾：数据已全部加载并渲染，隐藏 splash，彻底消除默认数据闪烁
+        if (window.__akiniHideSplash) window.__akiniHideSplash();
       }, 300);
       if (
         (window.__akiniAvatarCache &&
@@ -4639,7 +4665,9 @@ document.addEventListener("DOMContentLoaded", function () {
           __akiniBootApp();
         }
       }, 6000),
+      window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30),
       window._idbStore.restoreAll(function () {
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(70);
         window.akiniContacts && window.akiniContacts.tryRestoreFromBackup
           ? window.akiniContacts.tryRestoreFromBackup(__akiniBootApp)
           : __akiniBootApp();
@@ -10028,7 +10056,6 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       function o(t) {
-        console.log('[icity-debug] o() RENDER diary:', t && t.id, 'comments:', ((t && t.comments) || []).length);
         var e = localStorage.getItem("akini_icity_my_nick") || "我",
           n = t.likers || [],
           i = t.liked || n.indexOf(e) >= 0,
@@ -10298,7 +10325,6 @@ document.addEventListener("DOMContentLoaded", function () {
                     ts: Date.now(),
                   };
                   (e._replyTo && (l.replyTo = e._replyTo),
-                    console.log('[icity-debug] y() SEND comment diary', e._currentDiaryId, 'count:', (a[r].comments||[]).length),
                     a[r].comments.push(l),
                     j(a),
                     (u.value = ""),
@@ -10308,13 +10334,15 @@ document.addEventListener("DOMContentLoaded", function () {
                     n("icityMyProfileDiaries", "me"),
                     n("icityTaProfileDiaries", "ta"),
                     o(a[r]));
-                  var s = localStorage.getItem("akini_icity_ta_nick") || "对方";
-                  if (l.replyTo === s) {
-                    delete _taPending["cmt_" + e._currentDiaryId];
-                    delete _taPending["reply_" + e._currentDiaryId];
-                    // 用户回复了 TA 的 iCity 日记，通知引擎让该联系人再回复一条
+                  // 用户回复了某条评论（联系人或 TA），通知引擎让对应联系人再回复一条
+                  if (l.replyTo) {
+                    var s = localStorage.getItem("akini_icity_ta_nick") || "对方";
+                    if (l.replyTo === s) {
+                      delete _taPending["cmt_" + e._currentDiaryId];
+                      delete _taPending["reply_" + e._currentDiaryId];
+                    }
                     window.akiniOnMomentUserReply &&
-                      window.akiniOnMomentUserReply(e._currentDiaryId, s, "icity");
+                      window.akiniOnMomentUserReply(e._currentDiaryId, l.replyTo, "icity");
                   }
                 }
               }
@@ -12058,53 +12086,36 @@ document.addEventListener("DOMContentLoaded", function () {
           "sent" === kn && _n("sent"));
         const r = Dn();
         if (r) {
-          const e = parseFloat(
+          const minD = parseFloat(
               localStorage.getItem("akini_num_mailDelayMin") || "1",
             ),
-            a = parseFloat(
+            maxD = parseFloat(
               localStorage.getItem("akini_num_mailDelayMax") || "3",
             ),
-            c = 60 * (e + Math.random() * (a - e) || 1) * 1e3;
-          setTimeout(function () {
-            if (!window.AKR.isInTimeRange("mail")) {
-              return;
+            delayMs = 60 * (minD + Math.random() * (maxD - minD) || 1) * 1e3;
+          // syy envelope 模式：把回信预约时间持久化到 sent，
+          // 即使离线/刷新，下次启动 checkMailStatus 也会按时投递回信
+          const replyTime = Date.now() + delayMs;
+          const sentArr = i("akini_mail_sent", []);
+          for (var si = 0; si < sentArr.length; si++) {
+            if (
+              sentArr[si].date === sentDate &&
+              sentArr[si].content === t &&
+              !sentArr[si].replyTime
+            ) {
+              sentArr[si].replyTime = replyTime;
+              sentArr[si].replyContent = r;
+              sentArr[si].replyFromId = n.id;
+              sentArr[si].replyFromName = n.name;
+              sentArr[si].replyAvatar = n.avatar;
+              saveMailSent(sentArr);
+              break;
             }
-            const e = i("akini_mail_received", []);
-            (e.push({
-              content: r,
-              date: new Date().toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }),
-              from: n.name,
-              fromId: n.id,
-              subtype: "reply",
-              originalContent: t,
-            }),
-              saveMailReceived(e));
-            const sent = i("akini_mail_sent", []);
-            for (var si = 0; si < sent.length; si++) {
-              if (
-                sent[si].date === sentDate &&
-                sent[si].content === t &&
-                !sent[si].repliedByTa
-              ) {
-                sent[si].repliedByTa = !0;
-                saveMailSent(sent);
-                break;
-              }
-            }
-            ("received" === kn && _n("received"),
-              window.showInAppNotif &&
-                window.showInAppNotif({
-                  app: "信箱",
-                  appIcon: "✉️",
-                  avatar: nt(n.avatar, 40),
-                  name: n.name,
-                  fullContent: !0,
-                  msg: n.name + "回复了你的信件",
-                  onTap: function () {
-                    o("mail");
-                  },
-                }));
-          }, c);
+          }
+          // 应用保持打开时也立即检查一次，及时投递
+          if (window.akiniMailEngine && window.akiniMailEngine.checkStatus) {
+            window.akiniMailEngine.checkStatus();
+          }
         }
       }));
     var An = 0;
