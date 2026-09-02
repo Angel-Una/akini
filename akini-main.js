@@ -4208,25 +4208,28 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!Array.isArray(parsed) || !parsed.length) return;
       if (!F || !F.length) {
         F = parsed;
+        j(F);
         if ("function" == typeof window._renderIcity) window._renderIcity();
         return;
       }
       // 内存已有数据时合并，保证评论只增不减
       if ($(JSON.stringify(parsed), !0)) {
+        j(F);
         if ("function" == typeof window._renderIcity) window._renderIcity();
       }
     }
     function j(t, e) {
       F = t || [];
       var n = JSON.stringify(F);
-      // 统一走 akiniStore：同步写入内存缓存（消除刷新后读空导致的闪烁），
-      // 并异步落盘 IndexedDB（主存储，容量大）+ localStorage（热备），彻底解决数据消失
-      if (window.akiniStore && window.akiniStore.set) {
-        window.akiniStore.set("akini_icity_diaries", n);
-      } else {
-        _idbStore.set("akini_icity_diaries", n);
-        _idbStore.set("akini_icity_diaries_backup", n);
-        try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
+      // iCity 评论持久化：直接套用朋友圈保存模板，主存/备份/LocalStorage 三写，确保刷新不丢
+      if (window._idbStore && window._idbStore.set) {
+        window._idbStore.set("akini_icity_diaries", n);
+        window._idbStore.set("akini_icity_diaries_backup", n);
+      }
+      try { localStorage.setItem("akini_icity_diaries", n); } catch (x) {}
+      // 同时走 akiniStore 内存缓存，保证本地读取一致
+      if (window.akiniStore && window.akiniStore.memorySet) {
+        window.akiniStore.memorySet("akini_icity_diaries", n);
       }
       (window._idbStore &&
         window._idbStore.backupAll &&
@@ -8748,12 +8751,15 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!we.active || !we.isGroupCall) return;
       if (!window.akiniContacts) return;
       inviteCandidates = [];
-      var currentIds = (we.selectedMembers || []).map(function (m) {
+      // 只有“正在通话中（answered=true）”的联系人才不可再邀请；挂断/未接/拒接的都可以重新邀请
+      var busyIds = (we.selectedMembers || []).filter(function (m) {
+        return m.answered;
+      }).map(function (m) {
         return m.id;
       });
       var contacts = window.akiniContacts.getContacts();
       contacts.forEach(function (c) {
-        if (currentIds.indexOf(c.id) < 0 && c.id !== "me") {
+        if (busyIds.indexOf(c.id) < 0 && c.id !== "me") {
           inviteCandidates.push({
             id: c.id,
             name: c.name,
@@ -8813,6 +8819,11 @@ document.addEventListener("DOMContentLoaded", function () {
         rejectProb = 1 - answerProb - missProb;
       if (rejectProb < 0) rejectProb = 0;
       selected.forEach(function (t, a) {
+        // 若该联系人之前已在通话列表里（未接/拒接/挂断），先移除旧记录，避免重复
+        we.selectedMembers = (we.selectedMembers || []).filter(function (m) {
+          return m.id !== t.id;
+        });
+        t.answered = false;
         we.selectedMembers.push(t);
         var delay = 1e3 * (1 + 3 * Math.random()) + 800 * a;
         setTimeout(function () {
