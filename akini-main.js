@@ -4170,7 +4170,7 @@ document.addEventListener("DOMContentLoaded", function () {
           t.id ||
             ((t.id = Date.now() + "_" + Math.floor(1e3 * Math.random())),
             (e = !0));
-          // 评论按稳定 key 去重：只删除完全相同的备份（author+replyTo+text+ts），保留时间不同的合法重复
+          // 评论按稳定 key 去重：优先用 id，无 id 时用 author+replyTo+text+ts；给无 id 评论补 id 防误删
           if (t.comments && t.comments.length > 0) {
             var seen = {},
               deduped = [];
@@ -4179,7 +4179,11 @@ document.addEventListener("DOMContentLoaded", function () {
                 e = !0;
                 return;
               }
-              var k = (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0);
+              if (!c.id) {
+                c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
+                e = !0;
+              }
+              var k = c.id || ((c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0));
               if (!seen[k]) {
                 seen[k] = !0;
                 deduped.push(c);
@@ -4263,14 +4267,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 var seen = {};
                 oc.forEach(function (c) {
                   if (!c || typeof c !== "object") return;
-                  var k = (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0);
+                  if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
+                  var k = c.id;
                   seen[k] = !0;
                 });
                 nc.forEach(function (c) {
                   if (!c || typeof c !== "object") return;
-                  // 给无 id 评论补 id 便于调试
                   if (!c.id) c.id = "c_" + Math.random().toString(36).slice(2) + "_" + (c.ts || Date.now());
-                  var k = (c.author || "") + "|" + (c.replyTo || "") + "|" + (c.text || "") + "|" + (c.ts || 0);
+                  var k = c.id;
                   if (!seen[k]) {
                     seen[k] = !0;
                     allComments.push(c);
@@ -7343,6 +7347,13 @@ document.addEventListener("DOMContentLoaded", function () {
           });
           var a = localStorage.getItem("akini_my_name") || "我",
             o = localStorage.getItem("akini_ta_name") || "对方";
+          var _triggerContactReply = function (momentId, targetName) {
+            try {
+              if (window.akiniOnMomentUserReply) {
+                window.akiniOnMomentUserReply(momentId, targetName, "friends");
+              }
+            } catch (_e) {}
+          };
           if (_commentReplyIdx !== null && _commentCommentIdx !== null) {
             var c = r[_commentReplyIdx];
             if (!c) return closeCommentModal();
@@ -7350,6 +7361,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!l) return closeCommentModal();
             c.comments = c.comments || [];
             c.comments.push({
+              id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
               author: a,
               text: text,
               replyTo: l.author,
@@ -7360,16 +7372,12 @@ document.addEventListener("DOMContentLoaded", function () {
               R(r);
             } catch (_e) {}
             // 通知朋友圈引擎：用户回复了某联系人，该联系人将再回复一条
-            try {
-              if (window.akiniOnMomentUserReply) {
-                window.akiniOnMomentUserReply(c.ts, l.author, "friends");
-              }
-            } catch (_e2) {}
+            _triggerContactReply(c.ts, l.author);
           } else if (_commentPidx !== null) {
             var e = r[_commentPidx];
             if (!e) return closeCommentModal();
             e.comments = e.comments || [];
-            e.comments.push({ author: a, text: text, ts: Date.now() });
+            e.comments.push({ id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(), author: a, text: text, ts: Date.now() });
             try {
               R(r);
               if (window._idbStore && window._idbStore.set) {
@@ -7378,7 +7386,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 window._idbStore.set("akini_posts_backup", _pc);
               }
             } catch (e) {}
-            // 用户直接评论自己朋友圈（非回复联系人）不触发联系人再回复
+            // 用户评论朋友圈（含自己动态）都触发联系人再回复：优先回复者为动态作者，否则随机联系人
+            var postAuthor = e.author || o;
+            _triggerContactReply(e.ts, postAuthor);
           }
           (R(r),
             window._renderPosts && window._renderPosts(),
@@ -7526,34 +7536,6 @@ document.addEventListener("DOMContentLoaded", function () {
               n +
               '" style="background:none;border:none;padding:0;cursor:pointer;font-size:18px;color:#333;outline:none;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round style="width:20px;height:20px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button></div></div></div>' +
               d),
-            (function (t, e) {
-              var n = null;
-              function i(t) {
-                n && (clearTimeout(n), (n = null));
-              }
-              (t.addEventListener(
-                "touchstart",
-                function (t) {
-                  (n && clearTimeout(n),
-                    (n = setTimeout(function () {
-                      if (((n = null), confirm("确定要删除这条朋友圈吗？"))) {
-                        var t = O(),
-                          i = t.filter(function (t) {
-                            return t.id !== e.id;
-                          });
-                        i.length !== t.length &&
-                          (R(i), window._renderPosts && window._renderPosts());
-                      }
-                    }, 600)));
-                },
-                { passive: !0 },
-              ),
-                t.addEventListener("touchend", i),
-                t.addEventListener("touchmove", i),
-                t.addEventListener("contextmenu", function (t) {
-                  t.preventDefault();
-                }));
-            })(u, t),
             e.appendChild(u));
         }),
           (e.onclick = function (e) {
@@ -10419,6 +10401,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     "🐱";
                   a[r].comments = a[r].comments || [];
                   var l = {
+                    id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
                     author: c,
                     authorId: "me",
                     text: i,
@@ -10435,16 +10418,18 @@ document.addEventListener("DOMContentLoaded", function () {
                     n("icityMyProfileDiaries", "me"),
                     n("icityTaProfileDiaries", "ta"),
                     o(a[r]));
-                  // 用户回复了某条评论（联系人或 TA），通知引擎让对应联系人再回复一条
-                  if (l.replyTo) {
-                    var s = localStorage.getItem("akini_icity_ta_nick") || "对方";
-                    if (l.replyTo === s) {
-                      delete _taPending["cmt_" + e._currentDiaryId];
-                      delete _taPending["reply_" + e._currentDiaryId];
-                    }
-                    window.akiniOnMomentUserReply &&
-                      window.akiniOnMomentUserReply(e._currentDiaryId, l.replyTo, "icity");
+                  // 用户评论/回复 iCity 都触发联系人再回复：优先回复被回复者，否则该日记作者
+                  var _icityReplyTarget = l.replyTo;
+                  if (!_icityReplyTarget) {
+                    _icityReplyTarget = a[r].author || localStorage.getItem("akini_icity_ta_nick") || "对方";
                   }
+                  var s = localStorage.getItem("akini_icity_ta_nick") || "对方";
+                  if (l.replyTo === s) {
+                    delete _taPending["cmt_" + e._currentDiaryId];
+                    delete _taPending["reply_" + e._currentDiaryId];
+                  }
+                  window.akiniOnMomentUserReply &&
+                    window.akiniOnMomentUserReply(e._currentDiaryId, _icityReplyTarget, "icity");
                 }
               }
             }
@@ -13205,6 +13190,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     } else {
                       ((e.comments = e.comments || []),
                         e.comments.push({
+                          id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
                           author: n,
                           text: t.text,
                           replyTo: t.replyTo || a,
@@ -13228,6 +13214,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   } else {
                     ((e.comments = e.comments || []),
                       e.comments.push({
+                        id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
                         author: n,
                         text: t.text,
                         replyTo: t.replyTo || a,
@@ -13309,6 +13296,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   if (v >= 0) {
                     l[v].comments = l[v].comments || [];
                     l[v].comments.push({
+                      id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
                       author: n,
                       text: y,
                       replyTo: a,
@@ -14386,6 +14374,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (!g) break;
                 ((f.repliedByTa = !0),
                   n.comments.push({
+                    id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
                     author: l,
                     authorId: n.authorId,
                     text: g,

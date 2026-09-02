@@ -279,17 +279,25 @@
   // contactIdOrName: 被回复的联系人 id 或名字
   // app: 'friends' | 'icity'
   window.akiniOnMomentUserReply = function (momentId, contactIdOrName, app) {
-    if (!momentId || !contactIdOrName) return;
-    var contact = getContactById(contactIdOrName);
-    if (!contact) {
-      // 尝试按名字查找
-      var contacts = getContacts();
-      for (var i = 0; i < contacts.length; i++) {
-        if (getContactName(contacts[i]) === contactIdOrName) {
-          contact = contacts[i];
-          break;
+    if (!momentId) return;
+    var targetName = contactIdOrName || '';
+    var contact = null;
+    var contacts = getContacts();
+    if (targetName) {
+      contact = getContactById(targetName);
+      if (!contact) {
+        // 尝试按名字查找
+        for (var i = 0; i < contacts.length; i++) {
+          if (getContactName(contacts[i]) === targetName) {
+            contact = contacts[i];
+            break;
+          }
         }
       }
+    }
+    // 如果目标不是联系人（比如回复自己/用户自己），随机选一个联系人来回复
+    if (!contact && contacts.length) {
+      contact = contacts[Math.floor(Math.random() * contacts.length)];
     }
     if (!contact) return;
 

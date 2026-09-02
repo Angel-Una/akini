@@ -37,7 +37,19 @@
     'akini_stickers_backup',
     'akini_stickers_idx_backup',
     'akini_chat_pins',
-    'akini_chat_pins_backup'
+    'akini_chat_pins_backup',
+    'akini_my_avatar',
+    'akini_my_avatar_backup',
+    'akini_ta_avatar',
+    'akini_ta_avatar_backup',
+    'akini_icity_my_avatar',
+    'akini_icity_my_avatar_backup',
+    'akini_icity_ta_avatar',
+    'akini_icity_ta_avatar_backup',
+    'akini_my_name',
+    'akini_my_name_backup',
+    'akini_ta_name',
+    'akini_ta_name_backup'
   ];
   var CHAT_HISTORY_RE = /^akini_chat_history_/;
   var WB_GROUPS_RE = /^akini_wb_groups_/;
@@ -269,7 +281,9 @@
     var keys = [
       'akini_contacts','akini_groups','akini_chat_sessions','akini_home_avatars',
       'akini_mail_sent','akini_mail_received','akini_posts','akini_icity_diaries',
-      'akini_wordbank','akini_wb_groups','akini_stickers','akini_stickers_idx','akini_chat_pins'
+      'akini_wordbank','akini_wb_groups','akini_stickers','akini_stickers_idx','akini_chat_pins',
+      'akini_my_avatar','akini_ta_avatar','akini_icity_my_avatar','akini_icity_ta_avatar',
+      'akini_my_name','akini_ta_name'
     ];
     var out = [];
     keys.forEach(function (k) { out.push(k); out.push(k + '_backup'); });
