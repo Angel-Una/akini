@@ -60,24 +60,36 @@
   // 从字卡库取可用文字（排除拍一拍 pat）
   function getWordbankTexts() {
     var out = [];
+    var seen = {};
+    function addFromRaw(raw) {
+      if (!raw) return;
+      try {
+        var arr = JSON.parse(raw);
+        if (!Array.isArray(arr)) return;
+        arr.forEach(function (item) {
+          var t = typeof item === 'string' ? item : (item && item.text);
+          if (!t || !String(t).trim()) return;
+          var tab = ((item && item.tab) || '').toLowerCase();
+          var type = ((item && item.type) || '').toLowerCase();
+          if (tab === 'pat' || type === 'pat') return;
+          var key = String(t).trim();
+          if (!seen[key]) {
+            seen[key] = true;
+            out.push(key);
+          }
+        });
+      } catch (e) {}
+    }
     try {
+      // 优先从内存缓存读取（与 akiniStore 同步），避免 localStorage 配额空时无法取到字卡
+      if (window.akiniStore && window.akiniStore.memoryGet) {
+        addFromRaw(window.akiniStore.memoryGet('akini_wordbank'));
+      }
+      // 兜底 localStorage
       var keys = Object.keys(localStorage);
       keys.forEach(function (k) {
         if (k.indexOf('akini_wordbank') === 0) {
-          var raw = localStorage.getItem(k);
-          if (raw) {
-            var arr = JSON.parse(raw);
-            if (Array.isArray(arr)) {
-              arr.forEach(function (item) {
-                var t = typeof item === 'string' ? item : (item && item.text);
-                if (!t || !String(t).trim()) return;
-                var tab = ((item && item.tab) || '').toLowerCase();
-                var type = ((item && item.type) || '').toLowerCase();
-                if (tab === 'pat' || type === 'pat') return;
-                out.push(String(t).trim());
-              });
-            }
-          }
+          addFromRaw(localStorage.getItem(k));
         }
       });
     } catch (e) {}
