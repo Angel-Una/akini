@@ -461,11 +461,61 @@
     getEnvelopeData: function () { return envelopeData; }
   };
 
+  // 从 syy 的 localforage 恢复关键数据到 Akini localStorage（防止迁移后数据丢失）
+  async function restoreFromSyyToAkini() {
+    try {
+      // 恢复 iCity 日记
+      const currentDiaries = safeGetItem('akini_icity_diaries');
+      let currentArr = [];
+      try { currentArr = JSON.parse(currentDiaries || '[]'); } catch (e) {}
+      if (!Array.isArray(currentArr) || currentArr.length === 0) {
+        const syyDiaries = await localforage.getItem(getStorageKey('diaryEntries'));
+        if (syyDiaries && Array.isArray(syyDiaries) && syyDiaries.length > 0) {
+          safeSetItem('akini_icity_diaries', JSON.stringify(syyDiaries));
+          safeSetItem('akini_icity_diaries_backup', JSON.stringify(syyDiaries));
+          console.log('[akini-syy-bridge] 从 localforage 恢复 iCity 日记:', syyDiaries.length);
+        }
+      }
+      // 恢复朋友圈帖子
+      const currentPosts = safeGetItem('akini_posts');
+      let postsArr = [];
+      try { postsArr = JSON.parse(currentPosts || '[]'); } catch (e) {}
+      if (!Array.isArray(postsArr) || postsArr.length === 0) {
+        const syyPosts = await localforage.getItem(APP_PREFIX + 'moments_data');
+        if (!syyPosts) {
+          // 旧版存的是 moments_data
+          const legacy = safeGetItem('moments_data');
+          try { if (legacy) syyPosts = JSON.parse(legacy); } catch (e) {}
+        }
+        if (syyPosts && Array.isArray(syyPosts) && syyPosts.length > 0) {
+          safeSetItem('akini_posts', JSON.stringify(syyPosts));
+          safeSetItem('akini_posts_backup', JSON.stringify(syyPosts));
+          console.log('[akini-syy-bridge] 从 localforage 恢复朋友圈帖子:', syyPosts.length);
+        }
+      }
+      // 触发一次 iCity 安全合并，确保新恢复的本地数据被合并进内存
+      try {
+        if (typeof window._icitySafetyMerge === 'function') window._icitySafetyMerge();
+      } catch (e) {}
+      // 触发一次朋友圈 IDB 合并
+      try {
+        if (window._idbStore && window._idbStore.get) {
+          window._idbStore.get('akini_posts', function (v) {
+            if (v && typeof __akiniMergeFriendsPostsFromIDB === 'function') __akiniMergeFriendsPostsFromIDB(v);
+          });
+        }
+      } catch (e) {}
+    } catch (e) {
+      console.warn('[akini-syy-bridge] 恢复数据失败', e);
+    }
+  }
+
   // 页面加载完成后执行迁移与定时检查
   function init() {
     migrateAkiniToSyy().then(function () {
       loadEnvelopeData();
       setInterval(checkEnvelopeStatus, 30000); // 每 30 秒检查一次回信
+      return restoreFromSyyToAkini();
     });
   }
 

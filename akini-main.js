@@ -4089,10 +4089,42 @@ document.addEventListener("DOMContentLoaded", function () {
       return z;
     }
     function _applyPosts(parsed) {
-      if (Array.isArray(parsed) && parsed.length) {
+      if (!Array.isArray(parsed) || !parsed.length) return;
+      if (!z || !z.length) {
         z = parsed;
-        if ("function" == typeof window._renderPosts) window._renderPosts();
+      } else {
+        // 合并：以内存中较新的点赞/评论为准，ID 相同的数据取并集
+        var idxMap = {};
+        var merged = [];
+        z.forEach(function(p) { if (p && p.id) idxMap[p.id] = p; });
+        parsed.forEach(function(p) {
+          if (!p || !p.id) return;
+          if (!idxMap[p.id]) {
+            idxMap[p.id] = p;
+            return;
+          }
+          var existing = idxMap[p.id];
+          // 合并评论
+          if (p.comments && p.comments.length) {
+            existing.comments = existing.comments || [];
+            p.comments.forEach(function(c) {
+              if (!c || typeof c !== 'object') return;
+              if (!c.id) c.id = 'pc_' + Math.random().toString(36).slice(2) + '_' + (c.ts || Date.now());
+              var exists = existing.comments.some(function(x) { return x.id === c.id; });
+              if (!exists) existing.comments.push(c);
+            });
+          }
+          // 合并点赞
+          if (p.likers && p.likers.length) {
+            existing.likers = existing.likers || [];
+            p.likers.forEach(function(l) { if (existing.likers.indexOf(l) < 0) existing.likers.push(l); });
+          }
+          if (typeof p.likes === 'number') existing.likes = Math.max(existing.likes || 0, p.likes);
+        });
+        merged = Object.keys(idxMap).map(function(k) { return idxMap[k]; });
+        z = merged;
       }
+      R(z, function() { if ("function" == typeof window._renderPosts) window._renderPosts(); });
     }
     function R(t, e) {
       // 加固：若传入数组是过滤副本（如 filter 掉 icity），先合并回内存 z 中的 icity 帖子
@@ -4366,10 +4398,49 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
       // 内存已有数据时合并，保证评论只增不减
-      if ($(JSON.stringify(parsed), !0)) {
+      var merged = _mergeIcityDiaries(F, parsed);
+      var before = (F || []).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0);
+      var after = merged.reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0);
+      if (after >= before) {
+        F = merged;
         j(F);
-        if ("function" == typeof window._renderIcity) window._renderIcity();
       }
+      if ("function" == typeof window._renderIcity) window._renderIcity();
+    }
+    // 合并两组 iCity 日记：按日记 id 合并，评论去重，保证不丢失任何一方数据
+    function _mergeIcityDiaries(a, b) {
+      var map = {};
+      function addList(list) {
+        (list || []).forEach(function(d) {
+          if (!d || !d.id) return;
+          if (!map[d.id]) map[d.id] = Object.assign({}, d, { comments: [] });
+          var target = map[d.id];
+          // 合并文本/图片等基础字段，取非空值
+          ['text','author','authorId','avatar','ts','likes','source','images','location','mood','visibility'].forEach(function(k) {
+            if (d[k] !== undefined && d[k] !== null && d[k] !== '') target[k] = d[k];
+          });
+          if (typeof d.likes === 'number') target.likes = Math.max(target.likes || 0, d.likes);
+          // 合并评论
+          (d.comments || []).forEach(function(c) {
+            if (!c || typeof c !== 'object') return;
+            if (!c.id) c.id = 'c_' + Math.random().toString(36).slice(2) + '_' + (c.ts || Date.now());
+            var exists = target.comments.some(function(x) { return x.id === c.id; });
+            if (!exists) target.comments.push(c);
+          });
+          // 合并点赞人
+          if (d.likers && d.likers.length) {
+            target.likers = target.likers || [];
+            d.likers.forEach(function(l) { if (target.likers.indexOf(l) < 0) target.likers.push(l); });
+          }
+        });
+      }
+      addList(a);
+      addList(b);
+      return Object.keys(map).map(function(k) {
+        var d = map[k];
+        d.comments = d.comments.sort(function(x, y) { return (x.ts || 0) - (y.ts || 0); });
+        return d;
+      }).sort(function(x, y) { return (y.ts || 0) - (x.ts || 0); });
     }
     function j(t, e) {
       F = t || [];
