@@ -13861,8 +13861,8 @@ document.addEventListener("DOMContentLoaded", function () {
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260913") {
-            localStorage.setItem("akini_app_version", "20260913");
+          if (ver !== "20260944") {
+            localStorage.setItem("akini_app_version", "20260944");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.setItem("akini_toggle_contactPokeToggle", "1");
             localStorage.setItem("akini_toggle_contactFriendsToggle", "1");
