@@ -8,6 +8,20 @@
       hour: "2-digit", minute: "2-digit", hour12: false,
     });
   }
+  function fmtDateAt(ts) {
+    return new Date(ts).toLocaleString("zh-CN", {
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hour12: false,
+    });
+  }
+
+  // 记录最近活跃时间，用于离线补发来信时还原"离线期间"的时间段
+  function markActive() {
+    try { localStorage.setItem("akini_mail_last_active", String(Date.now())); } catch (e) {}
+  }
+  function lastActiveTs() {
+    try { return parseInt(localStorage.getItem("akini_mail_last_active") || "0", 10) || 0; } catch (e) { return 0; }
+  }
 
   function getSent() {
     return window.akiniStore && window.akiniStore.getSync
@@ -63,7 +77,9 @@
           var recv = getReceived();
           recv.push({
             content: s.replyContent || genLetter(),
-            date: fmtDate(),
+            // 用回信预约时间作为显示时间，还原"离线期间"对方回信的时间段
+            date: fmtDateAt(s.replyTime),
+            ts: s.replyTime,
             from: s.replyFromName || s.to || "对方",
             fromId: s.replyFromId || s.toId,
             subtype: "reply",
@@ -158,6 +174,7 @@
   window.akiniMailEngine = {
     checkStatus: checkStatus,
     start: start,
+    markActive: markActive,
   };
 
   // 等待数据恢复完成后启动
@@ -173,6 +190,16 @@
     }, 200);
   }
   boot();
+
+  // 应用可见时刷新活跃时间；切到后台再回来时触发离线补发，还原"离线期间"来信时间段
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      if (window.akiniMailEngine && window.akiniMailEngine.checkStatus) window.akiniMailEngine.checkStatus();
+      markActive();
+    }
+  });
+  // 周期性更新活跃时间（应用在前台时）
+  setInterval(markActive, 60000);
 
   console.log("[akini-mail-engine] 信箱离线回信/主动来信引擎已加载（syy envelope 模式）");
 })();

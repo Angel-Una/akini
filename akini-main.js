@@ -4583,7 +4583,22 @@ document.addEventListener("DOMContentLoaded", function () {
     // 绝不能直接覆盖内存 F，否则会丢掉用户刚发但尚未写回 IDB 的评论
     function _applyIcityParsed(parsed) {
       console.log("[iCity] _applyIcityParsed,异步数据日记数:", (parsed||[]).length, "评论总数:", (parsed||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0), "内存已有:", (F||[]).length);
-      if (!Array.isArray(parsed) || !parsed.length) return;
+      if (!Array.isArray(parsed) || !parsed.length) {
+        // 即使异步数据为空，也兜底合并独立评论备份，防止主存丢失时评论无法恢复
+        try {
+          if (typeof _loadIcityCommentBackups === "function") {
+            var bk = _loadIcityCommentBackups();
+            if (bk && bk.length && F && F.length) {
+              var bkMerged = _mergeIcityDiaries(F, bk);
+              if (bkMerged.reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0) >= (F||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0)) {
+                F = bkMerged;
+                if ("function" == typeof window._renderIcity) window._renderIcity();
+              }
+            }
+          }
+        } catch (e) {}
+        return;
+      }
       if (!F || !F.length) {
         F = parsed;
         j(F);
@@ -4592,6 +4607,13 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       // 内存已有数据时合并，保证评论只增不减
       var merged = _mergeIcityDiaries(F, parsed);
+      // 最后兜底：合并每条日记的独立评论备份（localStorage 配额满 / 主存被覆盖时）
+      try {
+        if (typeof _loadIcityCommentBackups === "function") {
+          var backups = _loadIcityCommentBackups();
+          if (backups && backups.length) merged = _mergeIcityDiaries(merged, backups);
+        }
+      } catch (e) {}
       var before = (F || []).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0);
       var after = merged.reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0);
       if (after >= before) {
@@ -10809,6 +10831,25 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       function o(t) {
+        // 渲染评论前最后兜底：从所有备份源恢复评论到内存，确保即使 F 被旧数据覆盖也能显示
+        try {
+          if (typeof _loadIcityCommentBackups === "function" && typeof _mergeIcityDiaries === "function") {
+            var backups = _loadIcityCommentBackups();
+            if (backups && backups.length) {
+              var before = (F || []).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0);
+              var merged = _mergeIcityDiaries(F || [], backups);
+              var after = merged.reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0);
+              if (after > before) {
+                F = merged;
+                if (typeof j === "function") j(F);
+              }
+              // 用恢复后的最新日记替换传入的 t
+              for (var fi = 0; fi < F.length; fi++) {
+                if (F[fi] && F[fi].id === t.id) { t = F[fi]; break; }
+              }
+            }
+          }
+        } catch (_e) {}
         var e = localStorage.getItem("akini_icity_my_nick") || "我",
           n = t.likers || [],
           i = t.liked || n.indexOf(e) >= 0,
@@ -12542,10 +12583,20 @@ document.addEventListener("DOMContentLoaded", function () {
                     var dd = String(dt.getDate()).padStart(2,"0");
                     var hh = String(dt.getHours()).padStart(2,"0");
                     var mm = String(dt.getMinutes()).padStart(2,"0");
-                    return yyyy + "-" + mo + "-" + dd + " " + hh + ":" + mm;
+                    // 12 小时制
+                    var h12 = dt.getHours() % 12;
+                    if (h12 === 0) h12 = 12;
+                    var h12s = String(h12).padStart(2,"0");
+                    var ampm = dt.getHours() < 12 ? "AM" : "PM";
+                    var full = yyyy + "-" + mo + "-" + dd + " " + hh + ":" + mm;
+                    var t12 = h12s + ":" + mm + " " + ampm;
+                    return '<span style="display:inline-flex;align-items:center;gap:6px;">' +
+                      '<span style="font-size:12px;color:#888;">' + full + '</span>' +
+                      '<span style="font-size:11px;color:#b08; background:#fce8f3; padding:1px 6px; border-radius:8px; font-weight:600;">' + t12 + '</span>' +
+                      '</span>';
                   } catch(err) { return d; }
                 }
-                return '<div style="font-size:12px;color:#888;">' + formatMailDate(e.date || "") + "</div>";
+                return formatMailDate(e.date || "");
               })()),
             n.addEventListener("click", function () {
               Date.now() - An < 500 ||
@@ -12562,7 +12613,16 @@ document.addEventListener("DOMContentLoaded", function () {
                       var dd = String(dt.getDate()).padStart(2, "0");
                       var hh = String(dt.getHours()).padStart(2, "0");
                       var mm = String(dt.getMinutes()).padStart(2, "0");
-                      return yyyy + "-" + mo + "-" + dd + " " + hh + ":" + mm;
+                      var h12 = dt.getHours() % 12;
+                      if (h12 === 0) h12 = 12;
+                      var h12s = String(h12).padStart(2, "0");
+                      var ampm = dt.getHours() < 12 ? "AM" : "PM";
+                      var full = yyyy + "-" + mo + "-" + dd + " " + hh + ":" + mm;
+                      var t12 = h12s + ":" + mm + " " + ampm;
+                      return '<span style="display:inline-flex;align-items:center;gap:6px;">' +
+                        '<span style="font-size:12px;color:#888;">' + full + '</span>' +
+                        '<span style="font-size:11px;color:#b08; background:#fce8f3; padding:1px 6px; border-radius:8px; font-weight:600;">' + t12 + '</span>' +
+                        '</span>';
                     } catch (e) {
                       return d;
                     }
@@ -12616,7 +12676,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       : "reply" === t.subtype
                         ? (o.textContent = a + "回复了" + n)
                         : (o.textContent = a + "寄给" + n)),
-                    r && (r.textContent = formatMailDate(t.date || "")),
+                    r && (r.innerHTML = formatMailDate(t.date || "")),
                     c &&
                       ("reply" === t.subtype && t.originalContent
                         ? (function () {
@@ -14333,6 +14393,17 @@ document.addEventListener("DOMContentLoaded", function () {
                           "0",
                         )),
                         alert("请在浏览器设置中允许通知权限"));
+                    } else {
+                      // 授权成功后自动开启保活，确保 iOS 主屏/安卓后台也能收到消息通知
+                      try {
+                        var ka = document.getElementById("keepAliveToggle");
+                        if (ka && !ka.classList.contains("on")) {
+                          ka.classList.add("on");
+                          localStorage.setItem("akini_toggle_keepAliveToggle", "1");
+                          "function" == typeof window.requestWakeLock && window.requestWakeLock();
+                          "function" == typeof startKeepAliveIsland && startKeepAliveIsland();
+                        }
+                      } catch (e) {}
                     }
                   });
                 else if ("denied" === Notification.permission) {
@@ -14341,6 +14412,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     (t.classList.remove("on"),
                     localStorage.setItem("akini_toggle_pushNotifyToggle", "0")),
                     alert("通知权限已被拒绝，请在浏览器设置中手动开启"));
+                } else {
+                  // 已授权：同样确保保活开启
+                  try {
+                    var ka2 = document.getElementById("keepAliveToggle");
+                    if (ka2 && !ka2.classList.contains("on")) {
+                      ka2.classList.add("on");
+                      localStorage.setItem("akini_toggle_keepAliveToggle", "1");
+                      "function" == typeof window.requestWakeLock && window.requestWakeLock();
+                      "function" == typeof startKeepAliveIsland && startKeepAliveIsland();
+                    }
+                  } catch (e) {}
                 }
               } else alert("此浏览器不支持通知功能");
           }));
@@ -14374,7 +14456,13 @@ document.addEventListener("DOMContentLoaded", function () {
               : sanitized.name
                 ? (i += " · " + sanitized.name)
                 : sanitized.groupName && (i += " · " + sanitized.groupName);
-            var d = new Notification(i, { body: body, icon: "./favicon.png" });
+            // 每条消息使用唯一 tag（chatId+时间戳），确保同时收到多条消息时各自独立通知、不会重叠成一条
+            var d = new Notification(i, {
+              body: body,
+              icon: "./favicon.png",
+              tag: "akini_" + (sanitized.chatId || "msg") + "_" + (sanitized.ts || Date.now()),
+              renotify: true,
+            });
             d.onclick = function () {
               (window.focus && window.focus(), d.close(), t.onTap && t.onTap());
             };
