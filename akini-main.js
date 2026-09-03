@@ -4318,6 +4318,13 @@ document.addEventListener("DOMContentLoaded", function () {
           window._akiniSaveDiaries &&
             window._akiniSaveDiaries(window._akiniGetDiaries());
         } catch (e) {}
+      }),
+      window.addEventListener("beforeunload", function () {
+        try {
+          window._akiniSaveDiaries &&
+            window._akiniSaveDiaries(window._akiniGetDiaries());
+          if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge();
+        } catch (e) {}
       }));
     function q() {
       // F 为空时重新读取；空数组且尚未完成 IDB 校验时也重新读取，避免启动竞态读到空默认值
@@ -4335,6 +4342,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (!parsed) {
                   var ls = localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
                   if (ls) { try { parsed = JSON.parse(ls); } catch (e) { parsed = null; } }
+                }
+                if (!parsed) {
+                  var es = sessionStorage.getItem("akini_icity_diaries_emergency");
+                  if (es) { try { parsed = JSON.parse(es); } catch (e) { parsed = null; } }
                 }
                 _applyIcityParsed(parsed);
               });
@@ -4445,7 +4456,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function j(t, e) {
       F = t || [];
       var n = JSON.stringify(F);
-      // iCity 评论持久化：内存缓存 + 主存/备份/LocalStorage 三写，确保刷新不丢
+      // iCity 评论持久化：内存缓存 + 主存/备份/LocalStorage/SessionStorage 四写，确保刷新不丢
       if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet("akini_icity_diaries", n);
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_icity_diaries", n);
@@ -4454,8 +4465,13 @@ document.addEventListener("DOMContentLoaded", function () {
         window._idbStore.set("akini_icity_diaries", n);
         window._idbStore.set("akini_icity_diaries_backup", n);
       }
-      try { localStorage.setItem("akini_icity_diaries", n); } catch (x) { console.warn("[iCity] localStorage写满,仅存IDB", x); }
-      try { localStorage.setItem("akini_icity_diaries_backup", n); } catch (x) {}
+      var lsOk = false;
+      try { localStorage.setItem("akini_icity_diaries", n); lsOk = true; } catch (x) { console.warn("[iCity] localStorage写满,仅存IDB", x); }
+      try { localStorage.setItem("akini_icity_diaries_backup", n); lsOk = true; } catch (x) {}
+      // localStorage 失败或不可用时，立即写入 sessionStorage 作为应急兜底（刷新/返回时仍可恢复）
+      if (!lsOk) {
+        try { sessionStorage.setItem("akini_icity_diaries_emergency", n); } catch (x) {}
+      }
       console.log("[iCity] 持久化,日记数:", F.length, "评论总数:", (F||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
       (window._idbStore &&
         window._idbStore.backupAll &&
@@ -4737,6 +4753,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var sources = [F];
         try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries"))); } catch (e) {}
         try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries_backup"))); } catch (e) {}
+        try { sources.push(parseArr(sessionStorage.getItem("akini_icity_diaries_emergency"))); } catch (e) {}
         try { _loadIcityCommentBackups().forEach(function (b) { sources.push(b); }); } catch (e) {}
         var merged = reconcile(sources);
         var before = 0; (F || []).forEach(function (d) { d && d.comments && (before += d.comments.length); });
@@ -4757,6 +4774,7 @@ document.addEventListener("DOMContentLoaded", function () {
             var sources = [F, parseArr(v), parseArr(v2)];
             try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries"))); } catch (e) {}
             try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries_backup"))); } catch (e) {}
+            try { sources.push(parseArr(sessionStorage.getItem("akini_icity_diaries_emergency"))); } catch (e) {}
             try { _loadIcityCommentBackups().forEach(function (b) { sources.push(b); }); } catch (e) {}
             var merged = reconcile(sources);
             var before = 0; (F || []).forEach(function (d) { d && d.comments && (before += d.comments.length); });
