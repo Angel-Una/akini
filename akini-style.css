@@ -909,8 +909,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   align-items: center;
   justify-content: space-between;
   padding: calc(0px + env(safe-area-inset-top, 0px)) 12px 4px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(6px);
+  /* iOS Safari 崩溃修复：position:fixed + backdrop-filter 会在切换 App 时崩溃渲染进程，改用不透明背景 */
+  background: rgba(255, 255, 255, 0.97);
   border-bottom: 1px solid #e8e8e8;
   z-index: 100;
   height: calc(50px + env(safe-area-inset-top, 0px));
@@ -1672,7 +1672,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   height: 100% !important;
   object-fit: cover !important;
 }
-.chat-body .msg-row .bubble {
+.chat-body .msg-row .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   padding: 9px 16px;
   border-radius: 999px !important;
   max-width: 65%;
@@ -1811,42 +1811,42 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #fff;
   font-weight: 500;
 }
-.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble) {
+.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #e9e9eb !important;
   color: #111 !important;
 }
 body.bubble-pink
   .chat-body
   .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble) {
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #ffd1dc;
   color: #111;
 }
 body.bubble-blue
   .chat-body
   .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble) {
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #007aff;
   color: #fff;
 }
 body.bubble-green
   .chat-body
   .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble) {
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #07c160;
   color: #fff;
 }
 body.bubble-black
   .chat-body
   .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble) {
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #111;
   color: #fff;
 }
 body.bubble-gray
   .chat-body
   .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble) {
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #e9e9eb;
   color: #111;
 }
@@ -1861,7 +1861,7 @@ body.bubble-gray
 .chat-body .msg-row.ta .bubble.transfer-bubble {
   background: #222 !important;
 }
-.chat-body .msg-row.other .bubble {
+.chat-body .msg-row.other .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   background: #fff;
   color: #111;
 }
@@ -4108,9 +4108,8 @@ body.dark-mode .wbItem {
   }
 }
 #inAppNotifBanner .notif-inner {
-  background: rgba(245, 245, 247, 0.88);
-  backdrop-filter: blur(28px) saturate(1.8);
-  -webkit-backdrop-filter: blur(28px) saturate(1.8);
+  /* iOS 修复：移除 backdrop-filter，改用不透明固态背景，避免多个 blur 层叠导致渲染崩溃 */
+  background: rgba(240, 240, 245, 0.98);
   border-radius: 999px;
   padding: 10px 18px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22);

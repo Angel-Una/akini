@@ -220,23 +220,10 @@ window.AKR = (function () {
     } catch (e) {}
     return !0;
   }
-  /* 一次回复的消息条数：读取设置页私聊/群聊字卡数量范围 */
-  function getCardCount(type) {
-    try {
-      var isGroup = type === "group";
-      var minKey = isGroup ? "akini_num_replyCardCountGroupMin" : "akini_num_replyCardCountMin";
-      var maxKey = isGroup ? "akini_num_replyCardCountGroupMax" : "akini_num_replyCardCountMax";
-      var mn = parseInt(localStorage.getItem(minKey) || "", 10);
-      var mx = parseInt(localStorage.getItem(maxKey) || "", 10);
-      if (isNaN(mn) || mn < 1) mn = 1;
-      if (isNaN(mx) || mx < mn) mx = mn;
-      mn = Math.max(1, Math.min(20, mn));
-      mx = Math.max(1, Math.min(20, mx));
-      return mn >= mx ? mn : Math.floor(Math.random() * (mx - mn + 1)) + mn;
-    } catch (e) {
-      var r = Math.random();
-      return r < 0.55 ? 1 : r < 0.88 ? 2 : 3;
-    }
+  /* syy 逻辑：一次回复的消息条数固定概率 1/2/3 */
+  function getReplyCount() {
+    var r = Math.random();
+    return r < 0.75 ? 1 : r < 0.95 ? 2 : 3;
   }
   /* 回复行为：未开“已读不回”时必回；开启后才按概率已读不回；3% 概率触发拍一拍 */
   function pickReplyBehavior() {
@@ -246,7 +233,7 @@ window.AKR = (function () {
     } catch (e) {}
     if (readNoReply) {
       if (Math.random() < getProb("noReply"))
-        return { type: "none", cardCount: 0, extra: {} };
+        return { type: "none", extra: {} };
     }
     var extra = {};
     if (Math.random() < getProb("poke")) extra.poke = true;
@@ -254,14 +241,13 @@ window.AKR = (function () {
       extra.emojiMix = true;
     return {
       type: "text",
-      cardCount: getCardCount("private"),
       extra: extra,
     };
   }
   return {
     getProb: getProb,
     isInTimeRange: isInTimeRange,
-    getCardCount: getCardCount,
+    getReplyCount: getReplyCount,
     pickReplyBehavior: pickReplyBehavior,
     isUserPresent: function () {
       return Date.now() - (window.__akiniLastActive || 0) < 6e5;
@@ -2694,11 +2680,8 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           return (V(), { mentionSender: k });
         }
-        var cc =
-          o.cardCount || (window.AKR && window.AKR.getCardCount)
-            ? window.AKR.getCardCount(s ? "group" : "private")
-            : 1;
-        cc = Math.max(1, Math.min(20, parseInt(cc, 10) || 1));
+        // syy 逻辑：固定概率 1/2/3 条，每条作为独立消息发送
+        var replyCount = window.AKR.getReplyCount();
         var msgArr = [];
         if (Math.random() < window.AKR.getProb("sticker") && m.length > 0) {
           msgArr.push({
@@ -2708,9 +2691,9 @@ document.addEventListener("DOMContentLoaded", function () {
               '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;">',
             text: "【表情包】",
           });
-          cc = Math.max(1, cc - 1);
+          replyCount = Math.max(1, replyCount - 1);
         }
-        for (var ci = 0; ci < cc; ci++) {
+        for (var ci = 0; ci < replyCount; ci++) {
           var q = o.forceText
               ? o.forceText
               : f[Math.floor(Math.random() * f.length)],
@@ -2730,81 +2713,82 @@ document.addEventListener("DOMContentLoaded", function () {
             rt(J) +
             "</div>";
         }
-        ((P = s
-          ? '<div class="msg-bubble-wrap"><div class="msg-sender-name">' +
+        Math.random() < window.AKR.getProb("noReply") && (h = !0);
+        // 逐条发送，每条独立气泡（syy 风格）
+        var _sendOne = function (item, isFirst) {
+          var _p = document.createElement("div");
+          _p.className = y;
+          var _P = s
+              ? '<div class="msg-bubble-wrap"><div class="msg-sender-name">' +
+                rt(c.name) +
+                '</div><div class="msg-bubble-row">'
+              : "",
+            _H = s ? "</div></div>" : "";
+          _p.innerHTML =
+            '<div class="msg-content-line">' +
+            _P +
+            '<div class="msg-avatar" data-sender-name="' +
             rt(c.name) +
-            '</div><div class="msg-bubble-row">'
-          : ""),
-          (H = s ? "</div></div>" : ""));
-        ((p.innerHTML =
-          '<div class="msg-content-line">' +
-          P +
-          '<div class="msg-avatar" data-sender-name="' +
-          rt(c.name) +
-          '">' +
-          u +
-          '</div><div class="bubble">' +
-          msgArr
-            .map(function (x) {
-              return x.html;
-            })
-            .join(
-              '<div style="height:1px;background:rgba(255,255,255,0.15);margin:4px 0;"></div>',
-            ) +
-          "</div>" +
-          ($
-            ? '<div style="flex-basis:100%;width:100%;padding-left:44px;box-sizing:border-box;margin-top:2px;">' +
-              $ +
-              "</div>"
-            : "") +
-          H +
-          "</div>" +
-          ""),
-          (v = msgArr
-            .map(function (x) {
-              return x.text;
-            })
-            .join(" ")),
-          Math.random() < window.AKR.getProb("noReply") && (h = !0));
-        if (l && U)
-          (__akiniAppendMessageHTML(t, p.outerHTML, {
-              lastMsg: v,
+            '">' +
+            u +
+            '</div><div class="bubble">' +
+            item.html +
+            "</div>" +
+            (isFirst && $
+              ? '<div style="flex-basis:100%;width:100%;padding-left:44px;box-sizing:border-box;margin-top:2px;">' +
+                $ +
+                "</div>"
+              : "") +
+            _H +
+            "</div>";
+          if (l && U) {
+            __akiniAppendMessageHTML(t, _p.outerHTML, {
+              lastMsg: item.text,
               lastSenderAvatar: c.avatar,
               lastSenderName: c.name,
-            }),
-            S(),
-            (U.scrollTop = U.scrollHeight));
-        else {
-          R =
-            ((G = window.akiniContacts.getSession(t)).messagesHTML || "") +
-            p.outerHTML;
-          var G,
-            K = (G.unread || 0) + 1;
-          (window.akiniContacts.updateSession(t, {
-            messagesHTML: R,
-            lastMsg: v.replace(/^【转账】/, "转账："),
-            lastTime: Date.now(),
-            unread: K,
-            lastSenderAvatar: c.avatar,
-            lastSenderName: c.name,
-          }),
-            C(t, R));
-        }
-        if ((V(), "function" == typeof window.showInAppNotif)) {
-          var X = {
-            app: "微信",
-            appIcon: "💬",
-            avatar: u,
-            name: c.name,
-            fullContent: !0,
-            msg: v,
-            chatId: t,
-            onTap: function () {
-              ct(t);
-            },
-          };
-          (s && (X.groupName = r.name), window.showInAppNotif(X));
-        }
+            });
+            S();
+            U.scrollTop = U.scrollHeight;
+          } else {
+            var _G = window.akiniContacts.getSession(t);
+            var _R = (_G.messagesHTML || "") + _p.outerHTML;
+            window.akiniContacts.updateSession(t, {
+              messagesHTML: _R,
+              lastMsg: item.text.replace(/^【转账】/, "转账："),
+              lastTime: Date.now(),
+              unread: (_G.unread || 0) + 1,
+              lastSenderAvatar: c.avatar,
+              lastSenderName: c.name,
+            });
+            C(t, _R);
+          }
+          V();
+          if ("function" == typeof window.showInAppNotif) {
+            var X = {
+              app: "微信",
+              appIcon: "💬",
+              avatar: u,
+              name: c.name,
+              fullContent: !0,
+              msg: item.text,
+              chatId: t,
+              onTap: function () {
+                ct(t);
+              },
+            };
+            s && (X.groupName = r.name);
+            window.showInAppNotif(X);
+          }
+        };
+        msgArr.forEach(function (item, idx) {
+          if (idx === 0) {
+            _sendOne(item, true);
+          } else {
+            setTimeout(function () {
+              _sendOne(item, false);
+            }, 1500 + Math.random() * 1000);
+          }
+        });
         return { mentionSender: k };
       } catch (t) {
         return (console.error("simulateMemberReply error:", t), null);
@@ -2867,16 +2851,27 @@ document.addEventListener("DOMContentLoaded", function () {
         v = i,
         k = t,
         b = v ? v + " " + t : t;
-      // 输入状态：用户发送后立即显示（milk-main 逻辑），且用户发送不打断联系人输入动画
-      (function() {
+      // 输入状态：先显示已读，再显示输入动态（连发消息只回复一次）
+      var __sendMemberId =
+        "group" === (__sendTarget && __sendTarget.type)
+          ? (__sendTarget.memberIds || [])[0]
+          : null;
+      var __readDelay = 600 + Math.random() * 600; // 0.6~1.2s 显示已读
+      var __typingDelay = __readDelay + 400; // 已读后再显示输入动态
+      function __showReadNow() {
+        var cb = document.getElementById("chatBody");
+        if (!cb) return;
+        cb.querySelectorAll(".msg-row.me[data-read-pending]").forEach(function (
+          row,
+        ) {
+          __akiniShowReadReceipt(row);
+        });
+      }
+      setTimeout(__showReadNow, __readDelay);
+      setTimeout(function () {
         if (l) l.style.display = "block";
-        showTypingBubble(
-          r,
-          "group" === (__sendTarget && __sendTarget.type)
-            ? (__sendTarget.memberIds || [])[0]
-            : null,
-        );
-      })();
+        showTypingBubble(r, __sendMemberId);
+      }, __typingDelay);
       var x =
           c && "group" === c.type
             ? (function (t) {
@@ -2893,66 +2888,72 @@ document.addEventListener("DOMContentLoaded", function () {
         E = x.some(function (t) {
           return "全体成员" === t || "all" === t;
         });
-      setTimeout(function () {
-        try {
-          console.log("[sendMsg] setTimeout fired, calling I");
-          var __dbg = null;
-          if (__dbg) {
-            __dbg.style.display = "block";
-            __dbg.textContent = "准备回复…";
-          }
-          r === window.akiniContacts.getActiveChatId() &&
-            (l && (l.style.display = "none"),
-            h());
-          var t = c;
-          if (!t) {
-            if (__dbg) __dbg.textContent = "t 为空，无法回复";
-            return;
-          }
-          if ("group" === t.type) {
-            var e = t.memberIds || [];
-            if (0 === e.length) return;
-            var n = [];
-            E
-              ? (n = e.slice())
-              : x.length > 0
-                ? (e.forEach(function (t) {
-                    var e = window.akiniContacts.getChatTarget(t);
-                    e && x.indexOf(e.name) >= 0 && n.push(t);
-                  }),
-                  0 === n.length && (n = e.slice()))
-                : (n = e.slice());
-            var i = g() || "我",
-              a = v ? i : "",
-              o = v || k || "";
-            return void n.forEach(function (e, n) {
-              var i = 3e3 * Math.random() + 1500 * n;
-              setTimeout(function () {
-                var n = w(t.id, e, { quoteText: o, quoteName: a, isGroup: !0 });
-                false && n &&
-                  n.mentionSender &&
-                  "me" !== n.mentionSender &&
-                  setTimeout(
-                    function () {
-                      w(t.id, n.mentionSender, { isGroup: !0 });
-                    },
-                    1500 + 2e3 * Math.random(),
-                  );
-              }, i);
-            });
-          }
-          window.I(t.id, t, __bh);
-        } catch (t) {
-          console.error("sendMsg reply error:", t);
+      window.__akiniPendingReplyMap = window.__akiniPendingReplyMap || {};
+      window.__akiniPendingReplyMap[r] = {
+        timer: setTimeout(function () {
           try {
+            delete window.__akiniPendingReplyMap[r];
+            hideTypingBubble(r);
+            console.log("[sendMsg] setTimeout fired, calling I");
             var __dbg = null;
             if (__dbg) {
               __dbg.style.display = "block";
-              __dbg.textContent = "回复出错: " + ((t && t.message) || t);
+              __dbg.textContent = "准备回复…";
             }
-          } catch (e) {}
-        }
-      }, p);
+            r === window.akiniContacts.getActiveChatId() &&
+              (l && (l.style.display = "none"),
+              h());
+            var t = c;
+            if (!t) {
+              if (__dbg) __dbg.textContent = "t 为空，无法回复";
+              return;
+            }
+            if ("group" === t.type) {
+              var e = t.memberIds || [];
+              if (0 === e.length) return;
+              var n = [];
+              E
+                ? (n = e.slice())
+                : x.length > 0
+                  ? (e.forEach(function (t) {
+                      var e = window.akiniContacts.getChatTarget(t);
+                      e && x.indexOf(e.name) >= 0 && n.push(t);
+                    }),
+                    0 === n.length && (n = e.slice()))
+                  : (n = e.slice());
+              var i = g() || "我",
+                a = v ? i : "",
+                o = v || k || "";
+              return void n.forEach(function (e, n) {
+                var i = 3e3 * Math.random() + 1500 * n;
+                setTimeout(function () {
+                  var n = w(t.id, e, { quoteText: o, quoteName: a, isGroup: !0 });
+                  false && n &&
+                    n.mentionSender &&
+                    "me" !== n.mentionSender &&
+                    setTimeout(
+                      function () {
+                        w(t.id, n.mentionSender, { isGroup: !0 });
+                      },
+                      1500 + 2e3 * Math.random(),
+                    );
+                }, i);
+              });
+            }
+            window.I(t.id, t, __bh);
+          } catch (t) {
+            console.error("sendMsg reply error:", t);
+            try {
+              var __dbg = null;
+              if (__dbg) {
+                __dbg.style.display = "block";
+                __dbg.textContent = "回复出错: " + ((t && t.message) || t);
+              }
+            } catch (e) {}
+          }
+        }, __typingDelay + p),
+        memberId: __sendMemberId,
+      };
     }
     function _() {
       return window.AKR ? window.AKR.pickReplyBehavior() : { type: "text" };
@@ -3037,10 +3038,6 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
         return;
       }
-      n.cardCount =
-        window.AKR && window.AKR.getCardCount
-          ? window.AKR.getCardCount(e.type === "group" ? "group" : "private")
-          : 1;
       const a = t === window.akiniContacts.getActiveChatId();
       a &&
         showTypingBubble(t, "group" === e.type ? (e.memberIds || [])[0] : null);
@@ -3063,7 +3060,7 @@ document.addEventListener("DOMContentLoaded", function () {
           o.forEach(function (e, a) {
             setTimeout(
               function () {
-                w(t, e, { isGroup: !0, cardCount: n.cardCount });
+                w(t, e, { isGroup: !0 });
               },
               1500 * a + 2e3 * Math.random(),
             );
@@ -3141,7 +3138,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (_ac) {
             var _e = window.akiniContacts.getChatTarget(_ac);
             if (_e) {
-              var _n = { type: "text", cardCount: 1, extra: {} };
+              var _n = { type: "text", extra: {} };
               if (typeof I === "function") {
                 I(_ac, _e, _n);
               }
@@ -3339,17 +3336,13 @@ document.addEventListener("DOMContentLoaded", function () {
         window.taPoke(t);
       } // === 最外层：文字回复（已读必回，100%）===
       var __isQuote = !!ex.quote;
-      var cardCount =
-        (n && n.cardCount) ||
-        (window.AKR && window.AKR.getCardCount
-          ? window.AKR.getCardCount(e.type === "group" ? "group" : "private")
-          : 1);
-      cardCount = Math.max(1, Math.min(20, parseInt(cardCount, 10) || 1));
-      // 联系人只能使用用户字卡库内容，绝无兜底字卡（syy 逻辑）
-      var picked = window.pickWordCards ? window.pickWordCards(cardCount) : "";
-      var messages = picked.split("\n").filter(function (x) {
-        return x.trim();
-      });
+      // syy 逻辑：固定概率 1/2/3 条，每条作为独立消息发送
+      var replyCount = window.AKR.getReplyCount();
+      var messages = [];
+      for (var _ci = 0; _ci < replyCount; _ci++) {
+        var _one = window.pickWordCards ? window.pickWordCards(1) : "";
+        if (_one && _one.trim()) messages.push(_one.trim());
+      }
       if (0 === messages.length) {
         // 字卡库为空或无可用内容时，不发送任何回复（无兜底）
         return;
@@ -5962,19 +5955,10 @@ document.addEventListener("DOMContentLoaded", function () {
         if (U) {
           var __rendered = U.getAttribute("data-rendered-chat-id");
           __rendered !== t && (U.innerHTML = "");
-          U.querySelectorAll('[id^="typingBubbleRow_"]').forEach(function (el) {
-            el.remove();
-          });
           U.setAttribute("data-rendered-chat-id", t);
         }
         (window.akiniContacts.setActiveChatId(t),
           window.akiniContacts.updateSession(t, { unread: 0 }));
-        if (window.__akiniTypingMap) {
-          var __typing = window.__akiniTypingMap[t];
-          __typing &&
-            (__typing.timer && clearTimeout(__typing.timer),
-            delete window.__akiniTypingMap[t]);
-        }
         bt();
         // 优先合并内存会话、本地 localStorage 备份和内存缓存，取最长非空聊天记录
         var ls1 = "",
@@ -6001,6 +5985,16 @@ document.addEventListener("DOMContentLoaded", function () {
         (r
           ? (window.akiniContacts.updateSession(t, { messagesHTML: r }), l(r))
           : (_prevHTML ? l(_prevHTML) : l("")),
+          (function () {
+            if (window.__akiniPendingReplyMap && window.__akiniPendingReplyMap[t]) {
+              var pending = window.__akiniPendingReplyMap[t];
+              if (window.__akiniTypingMap && window.__akiniTypingMap[t]) {
+                window.__akiniTypingMap[t].timer && clearTimeout(window.__akiniTypingMap[t].timer);
+                delete window.__akiniTypingMap[t];
+              }
+              showTypingBubble(t, pending.memberId);
+            }
+          })(),
           Tn(),
           _idbStore.get("akini_chat_history_" + t, function (a) {
             if (window.akiniContacts.getActiveChatId() !== t) return;
@@ -14531,10 +14525,6 @@ document.addEventListener("DOMContentLoaded", function () {
       ([
         { id: "replyDelayMin", key: "akini_num_replyDelayMin", def: "2" },
         { id: "replyDelayMax", key: "akini_num_replyDelayMax", def: "5" },
-        { id: "replyCardCountMin", key: "akini_num_replyCardCountMin", def: "1" },
-        { id: "replyCardCountMax", key: "akini_num_replyCardCountMax", def: "3" },
-        { id: "replyCardCountGroupMin", key: "akini_num_replyCardCountGroupMin", def: "1" },
-        { id: "replyCardCountGroupMax", key: "akini_num_replyCardCountGroupMax", def: "3" },
         { id: "mailDelayMin", key: "akini_num_mailDelayMin", def: "3" },
         { id: "mailDelayMax", key: "akini_num_mailDelayMax", def: "6" },
         { id: "activeMsgMin", key: "akini_num_activeMsgMin", def: "5" },
@@ -14713,10 +14703,6 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!e) return;
         const n = _();
         if ("none" === n.type) return;
-        n.cardCount =
-          window.AKR && window.AKR.getCardCount
-            ? window.AKR.getCardCount(e.type === "group" ? "group" : "private")
-            : 1;
         const i = document.getElementById("typingIndicator"),
           a = t === window.akiniContacts.getActiveChatId();
         a &&
@@ -18708,5 +18694,21 @@ document.addEventListener("DOMContentLoaded", function () {
         try { if (typeof j === "function" && F && F.length) j(F); } catch (e) {}
       } catch (e) {}
     }, 180000);
+
+    // ===== iOS Safari 崩溃修复：切换到后台时暂停所有无限 CSS 动画 =====
+    // 根因：position:fixed + backdrop-filter（聊天顶栏）与多个 transform 无限动画并发，
+    // iOS 在截屏（切换 App）时需要合成所有 GPU 层，层数过多导致 WebKit 渲染进程崩溃。
+    // 修复：页面隐藏时挂起 typing-dot / scroll-text 动画；恢复时继续播放。
+    document.addEventListener("visibilitychange", function () {
+      var state = document.hidden ? "paused" : "running";
+      try {
+        document.querySelectorAll(".typing-dot").forEach(function (el) {
+          el.style.animationPlayState = state;
+        });
+        document.querySelectorAll(".akini-scroll-text").forEach(function (el) {
+          el.style.animationPlayState = state;
+        });
+      } catch (e) {}
+    });
   } catch (e) {}
 });
