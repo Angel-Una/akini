@@ -168,6 +168,13 @@ window.__akiniBootStep = "start";
   } catch (e) {}
 })();
 /* ====== AKR（Akini 随机内核）：随机行为/概率/时间范围控制 ====== */
+window.__akiniToggleOn = function (key, defaultOn) {
+  try {
+    var v = localStorage.getItem("akini_toggle_" + key);
+    if (v === null || v === undefined) return defaultOn !== false;
+    return v === "1";
+  } catch (e) { return defaultOn !== false; }
+};
 window.AKR = (function () {
   /* 概率默认值（可用 localStorage 覆盖：akini_prob_<name>，范围 0-100） */
   var DEFAULT_PROBS = {
@@ -3098,7 +3105,7 @@ document.addEventListener("DOMContentLoaded", function () {
         __dbg.textContent =
           "回复中… type=" + n.type + " extra=" + JSON.stringify(n.extra || {});
       }
-      if ("1" !== localStorage.getItem("akini_toggle_contactReplyToggle")) {
+      if (!window.__akiniToggleOn("contactReplyToggle", true)) {
         console.log("[I] contactReplyToggle off, skip reply");
         return;
       }
@@ -3421,10 +3428,10 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function runExtras() {
         var list = [];
-        if (ex.transfer && "1" === localStorage.getItem("akini_toggle_contactTransferToggle")) list.push(doTransfer);
-        if (ex.sticker && "1" === localStorage.getItem("akini_toggle_contactEmojiToggle")) list.push(doSticker);
+        if (ex.transfer && window.__akiniToggleOn("contactTransferToggle", false)) list.push(doTransfer);
+        if (ex.sticker && window.__akiniToggleOn("contactEmojiToggle", false)) list.push(doSticker);
         if (ex.poke && "group" !== e.type) list.push(doPoke);
-        if (ex.call && "1" === localStorage.getItem("akini_toggle_contactActiveMsgToggle")) list.push(doCall);
+        if (ex.call && window.__akiniToggleOn("contactActiveMsgToggle", false)) list.push(doCall);
         if (0 === list.length) return;
         var k = 0;
         function next() {
@@ -12552,12 +12559,12 @@ document.addEventListener("DOMContentLoaded", function () {
         const r = Dn();
         if (r) {
           const minD = parseFloat(
-              localStorage.getItem("akini_num_mailDelayMin") || "1",
+              localStorage.getItem("akini_num_mailDelayMin") || "3",
             ),
             maxD = parseFloat(
-              localStorage.getItem("akini_num_mailDelayMax") || "3",
+              localStorage.getItem("akini_num_mailDelayMax") || "6",
             ),
-            delayMs = 60 * (minD + Math.random() * (maxD - minD) || 1) * 1e3;
+            delayMs = 3600 * (minD + Math.random() * (maxD - minD) || 1) * 1e3;
           // syy envelope 模式：把回信预约时间持久化到 sent，
           // 即使离线/刷新，下次启动 checkMailStatus 也会按时投递回信
           const replyTime = Date.now() + delayMs;
@@ -13459,7 +13466,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 t(false);
                 return;
               }
-              if ("1" !== localStorage.getItem("akini_toggle_contactFriendsToggle")) {
+              if (!window.__akiniToggleOn("contactFriendsToggle", true)) {
                 t(false);
                 return;
               }
@@ -13520,7 +13527,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             var e = getFriendsReplyDelayMs();
             function friendsInteractAction() {
-              if ("1" !== localStorage.getItem("akini_toggle_contactFriendsToggle")) {
+              if (!window.__akiniToggleOn("contactFriendsToggle", true)) {
                 t();
                 return;
               }
@@ -13742,10 +13749,10 @@ document.addEventListener("DOMContentLoaded", function () {
             var s, d, u;
             (l
               ? ((s = parseFloat(
-                  localStorage.getItem("akini_num_mailDelayMin") || "1",
+                  localStorage.getItem("akini_num_mailDelayMin") || "3",
                 )),
                 (d = parseFloat(
-                  localStorage.getItem("akini_num_mailDelayMax") || "3",
+                  localStorage.getItem("akini_num_mailDelayMax") || "6",
                 )),
                 (u = !1))
               : ((s = parseFloat(
@@ -13780,7 +13787,7 @@ document.addEventListener("DOMContentLoaded", function () {
               if (!window.AKR.isInTimeRange("mail")) {
                 return __recurse();
               }
-              if ("1" !== localStorage.getItem("akini_toggle_contactMailToggle")) {
+              if (!window.__akiniToggleOn("contactMailToggle", true)) {
                 return __recurse();
               }
               // 每次执行时实时读取联系人，避免闭包捕获到空列表导致永远不写信
@@ -13857,10 +13864,10 @@ document.addEventListener("DOMContentLoaded", function () {
           if (ver !== "20260913") {
             localStorage.setItem("akini_app_version", "20260913");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
-            localStorage.removeItem("akini_toggle_contactPokeToggle");
-            localStorage.removeItem("akini_toggle_contactFriendsToggle");
-            localStorage.removeItem("akini_toggle_contactIcityToggle");
-            localStorage.removeItem("akini_toggle_contactMailToggle");
+            localStorage.setItem("akini_toggle_contactPokeToggle", "1");
+            localStorage.setItem("akini_toggle_contactFriendsToggle", "1");
+            localStorage.setItem("akini_toggle_contactIcityToggle", "1");
+            localStorage.setItem("akini_toggle_contactMailToggle", "1");
             // emoji 融入消息默认关闭（旧版本误设为开启则重置）
             localStorage.setItem("akini_toggle_emojiMixToggle", "0");
             // 朋友圈/iCity 默认改为 30-60 分钟；任何一项异常（<=3、>=1000、乱填、min>max）都重置为新默认
@@ -13901,14 +13908,14 @@ document.addEventListener("DOMContentLoaded", function () {
             var _resetActiveMsgRange = function (minKey, maxKey) {
               var mn = parseFloat(localStorage.getItem(minKey) || "");
               var mx = parseFloat(localStorage.getItem(maxKey) || "");
-              // 只要存在旧值（无论 3/10 分钟还是 180/360 分钟），都重置为 3-6 小时
+              // 只要存在旧值（无论 3/10 分钟还是 180/360 分钟），都重置为 5-10 分钟
               if (!isNaN(mn) || !isNaN(mx)) {
-                localStorage.setItem(minKey, "3");
-                localStorage.setItem(maxKey, "6");
+                localStorage.setItem(minKey, "5");
+                localStorage.setItem(maxKey, "10");
                 return;
               }
-              localStorage.setItem(minKey, "3");
-              localStorage.setItem(maxKey, "6");
+              localStorage.setItem(minKey, "5");
+              localStorage.setItem(maxKey, "10");
             };
             _resetActiveMsgRange("akini_num_activeMsgMin", "akini_num_activeMsgMax");
             // 主动写信/发消息 之前按“分钟”单位存储，现在改为按“小时”读取，需要把旧值除以 60。
@@ -14123,9 +14130,9 @@ document.addEventListener("DOMContentLoaded", function () {
         { id: "replyCardCountMax", key: "akini_num_replyCardCountMax", def: "3" },
         { id: "replyCardCountGroupMin", key: "akini_num_replyCardCountGroupMin", def: "1" },
         { id: "replyCardCountGroupMax", key: "akini_num_replyCardCountGroupMax", def: "3" },
-        { id: "mailDelayMin", key: "akini_num_mailDelayMin", def: "1" },
-        { id: "mailDelayMax", key: "akini_num_mailDelayMax", def: "3" },
-        { id: "activeMsgMin", key: "akini_num_activeMsgMin", def: "3" },
+        { id: "mailDelayMin", key: "akini_num_mailDelayMin", def: "3" },
+        { id: "mailDelayMax", key: "akini_num_mailDelayMax", def: "6" },
+        { id: "activeMsgMin", key: "akini_num_activeMsgMin", def: "5" },
         { id: "activeMsgMax", key: "akini_num_activeMsgMax", def: "10" },
         { id: "activeMailMin", key: "akini_num_activeMailMin", def: "3" },
         { id: "activeMailMax", key: "akini_num_activeMailMax", def: "6" },
@@ -14317,13 +14324,13 @@ document.addEventListener("DOMContentLoaded", function () {
         if ("number" == typeof delay) s = delay;
         else {
           const o = parseFloat(
-              localStorage.getItem("akini_num_activeMsgMin") || "3",
+              localStorage.getItem("akini_num_activeMsgMin") || "5",
             ),
             r = parseFloat(
-              localStorage.getItem("akini_num_activeMsgMax") || "6",
+              localStorage.getItem("akini_num_activeMsgMax") || "10",
             ),
-            c = 3600 * o * 1e3,
-            l = 3600 * r * 1e3;
+            c = 60 * o * 1e3,
+            l = 60 * r * 1e3;
           s = c + Math.random() * Math.max(0, l - c);
         }
         window._akiniTimer.schedule("activeMsgReply", function () {
@@ -14347,20 +14354,20 @@ document.addEventListener("DOMContentLoaded", function () {
       }));
     !(function __amt(isFirst) {
       const e = parseFloat(
-          localStorage.getItem("akini_num_activeMsgMin") || "3",
+          localStorage.getItem("akini_num_activeMsgMin") || "5",
         ),
-        n = parseFloat(localStorage.getItem("akini_num_activeMsgMax") || "6");
-      // 首次触发使用最小间隔，之后按随机范围
-      var delayMin = 3600 * e * 1e3,
-        delayMax = 3600 * n * 1e3,
+        n = parseFloat(localStorage.getItem("akini_num_activeMsgMax") || "10");
+      // 首次触发使用最小间隔，之后按随机范围（单位：分钟）
+      var delayMin = 60 * e * 1e3,
+        delayMax = 60 * n * 1e3,
         o = isFirst
           ? delayMin
           : delayMin + Math.random() * Math.max(0, delayMax - delayMin);
-      console.log("[Akini 主动发消息] 下次调度：", (o / 36e5).toFixed(1), "小时后触发");
+      console.log("[Akini 主动发消息] 下次调度：", (o / 6e4).toFixed(1), "分钟后触发");
       function __amtAction() {
         try {
           // 防止短时间内多次主动发消息
-          var _minGap = Math.max(1, e) * 3600 * 1000 * 0.8;
+          var _minGap = Math.max(1, e) * 60 * 1000 * 0.8;
           var _lastRun = parseFloat(localStorage.getItem("akini_last_activeMsg_run") || "0");
           if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
             console.log("[Akini 主动发消息] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "小时");
@@ -14393,7 +14400,7 @@ document.addEventListener("DOMContentLoaded", function () {
             })();
             if (!e) return void __amt(false);
             var n = window.akiniContacts.getChatTarget(e);
-            if ("1" !== localStorage.getItem("akini_toggle_contactActiveMsgToggle")) {
+            if (!window.__akiniToggleOn("contactActiveMsgToggle", false)) {
               __amt(false);
               return;
             }
@@ -14462,7 +14469,7 @@ document.addEventListener("DOMContentLoaded", function () {
             t(false);
             return;
           }
-          if ("1" !== localStorage.getItem("akini_toggle_contactIcityToggle")) {
+          if (!window.__akiniToggleOn("contactIcityToggle", true)) {
             t(false);
             return;
           }
