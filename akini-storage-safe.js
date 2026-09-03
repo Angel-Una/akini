@@ -49,7 +49,8 @@
     'akini_my_name',
     'akini_my_name_backup',
     'akini_ta_name',
-    'akini_ta_name_backup'
+    'akini_ta_name_backup',
+    'akini_music_playlist'
   ];
   var CHAT_HISTORY_RE = /^akini_chat_history_/;
   var WB_GROUPS_RE = /^akini_wb_groups_/;

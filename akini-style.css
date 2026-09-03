@@ -1377,18 +1377,20 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   cursor: pointer;
   padding: 10px;
 }
-/* 置顶文字气泡：聊天窗口标题旁，类似 iCity 置顶日记 */
+/* 置顶文字标签：放在聊天列表昵称右侧，类似 iCity 置顶日记的灰色小 pill */
 .chat-pin-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   margin-left: 6px;
-  padding: 1px 7px;
-  background: rgba(7, 193, 96, 0.12);
-  color: #07c160;
+  padding: 2px 8px;
+  background: #f2f2f2;
+  color: #999;
   font-size: 11px;
-  font-weight: 600;
-  border-radius: 8px;
+  font-weight: 500;
+  border-radius: 10px;
   vertical-align: middle;
-  line-height: 1.6;
+  line-height: 1.2;
+  pointer-events: none;
 }
 .chat-list-item .cli-avatar {
   position: relative;

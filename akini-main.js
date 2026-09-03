@@ -1460,8 +1460,16 @@ document.addEventListener("DOMContentLoaded", function () {
               }
             }
           });
-          // 若从专用键恢复了头像，回写联系人数组，保证后续读取一致
-          if (_restoredAny) { try { g(e); } catch (err) {} }
+          // 恢复头像后，无论是否变化都刷新依赖头像的界面，避免界面停留在默认头像
+          if (_restoredAny) {
+            try { g(e); } catch (err) {}
+          }
+          setTimeout(function () {
+            try { "function" == typeof Tn && Tn(); } catch (e) {}
+            try { "function" == typeof ot && ot(); } catch (e) {}
+            try { "function" == typeof window.renderHomeAvatarPreviews && window.renderHomeAvatarPreviews(); } catch (e) {}
+            try { "function" == typeof window.renderHomeAvatarContacts && window.renderHomeAvatarContacts(); } catch (e) {}
+          }, 0);
         }
         return ((d = e), e);
       }
@@ -1472,6 +1480,12 @@ document.addEventListener("DOMContentLoaded", function () {
           if (Array.isArray(cur) && cur.length > 0) e = cur;
         }
         d = e;
+        // 冗余备份：每个联系人头像单独存一份，便于刷新后恢复
+        e.forEach(function (c) {
+          if (c && c.id && c.avatar && String(c.avatar).trim() && c.avatar !== "🐰" && c.avatar !== "🐱") {
+            try { L("akini_contact_avatar_" + c.id, c.avatar); } catch (err) {}
+          }
+        });
         // IndexedDB 优先；localStorage 仅作热备，超配额不抛错
         if (window.akiniStore && window.akiniStore.setJson) {
           window.akiniStore.setJson(t, e);
@@ -1533,6 +1547,11 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
               a = localStorage.getItem("akini_ta_avatar") || "";
             } catch (e) {}
+          }
+          if (!a || a === "🐰") {
+            try {
+              a = localStorage.getItem("akini_contact_avatar_" + e.id) || a;
+            } catch (err) {}
           }
           return {
             type: "contact",
@@ -1900,6 +1919,12 @@ document.addEventListener("DOMContentLoaded", function () {
           );
           var e = k();
           (delete e[t], _(e));
+          // 解散群聊后同步清理置顶、聊天记录缓存及历史记录，防止解散后仍出现在列表
+          try { "function" == typeof _akPinRemove && _akPinRemove(t); } catch (err) {}
+          try { E && delete E[t]; } catch (err) {}
+          try { localStorage.removeItem("akini_chat_history_" + t); } catch (err) {}
+          try { window._idbStore && window._idbStore.remove && window._idbStore.remove("akini_chat_history_" + t); } catch (err) {}
+          try { "function" == typeof window._snapshotCritical && window._snapshotCritical(); } catch (err) {}
         },
         migrateContacts: function () {
           if ("1" !== localStorage.getItem(r)) {
@@ -2006,6 +2031,26 @@ document.addEventListener("DOMContentLoaded", function () {
                 f();
               });
             });
+            // 恢复每个联系人独立保存的头像键
+            u++;
+            _idbStore.getAll(function (all) {
+              try {
+                Object.keys(all || {}).forEach(function (k) {
+                  if (k.indexOf("akini_contact_avatar_") !== 0) return;
+                  var v = all[k];
+                  if (v && "string" == typeof v && v.trim() && v !== "null" && v !== "undefined") {
+                    var cur = localStorage.getItem(k) || "";
+                    if (!cur || cur === "null" || cur === "undefined" || cur !== v) {
+                      localStorage.setItem(k, v);
+                      if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(k, v);
+                      d = !0;
+                    }
+                  }
+                });
+              } catch (e) {}
+              u--;
+              f();
+            });
           }
           (u++,
             l(t, function (idbC) {
@@ -2081,15 +2126,18 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     window.akiniContacts.tryRestoreFromBackup(function (restored) {
       console.log("[Akini] contacts/chat restore from backup", restored);
-      // 头像可能已从 IDB 恢复，立即刷新所有 DOM 头像
-      if (restored || window.__akiniAvatarCache) {
-        try {
-          "function" == typeof et && et();
-        } catch (e) {}
-        try {
-          "function" == typeof Tn && Tn();
-        } catch (e) {}
+      // 恢复完成后总是刷新一次头像/列表/预览，避免启动时先用默认头像渲染过的问题
+      function doRefresh() {
+        try { "function" == typeof et && et(); } catch (e) {}
+        try { "function" == typeof Tn && Tn(); } catch (e) {}
+        try { "function" == typeof ot && ot(); } catch (e) {}
+        try { "function" == typeof renderHomeAvatarContacts && renderHomeAvatarContacts(); } catch (e) {}
+        try { "function" == typeof window.renderHomeAvatarPreviews && window.renderHomeAvatarPreviews(); } catch (e) {}
       }
+      doRefresh();
+      // 异步再刷新一次，确保 IDB 头像回填已生效
+      setTimeout(doRefresh, 300);
+      setTimeout(doRefresh, 1200);
     });
     requestAnimationFrame(function t() {
       var e = document.getElementById("dayNumber");
@@ -4514,6 +4562,41 @@ document.addEventListener("DOMContentLoaded", function () {
       (window.getCurrentStickerContactId = J));
     // ===== iCity 评论终极保险：从 内存 / localStorage / IDB(主+备份) 全部来源合并评论，
     // 每篇日记取评论并集（按 id 去重），彻底杜绝刷新后评论丢失。延迟执行确保异步加载完成。
+    function _backupIcityComments(diaryId, comments) {
+      if (!diaryId || !Array.isArray(comments)) return;
+      var key = "akini_icity_comments_" + diaryId;
+      // 备份时同时带上日记 id，方便恢复时正确归属
+      var wrapped = { id: diaryId, comments: comments };
+      var json = JSON.stringify(wrapped);
+      try { localStorage.setItem(key, json); } catch (e) {}
+      try { window._idbStore && window._idbStore.set && window._idbStore.set(key, json); } catch (e) {}
+    }
+    function _loadIcityCommentBackups() {
+      function parseArr(v) {
+        try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+      }
+      var backups = [];
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var key = localStorage.key(i);
+          if (key && key.indexOf("akini_icity_comments_") === 0) {
+            var raw = localStorage.getItem(key);
+            if (!raw) continue;
+            // 兼容旧数据：老版本只存了 comments 数组，新版本存 {id, comments}
+            var diaryId = key.replace("akini_icity_comments_", "");
+            try {
+              var parsed = JSON.parse(raw);
+              if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.id) {
+                backups.push(parsed);
+              } else if (Array.isArray(parsed)) {
+                backups.push({ id: diaryId, comments: parsed });
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+      return backups;
+    }
     function _icitySafetyMerge() {
       function parseArr(v) {
         try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
@@ -4552,6 +4635,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var sources = [F];
         try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries"))); } catch (e) {}
         try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries_backup"))); } catch (e) {}
+        try { _loadIcityCommentBackups().forEach(function (b) { sources.push(b); }); } catch (e) {}
         var merged = reconcile(sources);
         var before = 0; (F || []).forEach(function (d) { d && d.comments && (before += d.comments.length); });
         var after = 0; merged.forEach(function (d) { d && d.comments && (after += d.comments.length); });
@@ -4571,6 +4655,7 @@ document.addEventListener("DOMContentLoaded", function () {
             var sources = [F, parseArr(v), parseArr(v2)];
             try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries"))); } catch (e) {}
             try { sources.push(parseArr(localStorage.getItem("akini_icity_diaries_backup"))); } catch (e) {}
+            try { _loadIcityCommentBackups().forEach(function (b) { sources.push(b); }); } catch (e) {}
             var merged = reconcile(sources);
             var before = 0; (F || []).forEach(function (d) { d && d.comments && (before += d.comments.length); });
             var after = 0; merged.forEach(function (d) { d && d.comments && (after += d.comments.length); });
@@ -5187,16 +5272,26 @@ document.addEventListener("DOMContentLoaded", function () {
     function _akPinGet() {
       try {
         var t = localStorage.getItem("akini_chat_pins");
-        return t ? JSON.parse(t) : [];
-      } catch (t) {
-        return [];
-      }
+        if (t) return JSON.parse(t);
+      } catch (t) {}
+      try {
+        if (window.akiniStore && window.akiniStore.memoryGet) {
+          var m = window.akiniStore.memoryGet("akini_chat_pins");
+          if (m) return JSON.parse(m);
+        }
+      } catch (t) {}
+      return [];
     }
     function _akPinSet(t) {
+      var arr = t || [];
+      // 同步写入 localStorage，确保下次 _akPinGet/ot() 立即读到
+      try { localStorage.setItem("akini_chat_pins", JSON.stringify(arr)); } catch (e) {}
+      try { localStorage.setItem("akini_chat_pins_backup", JSON.stringify(arr)); } catch (e) {}
+      if (window.akiniStore && window.akiniStore.memorySet) {
+        try { window.akiniStore.memorySet("akini_chat_pins", JSON.stringify(arr)); } catch (e) {}
+      }
       if (window.akiniStore && window.akiniStore.setJson) {
-        window.akiniStore.setJson("akini_chat_pins", t || []);
-      } else {
-        try { localStorage.setItem("akini_chat_pins", JSON.stringify(t || [])); } catch (t) {}
+        window.akiniStore.setJson("akini_chat_pins", arr);
       }
     }
     function _akPinRemove(t) {
@@ -5347,7 +5442,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       ? '<span class="cli-unread-badge">' + t.unread + "</span>"
                       : "",
                     a = t.pinned
-                      ? '<span style="display:inline-block;margin-left:4px;font-size:11px;color:#07c160;">📌</span>'
+                      ? '<span class="chat-pin-badge">置顶</span>'
                       : "",
                     r = t.pinned ? "取消置顶" : "置顶";
                   o +=
@@ -5374,6 +5469,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 (t.innerHTML = o),
                 t.querySelectorAll(".chat-list-item").forEach(function (t) {
                   function e(e) {
+                    // 如果当前卡片已经滑出操作按钮，点击先收起按钮，不进入聊天
+                    if (t.classList.contains("show-actions")) {
+                      e && (e.stopPropagation(), e.preventDefault());
+                      document.querySelectorAll(".chat-list-item").forEach(function (t) {
+                        t.classList.remove("show-actions");
+                      });
+                      return;
+                    }
                     e && (e.stopPropagation(), e.preventDefault());
                     var n = t.getAttribute("data-id");
                     n && ct(n);
@@ -5388,14 +5491,13 @@ document.addEventListener("DOMContentLoaded", function () {
                     i && (i.textContent = a ? "取消置顶" : "置顶");
                     var r = t.querySelector(".chat-list-item-inner .cli-name");
                     if (r) {
-                      var c = r.querySelector("span");
+                      var c = r.querySelector(".chat-pin-badge");
                       c && c.remove();
                       if (a) {
                         var l = document.createElement("span");
-                        ((l.style.cssText =
-                          "display:inline-block;margin-left:4px;font-size:11px;color:#07c160;"),
-                          (l.textContent = "📌"),
-                          r.appendChild(l));
+                        (l.className = "chat-pin-badge"),
+                          (l.textContent = "置顶"),
+                          r.appendChild(l);
                       }
                     }
                     t.classList.remove("show-actions");
@@ -5417,16 +5519,22 @@ document.addEventListener("DOMContentLoaded", function () {
                     var n = e.touches[0],
                       i = n.clientX - t._swipeStartX,
                       a = n.clientY - t._swipeStartY;
-                    (Math.abs(a) > 10 && (t._swipeStartX = null),
-                      i > 30 &&
-                        Math.abs(i) > Math.abs(a) &&
-                        ((t._swipeMoved = !0),
-                        document
-                          .querySelectorAll(".chat-list-item")
-                          .forEach(function (t) {
-                            t.classList.remove("show-actions");
-                          }),
-                        t.classList.add("show-actions")));
+                    if (Math.abs(a) > 10) {
+                      t._swipeStartX = null;
+                      return;
+                    }
+                    if (
+                      i < -30 &&
+                      Math.abs(i) > Math.abs(a)
+                    ) {
+                      t._swipeMoved = !0;
+                      document
+                        .querySelectorAll(".chat-list-item")
+                        .forEach(function (t) {
+                          t.classList.remove("show-actions");
+                        });
+                      t.classList.add("show-actions");
+                    }
                   }
                   function c(e) {
                     ((t._swipeStartX = null),
@@ -5450,8 +5558,19 @@ document.addEventListener("DOMContentLoaded", function () {
                   l &&
                     !l._pinBound &&
                     ((l._pinBound = !0),
+                    // 阻止触摸事件冒泡到列表项，避免点击置顶按钮误进聊天
+                    l.addEventListener("touchstart", function (e) {
+                      e.stopPropagation();
+                    }, { passive: !0 }),
+                    l.addEventListener("touchend", function (e) {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      n(e);
+                    }, { passive: !1 }),
                     l.addEventListener("click", function (e) {
-                      (e.stopPropagation(), e.preventDefault(), n());
+                      e.stopPropagation();
+                      e.preventDefault();
+                      n(e);
                     }));
                 }));
             })());
@@ -6680,7 +6799,10 @@ document.addEventListener("DOMContentLoaded", function () {
               if (_body) _body.innerHTML = "";
             })(),
             o("chat-list"),
-            ot());
+            ot(),
+            // 多次刷新列表，确保异步清理与 UI 渲染一致
+            setTimeout(function(){ try { ot(); } catch(e){} }, 50),
+            setTimeout(function(){ try { ot(); } catch(e){} }, 300));
         }));
     (me(),
       (function () {
@@ -10632,6 +10754,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   (e._replyTo && (l.replyTo = e._replyTo),
                     a[r].comments.push(l),
                     j(a),
+                    _backupIcityComments(a[r].id, a[r].comments),
                     setTimeout(function () { if (window._icitySafetyMerge) window._icitySafetyMerge(); }, 800),
                     (u.value = ""),
                     (e._replyTo = ""),
@@ -15801,35 +15924,115 @@ document.addEventListener("DOMContentLoaded", function () {
             }));
         var songUrlInput = document.getElementById("musicSongUrlInput");
         var songNameInput = document.getElementById("musicSongNameInput");
+        var songArtistInput = document.getElementById("musicSongArtistInput");
+        var songCoverFile = document.getElementById("musicSongCoverFile");
         var importSongBtn = document.getElementById("musicImportSongBtn");
+        var manualCoverDataUrl = "";
+        // 上传封面：读取图片并压缩为 data URL，供导入使用
+        songCoverFile &&
+          songCoverFile.addEventListener("change", function () {
+            var file = this.files && this.files[0];
+            if (!file) return;
+            var img = new Image();
+            var url = URL.createObjectURL(file);
+            img.onload = function () {
+              URL.revokeObjectURL(url);
+              var max = 500,
+                w = img.width,
+                h = img.height;
+              if (w > max || h > max) {
+                if (w >= h) {
+                  h = Math.round((h * max) / w);
+                  w = max;
+                } else {
+                  w = Math.round((w * max) / h);
+                  h = max;
+                }
+              }
+              var cv = document.createElement("canvas");
+              cv.width = w;
+              cv.height = h;
+              cv.getContext("2d").drawImage(img, 0, 0, w, h);
+              try {
+                manualCoverDataUrl = cv.toDataURL("image/jpeg", 0.8);
+                pt("封面已导入");
+              } catch (e) {
+                pt("封面导入失败，请重试");
+              }
+            };
+            img.onerror = function () {
+              URL.revokeObjectURL(url);
+              pt("封面图片读取失败");
+            };
+            img.src = url;
+          });
         var importMp3 = function () {
-          var url = (songUrlInput ? songUrlInput.value : "").trim();
-          if (!url) {
+          var rawUrl = (songUrlInput ? songUrlInput.value : "").trim();
+          if (!rawUrl) {
             alert("请输入 MP3 链接");
             return;
           }
+          var neteaseMatch = rawUrl.match(
+            /(?:https?:\/\/)?music\.163\.com\/song\/media\/outer\/url\?id=(\d+)/i,
+          );
           var name = (songNameInput ? songNameInput.value : "").trim();
-          if (!name) {
-            name = url.split("/").pop().split("?")[0] || "自定义歌曲";
+          var artist =
+            (songArtistInput ? songArtistInput.value : "").trim() || "自定义";
+          var cover = manualCoverDataUrl || "";
+          var track;
+          if (neteaseMatch && neteaseMatch[1]) {
+            // 网易云外链：直接用歌曲 ID 走代理接口，避免混合内容 302 到 http
+            var songId = neteaseMatch[1];
+            if (!name) name = "网易云歌曲 " + songId;
+            track = {
+              id: String(songId),
+              title: name,
+              artist: artist,
+              cover: cover,
+              duration: 0,
+            };
+          } else {
+            var url = rawUrl;
+            // 非网易云链接：HTTPS 页面无法直接播放 http，统一升级为 https
+            if (/^http:\/\//i.test(url)) {
+              url = "https://" + url.slice(7);
+            }
+            if (!name) {
+              name =
+                url.split("/").pop().split("?")[0].replace(/\.mp3$/i, "") ||
+                "自定义歌曲";
+            }
+            track = {
+              id: "mp3_" + Date.now(),
+              title: name,
+              artist: artist,
+              cover: cover,
+              url: url,
+              duration: 0,
+            };
           }
-          var track = {
-            id: "mp3_" + Date.now(),
-            title: name,
-            artist: "自定义",
-            cover: "",
-            url: url,
-            duration: 0,
-          };
           var list = JSON.parse(
             localStorage.getItem("akini_music_playlist") || "[]",
           );
           list.push(track);
-          localStorage.setItem("akini_music_playlist", JSON.stringify(list));
+          // 歌词/封面可能较大，优先用 akiniStore(IDB) 持久化，再写 localStorage 兜底
+          if (window.akiniStore && window.akiniStore.setJson) {
+            window.akiniStore.setJson("akini_music_playlist", list);
+          }
+          try {
+            localStorage.setItem(
+              "akini_music_playlist",
+              JSON.stringify(list),
+            );
+          } catch (e) {}
           c = list;
           l = list.length - 1;
           localStorage.setItem("akini_music_index", l);
           if (songUrlInput) songUrlInput.value = "";
           if (songNameInput) songNameInput.value = "";
+          if (songArtistInput) songArtistInput.value = "";
+          if (songCoverFile) songCoverFile.value = "";
+          manualCoverDataUrl = "";
           try {
             Pt();
           } catch (e) {}
@@ -17154,6 +17357,12 @@ document.addEventListener("DOMContentLoaded", function () {
                   if (window._akiniAudioErrCounts[errKey] > 3) {
                     console.warn("[Akini Music] 同一首歌错误次数过多，停止重试", errKey);
                     pt("该歌曲无法播放，自动切换下一首");
+                    // 自定义 MP3 链接没有网易云 ID，切歌前提示用户
+                    if (!r) {
+                      setTimeout(function () {
+                        alert("该 MP3 链接无法播放。可能原因：\n1. 链接为 HTTP，在当前 HTTPS 页面被浏览器拦截\n2. 目标服务器禁止跨域/直链访问\n3. 链接已失效或需要登录\n\n建议：使用以 https:// 开头的直链，或改用网易云歌单导入。");
+                      }, 200);
+                    }
                     window._akiniAudioErrCounts[errKey] = 0;
                     setTimeout(function () { St(); }, 800);
                     return;
@@ -17253,6 +17462,8 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (t) {}
             u.crossOrigin = null;
           }
+          // 统一升级为 https，避免混合内容被浏览器拦截
+          if (/^http:\/\//i.test(e)) e = "https://" + e.slice(7);
           (u.src !== e && ((u.src = e), u.load()), ht());
         } else mt();
       }
@@ -17312,6 +17523,8 @@ document.addEventListener("DOMContentLoaded", function () {
             var data = t && t.data && t.data[0] ? t.data[0] : {};
             var o = data.url || "";
             if (o) {
+              // 代理返回的地址常为 http，在 HTTPS 页面里会被混合内容拦截，升级为 https
+              o = o.replace(/^http:\/\//i, "https://");
               ((E = o),
                 (S = Date.now()),
                 (A = e.id),
@@ -17413,6 +17626,7 @@ document.addEventListener("DOMContentLoaded", function () {
         (function (e) {
           function loadLyric(retryCount) {
             if (!e) return Promise.resolve();
+            // 优先使用当前歌曲 ID（网易云外链导入时 id 就是歌曲 ID）
             console.log("[Akini lyric] loading id", e);
             var lyricCookie = (B && B.cookie) || "";
           try {
@@ -17512,19 +17726,36 @@ document.addEventListener("DOMContentLoaded", function () {
         window._renderPlaylist = Bt;
         window.Bt = Bt;
         window._akiniMusicReloadPlaylist = function () {
-          try {
-            var saved = localStorage.getItem("akini_music_playlist");
-            if (saved) {
-              var parsed = JSON.parse(saved);
-              if (parsed && parsed.length > 0) {
-                c = parsed;
+          function applySaved(saved) {
+            try {
+              if (saved && saved.length > 0) {
+                c = saved;
+                try {
+                  var idx = parseInt(localStorage.getItem("akini_music_index") || "0", 10) || 0;
+                  if (idx >= 0 && idx < c.length) l = idx;
+                } catch (e) {}
                 Bt();
+                // 同步更新主界面歌曲信息，避免"看起来歌单没了"
+                try {
+                  var cur = c[l];
+                  if (cur) {
+                    if (e.songName) e.songName.textContent = cur.title || "一起听";
+                    if (e.artist) e.artist.textContent = cur.artist || "";
+                    if (e.cover && cur.cover) e.cover.src = cur.cover;
+                  }
+                } catch (err) {}
               }
+            } catch (e) {
+              console.warn("[Akini music] reload playlist after restore failed", e);
             }
-          } catch (e) {
-            console.warn("[Akini music] reload playlist after restore failed", e);
           }
+          // 直接同步读 localStorage（导入时已写入），避免异步时序问题
+          try {
+            applySaved(JSON.parse(localStorage.getItem("akini_music_playlist") || "[]"));
+          } catch (e) {}
         };
+        // 启动时立即恢复歌单
+        setTimeout(function () { window._akiniMusicReloadPlaylist(); }, 100);
         window._TtNetease = Tt;
         window._importAllNeteasePlaylists = _importAllNeteasePlaylists;
         window._startNeteaseQr = function () {
