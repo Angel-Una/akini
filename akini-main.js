@@ -1457,6 +1457,19 @@ document.addEventListener("DOMContentLoaded", function () {
         if (d) return d;
         var e = i(t, []);
         console.log("[联系人] f()读取,数量:", (e||[]).length, "有头像:", (e||[]).filter(function(c){return c&&c.avatar&&c.avatar!=='🐰'&&c.avatar!=='🐱';}).length);
+        // 如果内存/localStorage 为空，从 sessionStorage 应急备份抢救
+        if (!Array.isArray(e) || 0 === e.length) {
+          try {
+            var em = sessionStorage.getItem("akini_contacts_emergency");
+            if (em) {
+              var emParsed = JSON.parse(em);
+              if (Array.isArray(emParsed) && emParsed.length > 0) {
+                e = emParsed;
+                console.log("[联系人] 从 sessionStorage 应急恢复,数量:", e.length);
+              }
+            }
+          } catch (_e) {}
+        }
         if (!Array.isArray(e) || 0 === e.length) {
           if (window._restoringData) return (d = []);
           e = [];
@@ -1508,6 +1521,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (Array.isArray(cur) && cur.length > 0) e = cur;
         }
         d = e;
+        // 同步 sessionStorage 应急备份：联系人数据刷新/重载时最可靠
+        try { sessionStorage.setItem("akini_contacts_emergency", JSON.stringify(e)); } catch (_e) {}
         // 冗余备份：每个联系人头像单独存一份，便于刷新后恢复
         e.forEach(function (c) {
           if (c && c.id && c.avatar && String(c.avatar).trim() && c.avatar !== "🐰" && c.avatar !== "🐱") {
@@ -1526,6 +1541,19 @@ document.addEventListener("DOMContentLoaded", function () {
       function y() {
         if (m) return m;
         var t = i(e, []);
+        // 如果 localStorage/IDB 为空，从 sessionStorage 应急备份抢救
+        if (!Array.isArray(t) || 0 === t.length) {
+          try {
+            var em = sessionStorage.getItem("akini_groups_emergency");
+            if (em) {
+              var emParsed = JSON.parse(em);
+              if (Array.isArray(emParsed) && emParsed.length > 0) {
+                t = emParsed;
+                console.log("[分组] 从 sessionStorage 应急恢复,数量:", t.length);
+              }
+            }
+          } catch (_e) {}
+        }
         return (m = Array.isArray(t) ? t : []);
       }
       function p(t) {
@@ -1534,6 +1562,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (Array.isArray(cur) && cur.length > 0) t = cur;
         }
         m = t;
+        // 同步 sessionStorage 应急备份
+        try { sessionStorage.setItem("akini_groups_emergency", JSON.stringify(t)); } catch (_e) {}
         if (window.akiniStore && window.akiniStore.setJson) {
           window.akiniStore.setJson(e, t);
         } else {
@@ -1606,11 +1636,26 @@ document.addEventListener("DOMContentLoaded", function () {
       function k() {
         if (sessCache) return sessCache;
         var t = i(n, {});
+        // 如果 localStorage/IDB 为空，从 sessionStorage 应急备份抢救
+        if (!t || typeof t !== "object" || Object.keys(t).length === 0) {
+          try {
+            var em = sessionStorage.getItem("akini_chat_sessions_emergency");
+            if (em) {
+              var emParsed = JSON.parse(em);
+              if (emParsed && typeof emParsed === "object" && Object.keys(emParsed).length > 0) {
+                t = emParsed;
+                console.log("[会话] 从 sessionStorage 应急恢复,数量:", Object.keys(t).length);
+              }
+            }
+          } catch (_e) {}
+        }
         return (sessCache =
           "object" == typeof t && null !== t ? t : {}), sessCache;
       }
       function _(t) {
         sessCache = t || {};
+        // 同步 sessionStorage 应急备份
+        try { sessionStorage.setItem("akini_chat_sessions_emergency", JSON.stringify(t || {})); } catch (_e) {}
         if (window.akiniStore && window.akiniStore.setJson) {
           window.akiniStore.setJson(n, t || {});
         } else {
@@ -4313,10 +4358,91 @@ document.addEventListener("DOMContentLoaded", function () {
           j(t);
         } catch (e) {}
       }),
+      // 启动时空数据抢救：如果关键数据为空，从 sessionStorage/localStorage/IDB 所有备份源恢复
+      (window._akiniRescueEmptyData = function () {
+        function tryParse(s) { try { return JSON.parse(s); } catch (e) { return null; } }
+        // 联系人抢救
+        try {
+          var contacts = window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+          if (!Array.isArray(contacts) || contacts.length === 0) {
+            var srcs = [
+              sessionStorage.getItem("akini_contacts_emergency"),
+              localStorage.getItem("akini_contacts"),
+              localStorage.getItem("akini_contacts_backup")
+            ];
+            for (var si = 0; si < srcs.length; si++) {
+              var p = tryParse(srcs[si]);
+              if (Array.isArray(p) && p.length > 0) {
+                window.akiniContacts.saveContacts(p);
+                console.log("[抢救] 联系人从备份恢复,数量:", p.length);
+                break;
+              }
+            }
+          }
+        } catch (e) {}
+        // iCity 抢救
+        try {
+          var diaries = q();
+          if (!Array.isArray(diaries) || diaries.length === 0) {
+            var isrcs = [
+              sessionStorage.getItem("akini_icity_diaries_emergency"),
+              localStorage.getItem("akini_icity_diaries"),
+              localStorage.getItem("akini_icity_diaries_backup")
+            ];
+            for (var ii = 0; ii < isrcs.length; ii++) {
+              var ip = tryParse(isrcs[ii]);
+              if (Array.isArray(ip) && ip.length > 0) {
+                j(ip);
+                console.log("[抢救] iCity 从备份恢复,日记数:", ip.length);
+                break;
+              }
+            }
+          }
+        } catch (e) {}
+      }),
+      // 同步写全量应急快照到 sessionStorage：刷新/返回时 IDB 事务可能未落盘，sessionStorage 同步可靠
+      (window._akiniEmergencySnapshot = function () {
+        try {
+          var diaries = q();
+          if (Array.isArray(diaries) && diaries.length > 0) {
+            sessionStorage.setItem("akini_icity_diaries_emergency", JSON.stringify(diaries));
+            diaries.forEach(function (d) {
+              if (d && d.id && Array.isArray(d.comments) && d.comments.length > 0) {
+                sessionStorage.setItem("akini_icity_comments_emergency_" + d.id, JSON.stringify({ id: d.id, comments: d.comments }));
+              }
+            });
+          }
+        } catch (e) {}
+        try {
+          if (window.akiniContacts && window.akiniContacts.getContacts) {
+            var contacts = window.akiniContacts.getContacts();
+            if (Array.isArray(contacts) && contacts.length > 0) {
+              sessionStorage.setItem("akini_contacts_emergency", JSON.stringify(contacts));
+            }
+          }
+        } catch (e) {}
+        try {
+          if (window.akiniContacts && window.akiniContacts.getGroups) {
+            var groups = window.akiniContacts.getGroups();
+            if (Array.isArray(groups) && groups.length > 0) {
+              sessionStorage.setItem("akini_groups_emergency", JSON.stringify(groups));
+            }
+          }
+        } catch (e) {}
+        try {
+          if (window.akiniContacts && window.akiniContacts.getSessions) {
+            var sessions = window.akiniContacts.getSessions();
+            if (sessions && typeof sessions === "object" && Object.keys(sessions).length > 0) {
+              sessionStorage.setItem("akini_chat_sessions_emergency", JSON.stringify(sessions));
+            }
+          }
+        } catch (e) {}
+      }),
       window.addEventListener("pagehide", function () {
         try {
           window._akiniSaveDiaries &&
             window._akiniSaveDiaries(window._akiniGetDiaries());
+          if (typeof window._akiniEmergencySnapshot === "function") window._akiniEmergencySnapshot();
         } catch (e) {}
       }),
       window.addEventListener("beforeunload", function () {
@@ -4324,6 +4450,7 @@ document.addEventListener("DOMContentLoaded", function () {
           window._akiniSaveDiaries &&
             window._akiniSaveDiaries(window._akiniGetDiaries());
           if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge();
+          if (typeof window._akiniEmergencySnapshot === "function") window._akiniEmergencySnapshot();
         } catch (e) {}
       }));
     function q() {
@@ -4331,6 +4458,30 @@ document.addEventListener("DOMContentLoaded", function () {
       var needLoad = !F || (Array.isArray(F) && F.length === 0 && !window.__akiniIcityLoaded);
       if (needLoad) {
         window.__akiniIcityLoaded = !0;
+        // 同步优先从 sessionStorage 应急备份读取：iOS Safari 刷新/返回时最可靠
+        try {
+          var em = sessionStorage.getItem("akini_icity_diaries_emergency");
+          if (em) {
+            var emParsed = JSON.parse(em);
+            if (Array.isArray(emParsed) && emParsed.length > 0) {
+              F = emParsed;
+              console.log("[iCity] q() 从 sessionStorage 应急恢复,日记数:", F.length);
+            }
+          }
+        } catch (e) {}
+        // 其次从 localStorage 主/备份同步恢复（作为内存兜底）
+        if (!F || !F.length) {
+          try {
+            var ls = localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
+            if (ls) {
+              var lsParsed = JSON.parse(ls);
+              if (Array.isArray(lsParsed) && lsParsed.length > 0) {
+                F = lsParsed;
+                console.log("[iCity] q() 从 localStorage 恢复,日记数:", F.length);
+              }
+            }
+          } catch (e) {}
+        }
         // 优先从 IndexedDB 读取（容量大，不受 localStorage 5MB 限制）
         if (window._idbStore && window._idbStore.get) {
           _idbStore.get("akini_icity_diaries", function (idbVal) {
@@ -4468,10 +4619,8 @@ document.addEventListener("DOMContentLoaded", function () {
       var lsOk = false;
       try { localStorage.setItem("akini_icity_diaries", n); lsOk = true; } catch (x) { console.warn("[iCity] localStorage写满,仅存IDB", x); }
       try { localStorage.setItem("akini_icity_diaries_backup", n); lsOk = true; } catch (x) {}
-      // localStorage 失败或不可用时，立即写入 sessionStorage 作为应急兜底（刷新/返回时仍可恢复）
-      if (!lsOk) {
-        try { sessionStorage.setItem("akini_icity_diaries_emergency", n); } catch (x) {}
-      }
+      // 同步写 sessionStorage 应急兜底：iOS Safari 刷新/返回时 localStorage/IDB 异步事务可能未落盘，sessionStorage 同步可靠
+      try { sessionStorage.setItem("akini_icity_diaries_emergency", n); } catch (x) {}
       console.log("[iCity] 持久化,日记数:", F.length, "评论总数:", (F||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
       (window._idbStore &&
         window._idbStore.backupAll &&
@@ -4694,10 +4843,17 @@ document.addEventListener("DOMContentLoaded", function () {
         try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
       }
       var backups = [];
+      var seen = {};
+      function addBackup(diaryId, comments) {
+        if (!diaryId || !Array.isArray(comments)) return;
+        if (seen[diaryId]) return;
+        seen[diaryId] = true;
+        backups.push({ id: diaryId, comments: comments });
+      }
       try {
         for (var i = 0; i < localStorage.length; i++) {
           var key = localStorage.key(i);
-          if (key && key.indexOf("akini_icity_comments_") === 0) {
+          if (key && key.indexOf("akini_icity_comments_") === 0 && key.indexOf("_emergency_") < 0) {
             var raw = localStorage.getItem(key);
             if (!raw) continue;
             // 兼容旧数据：老版本只存了 comments 数组，新版本存 {id, comments}
@@ -4705,9 +4861,25 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
               var parsed = JSON.parse(raw);
               if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.id) {
-                backups.push(parsed);
+                addBackup(parsed.id, parsed.comments);
               } else if (Array.isArray(parsed)) {
-                backups.push({ id: diaryId, comments: parsed });
+                addBackup(diaryId, parsed);
+              }
+            } catch (e) {}
+          }
+        }
+      } catch (e) {}
+      // 从 sessionStorage 应急备份读取（iOS 刷新时最可靠）
+      try {
+        for (var j = 0; j < sessionStorage.length; j++) {
+          var sKey = sessionStorage.key(j);
+          if (sKey && sKey.indexOf("akini_icity_comments_emergency_") === 0) {
+            var sRaw = sessionStorage.getItem(sKey);
+            if (!sRaw) continue;
+            try {
+              var sParsed = JSON.parse(sRaw);
+              if (sParsed && typeof sParsed === "object" && !Array.isArray(sParsed) && sParsed.id && Array.isArray(sParsed.comments)) {
+                addBackup(sParsed.id, sParsed.comments);
               }
             } catch (e) {}
           }
@@ -4804,7 +4976,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window.__akiniSplashProgress = 0;
     window.__akiniSplashDone = !1;
     window.__akiniSplashStartAt = Date.now();
-    window.__akiniSplashMinMs = 5000; // 固定 5s 引导加载，确保所有数据准备完成
+    window.__akiniSplashMinMs = 3000; // 固定 3s 引导加载，确保核心数据准备完成
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
@@ -4867,6 +5039,9 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
         // 强制从已恢复的内存缓存/IDB 重新读取关键数据，避免启动期间 q()/O() 因 F/z 已被 [] 占用而不再读权威数据
         try { F = null; z = null; _postsIdbLoaded = false; } catch (e) {}
+        // 启动时空数据抢救与 iCity 多源合并：防止 iOS 刷新时数据未落盘导致界面为空
+        try { if (typeof window._akiniRescueEmptyData === "function") window._akiniRescueEmptyData(); } catch (e) {}
+        try { if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge(); } catch (e) {}
         if ("function" == typeof window.renderChatList) window.renderChatList();
         if ("function" == typeof window._renderIcity) window._renderIcity();
         if ("function" == typeof window.updatePreview) window.updatePreview();
@@ -10885,6 +11060,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     a[r].comments.push(l),
                     j(a),
                     _backupIcityComments(a[r].id, a[r].comments),
+                    // 同步 sessionStorage 应急：评论发送后立即备份，防止 iOS 刷新时 IDB 事务未落盘
+                    (function(diaryId, comments) {
+                      try { sessionStorage.setItem("akini_icity_comments_emergency_" + diaryId, JSON.stringify({ id: diaryId, comments: comments })); } catch (_e) {}
+                    })(a[r].id, a[r].comments),
                     setTimeout(function () { if (window._icitySafetyMerge) window._icitySafetyMerge(); }, 800),
                     (u.value = ""),
                     (e._replyTo = ""),
@@ -16059,94 +16238,144 @@ document.addEventListener("DOMContentLoaded", function () {
         var songArtistInput = document.getElementById("musicSongArtistInput");
         var songCoverFile = document.getElementById("musicSongCoverFile");
         var importSongBtn = document.getElementById("musicImportSongBtn");
+        var mp3LinkInput = document.getElementById("musicMp3LinkInput");
+        var mp3NameInput = document.getElementById("musicMp3NameInput");
+        var mp3ArtistInput = document.getElementById("musicMp3ArtistInput");
+        var mp3CoverInput = document.getElementById("musicMp3CoverInput");
+        var mp3CoverLabel = document.getElementById("musicMp3CoverLabel");
+        var importMp3Btn = document.getElementById("musicImportMp3Btn");
         var manualCoverDataUrl = "";
         // 上传封面：读取图片并压缩为 data URL，供导入使用
+        function readCoverFile(fileInput) {
+          var file = fileInput && fileInput.files && fileInput.files[0];
+          if (!file) return;
+          var img = new Image();
+          var url = URL.createObjectURL(file);
+          img.onload = function () {
+            URL.revokeObjectURL(url);
+            var max = 500,
+              w = img.width,
+              h = img.height;
+            if (w > max || h > max) {
+              if (w >= h) {
+                h = Math.round((h * max) / w);
+                w = max;
+              } else {
+                w = Math.round((w * max) / h);
+                h = max;
+              }
+            }
+            var cv = document.createElement("canvas");
+            cv.width = w;
+            cv.height = h;
+            cv.getContext("2d").drawImage(img, 0, 0, w, h);
+            try {
+              manualCoverDataUrl = cv.toDataURL("image/jpeg", 0.8);
+              pt("封面已导入");
+              if (mp3CoverLabel) mp3CoverLabel.textContent = "唱片图片已导入";
+            } catch (e) {
+              pt("封面导入失败，请重试");
+            }
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            pt("封面图片读取失败");
+          };
+          img.src = url;
+        }
         songCoverFile &&
           songCoverFile.addEventListener("change", function () {
-            var file = this.files && this.files[0];
-            if (!file) return;
-            var img = new Image();
-            var url = URL.createObjectURL(file);
-            img.onload = function () {
-              URL.revokeObjectURL(url);
-              var max = 500,
-                w = img.width,
-                h = img.height;
-              if (w > max || h > max) {
-                if (w >= h) {
-                  h = Math.round((h * max) / w);
-                  w = max;
-                } else {
-                  w = Math.round((w * max) / h);
-                  h = max;
-                }
-              }
-              var cv = document.createElement("canvas");
-              cv.width = w;
-              cv.height = h;
-              cv.getContext("2d").drawImage(img, 0, 0, w, h);
-              try {
-                manualCoverDataUrl = cv.toDataURL("image/jpeg", 0.8);
-                pt("封面已导入");
-              } catch (e) {
-                pt("封面导入失败，请重试");
-              }
-            };
-            img.onerror = function () {
-              URL.revokeObjectURL(url);
-              pt("封面图片读取失败");
-            };
-            img.src = url;
+            readCoverFile(songCoverFile);
+          });
+        mp3CoverInput &&
+          mp3CoverInput.addEventListener("change", function () {
+            readCoverFile(mp3CoverInput);
           });
         var importMp3 = function () {
-          var rawUrl = (songUrlInput ? songUrlInput.value : "").trim();
-          if (!rawUrl) {
-            alert("请输入 MP3 链接");
-            return;
-          }
-          var neteaseMatch = rawUrl.match(
-            /(?:https?:\/\/)?music\.163\.com\/song\/media\/outer\/url\?id=(\d+)/i,
-          );
-          var name = (songNameInput ? songNameInput.value : "").trim();
-          var artist =
+          // 优先读取批量 MP3 链接 textarea
+          var bulkLines = (mp3LinkInput ? mp3LinkInput.value : "").trim();
+          var singleUrl = (songUrlInput ? songUrlInput.value : "").trim();
+          var defaultName = (mp3NameInput ? mp3NameInput.value : "").trim() ||
+            (songNameInput ? songNameInput.value : "").trim();
+          var defaultArtist = (mp3ArtistInput ? mp3ArtistInput.value : "").trim() ||
             (songArtistInput ? songArtistInput.value : "").trim() || "自定义";
           var cover = manualCoverDataUrl || "";
-          var track;
-          if (neteaseMatch && neteaseMatch[1]) {
-            // 网易云外链：直接用歌曲 ID 走代理接口，避免混合内容 302 到 http
-            var songId = neteaseMatch[1];
-            if (!name) name = "网易云歌曲 " + songId;
-            track = {
-              id: String(songId),
-              title: name,
-              artist: artist,
-              cover: cover,
-              duration: 0,
-            };
-          } else {
-            var url = rawUrl;
-            // 非网易云链接：HTTPS 页面无法直接播放 http，统一升级为 https
-            if (/^http:\/\//i.test(url)) {
-              url = "https://" + url.slice(7);
-            }
-            if (!name) {
-              name =
-                url.split("/").pop().split("?")[0].replace(/\.mp3$/i, "") ||
-                "自定义歌曲";
-            }
-            track = {
-              id: "mp3_" + Date.now(),
-              title: name,
-              artist: artist,
-              cover: cover,
-              url: url,
-              duration: 0,
-            };
-          }
           var list = JSON.parse(
             localStorage.getItem("akini_music_playlist") || "[]",
           );
-          list.push(track);
+          var added = 0;
+          var lastTrack = null;
+          var nowBase = Date.now();
+
+          function addTrack(rawUrl, idx) {
+            rawUrl = (rawUrl || "").trim();
+            if (!rawUrl) return;
+            // 网易云官方外链直链：直接当作 MP3 URL 播放，不经过代理
+            var neteaseOuterMatch = rawUrl.match(
+              /(?:https?:\/\/)?music\.163\.com\/song\/media\/outer\/url\?id=(\d+)/i,
+            );
+            // 网易云歌曲页面 ID：走后端代理获取真实播放地址
+            var neteaseSongMatch = rawUrl.match(
+              /(?:https?:\/\/)?music\.163\.com\/(?:#\/)?song\?id=(\d+)/i,
+            );
+            var name = defaultName;
+            var artist = defaultArtist;
+            var track;
+            if (neteaseSongMatch && neteaseSongMatch[1]) {
+              var songId = neteaseSongMatch[1];
+              if (!name) name = "网易云歌曲 " + songId;
+              track = {
+                id: String(songId),
+                title: name,
+                artist: artist,
+                cover: cover,
+                duration: 0,
+              };
+            } else {
+              var url = rawUrl;
+              if (/^http:\/\//i.test(url)) {
+                url = "https://" + url.slice(7);
+              }
+              if (!name) {
+                // 从 URL 文件名解析歌名：取路径最后一段，去掉参数与扩展名
+                var fileName = decodeURIComponent(url.split("/").pop().split("?")[0]);
+                name = fileName.replace(/\.(mp3|m4a|flac|wav|ogg|aac)$/i, "") || "自定义歌曲";
+                // 尝试把下划线/连字符替换为空格，提升可读性
+                name = name.replace(/[_\-]+/g, " ").trim();
+                // 网易云外链直链没有文件名，用歌曲 ID 兜底命名
+                if (neteaseOuterMatch && neteaseOuterMatch[1]) {
+                  name = "网易云歌曲 " + neteaseOuterMatch[1];
+                }
+              }
+              track = {
+                id: "mp3_" + (nowBase + idx),
+                title: name,
+                artist: artist,
+                cover: cover,
+                url: url,
+                duration: 0,
+              };
+            }
+            list.push(track);
+            added++;
+            lastTrack = track;
+          }
+
+          if (bulkLines) {
+            var lines = bulkLines.split(/\r?\n/);
+            lines.forEach(addTrack);
+          } else if (singleUrl) {
+            addTrack(singleUrl, 0);
+          } else {
+            alert("请输入 MP3 链接");
+            return;
+          }
+
+          if (added === 0) {
+            alert("未解析到有效链接");
+            return;
+          }
+
           // 歌词/封面可能较大，优先用 akiniStore(IDB) 持久化，再写 localStorage 兜底
           if (window.akiniStore && window.akiniStore.setJson) {
             window.akiniStore.setJson("akini_music_playlist", list);
@@ -16160,6 +16389,11 @@ document.addEventListener("DOMContentLoaded", function () {
           c = list;
           l = list.length - 1;
           localStorage.setItem("akini_music_index", l);
+          if (mp3LinkInput) mp3LinkInput.value = "";
+          if (mp3NameInput) mp3NameInput.value = "";
+          if (mp3ArtistInput) mp3ArtistInput.value = "";
+          if (mp3CoverInput) mp3CoverInput.value = "";
+          if (mp3CoverLabel) mp3CoverLabel.textContent = "导入唱片图片（可选）";
           if (songUrlInput) songUrlInput.value = "";
           if (songNameInput) songNameInput.value = "";
           if (songArtistInput) songArtistInput.value = "";
@@ -16168,8 +16402,8 @@ document.addEventListener("DOMContentLoaded", function () {
           try {
             Pt();
           } catch (e) {}
-          wt(c[l], !1);
-          pt("已导入歌曲：" + name);
+          if (lastTrack) wt(lastTrack, !1);
+          pt("已导入 " + added + " 首歌曲");
           Bt();
         };
         importSongBtn &&
@@ -16177,6 +16411,15 @@ document.addEventListener("DOMContentLoaded", function () {
         songUrlInput &&
           songUrlInput.addEventListener("keydown", function (t) {
             "Enter" === t.key && importMp3();
+          });
+        importMp3Btn &&
+          importMp3Btn.addEventListener("click", importMp3);
+        mp3LinkInput &&
+          mp3LinkInput.addEventListener("keydown", function (t) {
+            if ("Enter" === t.key && !t.shiftKey) {
+              t.preventDefault();
+              importMp3();
+            }
           });
         var musicMenuCloseBtn2 = document.getElementById("musicMenuCloseBtn");
         musicMenuCloseBtn2 &&
