@@ -4454,34 +4454,67 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
       }));
     function q() {
-      // F 为空时重新读取；空数组且尚未完成 IDB 校验时也重新读取，避免启动竞态读到空默认值
-      var needLoad = !F || (Array.isArray(F) && F.length === 0 && !window.__akiniIcityLoaded);
-      if (needLoad) {
-        window.__akiniIcityLoaded = !0;
-        // 同步优先从 sessionStorage 应急备份读取：iOS Safari 刷新/返回时最可靠
+      // 始终尝试从应急/备份源恢复评论（只增不减的合并），防止模块加载时的异步 IDB 回调
+      // 已用旧版 localStorage 填充 F 后，q() 因 F 非空而跳过恢复导致评论丢失
+      if (!window.__akiniIcityRecoverDone) {
+        window.__akiniIcityRecoverDone = !0;
+        if (!F || !F.length) F = i("akini_icity_diaries", []);
         try {
           var em = sessionStorage.getItem("akini_icity_diaries_emergency");
           if (em) {
             var emParsed = JSON.parse(em);
             if (Array.isArray(emParsed) && emParsed.length > 0) {
-              F = emParsed;
-              console.log("[iCity] q() 从 sessionStorage 应急恢复,日记数:", F.length);
+              F = _mergeIcityDiaries(F, emParsed);
             }
           }
         } catch (e) {}
-        // 其次从 localStorage 主/备份同步恢复（作为内存兜底）
-        if (!F || !F.length) {
-          try {
-            var ls = localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
-            if (ls) {
-              var lsParsed = JSON.parse(ls);
-              if (Array.isArray(lsParsed) && lsParsed.length > 0) {
-                F = lsParsed;
-                console.log("[iCity] q() 从 localStorage 恢复,日记数:", F.length);
-              }
+        try {
+          if (typeof _loadIcityCommentBackups === "function") {
+            var backups = _loadIcityCommentBackups();
+            if (backups && backups.length) {
+              F = _mergeIcityDiaries(F, backups);
             }
-          } catch (e) {}
-        }
+          }
+        } catch (e) {}
+      }
+      // F 为空时重新读取；空数组且尚未完成 IDB 校验时也重新读取，避免启动竞态读到空默认值
+      var needLoad = !F || (Array.isArray(F) && F.length === 0 && !window.__akiniIcityLoaded);
+      if (needLoad) {
+        window.__akiniIcityLoaded = !0;
+        // 同步先返回内存缓存 / localStorage 兜底
+        F = i("akini_icity_diaries", []);
+        // 同步从 sessionStorage 应急备份读取并合并：iOS Safari 刷新/返回时最可靠，优先于可能尚未更新的 localStorage
+        try {
+          var em = sessionStorage.getItem("akini_icity_diaries_emergency");
+          if (em) {
+            var emParsed = JSON.parse(em);
+            if (Array.isArray(emParsed) && emParsed.length > 0) {
+              F = _mergeIcityDiaries(F, emParsed);
+              console.log("[iCity] q() 从 sessionStorage 应急恢复并合并,日记数:", F.length, "评论总数:", F.reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
+            }
+          }
+        } catch (e) {}
+        // 其次从 localStorage 主/备份同步恢复并合并（作为兜底）
+        try {
+          var ls = localStorage.getItem("akini_icity_diaries") || localStorage.getItem("akini_icity_diaries_backup");
+          if (ls) {
+            var lsParsed = JSON.parse(ls);
+            if (Array.isArray(lsParsed) && lsParsed.length > 0) {
+              F = _mergeIcityDiaries(F, lsParsed);
+              console.log("[iCity] q() 从 localStorage 恢复并合并,日记数:", F.length, "评论总数:", F.reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
+            }
+          }
+        } catch (e) {}
+        // 同步从每条日记的独立评论备份恢复（localStorage 配额满或主存被覆盖时的最后兜底）
+        try {
+          if (typeof _loadIcityCommentBackups === "function") {
+            var backups = _loadIcityCommentBackups();
+            if (backups && backups.length) {
+              F = _mergeIcityDiaries(F, backups);
+              console.log("[iCity] q() 从评论独立备份恢复并合并,日记数:", F.length, "评论总数:", F.reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
+            }
+          }
+        } catch (e) {}
         // 优先从 IndexedDB 读取（容量大，不受 localStorage 5MB 限制）
         if (window._idbStore && window._idbStore.get) {
           _idbStore.get("akini_icity_diaries", function (idbVal) {
@@ -4505,8 +4538,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           });
         }
-        // 同步先返回内存缓存（akiniStore.memoryGet，IDB 预加载/写入同步），再读 localStorage 兜底
-        F = i("akini_icity_diaries", []);
         console.log("[iCity] q()读取,日记数:", (F||[]).length, "评论总数:", (F||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
       }
       var e = !1;
@@ -15770,6 +15801,7 @@ document.addEventListener("DOMContentLoaded", function () {
           playlistClearAll: document.getElementById("musicPlaylistClearAll"),
           playlistContainer: document.getElementById("musicPlaylistContainer"),
           status: document.getElementById("musicStatus"),
+          vipHint: document.getElementById("musicVipHint"),
           contactPicker: document.getElementById("musicContactPicker"),
           contactList: document.getElementById("musicContactList"),
           pickerBackBtn: document.getElementById("musicPickerBackBtn"),
@@ -16238,12 +16270,6 @@ document.addEventListener("DOMContentLoaded", function () {
         var songArtistInput = document.getElementById("musicSongArtistInput");
         var songCoverFile = document.getElementById("musicSongCoverFile");
         var importSongBtn = document.getElementById("musicImportSongBtn");
-        var mp3LinkInput = document.getElementById("musicMp3LinkInput");
-        var mp3NameInput = document.getElementById("musicMp3NameInput");
-        var mp3ArtistInput = document.getElementById("musicMp3ArtistInput");
-        var mp3CoverInput = document.getElementById("musicMp3CoverInput");
-        var mp3CoverLabel = document.getElementById("musicMp3CoverLabel");
-        var importMp3Btn = document.getElementById("musicImportMp3Btn");
         var manualCoverDataUrl = "";
         // 上传封面：读取图片并压缩为 data URL，供导入使用
         function readCoverFile(fileInput) {
@@ -16272,7 +16298,6 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
               manualCoverDataUrl = cv.toDataURL("image/jpeg", 0.8);
               pt("封面已导入");
-              if (mp3CoverLabel) mp3CoverLabel.textContent = "唱片图片已导入";
             } catch (e) {
               pt("封面导入失败，请重试");
             }
@@ -16286,10 +16311,6 @@ document.addEventListener("DOMContentLoaded", function () {
         songCoverFile &&
           songCoverFile.addEventListener("change", function () {
             readCoverFile(songCoverFile);
-          });
-        mp3CoverInput &&
-          mp3CoverInput.addEventListener("change", function () {
-            readCoverFile(mp3CoverInput);
           });
         var importMp3 = function () {
           // 优先读取批量 MP3 链接 textarea
@@ -16392,8 +16413,6 @@ document.addEventListener("DOMContentLoaded", function () {
           if (mp3LinkInput) mp3LinkInput.value = "";
           if (mp3NameInput) mp3NameInput.value = "";
           if (mp3ArtistInput) mp3ArtistInput.value = "";
-          if (mp3CoverInput) mp3CoverInput.value = "";
-          if (mp3CoverLabel) mp3CoverLabel.textContent = "导入唱片图片（可选）";
           if (songUrlInput) songUrlInput.value = "";
           if (songNameInput) songNameInput.value = "";
           if (songArtistInput) songArtistInput.value = "";
@@ -16411,15 +16430,6 @@ document.addEventListener("DOMContentLoaded", function () {
         songUrlInput &&
           songUrlInput.addEventListener("keydown", function (t) {
             "Enter" === t.key && importMp3();
-          });
-        importMp3Btn &&
-          importMp3Btn.addEventListener("click", importMp3);
-        mp3LinkInput &&
-          mp3LinkInput.addEventListener("keydown", function (t) {
-            if ("Enter" === t.key && !t.shiftKey) {
-              t.preventDefault();
-              importMp3();
-            }
           });
         var musicMenuCloseBtn2 = document.getElementById("musicMenuCloseBtn");
         musicMenuCloseBtn2 &&
@@ -17028,16 +17038,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (i) {
                   var a = parseInt(i.getAttribute("data-idx"), 10),
                     o = c[a];
+                  // 立即更新 UI（唱片/歌名/歌手），不等待网络请求，避免切歌时卡在上一首
+                  l = a;
+                  updateTrackUI();
                   o && o.id && !kt(o)
                     ? (_t(),
                       wt(o, !1)
                         .then(function () {
-                          ((l = a), It(), Ht());
+                          It();
+                          Ht();
                         })
                         .catch(function () {
-                          ((l = a), It(), Ht());
+                          It();
+                          Ht();
                         }))
-                    : ((l = a), It(), Ht());
+                    : (It(), Ht());
                 }
               }
               e.playlistContainer.addEventListener("click", function (t) {
@@ -17522,6 +17537,10 @@ document.addEventListener("DOMContentLoaded", function () {
         _spRaf && (cancelAnimationFrame(_spRaf), (_spRaf = null));
       }
       function yt() {
+        // 防止 timeupdate 与 ended 事件在短时间内重复触发导致跳一首
+        if (window._akiniEndingLock) return;
+        window._akiniEndingLock = !0;
+        setTimeout(function () { window._akiniEndingLock = !1; }, 500);
         ((__akiniManualPlay = !1),
           (w = 0),
           X(),
@@ -17599,7 +17618,15 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           localStorage.setItem("akini_music_current_time", "0");
         } catch (t) {}
-        if (prev) {
+        var oldL = l;
+        if (2 === s && !prev) {
+          // 随机播放模式：手动下一首也随机挑一首
+          if (1 === c.length) l = 0;
+          else
+            do {
+              l = Math.floor(Math.random() * c.length);
+            } while (l === oldL);
+        } else if (prev) {
           l = l > 0 ? l - 1 : c.length - 1;
         } else {
           l = l < c.length - 1 ? l + 1 : 0;
@@ -17645,6 +17672,17 @@ document.addEventListener("DOMContentLoaded", function () {
                   try {
                     u.currentTime = w;
                   } catch (t) {}
+                // VIP 试听检测：网易云歌曲且时长接近 30 秒，判定为 VIP 试听
+                if (e.vipHint) {
+                  var cur = c[l];
+                  var isNetease = cur && cur.id && !cur.url;
+                  var dur = u && u.duration ? u.duration : 0;
+                  if (isNetease && dur > 0 && dur <= 31) {
+                    e.vipHint.style.display = "block";
+                  } else {
+                    e.vipHint.style.display = "none";
+                  }
+                }
                 (ft(), pt("已获取歌曲时长"));
               }),
               u.addEventListener("timeupdate", function () {
@@ -17731,15 +17769,15 @@ document.addEventListener("DOMContentLoaded", function () {
                   window._akiniAudioErrCounts[errKey] = (window._akiniAudioErrCounts[errKey] || 0) + 1;
                   if (window._akiniAudioErrCounts[errKey] > 3) {
                     console.warn("[Akini Music] 同一首歌错误次数过多，停止重试", errKey);
-                    pt("该歌曲无法播放，自动切换下一首");
-                    // 自定义 MP3 链接没有网易云 ID，切歌前提示用户
+                    pt("该歌曲无法播放");
+                    // 自定义 MP3 链接没有网易云 ID，提示用户原因
                     if (!r) {
                       setTimeout(function () {
-                        alert("该 MP3 链接无法播放。可能原因：\n1. 链接为 HTTP，在当前 HTTPS 页面被浏览器拦截\n2. 目标服务器禁止跨域/直链访问\n3. 链接已失效或需要登录\n\n建议：使用以 https:// 开头的直链，或改用网易云歌单导入。");
+                        alert("该 MP3 链接无法播放。可能原因：\n1. 链接为 HTTP，在当前 HTTPS 页面被浏览器拦截\n2. 目标服务器禁止跨域/直链访问\n3. 链接已失效或需要登录\n\n建议：使用以 https:// 开头的直链，例如 catbox.moe、heliar.top 等。");
                       }, 200);
                     }
                     window._akiniAudioErrCounts[errKey] = 0;
-                    setTimeout(function () { St(); }, 800);
+                    xt();
                     return;
                   }
                   if ((4 === a || d) && r && "retry" !== n && "retry2" !== n) {
@@ -17785,10 +17823,8 @@ document.addEventListener("DOMContentLoaded", function () {
                           Date.now(),
                         "retry3",
                       ); }, 200);
-                    (pt("当前歌曲无法播放，自动切换下一首"),
-                      setTimeout(function () {
-                        St();
-                      }, 800));
+                    pt("当前歌曲无法播放");
+                    xt();
                   }
                 },
                 u.addEventListener("stalled", function () {
@@ -17950,6 +17986,25 @@ document.addEventListener("DOMContentLoaded", function () {
           ? 0
           : (e > 6e4 && (e /= 1e3), Math.floor(e));
       }
+      function updateTrackUI() {
+        var n = c[l];
+        if (!n) {
+          if (e.songName) e.songName.textContent = "一起听";
+          if (e.artist) e.artist.textContent = "点击右上角导入歌单";
+          if (e.vipHint) e.vipHint.style.display = "none";
+          return;
+        }
+        if (e.songName) e.songName.textContent = n.title || "未知歌曲";
+        if (e.artist) e.artist.textContent = n.artist || "未知歌手";
+        var i =
+          n.cover ||
+          "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+        if (i && !i.startsWith("data:"))
+          i = i.replace(/(\?.*)?$/, "?param=500y500");
+        if (e.cover) e.cover.src = i;
+        // 切歌时先隐藏 VIP 提示，待加载时长后再判断
+        if (e.vipHint) e.vipHint.style.display = "none";
+      }
       function It() {
         var n = c[l];
         if (!n)
@@ -17971,18 +18026,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         _spLastW = 0;
         _spLastTs = performance.now();
-        ((k = bt(n.duration)),
-          (e.songName.textContent = n.title || "未知歌曲"),
-          (e.artist.textContent = n.artist || "未知歌手"));
-        var i =
-          n.cover ||
-          "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-        (i &&
-          !i.startsWith("data:") &&
-          (i = i.replace(/(\?.*)?$/, "?param=500y500")),
-          (e.cover.src = i),
-          (d = __akiniManualPlay),
-          u && (u._ending = !1));
+        updateTrackUI();
+        (k = bt(n.duration));
+        (d = __akiniManualPlay), u && (u._ending = !1);
         __akiniManualPlay = !0;
         ft();
         wt(n, !0)
