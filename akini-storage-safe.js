@@ -56,11 +56,13 @@
 
   function getIDB() { return window._idbStore; }
 
+  var CONTACT_AVATAR_RE = /^akini_contact_avatar_/;
   function isCriticalKey(k) {
     if (!k) return false;
     if (CRITICAL_KEYS.indexOf(k) >= 0) return true;
     if (CHAT_HISTORY_RE.test(k)) return true;
     if (WB_GROUPS_RE.test(k)) return true;
+    if (CONTACT_AVATAR_RE.test(k)) return true; // 联系人头像专用键，走 IDB 优先读写
     return false;
   }
 
@@ -202,17 +204,26 @@
   }
 
   function restoreCriticalFromIdb() {
-    var keys = CRITICAL_KEYS.filter(function (k) { return k.indexOf('_backup') < 0; });
-    var remaining = keys.length;
-    function fireRestored() {
-      try { if (typeof window.__akiniOnCriticalRestored === 'function') window.__akiniOnCriticalRestored(); } catch (e) {}
-    }
-    if (!remaining) { fireRestored(); return; }
-    keys.forEach(function (k) {
-      restoreOneKey(k, function () {
-        remaining--;
-        if (remaining <= 0) fireRestored();
+    var staticKeys = CRITICAL_KEYS.filter(function (k) { return k.indexOf('_backup') < 0; });
+    function run(keys) {
+      var remaining = keys.length;
+      function fireRestored() {
+        try { if (typeof window.__akiniOnCriticalRestored === 'function') window.__akiniOnCriticalRestored(); } catch (e) {}
+      }
+      if (!remaining) { fireRestored(); return; }
+      keys.forEach(function (k) {
+        restoreOneKey(k, function () {
+          remaining--;
+          if (remaining <= 0) fireRestored();
+        });
       });
+    }
+    // 先把联系人头像专用键（动态前缀）从 IDB 查出，与静态关键键合并后一起恢复
+    idbKeys(function (allKeys) {
+      var avKeys = Array.isArray(allKeys)
+        ? allKeys.filter(function (k) { return CONTACT_AVATAR_RE.test(k) && k.indexOf('_backup') < 0; })
+        : [];
+      run(staticKeys.concat(avKeys));
     });
   }
 

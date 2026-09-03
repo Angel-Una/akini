@@ -1433,8 +1433,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if (window._restoringData) return (d = []);
           e = [];
         }
-        // 头像兜底：联系人 avatar 为空时，从 localStorage / 内存缓存的对方/我的头像回填，
-        // 避免 localStorage 写满或旧版数据导致刷新后头像变默认 emoji
+        // 头像恢复：联系人 avatar 为空时优先从专用键（IDB 权威）恢复，再回填对方/我的头像
         if (Array.isArray(e) && e.length > 0) {
           function _memOrLs(key1, key2) {
             var mem = "";
@@ -1448,13 +1447,21 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           var _taAv = _memOrLs("akini_ta_avatar", "akini_icity_ta_avatar");
           var _myAv = _memOrLs("akini_my_avatar", "akini_icity_my_avatar");
+          var _restoredAny = !1;
           e.forEach(function (c) {
-            if (c && (!c.avatar || !String(c.avatar).trim())) {
+            if (c && (!c.avatar || !String(c.avatar).trim() || c.avatar === "🐰")) {
               if (c.isDefault) c.avatar = _taAv || "🐰";
               else if (c.id === "me" || c.id === "my") c.avatar = _myAv || "🐱";
-              else c.avatar = _taAv || "🐰"; // 用户创建的联系人头像丢失时也用对方头像兜底
+              else {
+                // 用户创建的联系人：优先从专用头像键恢复（IDB 权威数据）
+                var _av = _memOrLs("akini_contact_avatar_" + c.id, "");
+                if (_av) { c.avatar = _av; _restoredAny = !0; }
+                else c.avatar = _taAv || "🐰";
+              }
             }
           });
+          // 若从专用键恢复了头像，回写联系人数组，保证后续读取一致
+          if (_restoredAny) { try { g(e); } catch (err) {} }
         }
         return ((d = e), e);
       }
@@ -1699,6 +1706,10 @@ document.addEventListener("DOMContentLoaded", function () {
               note: window.pickWordCards ? window.pickWordCards(1) : "",
               createdAt: Date.now(),
             };
+          // 联系人头像单独持久化到专用键（IDB 优先），避免随大数组写失败而丢失
+          if (a.avatar && String(a.avatar).trim()) {
+            try { L("akini_contact_avatar_" + a.id, a.avatar); } catch (err) {}
+          }
           return (
             n.push(a),
             g(n),
@@ -1715,6 +1726,10 @@ document.addEventListener("DOMContentLoaded", function () {
           for (var a in e) e.hasOwnProperty(a) && (n[i][a] = e[a]);
           if (!n[i].note && window.pickWordCards)
             n[i].note = window.pickWordCards(1);
+          // 头像变更时单独持久化到专用键（IDB 优先），防止大数组写失败导致刷新后头像丢失
+          if (void 0 !== e.avatar && n[i].avatar && String(n[i].avatar).trim()) {
+            try { L("akini_contact_avatar_" + t, n[i].avatar); } catch (err) {}
+          }
           g(n);
           var o = n[i],
             r = x();
@@ -5603,6 +5618,20 @@ document.addEventListener("DOMContentLoaded", function () {
             i && ((i.style.visibility = ""), (i.innerHTML = nt(_curAv, 38)));
           }
           (e && (e.textContent = t.name));
+          /* 置顶文字气泡：当前聊天被置顶时，在标题旁显示"置顶"（类似 iCity 置顶日记） */
+          try {
+            var _nameEl = document.getElementById("chatTaName");
+            if (_nameEl && _nameEl.parentNode) {
+              var _oldBadge = _nameEl.parentNode.querySelector(".chat-pin-badge");
+              if (_oldBadge) _oldBadge.remove();
+              if (window._akPinList && _akPinList().indexOf(t.id) >= 0) {
+                var _badge = document.createElement("span");
+                _badge.className = "chat-pin-badge";
+                _badge.textContent = "置顶";
+                _nameEl.parentNode.appendChild(_badge);
+              }
+            }
+          } catch (_e) {}
           /* 头像仍为空时异步从 IDB 恢复后重绘 */
           if (!_curAv && window._idbStore && window._idbStore.get) {
             _idbStore.get("akini_ta_avatar", function (_av) {
@@ -6642,6 +6671,14 @@ document.addEventListener("DOMContentLoaded", function () {
             (window.akiniContacts.deleteGroup(t),
             (Y.style.display = "none"),
             (Y.style.pointerEvents = "none"),
+            // 显式关闭聊天窗口并清除当前会话，避免解散后聊天窗口残留
+            window.akiniContacts.setActiveChatId && window.akiniContacts.setActiveChatId(null),
+            (function () {
+              var _chat = document.getElementById("app-chat");
+              if (_chat) { _chat.classList.remove("show"); _chat.style.display = "none"; }
+              var _body = document.getElementById("chatBody");
+              if (_body) _body.innerHTML = "";
+            })(),
             o("chat-list"),
             ot());
         }));

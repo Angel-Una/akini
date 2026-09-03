@@ -1377,6 +1377,19 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   cursor: pointer;
   padding: 10px;
 }
+/* 置顶文字气泡：聊天窗口标题旁，类似 iCity 置顶日记 */
+.chat-pin-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  background: rgba(7, 193, 96, 0.12);
+  color: #07c160;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 8px;
+  vertical-align: middle;
+  line-height: 1.6;
+}
 .chat-list-item .cli-avatar {
   position: relative;
   width: 48px;
