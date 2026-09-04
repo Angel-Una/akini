@@ -13157,14 +13157,14 @@ document.addEventListener("DOMContentLoaded", function () {
                       (((l = document.createElement("div")).id =
                         "mailDetailReplyArea"),
                       (l.style.cssText =
-                        "margin-top:16px;padding-top:14px;border-top:1px dashed #e8e2d9;"),
+                        "margin:16px 16px 20px;padding-top:14px;border-top:1px dashed #e8e2d9;"),
                       yn.querySelector("div > div").appendChild(l)),
                     "received" === e && "reply" !== t.subtype && !t.repliedByMe)
                   ) {
                     l.innerHTML =
                       '<div style="font-size:12px;color:#999;letter-spacing:1px;margin-bottom:8px;">✎ 写下你的回信</div>' +
                       '<textarea id="mailDetailReplyInput" placeholder="回复这封信…" style="width:100%;min-height:88px;border:none;background:#faf8f3;border-radius:14px;padding:12px 14px;font-size:14px;font-family:inherit;resize:none;outline:none;color:#333;box-sizing:border-box;line-height:1.6;box-shadow:inset 0 1px 3px rgba(0,0,0,.04);"></textarea>' +
-                      '<button type="button" id="mailDetailReplyBtn" style="margin-top:10px;width:100%;height:44px;background:#1a1a1a;color:#fff;border:none;border-radius:22px;font-size:14px;font-weight:600;letter-spacing:2px;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(0,0,0,.15);">寄出回信</button>';
+                      '<button type="button" id="mailDetailReplyBtn" style="margin-top:12px;width:100%;height:42px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;letter-spacing:2px;cursor:pointer;font-family:inherit;">寄出回信</button>';
                     var s = document.getElementById("mailDetailReplyBtn");
                     s &&
                       (s.onclick = function () {
