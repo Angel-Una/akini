@@ -4638,10 +4638,10 @@ body.dark-mode .akini-slider-value {
   margin-right: 0 !important;
 }
 #app-music {
-  overflow: auto !important;
+  overflow: hidden !important;
 }
 #app-music .music-container {
-  overflow: auto !important;
+  overflow: hidden !important;
 }
 .chat-input-bar {
   position: relative !important;

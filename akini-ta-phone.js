@@ -415,11 +415,11 @@
       '.akini-ta-phone-item-delete:hover{color:#ef4444;}',
       '.akini-ta-phone-empty{text-align:center;padding:40px 20px;color:#bbb;font-size:14px;}',
       '.akini-ta-phone-music-row{display:flex;align-items:center;gap:10px;padding-right:18px;}',
-      '.akini-ta-phone-music-disc{width:44px;height:44px;flex-shrink:0;border-radius:50%;background:repeating-radial-gradient(#111 0,#111 3px,#222 4px,#222 5px);box-shadow:inset 0 0 0 4px #1a1a1a;display:flex;align-items:center;justify-content:center;overflow:hidden;animation:akiniTaPhoneDiscSpin 10s linear infinite;}',
+      '.akini-ta-phone-music-disc{width:44px;height:44px;flex-shrink:0;border-radius:50%;background:repeating-radial-gradient(#111 0,#111 3px,#222 4px,#222 5px);box-shadow:inset 0 0 0 4px #1a1a1a;display:flex;align-items:center;justify-content:center;overflow:hidden;}',
       '.akini-ta-phone-music-meta{min-width:0;flex:1;}',
       '.akini-ta-phone-music-title{font-size:14px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
       '.akini-ta-phone-music-artist{font-size:12px;color:#888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
-      '@keyframes akiniTaPhoneDiscSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'
+      ''
     ].join('');
     document.head.appendChild(style);
   }
