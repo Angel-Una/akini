@@ -1819,36 +1819,36 @@ body.bubble-pink
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #ffd1dc;
-  color: #111;
+  background: #ffd1dc !important;
+  color: #111 !important;
 }
 body.bubble-blue
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #007aff;
-  color: #fff;
+  background: #007aff !important;
+  color: #fff !important;
 }
 body.bubble-green
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #07c160;
-  color: #fff;
+  background: #07c160 !important;
+  color: #fff !important;
 }
 body.bubble-black
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #111;
-  color: #fff;
+  background: #111 !important;
+  color: #fff !important;
 }
 body.bubble-gray
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #e9e9eb;
-  color: #111;
+  background: #e9e9eb !important;
+  color: #111 !important;
 }
 .chat-body .msg-row .bubble.transfer-bubble {
   background: #222 !important;
@@ -1910,15 +1910,17 @@ body.bubble-gray
   margin: 4px 0 10px;
   flex-direction: row;
 }
-.chat-body .msg-row.system .bubble {
-  background: rgba(180, 180, 180, 0.32);
-  color: #888;
-  font-size: 11px;
-  padding: 2px 10px;
-  border-radius: 20px;
-  max-width: 90%;
-  text-align: center;
-  box-shadow: none;
+.chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
+  background: rgba(200, 200, 200, 0.35) !important;
+  color: #888 !important;
+  font-size: 12px !important;
+  padding: 3px 10px !important;
+  border-radius: 20px !important;
+  max-width: 90% !important;
+  text-align: center !important;
+  box-shadow: none !important;
+  font-weight: normal !important;
+  line-height: 1.6 !important;
 }
 .timestamp-row {
   display: flex;

@@ -115,7 +115,7 @@
 
   // ========== 主动来信定时器（syy envelopeAutoSend 模式） ==========
   var autoTimer = null;
-  function manageAutoSendTimer() {
+  function manageAutoSendTimer(forceReset) {
     if (autoTimer) clearTimeout(autoTimer);
     var enabled = localStorage.getItem("akini_mailAutoSendEnabled");
     if (enabled === "0") return;
@@ -124,7 +124,21 @@
     if (isNaN(min) || min < 1) min = 30;
     if (isNaN(max) || max < min) max = min + 30;
     var delay = (min + Math.random() * (max - min)) * 60 * 1000;
+    // 跨重启续跑：已有未到期计划按剩余时间继续；已过期（关闭期间错过）则尽快补发
+    try {
+      if (forceReset) {
+        localStorage.removeItem("akini_next_mailAutoSend");
+      } else {
+        var existing = parseFloat(localStorage.getItem("akini_next_mailAutoSend") || "0");
+        var now0 = Date.now();
+        if (existing) {
+          delay = existing > now0 ? (existing - now0) : (8000 + Math.floor(Math.random() * 15000));
+        }
+      }
+      localStorage.setItem("akini_next_mailAutoSend", String(Date.now() + delay));
+    } catch (e) {}
     autoTimer = setTimeout(function () {
+      try { localStorage.removeItem("akini_next_mailAutoSend"); } catch (e) {}
       try {
         if (window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("mail")) {
           manageAutoSendTimer();
@@ -196,6 +210,11 @@
     if (!document.hidden) {
       if (window.akiniMailEngine && window.akiniMailEngine.checkStatus) window.akiniMailEngine.checkStatus();
       markActive();
+      // 后台冻结可能错过主动来信定时器：到期则重新调度（manageAutoSendTimer 会识别过期并尽快补发）
+      try {
+        var next = parseFloat(localStorage.getItem("akini_next_mailAutoSend") || "0");
+        if (next && Date.now() >= next) manageAutoSendTimer();
+      } catch (e) {}
     }
   });
   // 周期性更新活跃时间（应用在前台时）
