@@ -10968,8 +10968,22 @@ document.addEventListener("DOMContentLoaded", function () {
             "icityEmptyTip" !== t.id && t.remove();
           });
           var y = m.filter(function (t) {
-            return !0;
+            return t && typeof t.text === "string" && t.text.trim() !== "" && t.text !== "undefined";
           });
+          if (y.length !== m.length) {
+            /* 自愈清理：剔除历史脏条目（如无内容的 undefined 残留），并持久化到全部存储层 */
+            F = y;
+            try {
+              localStorage.setItem("akini_icity_diaries", JSON.stringify(F));
+              localStorage.setItem("akini_icity_diaries_backup", JSON.stringify(F));
+            } catch (e) {}
+            try {
+              if (window._idbStore && _idbStore.set) {
+                _idbStore.set("akini_icity_diaries", JSON.stringify(F));
+                _idbStore.set("akini_icity_diaries_backup", JSON.stringify(F));
+              }
+            } catch (e) {}
+          }
           (0 === y.length
             ? g && (g.style.display = "")
             : g && (g.style.display = "none"),
@@ -13937,8 +13951,9 @@ document.addEventListener("DOMContentLoaded", function () {
               e.readAsDataURL(t),
               (this.value = ""));
           }),
-          D("akini_music_bg", function (t) {
-            if (t) {
+          (function(){
+            var show = function (t) {
+              if (!t) return;
               const e = document.getElementById("musicBgLayer");
               e &&
                 ((e.style.backgroundImage = `url(${t})`),
@@ -13946,8 +13961,16 @@ document.addEventListener("DOMContentLoaded", function () {
                 (e.style.backgroundPosition = "center"),
                 (e.style.backgroundRepeat = "no-repeat"),
                 (e.style.display = "block"));
+            };
+            if (window._idbStore && _idbStore.get) {
+              _idbStore.get("akini_music_bg", function (v) {
+                if (typeof v === "string" && v) return show(v);
+                D("akini_music_bg", show);
+              });
+            } else {
+              D("akini_music_bg", show);
             }
-          }));
+          })());
         const u = document.getElementById("fileInputDayBgBeautify");
         u &&
           u.addEventListener("change", function () {
@@ -14350,10 +14373,6 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             var e = getFriendsReplyDelayMs();
             function friendsInteractAction() {
-              if (!window.__akiniToggleOn("contactFriendsToggle", false)) {
-                t();
-                return;
-              }
               const n = r().name,
                 i = nt(r().avatar, 40),
                 a = localStorage.getItem("akini_my_name") || "我",
@@ -14967,6 +14986,22 @@ document.addEventListener("DOMContentLoaded", function () {
         t("contactShopToggle", !1),
         t("contactFriendsToggle", !1),
         t("contactIcityToggle", !1),
+        (function(){
+          /* 开关已移至朋友圈/iCity 模块内；只控制主动发布，点赞/评论互动始终生效 */
+          function bindPageToggle(elId, key){
+            var b = document.getElementById(elId);
+            if (!b) return;
+            function sync(){ b.classList.toggle("on", window.__akiniToggleOn(key, false)); }
+            sync();
+            b.addEventListener("click", function(){
+              var on = !window.__akiniToggleOn(key, false);
+              try { localStorage.setItem("akini_toggle_" + key, on ? "1" : "0"); } catch(e){}
+              sync();
+            });
+          }
+          bindPageToggle("contactFriendsTogglePage", "contactFriendsToggle");
+          bindPageToggle("contactIcityTogglePage", "contactIcityToggle");
+        })(),
         t("timestampToggle", !1),
         (function(){
           // 时间格式选择：三个选项点击切换，存储 akini_timeFormat = "24" | "12PM" | "12AM"
@@ -17794,7 +17829,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function U() {
         var t = document.getElementById("musicDarkOverlay");
-        D("akini_music_bg", function (n) {
+        function apply(n) {
           (e.bgLayer &&
             (n
               ? ((e.bgLayer.style.backgroundImage = "url(" + n + ")"),
@@ -17805,7 +17840,16 @@ document.addEventListener("DOMContentLoaded", function () {
               (t.style.background = n
                 ? "radial-gradient(circle at 50% 40%, rgba(0,0,0,0.30) 0%, rgba(15,15,18,0.55) 70%, rgba(15,15,18,0.75) 100%)"
                 : "radial-gradient(circle at 50% 40%, transparent 0%, rgba(15,15,18,0.75) 70%, rgba(15,15,18,0.92) 100%)"));
-        });
+        }
+        /* 优先读 IndexedDB（新图写入的权威存储），localStorage 仅作兜底，避免旧残留遮蔽新值 */
+        if (window._idbStore && _idbStore.get) {
+          _idbStore.get("akini_music_bg", function (v) {
+            if (typeof v === "string" && v) return apply(v);
+            D("akini_music_bg", function (n) { apply(n || ""); });
+          });
+        } else {
+          D("akini_music_bg", function (n) { apply(n || ""); });
+        }
       }
       function K() {
         (x || (x = Date.now()), Y());

@@ -107,9 +107,8 @@
 
   function addCollection(contactId, type, content, originalTime) {
     if (!content || !content.trim()) return false;
-    // 收藏随机归属到我创建的联系人
-    var randomContact = pickRandomCreatedContact();
-    var targetId = (randomContact && randomContact.id) || contactId;
+    /* 严格归属到传入的联系人：微信消息只收藏对应窗口的，朋友圈/iCity/网易云各自独立收藏 */
+    var targetId = contactId;
     if (!targetId) return false;
     var data = loadCollections(targetId);
     var dup = false;
@@ -145,8 +144,7 @@
   // 联系人收藏用户添加的歌曲：track = {title, artist, cover, ...}
   function addMusicCollection(contactId, track, originalTime) {
     if (!track || !(track.title || track.name)) return false;
-    var randomContact = pickRandomCreatedContact();
-    var targetId = (randomContact && randomContact.id) || contactId;
+    var targetId = contactId;
     if (!targetId) return false;
     var data = loadCollections(targetId);
     var title = String(track.title || track.name || '').trim();
@@ -168,7 +166,12 @@
 
   window.akiniTaPhoneCollectMusic = function (track, timestamp) {
     if (!track) return;
-    if (Math.random() < MUSIC_CHANCE) addMusicCollection(null, track, timestamp || Date.now());
+    /* 每个联系人独立判定是否收藏（各自 10% 概率），收藏到各自的手机 */
+    var all = getContacts();
+    for (var i = 0; i < all.length; i++) {
+      if (all[i] && all[i].id && Math.random() < MUSIC_CHANCE)
+        addMusicCollection(all[i].id, track, timestamp || Date.now());
+    }
   };
 
   function scanHistory() {
@@ -185,47 +188,51 @@
           var tmp = document.createElement('div');
           tmp.innerHTML = html;
           var meRows = tmp.querySelectorAll('.msg-row.me');
-          meRows.forEach(function (row) {
-            var bubble = row.querySelector('.bubble');
-            if (!bubble) return;
-            if (bubble.querySelector('img') && !(bubble.textContent || '').trim()) return;
+          /* 只收藏该联系人自己窗口的消息；每次扫描每人最多 1 条（从最新往旧，命中即停） */
+          for (var ri = meRows.length - 1; ri >= 0; ri--) {
+            var bubble = meRows[ri].querySelector('.bubble');
+            if (!bubble) continue;
+            if (bubble.querySelector('img') && !(bubble.textContent || '').trim()) continue;
             var text = (bubble.textContent || '').trim();
-            if (!text) return;
-            if (Math.random() < CHAT_HISTORY_CHANCE) addCollection(c.id, 'chat', text, Date.now());
-          });
-        });
-      }
-      var posts = (typeof window.__akiniGetPosts === 'function') ? window.__akiniGetPosts() : [];
-      if (Array.isArray(posts)) {
-        var myName = localStorage.getItem('akini_my_name') || '我';
-        // 历史扫描时，每条内容归属到用户当前选中的联系人（严格模式，不回退到第一个）
-        var _strictCid = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null;
-        posts.forEach(function (post) {
-          if (!post || !post.text || !post.text.trim()) return;
-          if (post.author && post.author !== myName) return;
-          var cid = _strictCid || currentContactId;
-          if (!cid) return;
-          if (post.source === 'icity') {
-            if (Math.random() < ICITY_HISTORY_CHANCE) addCollection(cid, 'icity', post.text, post.ts || Date.now());
-          } else {
-            if (Math.random() < MOMENTS_HISTORY_CHANCE) addCollection(cid, 'moments', post.text, post.ts || Date.now());
+            if (!text) continue;
+            if (Math.random() < CHAT_HISTORY_CHANCE) { addCollection(c.id, 'chat', text, Date.now()); break; }
           }
         });
       }
-      // 历史扫描：我的网易云播放列表，按概率被联系人收藏
+      var posts = (typeof window.__akiniGetPosts === 'function') ? window.__akiniGetPosts() : [];
+      var myPosts = [], myDiaries = [];
+      if (Array.isArray(posts)) {
+        var myName = localStorage.getItem('akini_my_name') || '我';
+        posts.forEach(function (post) {
+          if (!post || !post.text || !post.text.trim()) return;
+          if (post.author && post.author !== myName) return;
+          if (post.source === 'icity') myDiaries.push(post); else myPosts.push(post);
+        });
+      }
+      var plist = [];
       try {
         var plistRaw = (window.akiniStore && window.akiniStore.getSync)
           ? window.akiniStore.getSync('akini_music_playlist', null)
           : localStorage.getItem('akini_music_playlist');
-        var plist = plistRaw ? JSON.parse(plistRaw) : [];
-        if (Array.isArray(plist)) {
-          plist.forEach(function (t) {
-            if (t && (t.title || t.name) && Math.random() < MUSIC_HISTORY_CHANCE) {
-              addMusicCollection(null, t, Date.now());
-            }
-          });
-        }
+        plist = plistRaw ? JSON.parse(plistRaw) : [];
       } catch (e) {}
+      if (!Array.isArray(plist)) plist = [];
+      /* 朋友圈/iCity/网易云：每个联系人独立判定、各自收藏到自己的手机；
+         每类每次扫描最多 1 条（从最新往旧扫，命中即停），不会一口气收藏一堆 */
+      contacts.forEach(function (c) {
+        if (!c || !c.id) return;
+        for (var mi = myPosts.length - 1; mi >= 0; mi--) {
+          if (Math.random() < MOMENTS_HISTORY_CHANCE) { addCollection(c.id, 'moments', myPosts[mi].text, myPosts[mi].ts || Date.now()); break; }
+        }
+        for (var di = myDiaries.length - 1; di >= 0; di--) {
+          if (Math.random() < ICITY_HISTORY_CHANCE) { addCollection(c.id, 'icity', myDiaries[di].text, myDiaries[di].ts || Date.now()); break; }
+        }
+        for (var si = plist.length - 1; si >= 0; si--) {
+          var t = plist[si];
+          if (!t || !(t.title || t.name)) continue;
+          if (Math.random() < MUSIC_HISTORY_CHANCE) { addMusicCollection(c.id, t, Date.now()); break; }
+        }
+      });
     } catch (e) {}
   }
 
@@ -397,8 +404,8 @@
       '.akini-ta-phone-grid-item:active{opacity:0.7;}',
       '.akini-ta-phone-grid-name{font-size:12px;color:#666;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}',
       // 联系人桌面（三个应用图标）
-      '.akini-ta-phone-desktop{display:none;justify-content:center;align-items:center;gap:22px;padding:45px 12px;flex:1;background:#fff;}',
-      '.akini-ta-phone-app{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;}',
+      '.akini-ta-phone-desktop{display:none;justify-content:flex-start;align-items:flex-start;flex-wrap:wrap;gap:26px 6%;padding:40px 24px;flex:1;background:#fff;align-content:flex-start;}',
+      '.akini-ta-phone-app{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;width:27%;flex-shrink:0;}',
       '.akini-ta-phone-app:active{opacity:0.7;}',
       '.akini-ta-phone-app-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:#666;}',
       '.akini-ta-phone-app-icon svg{width:100%;height:100%;}',
