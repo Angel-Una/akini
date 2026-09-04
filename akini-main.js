@@ -475,115 +475,108 @@ document.addEventListener("DOMContentLoaded", function () {
       document.body.appendChild(overlay);
     };
     window._idbStore = (function () {
-      var STORE = "imgs";
-      var DB_NAME = "akini_img_db";
-      var DB_VERSION = 1;
-      var db = null;
-      var queue = [];
-      var opening = false;
-
-      function fireReady(cbs, conn) {
-        for (var i = 0; i < cbs.length; i++) {
-          try { cbs[i](conn); } catch (e) {}
+      // 存储逻辑对齐 milk/syy：localforage（IndexedDB→WebSQL→localStorage 自动降级）为唯一主存储；
+      // localStorage 仅作小键热备与同步读取缓存。旧自研库 akini_img_db 的数据首次启动自动迁入。
+      var lf = null;
+      try {
+        if (typeof localforage !== "undefined") {
+          lf = localforage.createInstance({
+            driver: [localforage.INDEXEDDB, localforage.WEBSQL, localforage.LOCALSTORAGE],
+            name: "AkiniApp",
+            version: 1.0,
+            storeName: "akini_data",
+            description: "akini main storage (milk-style localforage)"
+          });
         }
+      } catch (e) { lf = null; }
+
+      var LEGACY_DB = "akini_img_db";
+      var LEGACY_STORE = "imgs";
+      var migrated = false, migrating = false, waiters = [];
+
+      function fireReady(inst) {
+        var q = waiters; waiters = [];
+        for (var i = 0; i < q.length; i++) { try { q[i](inst); } catch (e) {} }
       }
 
-      function open(cb) {
-        if (db) { cb(db); return; }
-        queue.push(cb);
-        if (opening) return;
-        opening = true;
+      function migrateLegacy(done) {
+        // 把旧自研 IDB（akini_img_db）里的数据搬进 localforage；旧库保留不删，双保险
         try {
-          var req = indexedDB.open(DB_NAME, DB_VERSION);
-          req.onupgradeneeded = function (e) {
-            var _db = e.target.result;
-            if (!_db.objectStoreNames.contains(STORE)) {
-              _db.createObjectStore(STORE);
-            }
-          };
+          if (typeof indexedDB === "undefined") { done(); return; }
+          var req = indexedDB.open(LEGACY_DB, 1);
           req.onsuccess = function (e) {
-            db = e.target.result;
+            var conn = e.target.result;
             try {
-              db.onclose = function () { db = null; };
-              db.onversionchange = function () { try { db.close(); } catch (_) {} db = null; };
-            } catch (_) {}
-            opening = false;
-            var q = queue; queue = [];
-            fireReady(q, db);
+              if (!conn.objectStoreNames.contains(LEGACY_STORE)) { conn.close(); done(); return; }
+              var tx = conn.transaction(LEGACY_STORE, "readonly");
+              var cursorReq = tx.objectStore(LEGACY_STORE).openCursor();
+              var pending = 0, ended = false, finished = false;
+              var finish = function () {
+                if (finished) return;
+                if (ended && pending <= 0) { finished = true; try { conn.close(); } catch (_) {} done(); }
+              };
+              cursorReq.onsuccess = function (ev) {
+                var cur = ev.target.result;
+                if (cur) {
+                  pending++;
+                  lf.setItem(cur.key, cur.value).then(
+                    function () { pending--; finish(); },
+                    function () { pending--; finish(); }
+                  );
+                  cur.continue();
+                } else { ended = true; finish(); }
+              };
+              cursorReq.onerror = function () { ended = true; finish(); };
+              tx.oncomplete = function () { ended = true; finish(); };
+              tx.onerror = tx.onabort = function () { ended = true; finish(); };
+            } catch (err) { try { conn.close(); } catch (_) {} done(); }
           };
-          req.onerror = req.onblocked = function () {
-            opening = false;
-            var q = queue; queue = [];
-            fireReady(q, null);
-          };
-        } catch (err) {
-          opening = false;
-          var q = queue; queue = [];
-          fireReady(q, null);
-        }
+          req.onerror = req.onblocked = function () { done(); };
+        } catch (err) { done(); }
       }
 
-      function withDB(use, fail) {
-        open(function (conn) {
-          if (!conn) { if (fail) fail(); return; }
-          function tryUse(retrying) {
-            try {
-              use(conn);
-            } catch (err) {
-              if (
-                !retrying && err &&
-                (err.name === "InvalidStateError" ||
-                 err.name === "NotFoundError" ||
-                 (err.message && err.message.toLowerCase().indexOf("closing") >= 0))
-              ) {
-                try { db.close(); } catch (_) {}
-                db = null;
-                open(function (conn2) {
-                  if (conn2) {
-                    try { use(conn2); } catch (e2) { if (fail) fail(); }
-                  } else if (fail) fail();
-                });
-              } else {
-                if (fail) fail();
-              }
-            }
-          }
-          tryUse(false);
+      function ready(cb) {
+        if (!lf) { cb(null); return; }
+        if (migrated) { cb(lf); return; }
+        waiters.push(cb);
+        if (migrating) return;
+        migrating = true;
+        migrateLegacy(function () {
+          migrated = true; migrating = false;
+          fireReady(lf);
         });
       }
 
-      function lsSet(k, v) {
-        try { if (typeof T !== "undefined" && T) T.call(localStorage, k, v); } catch (e) {}
+      function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+      function isEmpty(v) {
+        return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
       }
+      function isSnapKey(k) {
+        return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
+      }
+      // milk 逻辑：大数据只留 IDB + 内存缓存，不回写 localStorage（5MB 配额只装小键）
+      var LS_HOT_LIMIT = 153600;
 
       return {
         set: function (k, v, cb) {
           var done = function () { if (typeof cb === "function") cb(); };
-          withDB(function (conn) {
-            var tx = conn.transaction(STORE, "readwrite");
-            tx.objectStore(STORE).put(v, k);
-            tx.oncomplete = done;
-            tx.onerror = function () { lsSet(k, v); done(); };
-            tx.onabort = function () { lsSet(k, v); done(); };
-          }, function () { lsSet(k, v); done(); });
+          ready(function (inst) {
+            if (!inst) { lsSet(k, v); done(); return; }
+            inst.setItem(k, v).then(done, function () { lsSet(k, v); done(); });
+          });
         },
         get: function (k, cb) {
           if (typeof cb !== "function") return;
-          withDB(function (conn) {
-            var req = conn.transaction(STORE, "readonly").objectStore(STORE).get(k);
-            req.onsuccess = function () { cb(req.result !== undefined ? req.result : localStorage.getItem(k)); };
-            req.onerror = function () { cb(localStorage.getItem(k)); };
-          }, function () { cb(localStorage.getItem(k)); });
+          ready(function (inst) {
+            if (!inst) { cb(localStorage.getItem(k)); return; }
+            inst.getItem(k).then(function (v) {
+              cb(v !== null && v !== undefined ? v : localStorage.getItem(k));
+            }, function () { cb(localStorage.getItem(k)); });
+          });
         },
         backupAll: function (cb) {
           var done = function () { if (typeof cb === "function") cb(); };
-          function isEmpty(v) {
-            return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
-          }
-          function isSnapKey(k) {
-            return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
-          }
-          // 收集 localStorage 中需要备份的键值，但写入 IDB 前必须确认 IDB 中无该键，
+          // 收集 localStorage 中需要备份的键值，写入 IDB 前逐个比对长度，
           // 防止用可能已过期/被系统清空的 localStorage 数据覆盖 IDB 主存储。
           var lsItems = [];
           for (var i = 0; i < localStorage.length; i++) {
@@ -592,97 +585,67 @@ document.addEventListener("DOMContentLoaded", function () {
             if (isEmpty(c)) continue;
             lsItems.push({ k: r, v: c });
           }
-          withDB(function (conn) {
-            var tx = conn.transaction(STORE, "readwrite");
-            var store = tx.objectStore(STORE);
-            var existing = {};
-            var cursorReq = store.openCursor();
-            cursorReq.onsuccess = function (e) {
-              var cursor = e.target.result;
-              if (cursor) {
-                existing[cursor.key] = cursor.value;
-                cursor.continue();
-              } else {
-                for (var j = 0; j < lsItems.length; j++) {
-                  var item = lsItems[j];
-                  var idbVal = existing[item.k];
-                  var idbLen = idbVal === undefined || idbVal === null ? 0 : String(idbVal).length;
-                  // 只在新于 IDB 时才覆盖：聊天记录由 C() 直接维护，通常 IDB >= localStorage；
-                  // 设置类只在 localStorage 更新且更长时才同步到 IDB，避免过期快照覆盖最新数据。
-                  if (idbLen < String(item.v).length) {
-                    store.put(item.v, item.k);
-                  }
-                }
-              }
-            };
-            cursorReq.onerror = function () {
-              // 无法枚举已有键时宁可不写入，也不覆盖 IDB 中可能更新、更完整的数据
-            };
-            tx.oncomplete = done;
-            tx.onerror = done;
-          }, done);
+          ready(function (inst) {
+            if (!inst) { done(); return; }
+            var idx = 0;
+            (function next() {
+              if (idx >= lsItems.length) { done(); return; }
+              var item = lsItems[idx++];
+              inst.getItem(item.k).then(function (idbVal) {
+                var idbLen = (idbVal === null || idbVal === undefined) ? 0 : String(idbVal).length;
+                // 只在新于 IDB 时才覆盖：聊天记录由 C() 直接维护，通常 IDB >= localStorage；
+                // 设置类只在 localStorage 更新且更长时才同步到 IDB，避免过期快照覆盖最新数据。
+                if (idbLen < String(item.v).length) {
+                  inst.setItem(item.k, item.v).then(next, next);
+                } else next();
+              }, next);
+            })();
+          });
         },
         restoreAll: function (cb) {
           var done = function () { if (typeof cb === "function") cb(); };
-          function isEmpty(v) {
-            return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
-          }
-          withDB(function (conn) {
-            var cursorReq = conn.transaction(STORE, "readonly").openCursor();
-            cursorReq.onsuccess = function (e) {
-              var o = e.target.result;
-              if (o) {
-                var k = o.key, v = o.value;
-                if (
-                  k && k.indexOf("akini_app_icon_") !== 0 &&
-                  k.indexOf("akini_localstorage_snapshot") !== 0 &&
-                  !isEmpty(v)
-                ) {
-                  // 把 IDB 权威数据同步到内存缓存，避免 localStorage 满后读不到最新数据
-                  if (window.akiniStore && window.akiniStore.memorySet) {
-                    window.akiniStore.memorySet(k, v);
-                  }
-                  var cur = localStorage.getItem(k);
-                  // 只在本地为空/占位时才用 IDB 回填；已有数据不覆盖，防止旧数据覆盖新数据
-                  if (isEmpty(cur)) {
-                    try { localStorage.setItem(k, v); } catch (x) {}
-                  }
+          ready(function (inst) {
+            if (!inst) { done(); return; }
+            inst.iterate(function (v, k) {
+              if (k && k.indexOf("akini_app_icon_") !== 0 && !isSnapKey(k) && !isEmpty(v)) {
+                // 把 IDB 权威数据同步到内存缓存，避免 localStorage 满后读不到最新数据
+                if (window.akiniStore && window.akiniStore.memorySet) {
+                  window.akiniStore.memorySet(k, v);
                 }
-                o.continue();
-              } else done();
-            };
-            cursorReq.onerror = done;
-          }, done);
+                var cur = null;
+                try { cur = localStorage.getItem(k); } catch (e0) {}
+                // 只在本地为空/占位时才用 IDB 回填；大键不回写 LS（milk 逻辑：防配额爆满挤掉其它键）
+                if (isEmpty(cur) && String(v).length <= LS_HOT_LIMIT) {
+                  try { localStorage.setItem(k, v); } catch (x) {}
+                }
+              }
+            }).then(done, done);
+          });
         },
         getAll: function (cb) {
           if (typeof cb !== "function") return;
-          withDB(function (conn) {
+          ready(function (inst) {
+            if (!inst) { cb({}); return; }
             var out = {};
-            var req = conn.transaction(STORE, "readonly").openCursor();
-            req.onsuccess = function (e) {
-              var r = e.target.result;
-              if (r) { out[r.key] = r.value; r.continue(); } else cb(out);
-            };
-            req.onerror = function () { cb(out); };
-          }, function () { cb({}); });
+            inst.iterate(function (v, k) { out[k] = v; }).then(
+              function () { cb(out); },
+              function () { cb(out); }
+            );
+          });
         },
         remove: function (k, cb) {
           var done = function () { if (typeof cb === "function") cb(); };
-          withDB(function (conn) {
-            var tx = conn.transaction(STORE, "readwrite");
-            tx.objectStore(STORE).delete(k);
-            tx.oncomplete = done;
-            tx.onerror = done;
-          }, done);
+          ready(function (inst) {
+            if (!inst) { done(); return; }
+            inst.removeItem(k).then(done, done);
+          });
         },
         clearAll: function (cb) {
           var done = function () { if (typeof cb === "function") cb(); };
-          withDB(function (conn) {
-            var tx = conn.transaction(STORE, "readwrite");
-            tx.objectStore(STORE).clear();
-            tx.oncomplete = done;
-            tx.onerror = done;
-          }, done);
+          ready(function (inst) {
+            if (!inst) { done(); return; }
+            inst.clear().then(done, done);
+          });
         }
       };
     })();
@@ -2421,12 +2384,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       var oldTs = row.querySelector(".msg-ts");
       if (oldTs) oldTs.remove();
-      // 清掉游离的旧已读回执（v6 重建）
-      var oldRrFree = row.querySelector(":scope > .msg-content-line > .msg-rr") ||
-                      row.querySelector(":scope > .msg-content-line > .bubble-wrap > .msg-rr");
-      if (oldRrFree) {
-        if (oldRrFree.style.visibility === "visible") hadRead = true;
-        oldRrFree.remove();
+      // 清掉游离的旧已读回执（v10 重建：含 row 级，防重复渲染叠加）
+      var oldRrFrees = row.querySelectorAll(":scope > .msg-rr, :scope > .msg-content-line > .msg-rr, :scope > .msg-content-line > .bubble-wrap > .msg-rr");
+      for (var rfi = 0; rfi < oldRrFrees.length; rfi++) {
+        if (oldRrFrees[rfi].style.visibility === "visible") hadRead = true;
+        oldRrFrees[rfi].remove();
       }
       // 拆除旧版 avatar-col（保留头像本体），保证重复处理幂等
       var oldCol = row.querySelector(".avatar-col");
@@ -2513,7 +2475,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
       }
-      row.setAttribute("data-meta-v", "7");
+      row.setAttribute("data-meta-v", "10");
     }
     function __akiniShowReadReceipt(row) {
       if (!row) return;
