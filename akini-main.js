@@ -3054,8 +3054,11 @@ document.addEventListener("DOMContentLoaded", function () {
       __pending.memberId = __sendMemberId;
       __pending.ts = Date.now();
       __akiniPersistPendingReply();
+      // 连发合并：已有待执行的回复 timer 时只累加计数，一轮回复统一结清（防一条消息炸出多轮回复）
+      if (__pending.timer) return;
       __pending.timer = setTimeout(function () {
         try {
+          __pending.timer = null;
           console.log("[sendMsg] setTimeout fired, calling I");
           var __dbg = null;
           if (__dbg) {
@@ -3175,12 +3178,17 @@ document.addEventListener("DOMContentLoaded", function () {
       } else if (target) avatar = nt(target.avatar, 38);
       var m = window.__akiniTypingMap[t];
       if (m && m.timer) clearTimeout(m.timer);
-      // 只记录状态（头像 + 10 分钟兜底计时器），悬浮层由 __akiniPaintTypingFloat 统一绘制
+      // 只记录状态（头像 + 兜底计时器），悬浮层由 __akiniPaintTypingFloat 统一绘制。
+      // 兜底时长 = 回复延迟上限 + 15 秒（最长 2 分钟）：回复链任何环节断掉都不会让输入状态超过用户设置的时间
+      var __maxS = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
+      var __watchMs = Math.min(Math.max(__maxS * 1000 + 15000, 20000), 120000);
       window.__akiniTypingMap[t] = {
         avatar: avatar,
         timer: setTimeout(function () {
+          // 兜底触发时一并结清 pending，防止残留计数被 catchUp 兑现
+          try { __akiniOnReplyComplete(t); } catch (e0) {}
           hideTypingBubble(t);
-        }, 600000),
+        }, __watchMs),
       };
       __akiniPaintTypingFloat();
     }
@@ -3254,10 +3262,9 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) {}
     }
     function __akiniOnReplyComplete(t) {
+      // 一轮回复结清该聊天全部未回：一轮最多 getReplyCount()(1-3) 条，绝不按用户消息数翻倍
       var pending = window.__akiniPendingReplyMap && window.__akiniPendingReplyMap[t];
       if (pending) {
-        pending.count = Math.max(0, (pending.count || 0) - 1);
-        if (pending.count > 0) { __akiniPersistPendingReply(); return; }
         delete window.__akiniPendingReplyMap[t];
         __akiniPersistPendingReply();
       }
@@ -3275,10 +3282,21 @@ document.addEventListener("DOMContentLoaded", function () {
         try { hideTypingBubble(t); } catch (e) {}
         return;
       }
+      // 45 秒全局节流：同一聊天 45 秒内只允许一轮回复（catchUp 15s 周期/启动恢复/手动触发并发在此拦截）
+      var __lrB = (window.__akiniLastReplyRun = window.__akiniLastReplyRun || {});
+      var __nowB = Date.now();
+      if (__lrB[t] && __nowB - __lrB[t] < 45000) {
+        console.log("[b] 45秒内已有回复轮次，结清 pending 丢弃重复调度", t);
+        try { __akiniOnReplyComplete(t); } catch (e0) {}
+        return;
+      }
+      __lrB[t] = __nowB;
       const e = window.akiniContacts.getChatTarget(t);
       if (!e) return;
       const n = _();
       if ("none" === n.type) {
+        // 已读不回也要结清 pending 计数，否则残留 pending 会被 catchUp 每15秒反复兑现成回复
+        try { __akiniOnReplyComplete(t); } catch (e0) {}
         if (t) {
           var __s = window.akiniContacts.getSession(t);
           __s && window.akiniContacts.updateSession(t, { unread: 0 });
@@ -3421,6 +3439,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (__dbg) {
           __dbg.textContent = "已读不回，不回复";
         }
+        try { __akiniOnReplyComplete(t); } catch (e0) {}
         return;
       }
       if ((e || (e = window.akiniContacts.getChatTarget(t)), !e)) return;
@@ -3610,7 +3629,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (_one && _one.trim()) messages.push(_one.trim());
       }
       if (0 === messages.length) {
-        // 字卡库为空或无可用内容时，不发送任何回复（无兜底）
+        // 字卡库为空或无可用内容时，不发送任何回复（无兜底），但必须结清 pending 防残留爆发
+        try { __akiniOnReplyComplete(t); } catch (e0) {}
         return;
       }
       let g = "";
@@ -11635,14 +11655,23 @@ document.addEventListener("DOMContentLoaded", function () {
                 var _c = null;
                 try { _c = window.akiniContacts.getContactById && window.akiniContacts.getContactById(_aid); } catch (ce) {}
                 if (!_c) { try { _c = window.akiniContacts.getChatTarget && window.akiniContacts.getChatTarget(_aid); } catch (ce2) {} }
+                // 双通道都查不到（旧帖字段缺失/id 漂移）时，用当前激活聊天的联系人兜底
+                if (!_c) {
+                  try {
+                    var _ac = window.akiniContacts.getActiveChatId && window.akiniContacts.getActiveChatId();
+                    if (_ac) _c = window.akiniContacts.getChatTarget(_ac);
+                  } catch (ce3) {}
+                }
                 var _prof = null;
                 try { _prof = JSON.parse(localStorage.getItem("akini_icity_profile_" + _aid) || "null"); } catch (pe) {}
                 // icity 资料里的默认名视为未设置，回退到联系人自定义名（与聊天列表/日记列表一致）
                 var _pn = _prof && _prof.name;
                 if (!_pn || _pn === "对方" || _pn === "TA" || _pn === "ta") _pn = null;
-                var _nn = _pn || (_c && (_c.remark || _c.name)) || e.name;
+                // e.name 本身还是默认名时也一并回退
+                var _en = (e.name && e.name !== "对方" && e.name !== "TA" && e.name !== "ta") ? e.name : null;
+                var _nn = _pn || (_c && (_c.remark || _c.name)) || _en;
                 var _hh = (_prof && _prof.handle) || "";
-                if (!_hh || _hh === "对方" || _hh === "@对方") _hh = _nn ? String(_nn).replace(/^@/, "") : e.handle;
+                if (!_hh || _hh === "对方" || _hh === "@对方" || _hh === "TA" || _hh === "@TA") _hh = _nn ? String(_nn).replace(/^@/, "") : null;
                 if ((_nn && _nn !== e.name) || (_hh && _hh !== e.handle)) {
                   e = Object.assign({}, e, { name: _nn || e.name, handle: _hh || e.handle });
                 }
