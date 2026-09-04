@@ -60,8 +60,11 @@
   var CONTACT_AVATAR_RE = /^akini_contact_avatar_/;
   function isCriticalKey(k) {
     if (!k) return false;
+    var ks = String(k);
+    // 高频调度键（每几秒写一次）不走双写/全量备份，否则 IDB 事务堆积导致越用越卡、写入失败丢数据
+    if (ks.indexOf("akini_next_") === 0 || ks.indexOf("akini_last_") === 0) return false;
     // 全量保护：凡 akini_ 前缀的键（设置/内容/图片/任何数据）一律镜像 IDB，网站长期使用任何数据都不丢失
-    if (String(k).indexOf("akini_") === 0) return true;
+    if (ks.indexOf("akini_") === 0) return true;
     if (CRITICAL_KEYS.indexOf(k) >= 0) return true;
     if (CHAT_HISTORY_RE.test(k)) return true;
     if (WB_GROUPS_RE.test(k)) return true;

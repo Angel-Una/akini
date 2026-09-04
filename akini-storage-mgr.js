@@ -154,11 +154,6 @@
         '<div class="ak-hint" style="margin-top:8px">含图片/贴纸的消息以高清原图存储，比纯文字（仅几B）大很多属正常；可用下方「危险区」一键清空重开</div>' +
       "</div>" +
 
-      '<div class="settings-card"><div class="card-title">自动任务调度状态</div>' +
-        taskRowsHTML() +
-        '<div class="ak-hint">若「下次」时间异常偏远，新版本会自动按设置间隔重排</div>' +
-      "</div>" +
-
       '<div class="settings-card"><div class="card-title">备份与恢复</div>' +
         '<div class="ak-hint">数据每次变更已自动备份到浏览器本地库；换设备/清理浏览器前请先导出备份文件</div>' +
         '<div class="ak-btn-col">' +
