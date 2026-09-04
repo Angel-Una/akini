@@ -164,6 +164,16 @@
       if (cb) cb(ok);
       return;
     }
+    // 大值守卫（milk 式存储）：>150KB 的键只写 IDB + 内存，localStorage 热备删除以释放配额
+    // 读取侧有保障：akiniGet 先查 IDB；启动时 restoreCriticalFromIdb 会把 IDB 值预加载进内存缓存
+    if (v.length > 153600) {
+      idbSet(k, v, function (idbOk) {
+        try { localStorage.removeItem(k); } catch (e) {}
+        try { localStorage.removeItem(k + '_backup'); } catch (e) {}
+        if (cb) cb(idbOk);
+      });
+      return;
+    }
     // 优先写 IDB（主存储），再写 localStorage（热备，失败不影响）
     idbSet(k, v, function (idbOk) {
       var lsOk = lsSet(k, v);
@@ -196,7 +206,7 @@
       if (v != null) {
         memSet(k, v);
         var ls = lsGet(k);
-        if (v.length > (ls ? ls.length : 0)) {
+        if (v.length <= 153600 && v.length > (ls ? ls.length : 0)) {
           try { localStorage.setItem(k, v); } catch (e) {}
         }
       }
@@ -239,9 +249,31 @@
     });
   }
 
+  // 一次性搬迁：localStorage 里残留的 >150KB critical 大键迁到 IDB 并删除（milk 式：LS 只留小数据）
+  function evictBigKeysToIdb() {
+    try {
+      var doomed = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || !isCriticalKey(k)) continue;
+        var v = localStorage.getItem(k);
+        if (v && v.length > 153600) doomed.push({ k: k, v: v });
+      }
+      doomed.forEach(function (it) {
+        memSet(it.k, it.v);
+        idbSet(it.k, it.v, function () {
+          try { localStorage.removeItem(it.k); } catch (e) {}
+          try { localStorage.removeItem(it.k + '_backup'); } catch (e) {}
+        });
+      });
+      if (doomed.length) console.log('[存储瘦身] 大键迁入浏览器库:', doomed.length, '个');
+    } catch (e) {}
+  }
+
   function restoreAll() {
     restoreCriticalFromIdb();
     setTimeout(restoreChatHistoryFromIdb, 100);
+    setTimeout(evictBigKeysToIdb, 800);
   }
 
   // 暴露全局接口

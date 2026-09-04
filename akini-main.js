@@ -826,12 +826,18 @@ document.addEventListener("DOMContentLoaded", function () {
               var kk = localStorage.key(i);
               if (kk && kk.indexOf("akini_app_icon_") !== 0 && !isSnapshotKey(kk)) {
                 var vv = localStorage.getItem(kk);
-                if (!isEmptyValue(vv)) snap[kk] = vv;
+                // 大键（聊天记录/图片，>32KB）不进快照：它们有 chat_history 双备份 + IDB backupAll 兜底，
+                // 否则每次快照把全量数据再复制两份塞回 localStorage，5MB 配额很快爆掉
+                if (!isEmptyValue(vv) && vv.length <= 32768) snap[kk] = vv;
               }
             }
             var json = JSON.stringify(snap);
-            localStorage.setItem("akini_localstorage_snapshot", json);
-            localStorage.setItem("akini_localstorage_snapshot_backup", json);
+            // milk 式：快照只写 IndexedDB，不再占 localStorage（恢复侧已有 IDB 兜底读取）
+            try { _idbStore.set("akini_localstorage_snapshot", json); } catch (e1) {}
+            try { _idbStore.set("akini_localstorage_snapshot_backup", json); } catch (e2) {}
+            // 清掉旧版本写下的 localStorage 快照，立即释放配额
+            try { localStorage.removeItem("akini_localstorage_snapshot"); } catch (e3) {}
+            try { localStorage.removeItem("akini_localstorage_snapshot_backup"); } catch (e4) {}
           } catch (e) {}
         }
         function doBackup() {
@@ -849,22 +855,38 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (e) {}
           }, 200);
         }
+        function __akiniEmergencyTrim(html, n) {
+          if (!html) return html;
+          var total = (html.match(/<div[^>]*class="msg-row/g) || []).length;
+          if (total <= n) return html;
+          var count = 0, idx = html.length;
+          while ((idx = html.lastIndexOf('<div class="msg-row', idx - 1)) !== -1) {
+            count++;
+            if (count === n + 1) return html.slice(idx);
+          }
+          return html;
+        }
+        window.__akiniEmergencyTrim = __akiniEmergencyTrim;
         localStorage.setItem = function (k, v) {
           var r;
           try {
             r = origSetItem.apply(this, arguments);
           } catch (quotaErr) {
-            // 配额溢出：清理旧聊天记录/大值键腾出空间后重试，保护关键设置数据
-            console.warn("[Akini] localStorage配额溢出,清理旧数据重试", k);
+            // 配额溢出：先把全部数据备份到 IndexedDB，再把聊天历史修剪为最近40条（绝不整删，防数据丢失）
+            console.warn("[Akini] localStorage配额溢出,备份后修剪聊天历史重试", k);
             try {
-              var toDel = [];
-              for (var di = 0; di < localStorage.length; di++) {
+              try { window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll(); } catch (e0) {}
+              for (var di = localStorage.length - 1; di >= 0; di--) {
                 var dk = localStorage.key(di);
-                if (dk && (dk.indexOf("akini_chat_history_") === 0 || dk.indexOf("akini_chat_critical_") === 0)) {
-                  toDel.push(dk);
+                if (dk && dk.indexOf("akini_chat_history_") === 0) {
+                  try {
+                    var _qh = localStorage.getItem(dk);
+                    var _qt = (typeof __akiniEmergencyTrim === "function") ? __akiniEmergencyTrim(_qh, 40) : _qh;
+                    if (_qt !== _qh) origSetItem.call(localStorage, dk, _qt);
+                    else origRemoveItem.call(localStorage, dk); // 不足40条仍超限（大图片）才删，IDB已有完整备份
+                  } catch (e1) { try { origRemoveItem.call(localStorage, dk); } catch (e2) {} }
                 }
               }
-              toDel.forEach(function (dk) { try { origRemoveItem.call(localStorage, dk); } catch (e) {} });
               r = origSetItem.apply(this, arguments);
             } catch (e2) {
               console.error("[Akini] 清理后仍写失败", k, e2);
@@ -968,6 +990,15 @@ document.addEventListener("DOMContentLoaded", function () {
       console.warn("[Akini] restoreAll error", e);
     }
     // 定时器调度器：支持后台/冻结后恢复时追赶触发
+    function __akiniPostLog(app, msg) {
+      try {
+        var arr = JSON.parse(localStorage.getItem("akini_post_log") || "[]");
+        arr.unshift({ t: Date.now(), app: app, msg: msg });
+        if (arr.length > 30) arr.length = 30;
+        localStorage.setItem("akini_post_log", JSON.stringify(arr));
+      } catch (e) {}
+    }
+    window.__akiniPostLog = __akiniPostLog;
     (function () {
       var jobs = {};
       window._akiniTimer = {
@@ -975,6 +1006,7 @@ document.addEventListener("DOMContentLoaded", function () {
           try {
             if (jobs[name]) clearTimeout(jobs[name]);
             var now = Date.now();
+            var freshDelay = delayMs;
             // keepNext：周期性任务（朋友圈/写信/主动消息等）跨重启续跑——
             // 已有未到期计划则按剩余时间继续，已过期则尽快补发，避免每次打开应用都重置倒计时
             if (opts && opts.keepNext) {
@@ -984,6 +1016,12 @@ document.addEventListener("DOMContentLoaded", function () {
               if (existing) {
                 if (existing > now) {
                   delayMs = existing - now;
+                  // 残留"下次时间"异常偏远（超过新间隔3倍且超过6小时）视为损坏，按新间隔重排
+                  if (delayMs > Math.max(freshDelay * 3, 6 * 3600 * 1000)) {
+                    console.warn("[AkiniTimer] " + name + " 残留计划异常偏远，已按新间隔重排");
+                    try { window.__akiniPostLog && __akiniPostLog(name, "残留计划时间损坏，已重排"); } catch (e0) {}
+                    delayMs = freshDelay;
+                  }
                 } else {
                   delayMs = 5000 + Math.floor(Math.random() * 10000);
                 }
@@ -2335,6 +2373,32 @@ document.addEventListener("DOMContentLoaded", function () {
     function __akiniToggleOn(id) {
       return localStorage.getItem("akini_toggle_" + id) === "1";
     }
+    // 已读回执按气泡实际底部定位（短气泡时 content-line 被头像列撑高，不能用 top:100%）
+    function __akiniPlaceReadReceipt(line, rr) {
+      try {
+        var b = line.querySelector(":scope > .bubble") ||
+                line.querySelector(":scope > .bubble-col .bubble") ||
+                line.querySelector(":scope .bubble");
+        if (!b) return;
+        var apply = function () {
+          rr.style.top = (b.offsetTop + b.offsetHeight + 2) + "px";
+          // 右缘对齐气泡右缘，再往左挪 3px
+          rr.style.right = (line.clientWidth - (b.offsetLeft + b.offsetWidth) + 3) + "px";
+        };
+        apply();
+        var imgs = b.querySelectorAll("img");
+        for (var i = 0; i < imgs.length; i++) {
+          if (!imgs[i].complete) imgs[i].addEventListener("load", apply, { once: true });
+        }
+      } catch (e) {}
+    }
+    // 历史已完成转账卡清理：旧版 nn() 写入的内联灰底会序列化进缓存，这里统一移除交给 tr-finished CSS
+    function __akiniCleanFinishedTransferInline(root) {
+      try {
+        var list = (root || document).querySelectorAll(".bubble.transfer-bubble.tr-finished");
+        for (var i = 0; i < list.length; i++) list[i].style.removeProperty("background");
+      } catch (e) {}
+    }
     function __akiniProcessMsgMeta(row) {
       if (!row || row.nodeType !== 1) return;
       if (!row.classList.contains("msg-row")) return;
@@ -2345,79 +2409,147 @@ document.addEventListener("DOMContentLoaded", function () {
       var isSystem = row.classList.contains("system");
       if (isSystem) return; // 系统消息不显示时间戳和已读回执
       if (!isMe && !isOther) return;
-      // 旧版结构（独立 .msg-ts 行或时间+已读混排的 .msg-meta）统一重建
+      // v6：时间戳在头像正下方；已读回执包在 bubble-wrap 内固定于聊天气泡/引用正下方
+      if (row.getAttribute("data-meta-v") === "10") return; // 已是 v7 结构
+      var hadRead = row.getAttribute("data-had-read-receipt") === "1";
       var existing = row.querySelector(".msg-meta");
-      if (existing && existing.getAttribute("data-meta-v") === "2") return; // 已是新结构
-      var hadRead = false;
       if (existing) {
-        hadRead = (existing.textContent || "").indexOf("已读") >= 0;
+        // 已读回执默认恒在但隐藏，只有实际显示过（visibility:visible）才保留，不能只看文本
+        var oldRr = existing.querySelector(".msg-rr");
+        if (oldRr && oldRr.style.visibility === "visible") hadRead = true;
         existing.remove();
       }
       var oldTs = row.querySelector(".msg-ts");
       if (oldTs) oldTs.remove();
+      // 清掉游离的旧已读回执（v6 重建）
+      var oldRrFree = row.querySelector(":scope > .msg-content-line > .msg-rr") ||
+                      row.querySelector(":scope > .msg-content-line > .bubble-wrap > .msg-rr");
+      if (oldRrFree) {
+        if (oldRrFree.style.visibility === "visible") hadRead = true;
+        oldRrFree.remove();
+      }
+      // 拆除旧版 avatar-col（保留头像本体），保证重复处理幂等
+      var oldCol = row.querySelector(".avatar-col");
+      if (oldCol) {
+        var av0 = oldCol.querySelector(".msg-avatar");
+        if (av0) oldCol.parentNode.insertBefore(av0, oldCol);
+        oldCol.remove();
+      }
       row.removeAttribute("data-read-pending");
       // 时间戳每条消息都显示；已读回执仅用户消息且每条都显示
       var showTs = __akiniToggleOn("timestampToggle");
       var showRr = isMe && __akiniToggleOn("readReceiptToggle");
-      if (!showTs && !showRr) return;
+      if (!showTs && !showRr) { row.setAttribute("data-meta-v", "10"); return; }
       var ts = row.getAttribute("data-ts");
       if (!ts) {
         ts = Date.now();
         row.setAttribute("data-ts", ts);
       }
-      // 时间戳与已读回执同一行紧贴气泡下方：已读在气泡右下，时间戳在头像正下方
-      var meta = document.createElement("div");
-      meta.className = "msg-meta";
-      meta.setAttribute("data-meta-v", "2");
-      meta.style.cssText = "display:flex;align-items:center;margin-top:1px;padding:0;" +
-        (isMe ? "justify-content:flex-end;" : "justify-content:flex-start;");
-      var html = "";
-      if (showRr) {
-        html += '<span class="msg-rr" style="font-size:10px;color:#aaa;' +
-          (hadRead ? "" : "visibility:hidden;") +
-          "margin-right:" + (showTs ? "8px" : "46px") + ';">已读</span>';
-      }
+      // 时间戳 → 头像列：与气泡高度完全解耦
       if (showTs) {
-        html += '<span class="msg-ts" style="width:38px;text-align:center;white-space:nowrap;font-size:10px;color:#aaa;line-height:1.2;">' +
-          __akiniFormatMsgTime(parseInt(ts, 10)) + '</span>';
+        var line = row.querySelector(":scope > .msg-content-line") || row;
+        var avatar = line.querySelector(":scope > .msg-avatar");
+        if (avatar) {
+          var col = document.createElement("div");
+          col.className = "avatar-col";
+          avatar.parentNode.insertBefore(col, avatar);
+          col.appendChild(avatar);
+          var tsEl = document.createElement("span");
+          tsEl.className = "msg-ts";
+          tsEl.textContent = __akiniFormatMsgTime(parseInt(ts, 10));
+          col.appendChild(tsEl);
+        }
       }
-      meta.innerHTML = html;
-      row.appendChild(meta);
-      // 已读回执：发出去不立即显示，延迟 1.5~4s
-      if (showRr && !hadRead) {
-        row.setAttribute("data-read-pending", "1");
-        (function(__r) {
-          var readDelay = 1500 + Math.random() * 2500;
-          setTimeout(function() {
-            __akiniShowReadReceipt(__r);
-          }, readDelay);
-        })(row);
+      // 气泡包进 bubble-wrap（宽=气泡宽），已读回执放 wrap 内：天然贴气泡正下方、右缘对齐
+      var lineEl = row.querySelector(":scope > .msg-content-line");
+      if (lineEl) {
+        var bub0 = lineEl.querySelector(":scope > .bubble");
+        var wrap0 = (bub0 && bub0.parentNode && bub0.parentNode.classList && bub0.parentNode.classList.contains("bubble-wrap")) ? bub0.parentNode : null;
+        if (bub0 && !wrap0) {
+          wrap0 = document.createElement("div");
+          wrap0.className = "bubble-wrap";
+          lineEl.insertBefore(wrap0, bub0);
+          wrap0.appendChild(bub0);
+        }
+        if (wrap0) {
+          if (isMe) {
+            // me 行：引用块保持 row 级原位（整行宽、右对齐，原始样式不变）；
+            // 若之前版本把它包进了窄 wrap，这里挪回 row 末尾恢复原样
+            var qInWrap = wrap0.querySelector(":scope > div[style*='flex-basis:100%']") ||
+                          wrap0.querySelector(":scope > .quote-bubble");
+            if (qInWrap) row.appendChild(qInWrap);
+          } else {
+            // other 行：引用块包入 wrap（该行无已读回执，仅为结构统一）
+            var quote0 = lineEl.querySelector(":scope > div[style*='flex-basis:100%']") ||
+                         row.querySelector(":scope > div[style*='flex-basis:100%']");
+            if (quote0 && quote0.querySelector(".quote-bubble")) wrap0.appendChild(quote0);
+            if (wrap0 && !wrap0.querySelector(".quote-bubble")) {
+              var bareQ = lineEl.querySelector(":scope > .quote-bubble") ||
+                          row.querySelector(":scope > .quote-bubble");
+              if (bareQ) wrap0.appendChild(bareQ);
+            }
+          }
+        }
       }
+      if (showRr && lineEl) {
+        var wrapEl = lineEl.querySelector(":scope > .bubble-wrap");
+        if (wrapEl) {
+          var rrEl = document.createElement("span");
+          rrEl.className = "msg-rr";
+          rrEl.textContent = "已读";
+          if (!hadRead) rrEl.style.visibility = "hidden";
+          // me 行引用块在 row 级（wrap 外），已读回执必须放 row 末尾才能位于引用之下
+          if (isMe) row.appendChild(rrEl);
+          else wrapEl.appendChild(rrEl);
+          // 已读回执：发出去不立即显示，延迟 1.5~4s
+          if (!hadRead) {
+            row.setAttribute("data-read-pending", "1");
+            (function(__r) {
+              var readDelay = 1500 + Math.random() * 2500;
+              setTimeout(function() {
+                __akiniShowReadReceipt(__r);
+              }, readDelay);
+            })(row);
+          }
+        }
+      }
+      row.setAttribute("data-meta-v", "7");
     }
     function __akiniShowReadReceipt(row) {
       if (!row) return;
       if (!row.classList.contains("me")) return;
       row.removeAttribute("data-read-pending");
-      var rr = row.querySelector(".msg-rr");
+      row.setAttribute("data-had-read-receipt", "1");
+      // v6：已读回执在 bubble-wrap 内（气泡正下方）
+      if (row.getAttribute("data-meta-v") !== "7") {
+        var oldMeta = row.querySelector(".msg-meta");
+        if (oldMeta) oldMeta.remove();
+        __akiniProcessMsgMeta(row);
+        return;
+      }
+      var rr = row.querySelector(":scope > .msg-content-line .msg-rr");
       if (rr) {
         rr.style.visibility = "visible";
         return;
       }
-      // 兜底：meta 不存在时补建（保持同一行结构）
-      var meta = row.querySelector(".msg-meta");
-      if (!meta) {
-        meta = document.createElement("div");
-        meta.className = "msg-meta";
-        meta.setAttribute("data-meta-v", "2");
-        meta.style.cssText = "display:flex;justify-content:flex-end;align-items:center;margin-top:1px;padding:0;";
-        row.appendChild(meta);
+      var line = row.querySelector(":scope > .msg-content-line");
+      if (line && __akiniToggleOn("readReceiptToggle")) {
+        var wrap = line.querySelector(":scope > .bubble-wrap");
+        if (!wrap) {
+          var bub = line.querySelector(":scope > .bubble");
+          if (bub) {
+            wrap = document.createElement("div");
+            wrap.className = "bubble-wrap";
+            line.insertBefore(wrap, bub);
+            wrap.appendChild(bub);
+          }
+        }
+        if (!wrap) return;
+        rr = document.createElement("span");
+        rr.className = "msg-rr";
+        rr.textContent = "已读";
+        wrap.appendChild(rr);
       }
-      rr = document.createElement("span");
-      rr.className = "msg-rr";
-      rr.style.cssText = "font-size:10px;color:#aaa;margin-right:" +
-        (meta.querySelector(".msg-ts") ? "8px" : "46px") + ";";
-      rr.textContent = "已读";
-      meta.insertBefore(rr, meta.firstChild);
     }
     function __akiniInsertTimestampSeparators() {
       var chatBody = document.getElementById("chatBody");
@@ -2427,11 +2559,30 @@ document.addEventListener("DOMContentLoaded", function () {
         row.remove();
       });
     }
+    // 历史问卷卡片里的 emoji 图标升级为线条 SVG（新卡片构建时已用 SVG）
+    function __akiniUpgradeSurveyIcons(root) {
+      if (!window.__akiniSurveyIconSVG || !root || !root.querySelectorAll) return;
+      root.querySelectorAll(".survey-bubble-icon").forEach(function (el) {
+        if (el.innerHTML !== window.__akiniSurveyIconSVG) el.innerHTML = window.__akiniSurveyIconSVG;
+      });
+    }
+    // 卡片状态胶囊颜色同步（按文本推断状态，覆盖历史卡片与新状态变更）
+    function __akiniSyncCardStatus(root) {
+      if (!root || !root.querySelectorAll) return;
+      root.querySelectorAll(".tr-status, .survey-bubble-status, .shop-card-bubble-status").forEach(function (el) {
+        var t = (el.textContent || "").trim();
+        var st = /已收款|已接收|已付款|已回答/.test(t) ? "done" : (/退回|退还|拒收/.test(t) ? "refund" : "pending");
+        if (el.getAttribute("data-state") !== st) el.setAttribute("data-state", st);
+      });
+    }
     function __akiniSetupChatMetaObserver() {
       var chatBody = document.getElementById("chatBody");
       if (!chatBody) return;
       Array.from(chatBody.children).forEach(__akiniProcessMsgMeta);
+      __akiniCleanFinishedTransferInline(chatBody);
       __akiniInsertTimestampSeparators();
+      __akiniUpgradeSurveyIcons(chatBody);
+      __akiniSyncCardStatus(chatBody);
       if (!chatBody.__akiniMetaObserver) {
         var obs = new MutationObserver(function (mutations) {
           mutations.forEach(function (m) {
@@ -2439,6 +2590,7 @@ document.addEventListener("DOMContentLoaded", function () {
               if (node.nodeType === 1 && node.classList && node.classList.contains("msg-row") && !node.classList.contains("timestamp-row")) {
                 __akiniProcessMsgMeta(node);
                 __akiniInsertTimestampSeparators();
+                __akiniUpgradeSurveyIcons(node);
               }
             });
           });
@@ -2449,10 +2601,15 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!chatBody.__akiniMetaInterval) {
         chatBody.__akiniMetaInterval = setInterval(function () {
           var cb = document.getElementById("chatBody");
-          if (cb) Array.from(cb.children).forEach(__akiniProcessMsgMeta);
+          if (cb) {
+            Array.from(cb.children).forEach(__akiniProcessMsgMeta);
+            __akiniUpgradeSurveyIcons(cb);
+            __akiniSyncCardStatus(cb);
+          }
         }, 1500);
       }
     }
+    window.__akiniSetupChatMetaObserver = __akiniSetupChatMetaObserver;
     function __akiniMarkLastRead(t) {
       __akiniSetupChatMetaObserver();
     }
@@ -2943,6 +3100,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       __pending.count++;
       __pending.memberId = __sendMemberId;
+      __pending.ts = Date.now();
+      __akiniPersistPendingReply();
       __pending.timer = setTimeout(function () {
         try {
           console.log("[sendMsg] setTimeout fired, calling I");
@@ -3020,28 +3179,41 @@ document.addEventListener("DOMContentLoaded", function () {
     function _() {
       return window.AKR ? window.AKR.pickReplyBehavior() : { type: "text" };
     }
-    function showTypingBubble(t, memberId) {
+    // 输入动态悬浮层绘制：参考 milk 逻辑 —— 悬浮层独立于消息流，固定在输入栏上方，
+    // 视觉上永远位于所有消息之下，且 chatBody innerHTML 重绘不会将其清掉（防闪烁）
+    function __akiniPaintTypingFloat() {
+      var el = document.getElementById("akiniTypingFloat");
+      if (!el) return;
       var chatBody = document.getElementById("chatBody");
-      if (!chatBody) return;
-      window.__akiniTypingMap = window.__akiniTypingMap || {};
-      var existing = document.getElementById("typingBubbleRow_" + t);
-      if (existing) {
-        // 已有则移到最底部，确保始终在所有消息下方
-        if (t === window.akiniContacts.getActiveChatId()) {
-          chatBody.appendChild(existing);
-          chatBody.scrollTop = chatBody.scrollHeight;
+      var t = window.akiniContacts ? window.akiniContacts.getActiveChatId() : "";
+      var m = t && window.__akiniTypingMap ? window.__akiniTypingMap[t] : null;
+      if (!m) {
+        if (el.style.display !== "none") {
+          el.style.display = "none";
+          el.innerHTML = "";
+          el.__lastAvatar = null;
         }
-        // 同步 map，避免旧 row 与内存对象不一致变成孤儿
-        if (window.__akiniTypingMap[t] && window.__akiniTypingMap[t].row !== existing) {
-          try { window.__akiniTypingMap[t].row.remove(); } catch (e) {}
-        }
-        window.__akiniTypingMap[t] = window.__akiniTypingMap[t] || { row: existing, timer: null };
+        if (chatBody) chatBody.classList.remove("typing-on");
         return;
       }
-      // 清理内存中可能残留的旧打字行
-      if (window.__akiniTypingMap[t] && window.__akiniTypingMap[t].row) {
-        try { window.__akiniTypingMap[t].row.remove(); } catch (e) {}
+      // 头像未变则不动 innerHTML，避免打字点动画重起造成闪烁
+      if (el.__lastAvatar !== m.avatar) {
+        el.__lastAvatar = m.avatar;
+        el.innerHTML =
+          '<div class="msg-avatar">' + m.avatar + '</div>' +
+          '<div class="typing-bubble"><div class=typing-dot></div><div class=typing-dot></div><div class=typing-dot></div></div>';
       }
+      el.style.display = "flex";
+      if (chatBody) {
+        chatBody.classList.add("typing-on");
+        // 仅在用户本就停留在底部附近时才跟随滚动，上滑翻阅历史时不拽回
+        var __nb = chatBody.scrollHeight - chatBody.scrollTop - chatBody.clientHeight < 150;
+        if (__nb) chatBody.scrollTop = chatBody.scrollHeight;
+      }
+    }
+    window.__akiniPaintTypingFloat = __akiniPaintTypingFloat;
+    function showTypingBubble(t, memberId) {
+      window.__akiniTypingMap = window.__akiniTypingMap || {};
       var target =
         window.akiniContacts && window.akiniContacts.getChatTarget(t);
       var avatar = "🐰";
@@ -3049,53 +3221,93 @@ document.addEventListener("DOMContentLoaded", function () {
         var member = window.akiniContacts.getContactById(memberId);
         if (member) avatar = nt(member.avatar, 38);
       } else if (target) avatar = nt(target.avatar, 38);
-      var row = document.createElement("div");
-      row.id = "typingBubbleRow_" + t;
-      row.className = "msg-row other";
-      row.innerHTML =
-        "<div class=msg-content-line><div class=msg-avatar>" +
-        avatar +
-        '</div><div class="bubble typing-bubble"><div class=typing-dot></div><div class=typing-dot></div><div class=typing-dot></div></div></div>';
-      window.__akiniTypingMap[t] = { row: row, timer: null };
-      // 改为 10 分钟兜底：输入动态应持续到回复真正发出，而非 60 秒就消失
-      window.__akiniTypingMap[t].timer = setTimeout(function () {
-        hideTypingBubble(t);
-      }, 600000);
-      if (t === window.akiniContacts.getActiveChatId()) {
-        chatBody.appendChild(row);
-        chatBody.scrollTop = chatBody.scrollHeight;
-      }
+      var m = window.__akiniTypingMap[t];
+      if (m && m.timer) clearTimeout(m.timer);
+      // 只记录状态（头像 + 10 分钟兜底计时器），悬浮层由 __akiniPaintTypingFloat 统一绘制
+      window.__akiniTypingMap[t] = {
+        avatar: avatar,
+        timer: setTimeout(function () {
+          hideTypingBubble(t);
+        }, 600000),
+      };
+      __akiniPaintTypingFloat();
     }
     function hideTypingBubble(t) {
       if (t) {
         var m = window.__akiniTypingMap && window.__akiniTypingMap[t];
         if (m) {
           m.timer && clearTimeout(m.timer);
-          try { m.row && m.row.remove(); } catch (e) {}
           delete window.__akiniTypingMap[t];
         }
-        return;
+      } else {
+        window.__akiniTypingMap = window.__akiniTypingMap || {};
+        for (var k in window.__akiniTypingMap) {
+          var m = window.__akiniTypingMap[k];
+          m && m.timer && clearTimeout(m.timer);
+        }
+        window.__akiniTypingMap = {};
       }
+      // 清理历史遗留的消息流内 typing 行（旧版本结构）
       var chatBody = document.getElementById("chatBody");
       if (chatBody) {
         var rows = chatBody.querySelectorAll('[id^="typingBubbleRow_"]');
         for (var i = 0; i < rows.length; i++) rows[i].remove();
       }
-      window.__akiniTypingMap = window.__akiniTypingMap || {};
-      for (var k in window.__akiniTypingMap) {
-        var m = window.__akiniTypingMap[k];
-        m.timer && clearTimeout(m.timer);
-        try { m.row && m.row.remove(); } catch (e) {}
-      }
-      window.__akiniTypingMap = {};
+      __akiniPaintTypingFloat();
     }
     // 一条回复完成后调用：只有该聊天没有任何 pending 时才真正隐藏输入动态
+    // pending 回复状态持久化：iOS/国产 ROM 杀后台重载后内存定时器丢失，靠它补发回复
+    function __akiniPersistPendingReply() {
+      try {
+        var m = window.__akiniPendingReplyMap || {};
+        var out = {};
+        Object.keys(m).forEach(function (k) {
+          if (m[k] && m[k].count > 0) out[k] = { count: m[k].count, memberId: m[k].memberId || null, ts: m[k].ts || Date.now() };
+        });
+        var js = JSON.stringify(out);
+        if (Object.keys(out).length) {
+          try { localStorage.setItem("akini_pending_reply_v1", js); } catch (e) {}
+          try { window._idbStore && window._idbStore.set("akini_pending_reply_v1", js); } catch (e2) {}
+        } else {
+          try { localStorage.removeItem("akini_pending_reply_v1"); } catch (e3) {}
+          try { window._idbStore && window._idbStore.remove("akini_pending_reply_v1"); } catch (e4) {}
+        }
+      } catch (e) {}
+    }
+    // 启动/恢复时补发：把持久化的 pending 装回内存，并对每个会话重新调度回复
+    function __akiniRestorePendingReply() {
+      var raw = null;
+      try { raw = localStorage.getItem("akini_pending_reply_v1"); } catch (e) {}
+      var applyMap = function (rawStr) {
+        var m = null;
+        try { m = JSON.parse(rawStr || "null"); } catch (e) {}
+        if (!m || typeof m !== "object") return;
+        window.__akiniPendingReplyMap = window.__akiniPendingReplyMap || {};
+        Object.keys(m).forEach(function (cid) {
+          var p = m[cid];
+          if (!p || !(p.count > 0)) return;
+          // 超过 30 分钟的陈旧 pending 丢弃（对话上下文早已过去）
+          if (p.ts && Date.now() - p.ts > 1800000) return;
+          if (!window.__akiniPendingReplyMap[cid]) {
+            window.__akiniPendingReplyMap[cid] = { count: p.count, memberId: p.memberId || null, ts: p.ts };
+          }
+          (function (id) {
+            setTimeout(function () { try { b(id); } catch (e) {} }, 2500 + Math.random() * 2000);
+          })(cid);
+        });
+      };
+      if (raw) { applyMap(raw); return; }
+      try {
+        window._idbStore && window._idbStore.get("akini_pending_reply_v1", function (v) { if (v) applyMap(v); });
+      } catch (e) {}
+    }
     function __akiniOnReplyComplete(t) {
       var pending = window.__akiniPendingReplyMap && window.__akiniPendingReplyMap[t];
       if (pending) {
         pending.count = Math.max(0, (pending.count || 0) - 1);
-        if (pending.count > 0) return;
+        if (pending.count > 0) { __akiniPersistPendingReply(); return; }
         delete window.__akiniPendingReplyMap[t];
+        __akiniPersistPendingReply();
       }
       hideTypingBubble(t);
     }
@@ -3103,6 +3315,14 @@ document.addEventListener("DOMContentLoaded", function () {
       if (we && we.active) return;
       if (!window.akiniContacts) return;
       t = t || window.akiniContacts.getActiveChatId();
+      // 幽灵任务闸：该聊天没有"用户已发未回"的 pending 消息时，回复链一律不跑
+      // （残留定时器/catchUp 补跑等无用户交互的触发在此被丢弃）
+      var _pend = window.__akiniPendingReplyMap && window.__akiniPendingReplyMap[t];
+      if (!_pend || !(_pend.count > 0)) {
+        console.log("[b] 无待回复消息，丢弃残留回复任务", t);
+        try { hideTypingBubble(t); } catch (e) {}
+        return;
+      }
       const e = window.akiniContacts.getChatTarget(t);
       if (!e) return;
       const n = _();
@@ -3252,6 +3472,17 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
       if ((e || (e = window.akiniContacts.getChatTarget(t)), !e)) return;
+      // 全局节流：同一聊天 45 秒内只允许一轮回复/主动消息，防止定时器堆积集中爆发刷屏
+      if (!isUserReply) {
+        var __lr = (window.__akiniLastReplyRun = window.__akiniLastReplyRun || {});
+        var __nowTs = Date.now();
+        if (__lr[t] && __nowTs - __lr[t] < 45000) {
+          console.log("[I] 距上一轮不足45秒，跳过（防堆积爆发）");
+          try { hideTypingBubble(t); } catch (_e) {}
+          return;
+        }
+        __lr[t] = __nowTs;
+      }
       const i = (
           window._akiniAv ||
           (window._akiniAv = function (v, s) {
@@ -3592,6 +3823,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function akiniTriggerReply(t) {
       if (!window.akiniContacts) return;
+      // 回复总开关：关闭后任何"对方回应"（表情包/转账/收款等后续）都不再触发
+      if (window.__akiniToggleOn && !window.__akiniToggleOn("contactReplyToggle", true)) return;
       t = t || window.akiniContacts.getActiveChatId();
       var e = window.akiniContacts.getChatTarget(t);
       if (!e) return;
@@ -3689,6 +3922,14 @@ document.addEventListener("DOMContentLoaded", function () {
     function __akiniRenderChatBody(fullHTML, chatId) {
       if (!U) return;
       var cleanHTML = __akiniStripTypingRows(fullHTML);
+      // 防闪烁：同一聊天且内容未变化时跳过重绘（openChat/IDB 恢复会多次触发本函数）
+      var _rk = String(chatId || "") + "|" + cleanHTML.length + "|" + cleanHTML.slice(-128);
+      if (U.__akiniLastRenderKey === _rk) {
+        // 跳过重绘也要保证 meta 结构处理跑过（直接恢复路径可能绕过渲染管线，导致旧时间戳布局残留）
+        __akiniSetupChatMetaObserver();
+        return;
+      }
+      U.__akiniLastRenderKey = _rk;
       var total = __akiniCountMsgRows(cleanHTML);
       if (total <= AKINI_CHAT_BATCH_SIZE) {
         U.innerHTML = cleanHTML;
@@ -3745,7 +3986,9 @@ document.addEventListener("DOMContentLoaded", function () {
           while (temp.firstChild) {
             U.insertBefore(temp.firstChild, loadMore || null);
           }
-          U.scrollTop = U.scrollHeight;
+          // 仅当用户本就停留在底部附近时才跟随滚动，上滑翻阅历史时不拽回
+          var __nbA = U.scrollHeight - U.scrollTop - U.clientHeight < 150;
+          if (__nbA) U.scrollTop = U.scrollHeight;
         }
       }
     }
@@ -4487,6 +4730,25 @@ document.addEventListener("DOMContentLoaded", function () {
                 break;
               }
             }
+            // vivo/oppo 等国产 ROM 重进时 localStorage/sessionStorage 可能被系统清理，
+            // 同步源全部落空后从 IDB 兜底恢复（IDB 一般不会被清）
+            try {
+              var afterSync = window.akiniContacts.getContacts();
+              if ((!Array.isArray(afterSync) || afterSync.length === 0) && window._idbStore && window._idbStore.get) {
+                window._idbStore.get("akini_contacts", function (v) {
+                  try {
+                    var pv = typeof v === "string" ? JSON.parse(v) : v;
+                    if (Array.isArray(pv) && pv.length > 0) {
+                      var now2 = window.akiniContacts.getContacts();
+                      if (!Array.isArray(now2) || now2.length === 0) {
+                        window.akiniContacts.saveContacts(pv);
+                        console.log("[抢救] 联系人从 IDB 恢复,数量:", pv.length);
+                      }
+                    }
+                  } catch (e1) {}
+                });
+              }
+            } catch (e2) {}
           }
         } catch (e) {}
         // iCity 抢救
@@ -5203,6 +5465,8 @@ document.addEventListener("DOMContentLoaded", function () {
         try { F = null; z = null; _postsIdbLoaded = false; } catch (e) {}
         // 启动时空数据抢救与 iCity 多源合并：防止 iOS 刷新时数据未落盘导致界面为空
         try { if (typeof window._akiniRescueEmptyData === "function") window._akiniRescueEmptyData(); } catch (e) {}
+        setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 1500);
+        setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 4000);
         try { if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge(); } catch (e) {}
         if ("function" == typeof window.renderChatList) window.renderChatList();
         if ("function" == typeof window._renderIcity) window._renderIcity();
@@ -5491,6 +5755,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 关键数据从 IDB 异步恢复完成后，强制刷新所有界面（联系人/聊天/iCity/预览），
     // 确保启动竞态期间读到空/缺头像快照后，恢复完成时能重新读到完整数据
     window.__akiniOnCriticalRestored = function () {
+      try { setTimeout(__akiniRestorePendingReply, 3000); } catch (e) {}
       try { if (window.akiniContacts && window.akiniContacts.resetCache) window.akiniContacts.resetCache(); } catch (e) {}
       try { F = null; } catch (e) {}
       try { if (typeof window.renderChatList === 'function') window.renderChatList(); } catch (e) {}
@@ -6092,7 +6357,7 @@ document.addEventListener("DOMContentLoaded", function () {
           : (_prevHTML ? l(_prevHTML) : l("")),
           (function () {
             var pending = window.__akiniPendingReplyMap && window.__akiniPendingReplyMap[t];
-            if (pending && pending.count > 0) {
+            if (pending && pending.count > 0 && (!window.__akiniToggleOn || window.__akiniToggleOn("contactReplyToggle", true))) {
               if (window.__akiniTypingMap && window.__akiniTypingMap[t]) {
                 window.__akiniTypingMap[t].timer && clearTimeout(window.__akiniTypingMap[t].timer);
                 try { window.__akiniTypingMap[t].row && window.__akiniTypingMap[t].row.remove(); } catch (e) {}
@@ -6105,7 +6370,9 @@ document.addEventListener("DOMContentLoaded", function () {
           _idbStore.get("akini_chat_history_" + t, function (a) {
             if (window.akiniContacts.getActiveChatId() !== t) return;
             var o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", a || "", lsCrit);
-            if (o && o.length > (r ? r.length : 0))
+            // 仅在消息行数真正变多时才重绘：U.innerHTML 经 meta 处理后恒长于 r，
+            // 旧的长度比较会让每次进聊天都多刷一遍，导致消息和输入动态闪烁
+            if (o && __akiniCountMsgRows(o) > __akiniCountMsgRows(r || ""))
               return (
                 window.akiniContacts.updateSession(t, { messagesHTML: o }),
                 void l(o)
@@ -6113,7 +6380,7 @@ document.addEventListener("DOMContentLoaded", function () {
             _idbStore.get("akini_chat_history_backup_" + t, function (a) {
               if (window.akiniContacts.getActiveChatId() !== t) return;
               (o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", a || "", lsCrit)) &&
-                o.length > (r ? r.length : 0) &&
+                __akiniCountMsgRows(o) > __akiniCountMsgRows(r || "") &&
                 (window.akiniContacts.updateSession(t, { messagesHTML: o }),
                 l(o));
               var c = window.akiniContacts.getSession(t);
@@ -6121,7 +6388,8 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           }),
           lt(),
-          Tn());
+          Tn(),
+          __akiniPaintTypingFloat());
         var c = document.getElementById("typingIndicator");
         (c && (c.style.display = "none"), st(t), me(), e || o("chat"));
       }
@@ -6167,19 +6435,8 @@ document.addEventListener("DOMContentLoaded", function () {
                   });
               }
             } catch (e) {}
-            var cid =
-              window.akiniContacts && window.akiniContacts.getActiveChatId();
-            if (
-              cid &&
-              window.__akiniTypingMap &&
-              window.__akiniTypingMap[cid]
-            ) {
-              var cb = document.getElementById("chatBody");
-              if (cb) {
-                cb.appendChild(window.__akiniTypingMap[cid].row);
-                cb.scrollTop = cb.scrollHeight;
-              }
-            }
+            // 输入动态悬浮层独立于消息流，重绘后只需重新绘制悬浮层即可
+            __akiniPaintTypingFloat();
           }, 50));
       }
     }
@@ -7166,6 +7423,27 @@ document.addEventListener("DOMContentLoaded", function () {
         ((Y.style.display = "none"), (Y.style.pointerEvents = "none"));
         const t = document.getElementById("stickerManagerOverlay");
         t && ((t.style.display = "flex"), ae());
+      });
+    /* 清除聊天壁纸：恢复默认背景 */
+    var clearWpBtn = document.getElementById("clearChatWallpaperBtn");
+    clearWpBtn &&
+      clearWpBtn.addEventListener("click", function () {
+        var cid = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+        var cb2 = document.getElementById("chatBody");
+        if (cid) {
+          var bgKey = "akini_chat_bg_" + cid;
+          try { localStorage.removeItem(bgKey); } catch (e) {}
+          try { if (window._idbStore && window._idbStore.set) window._idbStore.set(bgKey, ""); } catch (e) {}
+        }
+        if (cb2) {
+          cb2.style.backgroundImage = "";
+          cb2.style.backgroundSize = "";
+          cb2.style.backgroundPosition = "";
+          cb2.style.backgroundRepeat = "";
+          cb2.setAttribute("data-current-bg", "");
+        }
+        try { if (typeof Y !== "undefined" && Y) { Y.style.display = "none"; Y.style.pointerEvents = "none"; } } catch (e) {}
+        try { window.akiniShowToast && window.akiniShowToast("已恢复默认壁纸"); } catch (e) {}
       });
     const de = document.getElementById("changeChatWallpaperBtn"),
       ue = document.getElementById("fileInputChatWallpaper");
@@ -9118,7 +9396,7 @@ document.addEventListener("DOMContentLoaded", function () {
               (o.className = "msg-row system"),
                 (o.innerHTML = '<div class="bubble">' + msgText + "</div>"),
                 U.appendChild(o),
-                (U.scrollTop = U.scrollHeight);
+                (U.scrollHeight - U.scrollTop - U.clientHeight < 150) && (U.scrollTop = U.scrollHeight);
             }
           }
           "function" == typeof ot && ot();
@@ -10028,8 +10306,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     function nn(t) {
       t &&
-        (t.style.setProperty("background", "#b0b0b0", "important"),
-        t.classList.remove("me-tr", "ta-tr"),
+        (t.style.removeProperty("background"),
         t.classList.add("tr-finished"));
     }
     function an(t, e, n, i, a) {
@@ -10083,7 +10360,7 @@ document.addEventListener("DOMContentLoaded", function () {
           c && m
             ? `<div class="tr-claim-tip" style="font-size:11px;opacity:0.75;margin-top:2px;">仅 ${rt(x)} 可领取</div>`
             : "",
-        A = `<div class="bubble transfer-bubble ${"me" === t ? "me-tr" : "ta-tr"}" id="${k}"\n            data-tr-uid="${v}" data-tr-who="${t}" data-tr-amount="${e}" data-tr-note="${_}" data-tr-status="${w}" data-tr-recipient="${rt(m || "")}"\n            onclick="(function(el){ if(typeof window._openTransferDetailFromBubble===&#39;function&#39;) window._openTransferDetailFromBubble(el.dataset.trUid); })(this)">\n            <div style="font-size:20px;font-weight:700;color:#fff;">¥${parseFloat(e).toFixed(2)}</div>\n            <div class="tr-note" id="${v}_note">${n || ""}</div>\n            ${E}\n            <div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div>\n            <div style="display:flex;justify-content:flex-end;">\n                <span class="tr-status" id="${w}">待收款</span>\n            </div>\n        </div>`;
+        A = `<div class="bubble transfer-bubble ${"me" === t ? "me-tr" : "ta-tr"}" id="${k}"\n            data-tr-uid="${v}" data-tr-who="${t}" data-tr-amount="${e}" data-tr-note="${_}" data-tr-status="${w}" data-tr-recipient="${rt(m || "")}"\n            onclick="(function(el){ if(typeof window._openTransferDetailFromBubble===&#39;function&#39;) window._openTransferDetailFromBubble(el.dataset.trUid); })(this)">\n            <div class="tr-amount" style="font-size:20px;font-weight:700;color:#1a1a1a;">¥${parseFloat(e).toFixed(2)}</div>\n            <div class="tr-note" id="${v}_note">${n || ""}</div>\n            ${E}\n            <div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div>\n            <div style="display:flex;justify-content:flex-end;">\n                <span class="tr-status" id="${w}">待收款</span>\n            </div>\n        </div>`;
       if (
         ((p.innerHTML =
           c && s
@@ -11399,6 +11676,29 @@ document.addEventListener("DOMContentLoaded", function () {
             ],
             f = {};
           ((window.openIcitySaveModal = function (e) {
+            // 保存图片上的名字/别名用当前资料刷新：旧日记的 name 可能是默认名（如"对方"）
+            try {
+              var _aid = e && (e.authorId || e.contactId);
+              if (_aid && _aid !== "me" && window.akiniContacts) {
+                var _c = null;
+                try { _c = window.akiniContacts.getContactById && window.akiniContacts.getContactById(_aid); } catch (ce) {}
+                if (!_c) { try { _c = window.akiniContacts.getChatTarget && window.akiniContacts.getChatTarget(_aid); } catch (ce2) {} }
+                var _prof = null;
+                try { _prof = JSON.parse(localStorage.getItem("akini_icity_profile_" + _aid) || "null"); } catch (pe) {}
+                // icity 资料里的默认名视为未设置，回退到联系人自定义名（与聊天列表/日记列表一致）
+                var _pn = _prof && _prof.name;
+                if (!_pn || _pn === "对方" || _pn === "TA" || _pn === "ta") _pn = null;
+                var _nn = _pn || (_c && (_c.remark || _c.name)) || e.name;
+                var _hh = (_prof && _prof.handle) || "";
+                if (!_hh || _hh === "对方" || _hh === "@对方") _hh = _nn ? String(_nn).replace(/^@/, "") : e.handle;
+                if ((_nn && _nn !== e.name) || (_hh && _hh !== e.handle)) {
+                  e = Object.assign({}, e, { name: _nn || e.name, handle: _hh || e.handle });
+                }
+              } else if (!_aid || _aid === "me") {
+                var _myNick = localStorage.getItem("akini_icity_my_nick");
+                if (_myNick && _myNick !== e.name) e = Object.assign({}, e, { name: _myNick });
+              }
+            } catch (re) {}
             ((l = e),
               (s = 0),
               (function (t) {
@@ -13912,19 +14212,22 @@ document.addEventListener("DOMContentLoaded", function () {
               var _lastRun = parseFloat(localStorage.getItem("akini_last_friendsPost_run") || "0");
               if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
                 console.log("[Akini 朋友圈] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
+                window.__akiniPostLog && __akiniPostLog("friends", "跳过：距上次发布太近");
                 t(false); return;
               }
               localStorage.setItem("akini_last_friendsPost_run", String(Date.now()));
               if (!window.AKR.isInTimeRange("friends")) {
+                window.__akiniPostLog && __akiniPostLog("friends", "跳过：不在活跃时段");
                 t(false);
                 return;
               }
               if (!window.__akiniToggleOn("contactFriendsToggle", true)) {
+                window.__akiniPostLog && __akiniPostLog("friends", "跳过：朋友圈开关关闭");
                 t(false);
                 return;
               }
               const _poster = r();
-              if (!_poster) return void t(false);
+              if (!_poster) { window.__akiniPostLog && __akiniPostLog("friends", "跳过：无可用联系人"); return void t(false); }
               const n = _poster.name,
                 i = nt(_poster.avatar, 40),
                 a = c(Math.floor(Math.random() * 5) + 1);
@@ -13939,6 +14242,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   likes: [],
                   comments: [],
                 };
+                window.__akiniPostLog && __akiniPostLog("friends", "已发布：" + String(a || "").slice(0, 20));
                 // 联系人发朋友圈时，8% 概率附带用户给该联系人添加的表情包
                 if (Math.random() < 0.08) {
                   var stickers = window.getContactStickersSync
@@ -13963,7 +14267,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     },
                   }),
                   t(false));
-              } else t(false);
+              } else { window.__akiniPostLog && __akiniPostLog("friends", "跳过：字卡内容为空"); t(false); }
             }
             window._akiniFriendsPostAction = friendsPostAction;
             window._akiniRescheduleFriendsPost = function () {
@@ -14809,6 +15113,9 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       (window.triggerTaReplyOnce = function (t, delay) {
         if (!we || we.active) return;
+        // 主动发消息总开关 + 时间段守卫：所有触发路径（定时器/双击头像等）统一在此拦截
+        if (!window.__akiniToggleOn || !window.__akiniToggleOn("contactActiveMsgToggle", false)) return;
+        if (window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("activeMsg")) return;
         if (!window.akiniContacts) return;
         t = t || window.akiniContacts.getActiveChatId();
         const e = window.akiniContacts.getChatTarget(t);
@@ -14968,14 +15275,17 @@ document.addEventListener("DOMContentLoaded", function () {
           var _lastRun = parseFloat(localStorage.getItem("akini_last_icityPost_run") || "0");
           if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
             console.log("[Akini iCity] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
+            window.__akiniPostLog && __akiniPostLog("icity", "跳过：距上次发布太近");
             t(false); return;
           }
           localStorage.setItem("akini_last_icityPost_run", String(Date.now()));
           if (!window.AKR.isInTimeRange("icity")) {
+            window.__akiniPostLog && __akiniPostLog("icity", "跳过：不在活跃时段");
             t(false);
             return;
           }
           if (!window.__akiniToggleOn("contactIcityToggle", true)) {
+            window.__akiniPostLog && __akiniPostLog("icity", "跳过：iCity开关关闭");
             t(false);
             return;
           }
@@ -14994,7 +15304,8 @@ document.addEventListener("DOMContentLoaded", function () {
               c = o && o.name ? o.name : i.name,
               l = o && o.avatar ? o.avatar : i.avatar,
               s = q();
-            (s.push({
+            (window.__akiniPostLog && __akiniPostLog("icity", "已发布：" + String(_diary || "").slice(0, 20)),
+              s.push({
               id: Date.now() + "_" + Math.floor(1e3 * Math.random()),
               who: a,
               author: c,
@@ -15025,7 +15336,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   },
                 }),
               t(false));
-          } else t(false);
+          } else { window.__akiniPostLog && __akiniPostLog("icity", "跳过：日记内容为空"); t(false); }
         }
         window._akiniIcityPostAction = icityPostAction;
         window._akiniRescheduleIcityPost = function () {

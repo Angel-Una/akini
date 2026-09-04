@@ -984,6 +984,88 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   min-width: 64px;
   min-height: 40px;
 }
+/* 输入动态悬浮层：参考 milk 逻辑，固定在输入栏上方，不参与消息流，
+   因此永远视觉上位于所有消息之下，且不会被 chatBody 重绘清掉（防闪烁） */
+.akini-typing-float {
+  position: absolute;
+  left: 12px;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+  animation: typingFadeIn 0.25s ease both;
+}
+.akini-typing-float .msg-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50% !important;
+  background: #ddd;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 16px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
+}
+.akini-typing-float .msg-avatar img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+}
+.akini-typing-float .typing-bubble {
+  background: #fff;
+  border-radius: 999px;
+  padding: 0 16px;
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.12),
+    0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.chat-body.typing-on {
+  padding-bottom: 72px;
+}
+
+/* ===== 时间戳位置兜底：无论新旧 meta 结构，一律钉在头像正下方 =====
+   旧内联 padding-right:46px 不带 !important，这里用 !important 无条件压制 */
+.chat-body .msg-row .msg-meta {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+.chat-body .msg-row.me .msg-meta {
+  justify-content: flex-end !important;
+}
+.chat-body .msg-row.other .msg-meta,
+.chat-body .msg-row.ta .msg-meta,
+.chat-body .msg-row.group .msg-meta {
+  justify-content: flex-start !important;
+}
+.chat-body .msg-row .msg-meta .msg-ts {
+  width: 38px !important;
+  text-align: center !important;
+  flex: none !important;
+}
+/* 已读回执在时间戳左侧，与气泡右缘留出一点距离 */
+.chat-body .msg-row.me .msg-meta .msg-rr {
+  margin-right: 14px !important;
+  flex: none !important;
+}
+/* 更老的独立时间戳行（未被 meta 包裹的 .msg-ts 直接子节点）同样固定头像下方 */
+.chat-body .msg-row > .msg-ts {
+  width: 38px !important;
+  text-align: center !important;
+  margin-top: 1px;
+  flex: none !important;
+}
+.chat-body .msg-row.me > .msg-ts {
+  align-self: flex-end !important;
+}
+.chat-body .msg-row.other > .msg-ts,
+.chat-body .msg-row.ta > .msg-ts,
+.chat-body .msg-row.group > .msg-ts {
+  align-self: flex-start !important;
+}
 .typing-dot {
   width: 6px;
   height: 6px;
@@ -1189,12 +1271,15 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #999;
 }
 .shop-card-bubble {
-  min-width: 260px;
-  max-width: 320px;
-  padding: 12px !important;
-  background: #2c2c2c !important;
-  color: #fff !important;
-  border-radius: 12px !important;
+  min-width: 224px;
+  max-width: 258px;
+  width: fit-content !important;
+  padding: 13px !important;
+  background: linear-gradient(160deg, #ffffff 0%, #f3f6fd 100%) !important;
+  border: 1px solid rgba(79, 124, 255, 0.16);
+  box-shadow: 0 6px 18px rgba(79, 124, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.05);
+  color: #1a1a1a !important;
+  border-radius: 16px !important;
   cursor: pointer;
   user-select: none;
   overflow: hidden;
@@ -1205,15 +1290,16 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   gap: 12px;
 }
 .shop-card-bubble .shop-card-bubble-img {
-  width: 70px;
-  height: 70px;
-  flex-shrink: 0;
-  border-radius: 8px;
-  background: #fff;
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  background: #f2f4fa;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 .shop-card-bubble .shop-card-bubble-img img {
   width: 100%;
@@ -1226,17 +1312,21 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
+  gap: 5px;
 }
 .shop-card-bubble-title {
   font-size: 15px;
-  line-height: 1.5;
-  color: #fff;
+  font-weight: 600;
+  color: #1a1a1a;
+  letter-spacing: 0.2px;
+  margin-bottom: 2px;
 }
 .shop-card-bubble-name {
-  font-size: 14px;
-  color: #fff;
-  opacity: 0.85;
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .shop-card-signature {
   color: #ff6b6b;
@@ -1249,18 +1339,28 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 .shop-card-bubble-status {
-  font-size: 13px;
-  color: #fff;
-  opacity: 0.7;
+  font-size: 12px;
+  color: #4f7cff !important;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(79, 124, 255, 0.12) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.shop-card-bubble-status[data-state="done"] {
+  color: #16a34a !important;
+  background: rgba(34, 197, 94, 0.13) !important;
 }
 .shop-card-bubble-status.done {
-  color: #fff;
-  opacity: 1;
+  color: #7ce3a1;
+  background: rgba(94, 210, 140, 0.16);
 }
 
 .shop-order-badge {
@@ -1672,7 +1772,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   height: 100% !important;
   object-fit: cover !important;
 }
-.chat-body .msg-row .bubble:not(.survey-bubble):not(.shop-card-bubble) {
+.chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   padding: 9px 16px;
   border-radius: 999px !important;
   max-width: 65%;
@@ -1680,9 +1780,15 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   word-break: normal;
   overflow-wrap: break-word;
   white-space: pre-wrap;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   writing-mode: horizontal-tb;
   line-height: 1.5;
+}
+/* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带阴影停用 */
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 .chat-body .msg-row .bubble.sticker-bubble {
   background: transparent !important;
@@ -1738,15 +1844,18 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   outline: none !important;
 }
 .chat-body .msg-row .bubble.survey-bubble {
-  background: #2f2f2f !important;
-  color: #fff !important;
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
-  border-radius: 10px !important;
+  width: 250px;
+  min-width: 250px;
+  max-width: 250px;
   padding: 0 !important;
+  border-radius: 16px !important;
+  background: linear-gradient(160deg, #ffffff 0%, #f3f6fd 100%) !important;
+  border: 1px solid rgba(79, 124, 255, 0.16) !important;
+  box-shadow: 0 6px 18px rgba(79, 124, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  color: #1a1a1a !important;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer;
+  box-sizing: border-box;
 }
 .chat-body .msg-row.me .bubble.survey-bubble {
   border-top-right-radius: 2px !important;
@@ -1761,15 +1870,18 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   padding: 12px;
 }
 .survey-bubble-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: #444;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
+  background: rgba(79, 124, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
   flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(79, 124, 255, 0.12);
+}
+.survey-bubble-icon svg {
+  display: block;
 }
 .survey-bubble-content {
   flex: 1;
@@ -1778,23 +1890,22 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .survey-bubble-title {
   font-size: 15px;
   font-weight: 600;
-  line-height: 1.4;
-  margin-bottom: 6px;
+  color: #1a1a1a;
+  letter-spacing: 0.2px;
 }
 .survey-bubble-q {
-  font-size: 13px;
-  line-height: 1.6;
-  color: rgba(255, 255, 255, 0.88);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 3px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 170px;
 }
 .survey-bubble-divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.2);
-  margin: 0;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.09), rgba(0, 0, 0, 0.02));
+  margin: 0 14px;
 }
 .survey-bubble-footer {
   padding: 8px 12px;
@@ -1804,46 +1915,61 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .survey-bubble-count {
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
+  color: #999;
+  letter-spacing: 0.3px;
 }
 .survey-bubble-status {
   font-size: 12px;
-  color: #fff;
+  color: #4f7cff;
   font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(79, 124, 255, 0.12);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
-.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+.survey-bubble-status[data-state="done"] {
+  color: #16a34a;
+  background: rgba(34, 197, 94, 0.13);
+}
+/* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带底色整体停用 */
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #e9e9eb !important;
   color: #111 !important;
 }
-body.bubble-pink
+body.bubble-pink:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #ffd1dc !important;
   color: #111 !important;
 }
-body.bubble-blue
+body.bubble-blue:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #007aff !important;
   color: #fff !important;
 }
-body.bubble-green
+body.bubble-green:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #07c160 !important;
   color: #fff !important;
 }
-body.bubble-black
+body.bubble-black:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #111 !important;
   color: #fff !important;
 }
-body.bubble-gray
+body.bubble-gray:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
@@ -1861,7 +1987,10 @@ body.bubble-gray
 .chat-body .msg-row.ta .bubble.transfer-bubble {
   background: #222 !important;
 }
-.chat-body .msg-row.other .bubble:not(.survey-bubble):not(.shop-card-bubble) {
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.other
+  .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   background: #fff;
   color: #111;
 }
@@ -1989,11 +2118,11 @@ body.bubble-gray
   line-height: 1.2;
 }
 .chat-body .msg-row.other .msg-meta {
-  padding-left: 46px;
+  padding-left: 0;
   justify-content: flex-start;
 }
 .chat-body .msg-row.me .msg-meta {
-  padding-right: 46px;
+  padding-right: 0;
   justify-content: flex-end;
 }
 .chat-body .msg-row.group .msg-bubble-wrap {
@@ -2019,7 +2148,7 @@ body.bubble-gray
   margin-top: 0;
 }
 .chat-body .msg-row.group .msg-meta {
-  padding-left: 46px;
+  padding-left: 0;
 }
 .chat-body .msg-row .bubble.transfer-bubble {
   width: 220px;
@@ -2038,29 +2167,59 @@ body.bubble-gray
   color: #fff !important;
 }
 .transfer-bubble .tr-note {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.75);
+  color: #6b7280 !important;
   margin-top: 2px;
 }
-.chat-body .msg-row.me .bubble.transfer-bubble.me-tr {
-  background: #222 !important;
-  color: #fff;
-  border-top-right-radius: 2px;
+body:not(.x) .chat-body .msg-row.me .bubble.transfer-bubble.me-tr,
+body:not(.x) .chat-body .msg-row.other .bubble.transfer-bubble.ta-tr,
+body:not(.x) .chat-body .msg-row.ta .bubble.transfer-bubble.ta-tr,
+body:not(.x) .chat-body .msg-row.me .msg-content-line .bubble.transfer-bubble.me-tr,
+body:not(.x) .chat-body .msg-row.other .msg-content-line .bubble.transfer-bubble.ta-tr,
+body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta-tr {
+  background: linear-gradient(160deg, #ffffff 0%, #f3f6fd 100%) !important;
+  color: #1a1a1a !important;
+  border: 1px solid rgba(79, 124, 255, 0.16) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 6px 18px rgba(79, 124, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  padding: 13px 14px !important;
+  width: auto !important;
+  min-width: 200px !important;
+  max-width: 250px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
 }
-.chat-body .msg-row.other .bubble.transfer-bubble.ta-tr,
-.chat-body .msg-row.ta .bubble.transfer-bubble.ta-tr {
-  background: #222 !important;
-  color: #fff;
-  border-top-left-radius: 2px;
+/* 旧版深色卡内联白色文字兜底改深色 */
+.chat-body .msg-row .bubble.transfer-bubble div[style*="font-size:20px"] {
+  color: #1a1a1a !important;
 }
 .transfer-bubble .tr-status {
   font-size: 12px;
-  color: #fff;
+  color: #4f7cff !important;
   font-weight: 500;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: rgba(79, 124, 255, 0.12) !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  letter-spacing: 0.2px;
+}
+.transfer-bubble .tr-status[data-state="done"] {
+  color: #16a34a !important;
+  background: rgba(34, 197, 94, 0.13) !important;
+}
+.transfer-bubble .tr-status[data-state="refund"] {
+  color: #8a8a8e !important;
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+/* 统一转账卡分隔线（覆盖旧卡片内联样式） */
+.transfer-bubble div[style*="height:1px"] {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.03)) !important;
 }
 .chat-input-bar-area {
   display: flex;
@@ -5272,3 +5431,144 @@ button.back-btn[type="button"] {
   border-color: #4f7cff;
 }
 
+
+/* ===== v4 时间戳：钉在头像正下方，不随气泡高度移动 ===== */
+.chat-body .msg-row .avatar-col {
+  display: flex !important;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  width: 38px;
+}
+.chat-body .msg-row .avatar-col .msg-ts {
+  width: 38px !important;
+  text-align: center !important;
+  white-space: nowrap;
+  font-size: 10px;
+  color: #aaa;
+  line-height: 1.2;
+  flex: none !important;
+}
+
+/* ===== 转账卡完成态（已收款/已退回）：浅色灰白，不再深灰椭圆 ===== */
+.chat-body .msg-row .bubble.transfer-bubble.tr-finished {
+  background: linear-gradient(160deg, #f8f9fb 0%, #eef0f5 100%) !important;
+  color: #8a8a8e !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 16px !important;
+  padding: 13px 14px !important;
+  width: auto !important;
+  min-width: 200px !important;
+  max-width: 250px !important;
+  height: auto !important;
+  min-height: 0 !important;
+  aspect-ratio: auto !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+}
+.chat-body .msg-row .bubble.transfer-bubble.tr-finished .tr-amount,
+.chat-body .msg-row .bubble.transfer-bubble.tr-finished div[style*="font-size:20px"] {
+  color: #8a8a8e !important;
+}
+.chat-body .msg-row .bubble.transfer-bubble.tr-finished .tr-note {
+  color: #a0a4ab !important;
+}
+
+/* ===== v5 已读回执：绝对定位于聊天气泡正下方 ===== */
+.chat-body .msg-row .msg-content-line {
+  position: relative;
+}
+/* 气泡容器：宽度=气泡宽，已读回执在容器内天然贴气泡正下方、右缘对齐气泡右缘 */
+.chat-body .msg-row .msg-content-line > .bubble-wrap {
+  display: flex;
+  flex-direction: column;
+  max-width: 65%;
+  min-width: 0;
+}
+.chat-body .msg-row.me .msg-content-line > .bubble-wrap {
+  align-items: flex-end;
+}
+.chat-body .msg-row .msg-content-line > .bubble-wrap > .bubble {
+  max-width: 100% !important;
+}
+/* 转账卡/表情包有固定内联宽度，不受容器 65% 限制 */
+.chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .transfer-bubble),
+.chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .sticker-bubble) {
+  max-width: none;
+}
+/* 引用块容器在 wrap 内：内联 flex-basis:100% 在纵向容器里会撑高度，覆盖为 auto */
+.chat-body .msg-row .msg-content-line > .bubble-wrap > div[style*="flex-basis:100%"] {
+  flex-basis: auto !important;
+}
+/* me 行 row 级已读回执：引用块保持原始整行样式，已读固定在其下一行、与引用右缘对齐 */
+.chat-body .msg-row.me > .msg-rr {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: right;
+  padding: 2px 47px 0 0;
+  margin: 0;
+  font-size: 10px;
+  color: #aaa;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+/* 已读回执：固定聊天气泡（及引用块）正下方 2px，右缘对齐气泡右缘再往左 3px */
+.chat-body .msg-row.me .msg-content-line > .bubble-wrap > .msg-rr {
+  margin: 2px 3px 0 0 !important;
+  padding: 0 !important;
+  font-size: 10px !important;
+  color: #aaa !important;
+  line-height: 1.2 !important;
+  white-space: nowrap;
+}
+.chat-body .msg-row.me {
+  padding-bottom: 0;
+}
+
+/* ===== 储存数据页（v20261001） ===== */
+.ak-storage-area { z-index: 999998; }
+.ak-stor-hero { padding: 14px; }
+.ak-stor-total-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ak-stor-total-label { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+.ak-stor-total-val { font-size: 13px; color: #888; }
+.ak-stor-track { height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
+.ak-stor-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
+.ak-warn { margin-top: 8px; font-size: 12px; color: #ff3b30; line-height: 1.5; }
+.ak-stor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+.ak-stor-cell { background: #f8f8f8; border-radius: 10px; padding: 10px 6px; text-align: center; }
+.ak-stor-cell-val { font-size: 14px; font-weight: 700; }
+.ak-stor-cell-key { font-size: 11px; color: #999; margin-top: 3px; }
+.ak-task-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+.ak-task-row:last-of-type { border-bottom: none; }
+.ak-task-name { font-size: 14px; color: #1a1a1a; font-weight: 500; }
+.ak-task-info { font-size: 12px; color: #888; text-align: right; line-height: 1.6; }
+.ak-task-time { color: #bbb; margin-left: 4px; }
+.ak-hint { font-size: 11px; color: #bbb; margin-top: 8px; line-height: 1.5; }
+.ak-log-list { max-height: 240px; overflow-y: auto; }
+.ak-log-row { display: flex; align-items: center; gap: 6px; padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
+.ak-log-row:last-child { border-bottom: none; }
+.ak-badge { flex-shrink: 0; font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
+.ak-badge-blue { background: #e8f1fd; color: #4a90e2; }
+.ak-badge-purple { background: #f2ebfb; color: #9c6fd4; }
+.ak-badge-gray { background: #f0f0f0; color: #888; }
+.ak-log-msg { flex: 1; min-width: 0; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ak-log-time { flex-shrink: 0; color: #bbb; font-size: 11px; }
+.ak-empty { font-size: 12px; color: #bbb; padding: 10px 0; text-align: center; }
+.ak-key-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
+.ak-key-row:last-child { border-bottom: none; }
+.ak-key-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
+.ak-key-name { flex: 1; min-width: 0; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ak-key-size { flex-shrink: 0; color: #999; font-variant-numeric: tabular-nums; }
+.ak-btn-col { display: flex; flex-direction: column; gap: 8px; }
+.ak-stor-btn { width: 100%; height: 42px; border-radius: 12px; border: 1px solid #e8e8e8; background: #f8f8f8; color: #333; font-size: 14px; cursor: pointer; }
+.ak-stor-btn.primary { background: #07c160; border-color: #07c160; color: #fff; font-weight: 600; }
+.ak-stor-btn.danger { background: #fff; border-color: #ffd6d3; color: #ff3b30; }
+.ak-stor-btn:active { opacity: .8; }
+
+/* me 行裸引用块进 wrap 后右对齐（v20261002） */
+.msg-row.me .bubble-wrap > .quote-bubble { margin-left: auto !important; }
+.bubble-wrap > .quote-bubble { flex-shrink: 0; }
