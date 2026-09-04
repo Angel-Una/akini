@@ -3343,16 +3343,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         if ("group" !== e.type) I(t, e, n);
         else {
-          var o = (e.memberIds || []).slice();
-          if (0 === o.length) return;
-          o.forEach(function (e, a) {
-            setTimeout(
-              function () {
-                w(t, e, { isGroup: !0 });
-              },
-              1500 * a + 2e3 * Math.random(),
-            );
-          });
+          // 群聊回复：直接走 I()（其内部已处理群成员选择/头像/群名），原来调用的 w() 不存在导致群聊永远不回复
+          if (!(e.memberIds || []).length) return;
+          I(t, e, n, true);
         }
       }
       window._akiniReplyAction = function () {
@@ -3371,9 +3364,6 @@ document.addEventListener("DOMContentLoaded", function () {
         friendsInteract: function () {
           window._akiniFriendsInteractAction &&
             window._akiniFriendsInteractAction();
-        },
-        mail: function () {
-          window._akiniMailAction && window._akiniMailAction();
         },
         icityPost: function () {
           window._akiniIcityPostAction && window._akiniIcityPostAction();
@@ -14639,9 +14629,8 @@ document.addEventListener("DOMContentLoaded", function () {
             window._akiniMailAction = mailAction;
             window._akiniRescheduleMail = function () {
               try { localStorage.removeItem("akini_next_mail"); } catch (e) {}
-              t(false);
             };
-            window._akiniTimer.schedule("mail", mailAction, m, { keepNext: true });
+            // 信箱统一由 akini-mail-engine 调度（setTimeout 自管），此处不再挂任务系统，避免双轨同时寄信/通知爆发
           })(true));
       })());
     ((function () {

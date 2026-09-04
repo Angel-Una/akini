@@ -172,9 +172,10 @@
     // 大值守卫（milk 式存储）：>150KB 的键只写 IDB + 内存，localStorage 热备删除以释放配额
     // 读取侧有保障：akiniGet 先查 IDB；启动时 restoreCriticalFromIdb 会把 IDB 值预加载进内存缓存
     if (v.length > 153600) {
+      // 大键：IDB 为主存储；LS 尽力回写（写失败只影响热备，不影响数据），绝不删除 LS 旧值——
+      // 站内大量读取路径直读 localStorage，删 LS 会导致"数据明明在库里却读不到=看似消失"
       idbSet(k, v, function (idbOk) {
-        try { localStorage.removeItem(k); } catch (e) {}
-        try { localStorage.removeItem(k + '_backup'); } catch (e) {}
+        try { lsSet(k, v); } catch (e) {}
         if (cb) cb(idbOk);
       });
       return;
