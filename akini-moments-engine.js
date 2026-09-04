@@ -26,18 +26,19 @@
     return null;
   }
 
-  function getContactName(contact) {
+  // 朋友圈用微信设置的昵称头像；icity 用 icity 里设置的资料，两者不互通
+  function getContactName(contact, app) {
     if (!contact) return '对方';
-    if (window.getIcityContactProfile) {
+    if (app === 'icity' && window.getIcityContactProfile) {
       var p = window.getIcityContactProfile(contact.id);
       if (p && p.name) return p.name;
     }
     return contact.name || '对方';
   }
 
-  function getContactAvatar(contact) {
+  function getContactAvatar(contact, app) {
     if (!contact) return '🐰';
-    if (window.getIcityContactProfile) {
+    if (app === 'icity' && window.getIcityContactProfile) {
       var p = window.getIcityContactProfile(contact.id);
       if (p && p.avatar) return p.avatar;
     }
@@ -169,7 +170,7 @@
   // ========== 点赞/评论核心 ==========
 
   function likeMoment(moment, contact, app) {
-    var name = getContactName(contact);
+    var name = getContactName(contact, app);
     if (app === 'icity') {
       moment.likers = moment.likers || [];
       if (moment.likers.indexOf(name) < 0) {
@@ -190,8 +191,8 @@
     var text = pickRandom(texts);
     if (!text) return false;
 
-    var name = getContactName(contact);
-    var avatar = getContactAvatar(contact);
+    var name = getContactName(contact, app);
+    var avatar = getContactAvatar(contact, app);
     var comment = {
       id: 'c_' + Math.random().toString(36).slice(2) + '_' + Date.now(),
       author: name,
@@ -229,7 +230,7 @@
     contacts.forEach(function (contact) {
       if (commentMoment(moment, contact, null, app)) {
         didAnything = true;
-        notify(app, getContactName(contact), getContactAvatar(contact), '评论了你的动态：' + moment.comments[moment.comments.length - 1].text.slice(0, 20));
+        notify(app, getContactName(contact, app), getContactAvatar(contact, app), '评论了你的动态：' + moment.comments[moment.comments.length - 1].text.slice(0, 20));
       }
     });
 
@@ -253,7 +254,7 @@
       saveData(app, data);
       render(app);
       var text = moment.comments[moment.comments.length - 1].text;
-      notify(app, getContactName(contact), getContactAvatar(contact), '回复了你的评论：' + text.slice(0, 20));
+      notify(app, getContactName(contact, app), getContactAvatar(contact, app), '回复了你的评论：' + text.slice(0, 20));
     }
   }
 
@@ -309,7 +310,7 @@
     var contact = getContactById(targetName);
     if (!contact) {
       for (var i = 0; i < contacts.length; i++) {
-        if (getContactName(contacts[i]) === targetName) {
+        if (getContactName(contacts[i], app) === targetName) {
           contact = contacts[i];
           break;
         }

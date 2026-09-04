@@ -178,17 +178,17 @@ window.__akiniToggleOn = function (key, defaultOn) {
 window.AKR = (function () {
   /* 概率默认值（可用 localStorage 覆盖：akini_prob_<name>，范围 0-100） */
   var DEFAULT_PROBS = {
-    meaningfulNumber: 0.12,
+    meaningfulNumber: 0.4,
     quote: 0.3,
     taTransfer: 0.08,
     groupTransferMe: 0.08,
-    noReply: 0.05,
+    noReply: 0.2,
     sticker: 0.2,
     incomingCall: 0.03,
     groupCall: 0.03,
     answerCall: 0.65,
     missCall: 0.30,
-    refundTransfer: 0.1,
+    refundTransfer: 0.2,
     poke: 0.03,
   };
   function getProb(name) {
@@ -1709,8 +1709,16 @@ document.addEventListener("DOMContentLoaded", function () {
           e.messagesHTML = __akiniStripTypingRows(e.messagesHTML);
           htmlToSave = e.messagesHTML;
           // 聊天记录只增不减：防止陈旧会话数据用短的 messagesHTML 覆盖内存中的完整记录
-          if (i.messagesHTML && "string" == typeof i.messagesHTML) {
-            i.messagesHTML = __akiniStripTypingRows(i.messagesHTML);
+          // 内存没有时从持久化的 chat_history 读旧值对比（否则旧值为空时任何覆盖都会放行=记录丢失）
+          var __oldHtml = "string" == typeof i.messagesHTML ? i.messagesHTML : "";
+          if (!__oldHtml) {
+            try {
+              __oldHtml = localStorage.getItem("akini_chat_history_" + t) ||
+                          localStorage.getItem("akini_chat_history_backup_" + t) || "";
+            } catch (e0) {}
+          }
+          if (__oldHtml) {
+            i.messagesHTML = __akiniStripTypingRows(__oldHtml);
             var newRows = __akiniCountMsgRows(e.messagesHTML);
             var oldRows = __akiniCountMsgRows(i.messagesHTML);
             if (newRows < oldRows) {
@@ -3399,6 +3407,13 @@ document.addEventListener("DOMContentLoaded", function () {
     window._akiniTransferNote = n;
     window.__akiniForceReply = function () {
       try {
+        var _fc = window.akiniContacts && window.akiniContacts.getActiveChatId();
+        var _ft = _fc && window.akiniContacts.getChatTarget(_fc);
+        if (_fc && _ft && window.I) {
+          // 用户主动点"继续说"：直接回复，绕开 pending 幽灵闸与 45 秒节流
+          window.I(_fc, _ft, null, true);
+          return;
+        }
         if (typeof b === "function") {
           b(
             window.akiniContacts
@@ -3856,6 +3871,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
       return div.innerHTML;
     }
+    window.__akiniCountMsgRows = __akiniCountMsgRows;
     function __akiniCountMsgRows(html) {
       if (!html) return 0;
       var clean = __akiniStripTypingRows(html);
@@ -4229,7 +4245,14 @@ document.addEventListener("DOMContentLoaded", function () {
       if (i && !a)
         return (
           _idbStore.set(t, e, function () {
-            n && n(!0);
+            // IDB 写成功后清除 localStorage 残留旧值：D() 优先读 localStorage，
+            // 历史路径（备份恢复/set降级）写入的旧背景会遮蔽新值导致更换不生效
+            _idbStore.get(t, function (v) {
+              if (v === e) {
+                try { localStorage.removeItem(t); } catch (x) {}
+              }
+              n && n(!0);
+            });
           }),
           !0
         );
@@ -10288,6 +10311,20 @@ document.addEventListener("DOMContentLoaded", function () {
         (t.style.removeProperty("background"),
         t.classList.add("tr-finished"));
     }
+    // 把单条新消息行追加到全量记录并持久化（幂等：行已在全量中则跳过）
+    function __akiniPersistMsgRow(chatId, rowEl) {
+      try {
+        if (!chatId || !rowEl || !window.akiniContacts) return;
+        var sess = window.akiniContacts.getSession(chatId) || {};
+        var full = sess.messagesHTML || "";
+        var row = rowEl.outerHTML || "";
+        if (!row) return;
+        if (full.indexOf(row) >= 0) return;
+        full += row;
+        window.akiniContacts.updateSession(chatId, { messagesHTML: full });
+        if (typeof C === "function") C(chatId, full);
+      } catch (e) {}
+    }
     function an(t, e, n, i, a) {
       const o = window.akiniContacts
           ? window.akiniContacts.getActiveChatId()
@@ -10354,6 +10391,7 @@ document.addEventListener("DOMContentLoaded", function () {
               ? `<div class="msg-content-line">${A}${h}</div>${d("right")}`
               : `<div class="msg-content-line">${h}${A}</div>${d("left")}`),
         U.appendChild(p),
+        __akiniPersistMsgRow(o, p),
         (window._transferStates[v] = {
           uid: v,
           who: t,
@@ -10386,6 +10424,7 @@ document.addEventListener("DOMContentLoaded", function () {
             ((o.className = "msg-row system"),
               (o.innerHTML = `<div class="bubble">${rt(x)}${e ? "已退回转账" : "已收款"}</div>`),
               U.appendChild(o),
+              __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
               S(),
               (U.scrollTop = U.scrollHeight),
               b(),
@@ -10405,6 +10444,7 @@ document.addEventListener("DOMContentLoaded", function () {
             ((o.className = "msg-row system"),
               (o.innerHTML = `<div class="bubble">${e ? l + "已退回转账" : l + "已收款"}</div>`),
               U.appendChild(o),
+              __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
               S(),
               (U.scrollTop = U.scrollHeight),
               b(),
@@ -10425,6 +10465,7 @@ document.addEventListener("DOMContentLoaded", function () {
           ((o.className = "msg-row system"),
             (o.innerHTML = `<div class="bubble">${rt(x)}${e ? "已退回转账" : "已收款"}</div>`),
             U.appendChild(o),
+            __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
             S(),
             (U.scrollTop = U.scrollHeight),
             b(),
@@ -13601,7 +13642,14 @@ document.addEventListener("DOMContentLoaded", function () {
               ((n.className = "msg-row system"),
                 (n.innerHTML = `<div class="bubble">${e}拍了拍${t}</div>`),
                 U && (U.appendChild(n), (U.scrollTop = U.scrollHeight), S()),
-                b());
+                (function () {
+                  try {
+                    var _pc = window.akiniContacts && window.akiniContacts.getActiveChatId();
+                    var _pt = _pc && window.akiniContacts.getChatTarget(_pc);
+                    if (_pc && _pt && window.I) window.I(_pc, _pt, null, true);
+                    else b();
+                  } catch (e) { b(); }
+                })());
             })(
               (document.getElementById("chatTaName") || {}).innerText || "对方",
               localStorage.getItem("akini_my_name") || "我",
@@ -14236,7 +14284,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 t(false);
                 return;
               }
-              if (!window.__akiniToggleOn("contactFriendsToggle", true)) {
+              if (!window.__akiniToggleOn("contactFriendsToggle", false)) {
                 window.__akiniPostLog && __akiniPostLog("friends", "跳过：朋友圈开关关闭");
                 t(false);
                 return;
@@ -14302,7 +14350,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             var e = getFriendsReplyDelayMs();
             function friendsInteractAction() {
-              if (!window.__akiniToggleOn("contactFriendsToggle", true)) {
+              if (!window.__akiniToggleOn("contactFriendsToggle", false)) {
                 t();
                 return;
               }
@@ -14638,12 +14686,13 @@ document.addEventListener("DOMContentLoaded", function () {
       (function () {
         try {
           var ver = localStorage.getItem("akini_app_version");
-          if (ver !== "20260944") {
-            localStorage.setItem("akini_app_version", "20260944");
+          if (ver !== "20261016") {
+            localStorage.setItem("akini_app_version", "20261016");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
             localStorage.setItem("akini_toggle_contactPokeToggle", "1");
-            localStorage.setItem("akini_toggle_contactFriendsToggle", "1");
-            localStorage.setItem("akini_toggle_contactIcityToggle", "1");
+            // 联系人主动发朋友圈/发iCity：默认关闭，需用户手动开启才生效
+            localStorage.setItem("akini_toggle_contactFriendsToggle", "0");
+            localStorage.setItem("akini_toggle_contactIcityToggle", "0");
             localStorage.setItem("akini_toggle_contactMailToggle", "1");
             // emoji 融入消息默认关闭（旧版本误设为开启则重置）
             localStorage.setItem("akini_toggle_emojiMixToggle", "0");
@@ -14916,8 +14965,8 @@ document.addEventListener("DOMContentLoaded", function () {
         t("contactMailToggle", !0),
         t("contactActiveMsgToggle", !1),
         t("contactShopToggle", !1),
-        t("contactFriendsToggle", !0),
-        t("contactIcityToggle", !0),
+        t("contactFriendsToggle", !1),
+        t("contactIcityToggle", !1),
         t("timestampToggle", !1),
         (function(){
           // 时间格式选择：三个选项点击切换，存储 akini_timeFormat = "24" | "12PM" | "12AM"
@@ -15298,7 +15347,7 @@ document.addEventListener("DOMContentLoaded", function () {
             t(false);
             return;
           }
-          if (!window.__akiniToggleOn("contactIcityToggle", true)) {
+          if (!window.__akiniToggleOn("contactIcityToggle", false)) {
             window.__akiniPostLog && __akiniPostLog("icity", "跳过：iCity开关关闭");
             t(false);
             return;
@@ -16162,6 +16211,12 @@ document.addEventListener("DOMContentLoaded", function () {
       function $t() {
         e.optionPicker && (e.optionPicker.style.display = "none");
       }
+      // 一起听消息停留时长（秒），可在 网易云菜单-导入歌单 处自定义；默认 20 秒
+      window.__akiniMusicMsgTtl = function () {
+        var v = 20;
+        try { v = parseFloat(localStorage.getItem("akini_music_msg_ttl") || "20") || 20; } catch (e) {}
+        return Math.min(Math.max(v, 3), 600) * 1000;
+      };
       function Jt(t, n, i, noStore) {
         if (t) {
           var a,
@@ -16227,7 +16282,7 @@ document.addEventListener("DOMContentLoaded", function () {
               setTimeout(function () {
                 m.parentNode && m.parentNode.removeChild(m);
               }, 500);
-            }, 2e4);
+            }, (window.__akiniMusicMsgTtl ? window.__akiniMusicMsgTtl() : 20000));
             n ||
               "function" != typeof window.showInAppNotif ||
               window.showInAppNotif({
@@ -16936,6 +16991,12 @@ document.addEventListener("DOMContentLoaded", function () {
           if (window.akiniStore && window.akiniStore.setJson) {
             window.akiniStore.setJson("akini_music_playlist", list);
           }
+          // TA 的手机网易云：联系人按概率收藏我刚添加的歌曲
+          try {
+            if (added > 0 && lastTrack && window.akiniTaPhoneCollectMusic) {
+              window.akiniTaPhoneCollectMusic(lastTrack);
+            }
+          } catch (e) {}
           try {
             localStorage.setItem(
               "akini_music_playlist",
@@ -17639,6 +17700,24 @@ document.addEventListener("DOMContentLoaded", function () {
           G(),
           st(),
           syncAvatars(),
+          (function () {
+            // 存量修复：localStorage 残留的 akini_music_bg 会遮蔽 IDB 中的新背景
+            try {
+              var _oldBg = localStorage.getItem("akini_music_bg");
+              if (_oldBg) {
+                _idbStore.get("akini_music_bg", function (v) {
+                  if (!v) {
+                    _idbStore.set("akini_music_bg", _oldBg, function () {
+                      try { localStorage.removeItem("akini_music_bg"); } catch (e) {}
+                      U();
+                    });
+                  } else {
+                    try { localStorage.removeItem("akini_music_bg"); } catch (e) {}
+                  }
+                });
+              }
+            } catch (e) {}
+          })(),
           U(),
           lt(),
           ot() && (window.requestWakeLock && window.requestWakeLock(), V()),

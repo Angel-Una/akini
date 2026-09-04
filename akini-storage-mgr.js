@@ -175,6 +175,7 @@
 
   function bindActions() {
     // 备份与恢复
+    var $ = function (id) { return document.getElementById(id); };
     var expBtn = $("akStorExport");
     if (expBtn) expBtn.onclick = function () {
       if (window.akExportBackup) { window.akExportBackup(); }

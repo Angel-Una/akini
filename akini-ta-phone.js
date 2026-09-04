@@ -10,12 +10,14 @@
 (function () {
   'use strict';
 
-  var CHAT_CHANCE = 0.01;           // 聊天实时收藏概率 1%（原2%减半）
-  var MOMENTS_CHANCE = 0.05;        // 朋友圈实时收藏概率 5%（原10%减半）
-  var ICITY_CHANCE = 0.05;          // iCity 实时收藏概率 5%（原10%减半）
-  var CHAT_HISTORY_CHANCE = 0.015;  // 历史聊天收藏概率 1.5%（原3%减半）
-  var MOMENTS_HISTORY_CHANCE = 0.025;// 历史朋友圈收藏概率 2.5%（原5%减半）
-  var ICITY_HISTORY_CHANCE = 0.025; // 历史 iCity 收藏概率 2.5%（原5%减半）
+  var CHAT_CHANCE = 0.02;           // 聊天实时收藏概率 2%（对齐 syy）
+  var MOMENTS_CHANCE = 0.10;        // 朋友圈实时收藏概率 10%（对齐 syy）
+  var ICITY_CHANCE = 0.10;          // iCity 实时收藏概率 10%（与朋友圈一致）
+  var MUSIC_CHANCE = 0.10;          // 网易云收藏概率 10%（与朋友圈一致）
+  var CHAT_HISTORY_CHANCE = 0.03;   // 历史聊天收藏概率 3%（对齐 syy）
+  var MOMENTS_HISTORY_CHANCE = 0.05;// 历史朋友圈收藏概率 5%（对齐 syy）
+  var ICITY_HISTORY_CHANCE = 0.05;  // 历史 iCity 收藏概率 5%（与朋友圈一致）
+  var MUSIC_HISTORY_CHANCE = 0.05;  // 历史网易云收藏概率 5%（与朋友圈一致）
 
   // 当前查看的联系人 id
   var currentContactId = null;
@@ -86,11 +88,12 @@
         return {
           chat: Array.isArray(parsed.chat) ? parsed.chat : [],
           moments: Array.isArray(parsed.moments) ? parsed.moments : [],
-          icity: Array.isArray(parsed.icity) ? parsed.icity : []
+          icity: Array.isArray(parsed.icity) ? parsed.icity : [],
+          music: Array.isArray(parsed.music) ? parsed.music : []
         };
       }
     } catch (e) {}
-    return { chat: [], moments: [], icity: [] };
+    return { chat: [], moments: [], icity: [], music: [] };
   }
 
   function saveCollections(contactId, data) {
@@ -139,6 +142,35 @@
     if (Math.random() < ICITY_CHANCE) addCollection(contactId, 'icity', text.trim(), timestamp || Date.now());
   };
 
+  // 联系人收藏用户添加的歌曲：track = {title, artist, cover, ...}
+  function addMusicCollection(contactId, track, originalTime) {
+    if (!track || !(track.title || track.name)) return false;
+    var randomContact = pickRandomCreatedContact();
+    var targetId = (randomContact && randomContact.id) || contactId;
+    if (!targetId) return false;
+    var data = loadCollections(targetId);
+    var title = String(track.title || track.name || '').trim();
+    var artist = String(track.artist || track.singer || '').trim();
+    var cover = track.cover || track.pic || '';
+    for (var i = 0; i < data.music.length; i++) {
+      var it = data.music[i];
+      if (it && it.track && it.track.title === title && it.track.artist === artist) return false;
+    }
+    data.music.unshift({
+      id: Date.now() + Math.random(),
+      track: { title: title, artist: artist, cover: cover },
+      originalTime: originalTime || Date.now(),
+      collectedTime: Date.now()
+    });
+    saveCollections(targetId, data);
+    return true;
+  }
+
+  window.akiniTaPhoneCollectMusic = function (track, timestamp) {
+    if (!track) return;
+    if (Math.random() < MUSIC_CHANCE) addMusicCollection(null, track, timestamp || Date.now());
+  };
+
   function scanHistory() {
     try {
       var contacts = getContacts();
@@ -180,6 +212,20 @@
           }
         });
       }
+      // 历史扫描：我的网易云播放列表，按概率被联系人收藏
+      try {
+        var plistRaw = (window.akiniStore && window.akiniStore.getSync)
+          ? window.akiniStore.getSync('akini_music_playlist', null)
+          : localStorage.getItem('akini_music_playlist');
+        var plist = plistRaw ? JSON.parse(plistRaw) : [];
+        if (Array.isArray(plist)) {
+          plist.forEach(function (t) {
+            if (t && (t.title || t.name) && Math.random() < MUSIC_HISTORY_CHANCE) {
+              addMusicCollection(null, t, Date.now());
+            }
+          });
+        }
+      } catch (e) {}
     } catch (e) {}
   }
 
@@ -234,7 +280,7 @@
     var listView = getEl('akini-ta-phone-list-view');
     if (listView) listView.style.display = 'flex';
     var c = getContactById(currentContactId);
-    updateTitle((c && c.name ? c.name + ' · ' : '') + (tab === 'chat' ? '聊天' : (tab === 'moments' ? '朋友圈' : 'iCity')));
+    updateTitle((c && c.name ? c.name + ' · ' : '') + (tab === 'chat' ? '聊天' : (tab === 'moments' ? '朋友圈' : (tab === 'music' ? '网易云' : 'iCity'))));
     renderList();
   }
 
@@ -290,6 +336,26 @@
     var sorted = items.slice();
     // 所有数据统一按收藏时间倒序排列
     sorted.sort(function (a, b) { return (b.collectedTime || 0) - (a.collectedTime || 0); });
+    if (currentTab === 'music') {
+      el.innerHTML = sorted.map(function (item) {
+        var t = item.track || {};
+        var cover = t.cover
+          ? '<img src="' + t.cover + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" alt="封面"/>'
+          : '<span style="font-size:20px;line-height:1;">🎵</span>';
+        return '<div class="akini-ta-phone-item akini-ta-phone-music-item">' +
+          '<button class="akini-ta-phone-item-delete" onclick="window.AkiniTaPhone.deleteCollection(\'' + currentContactId + '\',\'music\',' + item.id + ')" title="删除">×</button>' +
+          '<div class="akini-ta-phone-music-row">' +
+            '<div class="akini-ta-phone-music-disc">' + cover + '</div>' +
+            '<div class="akini-ta-phone-music-meta">' +
+              '<div class="akini-ta-phone-music-title">' + escapeHtml(t.title || '未知歌曲') + '</div>' +
+              '<div class="akini-ta-phone-music-artist">' + escapeHtml(t.artist || '未知歌手') + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="akini-ta-phone-item-meta">收藏于: ' + formatTime(item.collectedTime) + '</div>' +
+        '</div>';
+      }).join('');
+      return;
+    }
     el.innerHTML = sorted.map(function (item) {
       return '<div class="akini-ta-phone-item">' +
         '<button class="akini-ta-phone-item-delete" onclick="window.AkiniTaPhone.deleteCollection(\'' + currentContactId + '\',\'' + currentTab + '\',' + item.id + ')" title="删除">×</button>' +
@@ -331,7 +397,7 @@
       '.akini-ta-phone-grid-item:active{opacity:0.7;}',
       '.akini-ta-phone-grid-name{font-size:12px;color:#666;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;}',
       // 联系人桌面（三个应用图标）
-      '.akini-ta-phone-desktop{display:none;justify-content:center;align-items:center;gap:34px;padding:45px 20px;flex:1;background:#fff;}',
+      '.akini-ta-phone-desktop{display:none;justify-content:center;align-items:center;gap:22px;padding:45px 12px;flex:1;background:#fff;}',
       '.akini-ta-phone-app{display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;}',
       '.akini-ta-phone-app:active{opacity:0.7;}',
       '.akini-ta-phone-app-icon{width:56px;height:56px;display:flex;align-items:center;justify-content:center;color:#666;}',
@@ -347,7 +413,13 @@
       '.akini-ta-phone-item-meta{font-size:11px;color:#bbb;margin-top:4px;}',
       '.akini-ta-phone-item-delete{position:absolute;top:8px;right:8px;background:none;border:none;color:#ccc;font-size:18px;cursor:pointer;line-height:1;}',
       '.akini-ta-phone-item-delete:hover{color:#ef4444;}',
-      '.akini-ta-phone-empty{text-align:center;padding:40px 20px;color:#bbb;font-size:14px;}'
+      '.akini-ta-phone-empty{text-align:center;padding:40px 20px;color:#bbb;font-size:14px;}',
+      '.akini-ta-phone-music-row{display:flex;align-items:center;gap:10px;padding-right:18px;}',
+      '.akini-ta-phone-music-disc{width:44px;height:44px;flex-shrink:0;border-radius:50%;background:repeating-radial-gradient(#111 0,#111 3px,#222 4px,#222 5px);box-shadow:inset 0 0 0 4px #1a1a1a;display:flex;align-items:center;justify-content:center;overflow:hidden;animation:akiniTaPhoneDiscSpin 10s linear infinite;}',
+      '.akini-ta-phone-music-meta{min-width:0;flex:1;}',
+      '.akini-ta-phone-music-title{font-size:14px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '.akini-ta-phone-music-artist{font-size:12px;color:#888;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+      '@keyframes akiniTaPhoneDiscSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'
     ].join('');
     document.head.appendChild(style);
   }
@@ -382,6 +454,10 @@
           '<div class="akini-ta-phone-app" onclick="window.AkiniTaPhone.showApp(\'icity\')">' +
             '<div class="akini-ta-phone-app-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></div>' +
             '<span class="akini-ta-phone-app-name">iCity</span>' +
+          '</div>' +
+          '<div class="akini-ta-phone-app" onclick="window.AkiniTaPhone.showApp(\'music\')">' +
+            '<div class="akini-ta-phone-app-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>' +
+            '<span class="akini-ta-phone-app-name">网易云</span>' +
           '</div>' +
         '</div>' +
         // 收藏列表
