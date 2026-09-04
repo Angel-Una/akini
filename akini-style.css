@@ -1773,8 +1773,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   object-fit: cover !important;
 }
 .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  padding: 9px 16px;
-  border-radius: 999px !important;
+  padding: 9px 14px;
+  border-radius: 14px !important;
   max-width: 65%;
   font-size: 14px;
   word-break: normal;
@@ -5498,12 +5498,22 @@ button.back-btn[type="button"] {
 .chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .sticker-bubble) {
   max-width: none;
 }
-/* 引用行/已读行上移贴紧气泡：清掉容器与气泡内联的上间距 */
+/* 引用行/已读行上移贴紧气泡：清掉容器与气泡内联的上间距，强制整行右对齐 */
 .chat-body .msg-row.me > div[style*="flex-basis:100%"] {
-  margin-top: 0 !important;
+  margin-top: 1px !important;
+  padding-top: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 .chat-body .msg-row.me > div[style*="flex-basis:100%"] .quote-bubble {
-  margin-top: 1px !important;
+  margin-top: 0 !important;
+}
+/* 引用容器若仍留在消息行内部（flex 换行结构），行距收紧到 2px */
+.chat-body .msg-row .msg-content-line {
+  row-gap: 2px !important;
 }
 /* row 级引用容器同理：msg-row 是纵向 flex，内联 flex-basis:100% 会撑高度造成大行距 */
 .chat-body .msg-row > div[style*="flex-basis:100%"] {

@@ -1028,12 +1028,27 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch (e) {}
         },
         catchUp: function (actions) {
+          // 退出网站期间错过的 icity/朋友圈等周期任务不补发，直接重排到下一周期
+          var NO_CATCHUP_RESCHEDULE = {
+            icityPost: "_akiniRescheduleIcityPost",
+            friendsPost: "_akiniRescheduleFriendsPost",
+          };
           var dueNames = [];
           for (var name in actions) {
             if (actions.hasOwnProperty(name) && "function" == typeof actions[name]) {
               try {
                 var next = parseFloat(localStorage.getItem("akini_next_" + name) || "0");
-                if (next && Date.now() >= next) dueNames.push(name);
+                if (next && Date.now() >= next) {
+                  if (NO_CATCHUP_RESCHEDULE[name]) {
+                    try {
+                      localStorage.removeItem("akini_next_" + name);
+                      var rf = window[NO_CATCHUP_RESCHEDULE[name]];
+                      if (typeof rf === "function") rf();
+                    } catch (e0) {}
+                    continue;
+                  }
+                  dueNames.push(name);
+                }
               } catch (e) {}
             }
           }

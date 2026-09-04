@@ -60,6 +60,8 @@
   var CONTACT_AVATAR_RE = /^akini_contact_avatar_/;
   function isCriticalKey(k) {
     if (!k) return false;
+    // 全量保护：凡 akini_ 前缀的键（设置/内容/图片/任何数据）一律镜像 IDB，网站长期使用任何数据都不丢失
+    if (String(k).indexOf("akini_") === 0) return true;
     if (CRITICAL_KEYS.indexOf(k) >= 0) return true;
     if (CHAT_HISTORY_RE.test(k)) return true;
     if (WB_GROUPS_RE.test(k)) return true;
