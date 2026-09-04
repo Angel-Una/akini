@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20261008';
+const CACHE_NAME = 'akini-cache-v20261009';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',

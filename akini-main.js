@@ -3755,6 +3755,8 @@ document.addEventListener("DOMContentLoaded", function () {
             chatId: t,
             onTap: function () {
               ct(t);
+              // 延迟再开一次：避开恢复竞态，保证点进通知时刚落的回信必然渲染出来
+              setTimeout(function () { try { ct(t); } catch (e0) {} }, 300);
             },
           };
           ("group" === e.type && (s.groupName = e.name),
@@ -12103,8 +12105,33 @@ document.addEventListener("DOMContentLoaded", function () {
           var e = "me" === t.author || "me" === t.who,
             n = localStorage.getItem("akini_icity_my_nick") || "我",
             i = localStorage.getItem("akini_icity_my_handle") || n,
-            a = localStorage.getItem("akini_icity_ta_nick") || "对方",
-            o = localStorage.getItem("akini_icity_ta_handle") || a;
+            a = "对方",
+            o = "对方",
+            _taAvatar = localStorage.getItem("akini_ta_avatar") || "";
+          if (!e) {
+            // 对方日记：名字/头像优先按作者联系人资料取（与聊天列表一致），默认名一律视为未设置
+            var _aid = t.authorId || t.contactId;
+            var _c = null;
+            if (_aid && _aid !== "me" && window.akiniContacts) {
+              try { _c = window.akiniContacts.getContactById && window.akiniContacts.getContactById(_aid); } catch (e1) {}
+              if (!_c) { try { _c = window.akiniContacts.getChatTarget && window.akiniContacts.getChatTarget(_aid); } catch (e2) {} }
+            }
+            if (!_c && window.akiniContacts) {
+              try {
+                var _ac = window.akiniContacts.getActiveChatId && window.akiniContacts.getActiveChatId();
+                if (_ac) _c = window.akiniContacts.getChatTarget(_ac);
+              } catch (e3) {}
+            }
+            var _tn = (t.name && t.name !== "对方" && t.name !== "TA" && t.name !== "ta") ? t.name : null;
+            var _sn = localStorage.getItem("akini_icity_ta_nick");
+            if (!_sn || _sn === "对方" || _sn === "TA" || _sn === "ta") _sn = null;
+            a = _tn || (_c && (_c.remark || _c.name)) || _sn || "对方";
+            var _th = (t.handle && t.handle !== "对方" && t.handle !== "@对方" && t.handle !== "TA" && t.handle !== "@TA") ? String(t.handle).replace(/^@/, "") : null;
+            var _sh = localStorage.getItem("akini_icity_ta_handle");
+            if (!_sh || _sh === "对方" || _sh === "@对方" || _sh === "TA" || _sh === "@TA") _sh = null;
+            o = _th || (_sh ? String(_sh).replace(/^@/, "") : null) || a;
+            if (_c && _c.avatar) _taAvatar = _c.avatar;
+          }
           return {
             isMe: e,
             name: e ? n : a,
@@ -12113,7 +12140,7 @@ document.addEventListener("DOMContentLoaded", function () {
               ? localStorage.getItem("akini_my_avatar") ||
                 (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
                 ""
-              : localStorage.getItem("akini_ta_avatar") || "",
+              : _taAvatar,
           };
         }
         function p(t) {
@@ -13130,12 +13157,14 @@ document.addEventListener("DOMContentLoaded", function () {
                       (((l = document.createElement("div")).id =
                         "mailDetailReplyArea"),
                       (l.style.cssText =
-                        "margin-top:16px;padding-top:12px;"),
+                        "margin-top:16px;padding-top:14px;border-top:1px dashed #e8e2d9;"),
                       yn.querySelector("div > div").appendChild(l)),
                     "received" === e && "reply" !== t.subtype && !t.repliedByMe)
                   ) {
                     l.innerHTML =
-                      '<textarea id="mailDetailReplyInput" placeholder="回复这封信…" style="width:100%;min-height:70px;border:1px solid #e8e8e8;border-radius:10px;padding:8px 12px;font-size:14px;font-family:inherit;resize:none;outline:none;color:#333;box-sizing:border-box;"></textarea><button type="button" id="mailDetailReplyBtn" style="margin-top:8px;width:100%;padding:10px;background:#333;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;">发送回复</button>';
+                      '<div style="font-size:12px;color:#999;letter-spacing:1px;margin-bottom:8px;">✎ 写下你的回信</div>' +
+                      '<textarea id="mailDetailReplyInput" placeholder="回复这封信…" style="width:100%;min-height:88px;border:none;background:#faf8f3;border-radius:14px;padding:12px 14px;font-size:14px;font-family:inherit;resize:none;outline:none;color:#333;box-sizing:border-box;line-height:1.6;box-shadow:inset 0 1px 3px rgba(0,0,0,.04);"></textarea>' +
+                      '<button type="button" id="mailDetailReplyBtn" style="margin-top:10px;width:100%;height:44px;background:#1a1a1a;color:#fff;border:none;border-radius:22px;font-size:14px;font-weight:600;letter-spacing:2px;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(0,0,0,.15);">寄出回信</button>';
                     var s = document.getElementById("mailDetailReplyBtn");
                     s &&
                       (s.onclick = function () {
