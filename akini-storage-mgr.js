@@ -151,6 +151,7 @@
               fmtBytes(st[c]) + '</div><div class="ak-stor-cell-key">' + meta.label + "</div></div>";
           }).join("") +
         "</div>" +
+        '<div class="ak-hint" style="margin-top:8px">含图片/贴纸的消息以高清原图存储，比纯文字（仅几B）大很多属正常；可用下方「危险区」一键清空重开</div>' +
       "</div>" +
 
       '<div class="settings-card"><div class="card-title">自动任务调度状态</div>' +
@@ -164,6 +165,13 @@
           '<button class="ak-stor-btn primary" id="akStorExport" type="button">导出全部备份</button>' +
           '<button class="ak-stor-btn" id="akStorImport" type="button">从备份文件恢复</button>' +
           '<input type="file" id="akStorImportFile" accept=".zip,.json" style="display:none">' +
+        "</div>" +
+      "</div>" +
+
+      '<div class="settings-card"><div class="card-title">危险区</div>' +
+        '<div class="ak-hint">清空后聊天记录、联系人、朋友圈、iCity、贴纸、设置全部删除（含浏览器本地库），不可恢复</div>' +
+        '<div class="ak-btn-col">' +
+          '<button class="ak-stor-btn" id="akStorWipe" type="button" style="color:#fa5151;border-color:#fa5151">清空全部数据</button>' +
         "</div>" +
       "</div>";
 
@@ -187,6 +195,20 @@
         impFile.value = "";
       };
     }
+    var wipeBtn = $("akStorWipe");
+    if (wipeBtn) wipeBtn.onclick = function () {
+      if (!confirm("确定要清空全部数据吗？\n聊天记录、联系人、朋友圈、iCity、贴纸、设置都会被删除，且无法恢复！")) return;
+      if (!confirm("最后确认：真的要全部删除吗？建议先点「导出全部备份」留底。")) return;
+      try { localStorage.clear(); } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
+      try { window._idbStore && window._idbStore.clearAll && window._idbStore.clearAll(); } catch (e) {}
+      try { indexedDB.deleteDatabase("akini_img_db"); } catch (e) {}
+      try { indexedDB.deleteDatabase("AkiniApp"); } catch (e) {}
+      try {
+        if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); });
+      } catch (e) {}
+      setTimeout(function () { location.reload(); }, 400);
+    };
     var g = function (id) { return document.getElementById(id); };
     var note = function (msg) {
       try {

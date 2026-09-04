@@ -5498,6 +5498,10 @@ button.back-btn[type="button"] {
 .chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .sticker-bubble) {
   max-width: none;
 }
+/* row 级引用容器同理：msg-row 是纵向 flex，内联 flex-basis:100% 会撑高度造成大行距 */
+.chat-body .msg-row > div[style*="flex-basis:100%"] {
+  flex-basis: auto !important;
+}
 /* 引用块容器在 wrap 内：内联 flex-basis:100% 在纵向容器里会撑高度，覆盖为 auto */
 .chat-body .msg-row .msg-content-line > .bubble-wrap > div[style*="flex-basis:100%"] {
   flex-basis: auto !important;
@@ -5505,7 +5509,6 @@ button.back-btn[type="button"] {
 /* me 行 row 级已读回执：引用块保持原始整行样式，已读固定在其下一行、与引用右缘对齐 */
 .chat-body .msg-row.me > .msg-rr {
   display: block;
-  flex-basis: 100%;
   width: 100%;
   box-sizing: border-box;
   text-align: right;

@@ -2482,35 +2482,25 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!row.classList.contains("me")) return;
       row.removeAttribute("data-read-pending");
       row.setAttribute("data-had-read-receipt", "1");
-      // v6：已读回执在 bubble-wrap 内（气泡正下方）
-      if (row.getAttribute("data-meta-v") !== "7") {
+      // v10：已读回执在 row 末尾（引用块之下）
+      if (row.getAttribute("data-meta-v") !== "10") {
         var oldMeta = row.querySelector(".msg-meta");
         if (oldMeta) oldMeta.remove();
+        row.removeAttribute("data-meta-v");
         __akiniProcessMsgMeta(row);
-        return;
       }
-      var rr = row.querySelector(":scope > .msg-content-line .msg-rr");
+      var rr = row.querySelector(":scope > .msg-rr") ||
+               row.querySelector(":scope > .msg-content-line .msg-rr");
       if (rr) {
         rr.style.visibility = "visible";
         return;
       }
       var line = row.querySelector(":scope > .msg-content-line");
       if (line && __akiniToggleOn("readReceiptToggle")) {
-        var wrap = line.querySelector(":scope > .bubble-wrap");
-        if (!wrap) {
-          var bub = line.querySelector(":scope > .bubble");
-          if (bub) {
-            wrap = document.createElement("div");
-            wrap.className = "bubble-wrap";
-            line.insertBefore(wrap, bub);
-            wrap.appendChild(bub);
-          }
-        }
-        if (!wrap) return;
         rr = document.createElement("span");
         rr.className = "msg-rr";
         rr.textContent = "已读";
-        wrap.appendChild(rr);
+        row.appendChild(rr);
       }
     }
     function __akiniInsertTimestampSeparators() {
