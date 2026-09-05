@@ -148,12 +148,16 @@
         targets.forEach(function (k) {
           idbGet(k, function (v) {
             if (v != null && v !== '') {
-              // 三层对账：IDB 值与 LS 不一致时，以更长（更完整）者为准回填两边
+              // 对账策略：localStorage 是同步权威层，有值一律以 LS 为准并回写 IDB；
+              // 仅当 LS 丢失（被浏览器清理等）时才用 IDB 镜像回填，避免旧数据回滚覆盖新操作
               var ls = lsGet(k);
-              var best = v;
-              if (ls != null && ls.length > v.length) { best = ls; queueIdbWrite(k, ls); }
-              memSet(k, best);
-              if (ls !== best) lsSet(k, best);
+              if (ls != null && ls !== '') {
+                memSet(k, ls);
+                if (ls !== v) queueIdbWrite(k, ls);
+              } else {
+                memSet(k, v);
+                lsSet(k, v);
+              }
             }
             fin();
           });
@@ -210,6 +214,18 @@
   } catch (e) {
     console.warn('[存储] localStorage 拦截安装失败（不影响读写）', e);
   }
+
+  // ---- 申请持久化存储，降低浏览器/系统清理 IndexedDB 的概率（荣耀/小米等机型尤其需要）----
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      var _persistRet = navigator.storage.persist();
+      if (_persistRet && typeof _persistRet.then === 'function') {
+        _persistRet.then(function (granted) {
+          console.log('[存储] 持久化存储申请', granted ? '已获准' : '未获准（继续使用镜像兜底）');
+        });
+      }
+    }
+  } catch (e) {}
 
   // ---- 启动恢复：等 _idbStore 就绪后全量对账 ----
   var _restoreTimer = null;

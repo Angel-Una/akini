@@ -103,7 +103,10 @@
             name: s2.replyFromName || "对方",
             fullContent: true,
             msg: (s2.replyFromName || "对方") + "回复了你的信件",
-            onTap: function () { if (window.o) window.o("mail"); },
+            onTap: function () {
+              if (window.o) window.o("mail");
+              if (window.__mailShowTab) window.__mailShowTab("received");
+            },
           });
         }
       }
@@ -166,7 +169,10 @@
             name: c.name,
             fullContent: true,
             msg: c.name + "给你写了一封信",
-            onTap: function () { if (window.o) window.o("mail"); },
+            onTap: function () {
+              if (window.o) window.o("mail");
+              if (window.__mailShowTab) window.__mailShowTab("received");
+            },
           });
         }
         if (window.__renderMail) window.__renderMail();

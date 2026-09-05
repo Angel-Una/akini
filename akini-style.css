@@ -480,7 +480,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   object-fit: cover;
 }
 .preview-bubble {
-  flex: 1;
+  flex: 0 1 auto;
+  width: fit-content;
   min-width: 0;
   background: rgba(255, 255, 255, 0.55);
   backdrop-filter: blur(10px);
@@ -3271,12 +3272,26 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 .wb-toolbar {
   display: flex;
   justify-content: space-between;
-  padding: 6px 18px;
+  align-items: center;
+  padding: 6px 12px;
   background: #fff;
   border-bottom: 1px solid #eee;
   flex-shrink: 0;
-  flex-wrap: wrap;
-  gap: 4px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.wb-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.wb-toolbar .left-group,
+.wb-toolbar .right-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
 .wb-toolbar .left-group,
 .wb-toolbar .right-group {
@@ -3284,8 +3299,9 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   gap: 6px;
 }
 .wb-toolbar .tool-btn {
-  min-width: 44px;
-  padding: 0 10px;
+  min-width: 36px;
+  width: 36px;
+  padding: 0;
   height: 36px;
   border-radius: 10px;
   border: 1px solid #e0e0e0;

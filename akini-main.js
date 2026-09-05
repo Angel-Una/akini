@@ -273,18 +273,24 @@ function requestPersistentStorage() {
     navigator.storage &&
     navigator.storage.persist
   ) {
-    navigator.storage
-      .persist()
-      .then(function (persistent) {
-        if (!persistent) {
-          console.warn(
-            "[Akini] 浏览器未授予持久存储权限，重新进入页面可能导致数据丢失",
-          );
-        }
-      })
-      .catch(function (e) {
-        console.warn("[Akini] 持久存储请求失败", e);
-      });
+    try {
+      var __persistRet = navigator.storage.persist();
+      if (__persistRet && typeof __persistRet.then === "function") {
+        __persistRet
+          .then(function (persistent) {
+            if (!persistent) {
+              console.warn(
+                "[Akini] 浏览器未授予持久存储权限，重新进入页面可能导致数据丢失",
+              );
+            }
+          })
+          .catch(function (e) {
+            console.warn("[Akini] 持久存储请求失败", e);
+          });
+      }
+    } catch (e) {
+      console.warn("[Akini] 持久存储请求异常", e);
+    }
   }
 }
 document.addEventListener("DOMContentLoaded", function () {
@@ -8666,12 +8672,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 cards = byCC[c.id] || [],
                 row = document.createElement("div");
               ((row.className = "wb-excl-contact"), (row.dataset.cid = c.id));
-              const av =
-                c.avatar && String(c.avatar).trim()
-                  ? '<img src="' + c.avatar + '" alt=""/>'
-                  : '<span style="font-size:20px">' +
-                    (String(c.name || "?").charAt(0) || "?") +
-                    "</span>";
+              const _avt = c.avatar && String(c.avatar).trim() ? String(c.avatar).trim() : "";
+              const av = /^(data:|https?:|\/|<img)/i.test(_avt)
+                ? '<img src="' + _avt.replace(/"/g, "&quot;") + '" style="width:100%;height:100%;object-fit:cover" alt=""/>'
+                : '<span style="font-size:20px">' +
+                  (_avt || String(c.name || "?").charAt(0) || "?") +
+                  "</span>";
               const subTxt = gids.length || cards.length
                 ? "已设 " + (gids.length ? gids.length + " 个专属分组" : "") + (gids.length && cards.length ? "、" : "") + (cards.length ? cards.length + " 张专属字卡" : "")
                 : "未设置专属";
@@ -8696,7 +8702,11 @@ document.addEventListener("DOMContentLoaded", function () {
             const b = ev.target && ev.target.closest ? ev.target.closest("button[data-m]") : null;
             if (!b) return;
             exclMode = b.dataset.m;
-            renderExclDetail(cid);
+            try {
+              renderExclDetail(cid);
+            } catch (err) {
+              try { console.warn("[专属字卡] 切换视图失败", err); } catch (e2) {}
+            }
           });
           return seg;
         }
@@ -8712,7 +8722,7 @@ document.addEventListener("DOMContentLoaded", function () {
             (WETip.textContent = "勾选后，这些字卡只有「" + cname + "」能使用；未勾选的全部通用"));
           const cmap = window.__wbRead("akini_wb_exclusive_cards", {});
           ((WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)));
-          const all = l(),
+          const all = window.__wbRead("akini_wordbank", []) || [],
             tabs = [["main", "主字卡"], ["emoji", "Emoji"], ["pat", "拍一拍"]];
           let any = !1;
           (tabs.forEach((tb) => {
@@ -8799,15 +8809,26 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         WE &&
           a(WE, function () {
+            // 专属字卡是字卡库的子页面：确保字卡库保持打开，专属页覆盖其上（z-index 320 > 300）
+            const _wb = document.getElementById("wordbankOverlay");
+            if (_wb && _wb.style.display !== "flex") {
+              (_wb.style.display = "flex"), _wb.classList.add("show");
+            }
             WEO &&
               (renderExclContacts(),
               (WEO.style.display = "flex"),
+              (WEO.style.zIndex = "320"),
               WEO.classList.add("show"));
           });
         const WEClose = document.getElementById("wbExclClose");
         (WEClose &&
           a(WEClose, function () {
             WEO && ((WEO.style.display = "none"), WEO.classList.remove("show"));
+            // 关闭专属页后回到字卡库
+            const _wb = document.getElementById("wordbankOverlay");
+            if (_wb && _wb.style.display !== "flex") {
+              (_wb.style.display = "flex"), _wb.classList.add("show");
+            }
           }),
           WEBack &&
             a(WEBack, function () {
@@ -13825,6 +13846,8 @@ document.addEventListener("DOMContentLoaded", function () {
           window._idbStore.set("akini_mail_received_backup", e));
       }
     }
+    window.__akiniBootStep = "dom-ready:mail";
+    window.__mailShowTab = bn;
     function bn(t) {
       kn = t;
       const e = "sent" === t;
@@ -15342,6 +15365,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         } catch (e) {}
       })();
+      window.__akiniBootStep = "dom-ready:toggles";
       function t(t, e) {
         const n = document.getElementById(t);
         if (!n) {
@@ -19534,14 +19558,22 @@ document.addEventListener("DOMContentLoaded", function () {
       o && (o.style.display = "flex");
     };
     ((window.I = I));
+    window.__akiniBootStep = "dom-ready:done";
     console.log("[Akini] v20260825s build - DOMContentLoaded 执行完毕 ✅");
   } catch (__bootErr) {
     console.error("[Akini] BOOT ERROR", __bootErr);
+    var __stack = "";
+    try {
+      __stack = (__bootErr && __bootErr.stack ? String(__bootErr.stack) : "")
+        .replace(/\s+/g, " ")
+        .slice(0, 500);
+    } catch (_) {}
     __akiniShowBanner(
       "初始化错误: " +
         ((__bootErr && __bootErr.message) || __bootErr) +
         " 步骤:" +
-        window.__akiniBootStep,
+        window.__akiniBootStep +
+        (__stack ? " 位置:" + __stack : ""),
       "#ff4444",
     );
   } /* 网易云一起听邀请功能 */
