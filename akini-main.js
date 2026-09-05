@@ -8843,13 +8843,58 @@ document.addEventListener("DOMContentLoaded", function () {
             // 专属字卡是字卡库的子页面：无条件确保字卡库保持展开，专属页覆盖其上（z-index 320 > 300）
             const _wb = document.getElementById("wordbankOverlay");
             _wb && ((_wb.style.display = "flex"), _wb.classList.add("show"));
+            // 先无条件展开专属页，再渲染内容——渲染即使异常也绝不挡住打开动作
             WEO &&
-              (renderExclContacts(),
-              (WEO.style.display = "flex"),
+              ((WEO.style.display = "flex"),
               (WEO.style.zIndex = "320"),
               WEO.classList.add("show"));
+            try { renderExclContacts(); } catch (e) { console.warn("renderExclContacts", e); }
           });
         const WEClose = document.getElementById("wbExclClose");
+        /* 导出字卡：打包所有 akini_wb_ 数据（分组/字卡/专属/屏蔽）为 JSON 下载 */
+        const WEExport = document.getElementById("wbExportBtn");
+        (WEExport &&
+          a(WEExport, function () {
+            try {
+              const dump = {};
+              for (let i = 0; i < localStorage.length; i++) {
+                const k = localStorage.key(i);
+                if (k && k.indexOf("akini_wb_") === 0) {
+                  const v = localStorage.getItem(k);
+                  if (v != null) dump[k] = v;
+                }
+              }
+              // 内存镜像补缺（localStorage 写满时数据可能只在内存）
+              if (window.akiniStore && window.akiniStore.memoryGet) {
+                ["akini_wb_groups", "akini_wb_groups_main", "akini_wb_blocked", "akini_wb_exclusive", "akini_wb_exclusive_cards"].forEach(function (k) {
+                  if (!dump[k]) {
+                    const mv = window.akiniStore.memoryGet(k);
+                    if (mv != null && mv !== "") dump[k] = mv;
+                  }
+                });
+              }
+              const keys = Object.keys(dump);
+              if (!keys.length) {
+                window.__akiniToast ? window.__akiniToast("暂无字卡数据") : alert("暂无字卡数据");
+                return;
+              }
+              const pad = function (n) { return n < 10 ? "0" + n : n; };
+              const d = new Date();
+              const name = "akini-wordcards-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes()) + ".json";
+              const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const aEl = document.createElement("a");
+              aEl.href = url;
+              aEl.download = name;
+              document.body.appendChild(aEl);
+              aEl.click();
+              setTimeout(function () { document.body.removeChild(aEl); URL.revokeObjectURL(url); }, 500);
+              window.__akiniToast ? window.__akiniToast("已导出 " + keys.length + " 项字卡数据") : null;
+            } catch (e) {
+              console.warn("导出字卡失败", e);
+              alert("导出失败：" + (e && e.message ? e.message : "未知错误"));
+            }
+          }));
         (WEClose &&
           a(WEClose, function () {
             WEO && ((WEO.style.display = "none"), WEO.classList.remove("show"));
@@ -17180,7 +17225,9 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.getItem("akini_music_selected_option");
         try {
           var M = localStorage.getItem("akini_music_selected_contacts");
+          // 单选模式：历史存档可能存了多人，恢复时只保留第一个，多余的一律丢弃
           M && (T = JSON.parse(M));
+          Array.isArray(T) && T.length > 1 && (T = T.slice(0, 1));
         } catch (t) {
           T = [];
         }
