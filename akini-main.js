@@ -8851,6 +8851,7 @@ document.addEventListener("DOMContentLoaded", function () {
               WEO.classList.add("show"));
             try { renderExclContacts(); } catch (e) { console.warn("renderExclContacts", e); }
           }),
+          (window.__wbRenderExcl = function () { try { renderExclContacts(); } catch (e) {} }),
           a(WE, function () { window.__wbOpenExclusive(); }));
         const WEClose = document.getElementById("wbExclClose");
         /* 导出字卡：打包所有 akini_wb_ 数据（分组/字卡/专属/屏蔽）为 JSON 下载，挂 window 供 onclick 调用 */

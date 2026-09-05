@@ -40,10 +40,11 @@
         if (v != null) data[k] = v;
       }
     } catch (e) {}
-    // 内存镜像补充（localStorage 写满时数据可能只在内存里）
+    // 内存镜像补充：大键（>200KB 图片等）只存在内存/IDB，必须全量遍历内存键，否则会漏备
     try {
-      if (window.akiniStore && window.akiniStore.memoryGet) {
-        Object.keys(data).forEach(function (k) {
+      if (window.akiniStore && window.akiniStore.memoryKeys && window.akiniStore.memoryGet) {
+        window.akiniStore.memoryKeys().forEach(function (k) {
+          if (!k || k.indexOf("akini_") !== 0 || SKIP_RE.test(k)) return;
           var mv = window.akiniStore.memoryGet(k);
           if (mv != null && mv !== "") data[k] = mv;
         });
@@ -77,6 +78,7 @@
 
   function backup(immediate) {
     if (_backingUp && !immediate) return;
+    if (document.hidden && !immediate) return; // 页面在后台时不跑周期备份，省电省 CPU（切后台瞬间已有 immediate 备份兜底）
     if (_backupTimer) { clearTimeout(_backupTimer); _backupTimer = null; }
     var run = function () {
       try {
@@ -164,8 +166,8 @@
   });
   window.addEventListener("pagehide", function () { backup(true); });
   window.addEventListener("beforeunload", function () { backup(true); });
-  // 每 90 秒周期检测（有变化才上传）
-  setInterval(function () { backup(false); }, 90000);
+  // 每 150 秒周期检测（有变化才上传；降低低配机 CPU 峰值，切后台时仍有即时备份）
+  setInterval(function () { backup(false); }, 150000);
   // 启动：先恢复（补缺），30 秒后开始周期备份
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () { setTimeout(restore, 1500); });

@@ -5797,7 +5797,31 @@ html, body {
   .wb-excl-card-row .t { color: #ddd; }
 }
 
-/* 预览气泡：空内容时隐藏（不占位、不显示空白条） */
-.preview-bubble:empty {
-  visibility: hidden !important;
+/* 预览气泡：空内容时显示为可点击输入的占位虚线框（不是空白消息条） */
+.preview-bubble.is-empty {
+  background: transparent !important;
+  border: 1.5px dashed rgba(0, 0, 0, 0.2) !important;
+  box-shadow: none !important;
+  color: rgba(0, 0, 0, 0.35) !important;
+}
+.preview-bubble.is-empty::before {
+  content: "点我输入";
+  font-size: 12px;
+}
+
+
+/* ===== 低内存设备减负（防卡顿发烫崩溃，mochi 同款思路） ===== */
+/* backdrop-filter 毛玻璃是手机 GPU 发热头号大户，低端机直接关闭（保留底色半透明观感） */
+.low-mem *,
+.low-mem *::before,
+.low-mem *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* 关闭低端机上的循环装饰动画，GPU/CPU 占用清零 */
+.low-mem [class*="cloud"],
+.low-mem [class*="float"],
+.low-mem [class*="sparkle"],
+.low-mem [class*="shine"] {
+  animation: none !important;
 }
