@@ -147,12 +147,18 @@
           try { if (window._idbStore && window._idbStore.set) { window._idbStore.set(k, cloud[k]); window._idbStore.set(k + "_backup", cloud[k]); } } catch (e) {}
         });
         console.warn("[云备份] 已从云端恢复 " + missing.length + " 项缺失数据");
-        // 缺失较多说明本地被清理过：回填后刷新一次让界面用上恢复的数据（防循环）
+        // 缺失较多说明本地被清理过：回填后重新渲染界面（不再强制 reload，避免白屏/数据中断）
         if (missing.length >= 3) {
           try {
             if (!sessionStorage.getItem("akini_cloud_restored")) {
               sessionStorage.setItem("akini_cloud_restored", "1");
-              location.reload();
+              // 触发 UI 重渲染，不刷新页面
+              if (typeof window.__akiniBootApp === 'function') {
+                try { window.__akiniBootApp(); } catch (e) {}
+              }
+              if (typeof window.renderChatList === 'function') {
+                try { window.renderChatList(); } catch (e) {}
+              }
             }
           } catch (e) {}
         }

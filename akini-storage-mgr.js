@@ -189,7 +189,14 @@
       try {
         if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); });
       } catch (e) {}
-      setTimeout(function () { location.reload(); }, 400);
+      setTimeout(function () {
+        // 不再强制 reload，改为提示用户刷新 + 重渲染
+        try {
+          if (typeof window.__akiniCenterModal === 'function') {
+            window.__akiniCenterModal('数据已清除', '数据已全部清除，请刷新页面以重新开始。');
+          }
+        } catch (e) {}
+      }, 400);
     };
     var g = function (id) { return document.getElementById(id); };
     var note = function (msg) {

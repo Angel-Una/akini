@@ -331,6 +331,18 @@ function requestPersistentStorage() {
     }
   }
 }
+// DOMContentLoaded 8秒安全兜底：如果事件迟迟不触发（defer脚本阻塞等），手动派发
+(function() {
+  var fired = false;
+  document.addEventListener("DOMContentLoaded", function() { fired = true; });
+  setTimeout(function() {
+    if (!fired && document.readyState === "loading") {
+      console.warn("[Akini] DOMContentLoaded timeout (8s), manual dispatch");
+      try { document.dispatchEvent(new Event("DOMContentLoaded")); } catch (e) {}
+      try { document.dispatchEvent(new Event("readystatechange")); } catch (e) {}
+    }
+  }, 8000);
+})();
 document.addEventListener("DOMContentLoaded", function () {
   try {
     window.__akiniBootStep = "dom-ready";
@@ -5649,6 +5661,18 @@ document.addEventListener("DOMContentLoaded", function () {
         if (window.__akiniHideSplash) window.__akiniHideSplash();
       });
     })();
+    // Splash 4秒强制隐藏兜底：无论加载是否完成，4秒后必须移除 splash，避免白屏
+    setTimeout(function () {
+      try {
+        if (window.__akiniHideSplash) {
+          console.log("[Akini] splash 4s fallback hide");
+          window.__akiniHideSplash();
+        } else {
+          var el = document.getElementById("akiniSplash");
+          if (el) { el.classList.add("hidden"); setTimeout(function(){el.parentNode&&el.parentNode.removeChild(el);},600); }
+        }
+      } catch (e) {}
+    }, 4000);
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
       window.__akiniBooted = !0;
@@ -5971,7 +5995,7 @@ document.addEventListener("DOMContentLoaded", function () {
           console.warn("[Akini] restore timeout, force opening data gate");
           __akiniBootApp();
         }
-      }, 5000),
+      }, 3000),
       window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30),
       window._idbStore.restoreAll(function () {
         window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(68);
@@ -7842,16 +7866,16 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!i) return;
           let a = l()
             .map((t, e) => ({ item: t, idx: e }))
-            .filter(({ item: e }) => (e.tab || "main") === t);
+            .filter(({ item: it }) => (it.tab || "main") === t);
           if ("" !== n) {
-            if ("__ungrouped__" === n) a = a.filter(({ item: t }) => !t.gid);
+            if ("__ungrouped__" === n) a = a.filter(({ item: it }) => !it.gid);
             else
-              a = a.filter(({ item: t }) => String(t.gid || "") === String(n));
+              a = a.filter(({ item: it }) => String(it.gid || "") === String(n));
           }
           if (e) {
-            const t = e.toLowerCase();
-            a = a.filter(({ item: e }) =>
-              (e.text || e.content || "").toLowerCase().includes(t),
+            const kw = e.toLowerCase();
+            a = a.filter(({ item: it }) =>
+              (it.text || it.content || "").toLowerCase().includes(kw),
             );
           }
           if (0 === a.length) {

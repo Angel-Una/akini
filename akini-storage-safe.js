@@ -158,9 +158,9 @@
   var BIG_MEM_BUDGET = ((typeof navigator !== 'undefined' && navigator.deviceMemory) || 4) <= 4 ? 12 * 1024 * 1024 : 24 * 1024 * 1024;
   var _bigMemUsed = 0;
   if (!window.__akiniDeferredKeys) window.__akiniDeferredKeys = {};
-  function restoreAll() {
+  function restoreAll(cb) {
     var IDB = getIDB();
-    if (!IDB || !IDB.keys) return;
+    if (!IDB || !IDB.keys) { if (cb) try { cb(); } catch (e) {} return; }
     try {
       IDB.keys(function (keys) {
         if (!Array.isArray(keys)) return;
@@ -175,6 +175,7 @@
               try { if (typeof window.__akiniOnCriticalRestored === 'function') window.__akiniOnCriticalRestored(); } catch (e) {}
               console.log('[存储] 启动恢复完成，共同步', targets.length, '个键，大键驻留', Math.round(_bigMemUsed / 1024), 'KB');
             }
+            try { if (typeof cb === 'function') cb(); } catch (e) {}
             return;
           }
           var batch = targets.slice(i, i + 4);
