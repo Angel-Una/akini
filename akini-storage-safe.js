@@ -116,18 +116,63 @@
     } catch (e) { if (cb) cb(null); }
   }
 
-  function idbSet(k, v, cb) {
+  /* ===== milk 式防抖批量写（throttledSaveData 500ms）=====
+   * 内存 + localStorage 保持同步写（页面内同步读取语义不变），
+   * IndexedDB 写入进入去重队列，500ms 防抖后批量落盘；
+   * backupAll 全量快照 30s 节流（原实现每次写入都全库遍历比对，是卡顿/发烫主因）；
+   * 页面隐藏/关闭时立即 flush，保证数据可靠长期保存。 */
+  var _idbQueue = {};
+  var _idbFlushTimer = null;
+  var _lastBackupAllAt = 0;
+
+  function flushIdbQueue() {
+    _idbFlushTimer = null;
+    var keys = Object.keys(_idbQueue);
+    if (!keys.length) return;
     var IDB = getIDB();
-    if (!IDB || !IDB.set) { if (cb) cb(false); return; }
-    try {
-      IDB.set(k, v);
-      IDB.set(k + '_backup', v);
-      if (IDB.backupAll) IDB.backupAll();
-      if (cb) cb(true);
-    } catch (e) { if (cb) cb(false); }
+    if (!IDB || !IDB.set) {
+      // IDB 未就绪：500ms 后重试，队列不丢
+      _idbFlushTimer = setTimeout(flushIdbQueue, 500);
+      return;
+    }
+    var batch = _idbQueue;
+    _idbQueue = {};
+    keys.forEach(function (k) {
+      try { IDB.set(k, batch[k]); IDB.set(k + '_backup', batch[k]); } catch (e) {}
+    });
+    if (IDB.backupAll && Date.now() - _lastBackupAllAt > 30000) {
+      _lastBackupAllAt = Date.now();
+      try { IDB.backupAll(); } catch (e) {}
+    }
+  }
+
+  function scheduleIdbFlush() {
+    if (_idbFlushTimer) return;
+    _idbFlushTimer = setTimeout(flushIdbQueue, 500);
+  }
+
+  function queueIdbWrite(k, v) {
+    _idbQueue[k] = String(v); // 同 key 去重，只保留最新值
+    scheduleIdbFlush();
+  }
+
+  // 页面切后台/关闭时立即落盘，防止防抖窗口内丢数据
+  try {
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) flushIdbQueue();
+    });
+    window.addEventListener('pagehide', flushIdbQueue);
+    window.addEventListener('beforeunload', flushIdbQueue);
+  } catch (e) {}
+
+  function idbSet(k, v, cb) {
+    queueIdbWrite(k, v);
+    if (cb) cb(true);
   }
 
   function idbRemove(k, cb) {
+    delete _idbQueue[k];
+    delete _idbQueue[k + '_backup'];
     var IDB = getIDB();
     if (!IDB || !IDB.remove) { if (cb) cb(false); return; }
     try { IDB.remove(k); IDB.remove(k + '_backup'); if (cb) cb(true); } catch (e) { if (cb) cb(false); }
@@ -284,6 +329,8 @@
 
   // 暴露全局接口
   window.akiniStore = {
+    _queueIdbWrite: queueIdbWrite,
+    flushIdb: flushIdbQueue,
     get: akiniGet,
     getSync: akiniGetSync,
     set: akiniSet,
@@ -351,8 +398,6 @@
   })() : [];
   var CHAT_HISTORY_RE = /^akini_chat_history_/;
   var WB_GROUPS_RE2 = /^akini_wb_groups_/;
-  var pendingWrites = [];
-  var pendingTimer = null;
 
   function isCritical(k) {
     if (!k) return false;
@@ -362,42 +407,11 @@
     return false;
   }
 
-  function flushPending() {
-    var IDB = window._idbStore;
-    if (!IDB || !IDB.set) return;
-    while (pendingWrites.length) {
-      var item = pendingWrites.shift();
-      try {
-        IDB.set(item.k, item.v);
-        IDB.set(item.k + '_backup', item.v);
-      } catch (e) {}
-    }
-    if (IDB.backupAll) IDB.backupAll();
-  }
-
-  function watchIDB() {
-    if (pendingTimer) return;
-    pendingTimer = setInterval(function () {
-      if (window._idbStore && window._idbStore.set) {
-        flushPending();
-        if (!pendingWrites.length) {
-          clearInterval(pendingTimer);
-          pendingTimer = null;
-        }
-      }
-    }, 50);
-    setTimeout(function () {
-      if (pendingTimer) { clearInterval(pendingTimer); pendingTimer = null; flushPending(); }
-    }, 5000);
-  }
-
   function queueIDBWrite(k, v) {
-    // 去重：只保留最后一次写入
-    for (var i = pendingWrites.length - 1; i >= 0; i--) {
-      if (pendingWrites[i].k === k) { pendingWrites.splice(i, 1); break; }
+    // 统一走第一段的 milk 式防抖队列（500ms 批量落盘，页面隐藏时立即落盘）
+    if (window.akiniStore && window.akiniStore._queueIdbWrite) {
+      window.akiniStore._queueIdbWrite(k, v);
     }
-    pendingWrites.push({ k: k, v: v });
-    watchIDB();
   }
 
   var origSetItem = localStorage.setItem;
@@ -408,18 +422,7 @@
     if (isCritical(k)) memSet(k, String(v));
     // 先执行原 localStorage 写入（保持同步语义）
     try { origSetItem.call(localStorage, k, v); } catch (e) {}
-    if (isCritical(k)) {
-      var IDB = window._idbStore;
-      if (IDB && IDB.set) {
-        try {
-          IDB.set(k, String(v));
-          IDB.set(k + '_backup', String(v));
-          if (IDB.backupAll) IDB.backupAll();
-        } catch (e) {}
-      } else {
-        queueIDBWrite(k, String(v));
-      }
-    }
+    if (isCritical(k)) queueIDBWrite(k, String(v));
   };
 
   localStorage.removeItem = function (k) {

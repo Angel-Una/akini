@@ -576,6 +576,10 @@ document.addEventListener("DOMContentLoaded", function () {
         },
         backupAll: function (cb) {
           var done = function () { if (typeof cb === "function") cb(); };
+          /* v20261024 节流：30s 内重复调用直接跳过，避免高频全库遍历比对导致卡顿/发烫 */
+          var _now = Date.now();
+          if (this._lastBA && _now - this._lastBA < 30000) { done(); return; }
+          this._lastBA = _now;
           // 收集 localStorage 中需要备份的键值，写入 IDB 前逐个比对长度，
           // 防止用可能已过期/被系统清空的 localStorage 数据覆盖 IDB 主存储。
           var lsItems = [];
@@ -687,6 +691,10 @@ document.addEventListener("DOMContentLoaded", function () {
         SNAPSHOT_KEY = "akini_localstorage_snapshot";
       window._akiniCacheStore = {
         backupAll: function (e) {
+          /* v20261024 节流：30s 内重复调用直接跳过 */
+          var _now2 = Date.now();
+          if (this._lastBA && _now2 - this._lastBA < 30000) return void (e && e());
+          this._lastBA = _now2;
           try {
             if ("undefined" == typeof caches || !caches.open) return void (e && e());
             function isEmpty(v) {
@@ -15020,8 +15028,7 @@ document.addEventListener("DOMContentLoaded", function () {
               sync();
             });
           }
-          bindPageToggle("contactFriendsTogglePage", "contactFriendsToggle");
-          bindPageToggle("contactIcityTogglePage", "contactIcityToggle");
+
         })(),
         t("timestampToggle", !1),
         (function(){
