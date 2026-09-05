@@ -1081,6 +1081,61 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch(e){}
   }, 100);
 });
+/* ===== 字卡库全局过滤：屏蔽字卡 + 联系人专属字卡 ===== */
+    (function () {
+      window.__wbRead = function (key, def) {
+        try {
+          if (window.akiniStore && window.akiniStore.memoryGet) {
+            var c = window.akiniStore.memoryGet(key);
+            if (c !== null && c !== undefined && "" !== c) return JSON.parse(c);
+          }
+          var v = localStorage.getItem(key);
+          return v ? JSON.parse(v) : def;
+        } catch (e) {
+          return def;
+        }
+      };
+      window.__wbWrite = function (key, val) {
+        try {
+          if (window.akiniStore && window.akiniStore.setJson) {
+            window.akiniStore.setJson(key, val);
+            return;
+          }
+          localStorage.setItem(key, JSON.stringify(val));
+          window.akiniContacts &&
+            window.akiniContacts.backupToIDB &&
+            window.akiniContacts.backupToIDB(key, val);
+        } catch (e) {}
+      };
+      window.__wbIsBlocked = function (tab, text) {
+        var b = window.__wbRead("akini_wb_blocked", []);
+        var k = (tab || "main") + "::" + (text || "").trim();
+        return b.indexOf(k) >= 0;
+      };
+      // 过滤字卡：排除屏蔽字卡；专属分组/专属字卡仅专属联系人可用（无联系人上下文时排除全部专属卡）
+      window.__wbFilter = function (cards, contactId) {
+        var blocked = window.__wbRead("akini_wb_blocked", []);
+        var excl = window.__wbRead("akini_wb_exclusive", {});
+        var exclCards = window.__wbRead("akini_wb_exclusive_cards", {});
+        var bset = {};
+        (blocked || []).forEach(function (k) {
+          bset[k] = 1;
+        });
+        var cid = contactId === null || contactId === undefined ? "" : String(contactId);
+        return (cards || []).filter(function (t) {
+          if (!t) return false;
+          var tab = t.tab || "main";
+          var text = (t.text || t.content || "").trim();
+          if (bset[tab + "::" + text]) return false;
+          // 字卡级专属：只有添加进专属的字卡是专属的，未添加的全部通用
+          var cardOwner = exclCards[tab + "::" + text];
+          if (cardOwner && String(cardOwner) !== cid) return false;
+          var gid = t.gid ? String(t.gid) : "";
+          if (gid && excl[gid] && String(excl[gid]) !== cid) return false;
+          return true;
+        });
+      };
+    })();
 ((window.onerror = function (t, e, n, i, a) {
       var r = t + "";
       if (a && a.stack) r += "\\n" + a.stack;
@@ -1114,10 +1169,11 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       return 1 * (99999.99 * Math.random() + 0.01).toFixed(2);
     }
-    function n() {
-      const t = i("akini_wordbank", []).filter(
+    function n(contactId) {
+      let t = i("akini_wordbank", []).filter(
         (t) => !t.tab || "main" === t.tab,
       );
+      window.__wbFilter && (t = window.__wbFilter(t, contactId));
       if (0 === t.length) return "";
       const e = t[Math.floor(Math.random() * t.length)];
       return (e.text || e.content || "").trim() || "";
@@ -1775,7 +1831,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // 左侧固定为“我”，只保存右侧联系人
         localStorage.setItem(o, JSON.stringify({ left: "me", right: e }));
       }
-      window.pickWordCards = function (count) {
+      window.pickWordCards = function (count, contactId) {
         count = Math.max(1, parseInt(count) || 1);
         var wb = i("akini_wordbank", []);
         if (!wb.length) return "";
@@ -1784,6 +1840,7 @@ document.addEventListener("DOMContentLoaded", function () {
             n = (t.type || "").toLowerCase();
           return t && t.text && "pat" !== e && "pat" !== n;
         });
+        if (window.__wbFilter) valid = window.__wbFilter(valid, contactId);
         if (!valid.length) return "";
         var out = [];
         for (var i = 0; i < count; i++) {
@@ -2583,13 +2640,15 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (!chatBody.__akiniMetaInterval) {
         chatBody.__akiniMetaInterval = setInterval(function () {
+          if (document.hidden) return;
           var cb = document.getElementById("chatBody");
+          if (cb && cb.offsetParent === null) return;
           if (cb) {
             Array.from(cb.children).forEach(__akiniProcessMsgMeta);
             __akiniUpgradeSurveyIcons(cb);
             __akiniSyncCardStatus(cb);
           }
-        }, 1500);
+        }, 3000);
       }
     }
     window.__akiniSetupChatMetaObserver = __akiniSetupChatMetaObserver;
@@ -2773,6 +2832,7 @@ document.addEventListener("DOMContentLoaded", function () {
           f = i("akini_wordbank", []).filter(function (t) {
             return !t.tab || "main" === t.tab;
           });
+        window.__wbFilter && (f = window.__wbFilter(f, c && c.id));
         if (0 === f.length && !o.forceText) return;
         var y = "msg-row other" + (s ? " group" : ""),
           p = document.createElement("div");
@@ -2922,7 +2982,7 @@ document.addEventListener("DOMContentLoaded", function () {
             item.html +
             "</div>" +
             (isFirst && $
-              ? '<div style="flex-basis:100%;width:100%;padding-left:44px;box-sizing:border-box;margin-top:2px;">' +
+              ? '<div style="flex-basis:100%;width:100%;padding-left:46px;box-sizing:border-box;margin-top:2px;">' +
                 $ +
                 "</div>"
               : "") +
@@ -3007,7 +3067,7 @@ document.addEventListener("DOMContentLoaded", function () {
           f() +
           "</div></div>" +
           (a
-            ? '<div style="flex-basis:100%;width:100%;padding-right:44px;box-sizing:border-box;margin-top:2px;text-align:right">' +
+            ? '<div style="flex-basis:100%;width:100%;padding-right:46px;box-sizing:border-box;margin-top:2px;text-align:right">' +
               a +
               "</div>"
             : "") +
@@ -3409,7 +3469,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
-      }, 15000);
+      }, 60000);
     })();
     window._akiniTransferAmount = e;
     window._akiniTransferNote = n;
@@ -3653,7 +3713,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var replyCount = window.AKR.getReplyCount();
       var messages = [];
       for (var _ci = 0; _ci < replyCount; _ci++) {
-        var _one = window.pickWordCards ? window.pickWordCards(1) : "";
+        var _one = window.pickWordCards ? window.pickWordCards(1, e && e.id) : "";
         if (_one && _one.trim()) messages.push(_one.trim());
       }
       if (0 === messages.length) {
@@ -3700,14 +3760,24 @@ document.addEventListener("DOMContentLoaded", function () {
         var emojis = [];
         try {
           var wb = i("akini_wordbank", []);
-          emojis = wb
-            .filter(function (it) {
-              var tab = (it.tab || "").toLowerCase();
-              return tab === "emoji" && it.text;
-            })
-            .map(function (it) {
-              return it.text;
-            });
+          var _ecards = wb.filter(function (it) {
+            var tab = (it.tab || "").toLowerCase();
+            return tab === "emoji" && it.text;
+          });
+          if (window.__wbFilter) {
+            var _ac =
+              window.akiniContacts && window.akiniContacts.getActiveChatId
+                ? window.akiniContacts.getActiveChatId()
+                : null;
+            var _eco =
+              _ac && window.akiniContacts.getChatTarget
+                ? window.akiniContacts.getChatTarget(_ac)
+                : null;
+            _ecards = window.__wbFilter(_ecards, _eco && _eco.id);
+          }
+          emojis = _ecards.map(function (it) {
+            return it.text;
+          });
         } catch (err) {}
         // 无自定义 emoji 时不混入（联系人只能用字卡库内容，无兜底）
         if (!emojis.length) return text;
@@ -3728,7 +3798,7 @@ document.addEventListener("DOMContentLoaded", function () {
           rt(f) +
           "</div></div>" +
           (g
-            ? '<div style="flex-basis:100%;width:100%;padding-left:44px;box-sizing:border-box;margin-top:2px;">' +
+            ? '<div style="flex-basis:100%;width:100%;padding-left:46px;box-sizing:border-box;margin-top:2px;">' +
               g +
               "</div>"
             : "") +
@@ -3912,15 +3982,50 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       return rows.slice(start, end).join("");
     }
-    function __akiniCreateLoadMoreBtn(chatId) {
-      var div = document.createElement("div");
-      div.className = "msg-load-more";
-      div.style.cssText = "text-align:center;padding:12px 0;font-size:13px;color:#888;cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none;";
-      div.innerHTML = '<span class="load-more-text">↑ 加载更多聊天记录</span>';
-      div.addEventListener("click", function () {
-        __akiniLoadMoreHistory(chatId);
-      });
-      return div;
+    // 滑到最顶部后再下拉一次 → 加载更早的聊天记录（无按钮，绝不占位/闪烁）
+    function __akiniBindPullLoad(chatId) {
+      if (!U) return;
+      var key = String(chatId || '');
+      if (U.__akiniPullBoundFor === key) return;
+      U.__akiniPullBoundFor = key;
+      if (U.__akiniPullScrollFn) {
+        try { U.removeEventListener('scroll', U.__akiniPullScrollFn); } catch (e) {}
+      }
+      if (U.__akiniPullTsFn) {
+        try { U.removeEventListener('touchstart', U.__akiniPullTsFn); } catch (e) {}
+        try { U.removeEventListener('touchmove', U.__akiniPullTmFn); } catch (e) {}
+      }
+      U.__akiniPullArmed = false;
+      U.__akiniPullScrollFn = function () {
+        if (U.scrollTop <= 2) U.__akiniPullArmed = true;
+        else if (U.scrollTop > 40) U.__akiniPullArmed = false;
+      };
+      U.__akiniPullTsFn = function (ev) {
+        try { U.__akiniPullStartY = ev.touches && ev.touches[0] ? ev.touches[0].clientY : 0; } catch (e) {}
+      };
+      U.__akiniPullTmFn = function (ev) {
+        try {
+          if (!U.__akiniPullArmed) return;
+          if (U.scrollTop > 2) return;
+          var y = ev.touches && ev.touches[0] ? ev.touches[0].clientY : 0;
+          var dy = y - (U.__akiniPullStartY || 0);
+          if (dy > 60) {
+            U.__akiniPullArmed = false;
+            var now = Date.now();
+            if (now - (U.__akiniPullLastLoad || 0) < 3000) return; // 冷却防频繁触发
+            U.__akiniPullLastLoad = now;
+            var sess = window.akiniContacts && window.akiniContacts.getSession ? window.akiniContacts.getSession(chatId) : null;
+            var full = (sess && sess.messagesHTML) || '';
+            if (!full) return;
+            if (__akiniCountMsgRows(U.innerHTML) < __akiniCountMsgRows(full)) {
+              __akiniLoadMoreHistory(chatId);
+            }
+          }
+        } catch (e) {}
+      };
+      U.addEventListener('scroll', U.__akiniPullScrollFn, { passive: true });
+      U.addEventListener('touchstart', U.__akiniPullTsFn, { passive: true });
+      U.addEventListener('touchmove', U.__akiniPullTmFn, { passive: true });
     }
     function __akiniRenderChatBody(fullHTML, chatId) {
       if (!U) return;
@@ -3939,7 +4044,7 @@ document.addEventListener("DOMContentLoaded", function () {
       } else {
         var batchHTML = __akiniSliceLastMsgRows(cleanHTML, AKINI_CHAT_BATCH_SIZE);
         U.innerHTML = batchHTML;
-        U.appendChild(__akiniCreateLoadMoreBtn(chatId));
+        __akiniBindPullLoad(chatId);
       }
       try {
         U.setAttribute(
@@ -3962,7 +4067,6 @@ document.addEventListener("DOMContentLoaded", function () {
       // 记录旧高度，避免加载后滚动位置跳到底部
       var oldHeight = U.scrollHeight, oldTop = U.scrollTop;
       U.innerHTML = newHTML;
-      U.appendChild(__akiniCreateLoadMoreBtn(chatId));
       U.scrollTop = oldTop + (U.scrollHeight - oldHeight);
       __akiniSetupChatMetaObserver();
     }
@@ -3984,10 +4088,9 @@ document.addEventListener("DOMContentLoaded", function () {
         // 如果当前 DOM 里已经展示了全部消息，直接追加；否则只追加到末尾（用户仍在底部时可见）
         var visibleRows = U.querySelectorAll('.msg-row').length;
         if (total - visibleRows <= 1) {
-          var loadMore = U.querySelector('.msg-load-more');
           var temp = document.createElement('div'); temp.innerHTML = cleanNew;
           while (temp.firstChild) {
-            U.insertBefore(temp.firstChild, loadMore || null);
+            U.appendChild(temp.firstChild);
           }
           // 仅当用户本就停留在底部附近时才跟随滚动，上滑翻阅历史时不拽回
           var __nbA = U.scrollHeight - U.scrollTop - U.clientHeight < 150;
@@ -5846,7 +5949,7 @@ document.addEventListener("DOMContentLoaded", function () {
           var _wbg = i("akini_wb_groups_main", []);
           window.akiniContacts.backupToIDB("akini_wb_groups", _wbg);
         }
-      }, 10000));
+      }, 120000));
     function flushAllData() {
       try {
         if (window._restoringData) return;
@@ -6007,7 +6110,7 @@ document.addEventListener("DOMContentLoaded", function () {
             window.akiniContacts.updateSession(e, { messagesHTML: t });
           });
         } catch (e) {}
-      }, 10000),
+      }, 30000),
       (window.renderAvatarHtml = nt),
       (window.renderAvatarFill = it));
     var at = null;
@@ -7588,7 +7691,9 @@ document.addEventListener("DOMContentLoaded", function () {
           e = "",
           n = "",
           r = !1,
-          c = new Set();
+          c = new Set(),
+          bm = !1,
+          bc = new Set();
         function l() {
           return i("akini_wordbank", []);
         }
@@ -7673,20 +7778,39 @@ document.addEventListener("DOMContentLoaded", function () {
           ((i.innerHTML = ""),
             a.forEach(({ item: t, idx: e }) => {
               const n = document.createElement("div");
-              ((n.className = "wb-word-item" + (c.has(e) ? " selected" : "")),
+              const _blocked =
+                window.__wbIsBlocked &&
+                window.__wbIsBlocked(t.tab || "main", t.text || t.content || "");
+              ((n.className =
+                "wb-word-item" +
+                ((bm ? bc : c).has(e) ? " selected" : "") +
+                (_blocked ? " wb-word-blocked" : "")),
                 (n.dataset.idx = e));
               const a = (function (t) {
                 if (!t) return "";
                 const e = d().find((e) => String(e.id) === String(t));
                 return e ? e.name : "";
               })(t.gid);
-              ((n.innerHTML = `\n                    ${r ? `<div class="wb-word-check">${c.has(e) ? "✓" : ""}</div>` : ""}\n                    <span class="wb-word-text">${t.text || t.content || ""}</span>\n                    ${a ? `<span class="wb-word-group">${a}</span>` : ""}\n                    ${r ? "" : `<button type="button" class="wb-word-del" data-idx="${e}">✕</button>`}\n                `),
+              ((n.innerHTML = `\n                    ${r || bm ? `<div class="wb-word-check">${(bm ? bc : c).has(e) ? "✓" : ""}</div>` : ""}\n                    <span class="wb-word-text">${t.text || t.content || ""}</span>\n                    ${a ? `<span class="wb-word-group">${a}</span>` : ""}\n                    ${r || bm ? "" : `<button type="button" class="wb-word-del" data-idx="${e}">✕</button>`}\n                `),
                 i.appendChild(n));
             }),
             g());
         }
         function g() {
-          const t = document.getElementById("wbSelectActions");
+          const t = document.getElementById("wbSelectActions"),
+            bA = document.getElementById("wbBlockActions");
+          if (bm) {
+            t && (t.style.display = "none");
+            if (bA) {
+              bA.style.display = "flex";
+              const bb = document.getElementById("wbBlockDoBtn");
+              bb && (bb.textContent = `屏蔽(${bc.size})`);
+              const ub = document.getElementById("wbBlockUndoBtn");
+              ub && (ub.textContent = `取消屏蔽(${bc.size})`);
+            }
+            return;
+          }
+          bA && (bA.style.display = "none");
           if (t)
             if (r) {
               t.style.display = "flex";
@@ -7761,7 +7885,8 @@ document.addEventListener("DOMContentLoaded", function () {
               if (t.target.closest ? t.target.closest(".wb-word-del") : null) {
                 const t = l();
                 (t.splice(n, 1), s(t), c.clear(), f(), m());
-              } else if (r) (c.has(n) ? c.delete(n) : c.add(n), f(), m());
+              } else if (bm) (bc.has(n) ? bc.delete(n) : bc.add(n), f());
+              else if (r) (c.has(n) ? c.delete(n) : c.add(n), f(), m());
               else {
                 const i = e.dataset.idx;
                 const wt = e.querySelector(".wb-word-text"),
@@ -7795,6 +7920,7 @@ document.addEventListener("DOMContentLoaded", function () {
               (n = ""),
               (e = ""),
               c.clear(),
+              bm && exitBlockMode(),
               y
                 .querySelectorAll(".tab")
                 .forEach((t) => t.classList.remove("active")),
@@ -7934,27 +8060,89 @@ document.addEventListener("DOMContentLoaded", function () {
           });
         document.getElementById("wbImportBtn");
         const S = document.getElementById("wbImportInput");
-        S &&
-          (S.addEventListener("click", function () {
-            this.value = "";
-          }),
-          S.addEventListener("change", function () {
-            const i = this.files[0];
-            if (!i) return;
-            const a = new FileReader();
-            ((a.onload = function (i) {
-              try {
-                const p = (i.target.result || "").trim();
-                if (!p) return void (window.__akiniCenterModal && window.__akiniCenterModal("导入失败", "文件内容为空"));
+        // milk 同款容错 JSON 解析：修复尾逗号、换行漏逗号等常见手改错误
+        function wbParseFlexibleJSON(text) {
+          try { return JSON.parse(text); } catch (_) {}
+          var repaired = text
+            .replace(/,\s*([}\]])/g, "$1")
+            .replace(/(["\d\w}])\s*\n\s*"/g, function (mm, p1) {
+              if (p1 === "}" || p1 === "]") return mm;
+              return p1 + ',\n"';
+            });
+          try { return JSON.parse(repaired); } catch (_) {}
+          repaired = text.replace(/("(?:[^"\\]|\\.)*")\s*\n(\s*")/g, "$1,\n$2")
+            .replace(/,\s*([}\]])/g, "$1");
+          try { return JSON.parse(repaired); } catch (_) { return null; }
+        }
+        // milk 同款导入面板：列出文件包含的模块，勾选后选「追加/覆盖」导入
+        function wbShowImportSheet(modules, onConfirm) {
+          var ov = document.createElement("div");
+          ov.style.cssText = "position:fixed;inset:0;z-index:1000002;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center";
+          var rowsHtml = modules.map(function (mod) {
+            return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1.5px solid #e8e8e8;background:#fff;cursor:pointer;margin-bottom:8px">' +
+              '<input type="checkbox" data-key="' + mod.key + '" checked style="width:16px;height:16px;accent-color:#07c160;flex-shrink:0"/>' +
+              '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#222">' + mod.label + '</div>' +
+              '<div style="font-size:11px;color:#999;margin-top:2px">' + mod.count + ' 条</div></div></label>';
+          }).join("");
+          ov.innerHTML = '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:18px 20px calc(18px + env(safe-area-inset-bottom,0px));max-height:80vh;overflow-y:auto">' +
+            '<div style="font-size:16px;font-weight:700;color:#222;margin-bottom:2px">导入字卡</div>' +
+            '<div style="font-size:12px;color:#999;margin-bottom:14px">文件中包含 ' + modules.length + ' 个模块，勾选要导入的内容</div>' +
+            rowsHtml +
+            '<div style="display:flex;align-items:center;gap:8px;padding:11px 14px;border-radius:13px;background:#f7f7f7;margin:6px 0 14px">' +
+            '<span style="font-size:13px;color:#333;flex:1">导入方式</span>' +
+            '<label style="font-size:12px;color:#333;display:flex;align-items:center;gap:4px"><input type="radio" name="__wb_io_mode" value="merge" checked/>追加</label>' +
+            '<label style="font-size:12px;color:#333;display:flex;align-items:center;gap:4px"><input type="radio" name="__wb_io_mode" value="overwrite"/>覆盖</label></div>' +
+            '<div style="display:flex;gap:10px"><button type="button" data-act="cancel" style="flex:1;padding:12px;border:1.5px solid #e5e5e5;border-radius:13px;background:none;color:#888;font-size:13px;cursor:pointer">取消</button>' +
+            '<button type="button" data-act="ok" style="flex:2;padding:12px;border:none;border-radius:13px;background:#07c160;color:#fff;font-size:14px;font-weight:700;cursor:pointer">导入</button></div></div>';
+          ov.addEventListener("click", function (ev) {
+            if (ev.target === ov) { ov.remove(); return; }
+            var btn = ev.target && ev.target.closest ? ev.target.closest("button[data-act]") : null;
+            if (!btn) return;
+            if (btn.dataset.act === "cancel") { ov.remove(); return; }
+            var sel = {};
+            ov.querySelectorAll("input[type=checkbox][data-key]").forEach(function (cb) { sel[cb.dataset.key] = cb.checked; });
+            var modeEl = ov.querySelector("input[name=__wb_io_mode]:checked");
+            var mode = modeEl ? modeEl.value : "merge";
+            ov.remove();
+            onConfirm(sel, mode);
+          });
+          document.body.appendChild(ov);
+        }
+        // 纯文本导入：每行一张主字卡
+        function wbRunTextImport(p) {
+          const k = l(),
+            _existing = new Set(k.map((t) => (t.text || t.content || "").trim()));
+          let v = 0;
+          p.split("\n").forEach(function (line) {
+            var s2 = (line || "").trim();
+            if (!s2 || _existing.has(s2)) return;
+            k.push({ text: s2, tab: "main" });
+            _existing.add(s2);
+            v++;
+          });
+          (s(k), c.clear(), m(), f());
+          window.__akiniCenterModal &&
+            window.__akiniCenterModal(v > 0 ? "导入成功" : "导入", v > 0 ? "成功导入\n字卡：" + v + " 张" : "没有可导入的新字卡（可能全部重复）");
+        }
+        // 执行 JSON 导入：sel 控制各模块开关，mode=overwrite 时先清空对应模块再导入
+        function wbRunJsonImport(x, sel, mode) {
+          try {
                 let v = 0,
                   h = 0,
                   existingDupCount = 0,
                   importDupCount = 0;
+                let k = l();
+                let b = d();
+                if (mode === "overwrite") {
+                  var _drop = {};
+                  (sel.main && (_drop.main = 1), sel.pat && (_drop.pat = 1), sel.emoji && (_drop.emoji = 1));
+                  if (_drop.main || _drop.pat || _drop.emoji)
+                    k = k.filter(function (t) { return !_drop[(t && t.tab) || "main"]; });
+                  if (sel.groups) b.length = 0;
+                }
                 const w = { main: 0, emoji: 0, pat: 0 },
-                  k = l(),
                   _existing = new Set(k.map((t) => (t.text || t.content || "").trim())),
-                  _seen = new Set(),
-                  b = d();
+                  _seen = new Set();
                 function a(t, e) {
                   e = e || {};
                   var n,
@@ -8020,15 +8208,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                   }
                 }
-                const I = p.startsWith("{") || p.startsWith("[");
-                let x = null;
-                if (I)
-                  try {
-                    x = JSON.parse(p);
-                  } catch (C) {
-                    return void (window.__akiniCenterModal && window.__akiniCenterModal("导入失败", "JSON 解析失败：" + C.message));
-                  }
-                if (Array.isArray(x)) x.forEach((t) => a(t, { tab: "main" }));
+                if (Array.isArray(x)) { sel.main && x.forEach((t) => a(t, { tab: "main" })); }
                 else if (x && "object" == typeof x) {
                   (function () {
                     var _gf = [
@@ -8057,9 +8237,8 @@ document.addEventListener("DOMContentLoaded", function () {
                       }
                     }
                   })();
-                  if (
-                    (Array.isArray(x.customReplyGroups) &&
-                      x.customReplyGroups.forEach((t) => {
+                  if (sel.groups && Array.isArray(x.customReplyGroups))
+                    x.customReplyGroups.forEach((t) => {
                         if (!t || !t.name) return;
                         var e;
                         var existingGroup = b.find(function (g) {
@@ -8112,15 +8291,14 @@ document.addEventListener("DOMContentLoaded", function () {
                         })().forEach((t) =>
                           a(t, { tab: "main", gid: e }),
                         );
-                      }),
-                    Array.isArray(x.customReplies) &&
-                      x.customReplies.forEach((t) => a(t, { tab: "main" })),
-                    Array.isArray(x.customPokes) &&
-                      x.customPokes.forEach((t) => a(t, { tab: "pat" })),
-                    Array.isArray(x.customEmojis) &&
-                      x.customEmojis.forEach((t) => a(t, { tab: "emoji" })),
-                    0 === v && 0 === h)
-                  ) {
+                      });
+                  if (sel.main && Array.isArray(x.customReplies))
+                    x.customReplies.forEach((t) => a(t, { tab: "main" }));
+                  if (sel.pat && Array.isArray(x.customPokes))
+                    x.customPokes.forEach((t) => a(t, { tab: "pat" }));
+                  if (sel.emoji && Array.isArray(x.customEmojis))
+                    x.customEmojis.forEach((t) => a(t, { tab: "emoji" }));
+                  if (sel.other && 0 === v && 0 === h) {
                     if (x.ls) {
                       var o = x.ls.akini_wordbank;
                       if ("string" == typeof o)
@@ -8181,7 +8359,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       "string" == typeof x.text &&
                       x.text.split("\n").forEach((t) => a(t, { tab: "main" }));
                   }
-                  0 === v &&
+                  sel.other && 0 === v &&
                     [
                       "items",
                       "replies",
@@ -8195,7 +8373,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       Array.isArray(x[t]) &&
                         x[t].forEach((t) => a(t, { tab: "main" }));
                     });
-                } else p.split("\n").forEach((t) => a(t, { tab: "main" }));
+                }
                 (h > 0 && u(b), s(k), c.clear());
                 let E = "main";
                 console.log("[wordbank] 导入完成：新增" + v + "条，分组" + h + "个，当前总数" + k.length + "，切换到tab=" + (v > 0 ? E : t));
@@ -8224,18 +8402,67 @@ document.addEventListener("DOMContentLoaded", function () {
                   window.__akiniCenterModal &&
                     window.__akiniCenterModal(
                       "导入成功",
-                      "成功导入" +
+                      "成功导入（" + (mode === "overwrite" ? "覆盖" : "追加") + "）" +
                         (importParts.length ? "\n" + importParts.join("\n") : ""),
                     );
                 }
                 (A && (A.value = ""), m(), f(), void 0);
+          } catch (D) {
+            window.__akiniCenterModal
+              ? window.__akiniCenterModal("导入失败", "导入失败：" + D.message)
+              : alert("导入失败：" + D.message);
+          }
+        }
+        S &&
+          (S.addEventListener("click", function () {
+            this.value = "";
+          }),
+          S.addEventListener("change", function () {
+            const i = this.files[0];
+            if (!i) return;
+            const fr = new FileReader();
+            ((fr.onload = function (i2) {
+              try {
+                const p = (i2.target.result || "").trim();
+                if (!p) return void (window.__akiniCenterModal && window.__akiniCenterModal("导入失败", "文件内容为空"));
+                const isJ = p.startsWith("{") || p.startsWith("[");
+                if (!isJ) return void wbRunTextImport(p);
+                let x = wbParseFlexibleJSON(p);
+                if (!x) return void (window.__akiniCenterModal && window.__akiniCenterModal("导入失败", "JSON 解析失败：内容格式无法识别"));
+                // 统计文件包含的模块（milk 格式：customReplies/customPokes/customEmojis/customReplyGroups）
+                var mods = [];
+                var grpArr = [];
+                ["customReplyGroups", "groups", "分组", "categories", "wb_groups", "replyGroups", "groupList", "replyGroup", "reply_groups", "group"].forEach(function (k2) {
+                  if (x && !Array.isArray(x) && Array.isArray(x[k2])) grpArr = grpArr.concat(x[k2]);
+                });
+                var grpCardCnt = 0;
+                grpArr.forEach(function (gr) {
+                  if (!gr) return;
+                  ["items", "replies", "cards", "words", "list", "data", "wordbank", "main", "customReplies", "customPokes", "customEmojis"].forEach(function (f2) {
+                    if (Array.isArray(gr[f2])) grpCardCnt += gr[f2].length;
+                  });
+                });
+                var mainCnt = (Array.isArray(x) ? x.length : 0) + (x && Array.isArray(x.customReplies) ? x.customReplies.length : 0) + grpCardCnt;
+                if (mainCnt > 0) mods.push({ key: "main", label: "主字卡", count: mainCnt });
+                if (x && Array.isArray(x.customPokes) && x.customPokes.length) mods.push({ key: "pat", label: "拍一拍", count: x.customPokes.length });
+                if (x && Array.isArray(x.customEmojis) && x.customEmojis.length) mods.push({ key: "emoji", label: "Emoji", count: x.customEmojis.length });
+                if (grpArr.length) mods.push({ key: "groups", label: "字卡分组", count: grpArr.length });
+                var otherCnt = 0;
+                ["items", "replies", "words", "list", "data", "wordbank", "cards", "main"].forEach(function (k3) {
+                  if (x && !Array.isArray(x) && Array.isArray(x[k3])) otherCnt += x[k3].length;
+                });
+                if (otherCnt > 0 || (x && (x.ls || x.idb || x.text))) mods.push({ key: "other", label: "其他字卡", count: otherCnt > 0 ? otherCnt : "若干" });
+                if (!mods.length) mods.push({ key: "other", label: "尝试识别全部内容", count: "自动" });
+                wbShowImportSheet(mods, function (sel, mode) {
+                  wbRunJsonImport(x, sel, mode);
+                });
               } catch (D) {
                 window.__akiniCenterModal
                   ? window.__akiniCenterModal("导入失败", "导入失败：" + D.message)
                   : alert("导入失败：" + D.message);
               }
             }),
-              a.readAsText(i, "UTF-8"),
+              fr.readAsText(i, "UTF-8"),
               (this.value = ""));
           }));
         const A = document.getElementById("selectBtn");
@@ -8243,6 +8470,7 @@ document.addEventListener("DOMContentLoaded", function () {
           a(A, function () {
             ((r = !r),
               c.clear(),
+              r && bm && exitBlockMode(),
               (A.style.background = r ? "#a0a0a0" : ""),
               (A.style.color = r ? "#fff" : ""),
               f());
@@ -8327,6 +8555,297 @@ document.addEventListener("DOMContentLoaded", function () {
             a(D, function () {
               M && (M.style.display = "none");
             }));
+        /* ===== 屏蔽字卡模式：多选后批量屏蔽/取消屏蔽 ===== */
+        const WB = document.getElementById("wbBlockBtn");
+        function exitBlockMode() {
+          ((bm = !1), bc.clear());
+          const b = document.getElementById("wbBlockBtn");
+          b && ((b.style.background = ""), (b.style.color = ""));
+        }
+        WB &&
+          a(WB, function () {
+            if (((bm = !bm), bc.clear(), bm && r)) {
+              ((r = !1), c.clear());
+              const sb = document.getElementById("selectBtn");
+              sb && ((sb.style.background = ""), (sb.style.color = ""));
+            }
+            ((WB.style.background = bm ? "#a0a0a0" : ""),
+              (WB.style.color = bm ? "#fff" : ""),
+              f());
+          });
+        const WBDo = document.getElementById("wbBlockDoBtn");
+        WBDo &&
+          a(WBDo, function () {
+            if (0 === bc.size) return void alert("请先选择要屏蔽的字卡");
+            const cards = l(),
+              blocked = window.__wbRead("akini_wb_blocked", []);
+            let added = 0;
+            (bc.forEach((i) => {
+              const t = cards[i];
+              if (!t) return;
+              const k =
+                (t.tab || "main") + "::" + (t.text || t.content || "").trim();
+              blocked.indexOf(k) < 0 && (blocked.push(k), added++);
+            }),
+              window.__wbWrite("akini_wb_blocked", blocked),
+              bc.clear(),
+              f());
+          });
+        const WBUndo = document.getElementById("wbBlockUndoBtn");
+        WBUndo &&
+          a(WBUndo, function () {
+            if (0 === bc.size) return void alert("请先选择要取消屏蔽的字卡");
+            const cards = l(),
+              keys = new Set();
+            (bc.forEach((i) => {
+              const t = cards[i];
+              t &&
+                keys.add(
+                  (t.tab || "main") + "::" + (t.text || t.content || "").trim(),
+                );
+            }),
+              window.__wbWrite(
+                "akini_wb_blocked",
+                window
+                  .__wbRead("akini_wb_blocked", [])
+                  .filter((k) => !keys.has(k)),
+              ),
+              bc.clear(),
+              f());
+          });
+        const WBExit = document.getElementById("wbBlockExitBtn");
+        WBExit &&
+          a(WBExit, function () {
+            (exitBlockMode(), f());
+          });
+        /* ===== 联系人专属字卡：选联系人 → 选 TA 专属分组 ===== */
+        const WE = document.getElementById("wbExclusiveBtn"),
+          WEO = document.getElementById("wbExclOverlay"),
+          WEL = document.getElementById("wbExclList"),
+          WET = document.getElementById("wbExclTitle"),
+          WEBack = document.getElementById("wbExclBack"),
+          WETip = document.getElementById("wbExclTip");
+        let exclCid = null;
+        function wbContactName(cid) {
+          const cs =
+            window.akiniContacts && window.akiniContacts.getContacts
+              ? window.akiniContacts.getContacts()
+              : [];
+          const f0 = cs.find((x) => String(x.id) === String(cid));
+          return f0 ? f0.name || "未命名" : "未知联系人";
+        }
+        function renderExclContacts() {
+          if (!WEL) return;
+          ((exclCid = null),
+            (WET.textContent = "专属字卡"),
+            (WEBack.style.display = "none"),
+            (WETip.textContent =
+              "专属分组内的字卡只有该联系人能使用，其他联系人不会抽到"));
+          const cs =
+            window.akiniContacts && window.akiniContacts.getContacts
+              ? window.akiniContacts.getContacts()
+              : [];
+          if (!cs.length)
+            return void (WEL.innerHTML =
+              '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0">暂无联系人</div>');
+          const map = window.__wbRead("akini_wb_exclusive", {}),
+            cmap = window.__wbRead("akini_wb_exclusive_cards", {}),
+            byC = {},
+            byCC = {};
+          (Object.keys(map).forEach((g) => {
+            const cid = map[g];
+            ((byC[cid] = byC[cid] || []).push(g));
+          }),
+            Object.keys(cmap).forEach((k) => {
+              const cid = cmap[k];
+              ((byCC[cid] = byCC[cid] || []).push(k));
+            }),
+            (WEL.innerHTML = ""),
+            cs.forEach((c) => {
+              const gids = byC[c.id] || [],
+                cards = byCC[c.id] || [],
+                row = document.createElement("div");
+              ((row.className = "wb-excl-contact"), (row.dataset.cid = c.id));
+              const av =
+                c.avatar && String(c.avatar).trim()
+                  ? '<img src="' + c.avatar + '" alt=""/>'
+                  : '<span style="font-size:20px">' +
+                    (String(c.name || "?").charAt(0) || "?") +
+                    "</span>";
+              const subTxt = gids.length || cards.length
+                ? "已设 " + (gids.length ? gids.length + " 个专属分组" : "") + (gids.length && cards.length ? "、" : "") + (cards.length ? cards.length + " 张专属字卡" : "")
+                : "未设置专属";
+              ((row.innerHTML =
+                '<div class="wb-excl-avatar">' +
+                av +
+                '</div><div style="flex:1;min-width:0"><div class="wb-excl-name">' +
+                (c.name || "未命名") +
+                '</div><div class="wb-excl-sub">' +
+                subTxt +
+                '</div></div><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#c5c5c5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>'),
+                WEL.appendChild(row));
+            }));
+        }
+        let exclMode = "group";
+        function renderExclSeg(cid) {
+          const seg = document.createElement("div");
+          ((seg.className = "wb-excl-seg"),
+            (seg.innerHTML =
+              '<button type="button" data-m="group"' + (exclMode === "group" ? ' class="on"' : "") + '>按分组</button><button type="button" data-m="card"' + (exclMode === "card" ? ' class="on"' : "") + '>按字卡</button>'));
+          seg.addEventListener("click", function (ev) {
+            const b = ev.target && ev.target.closest ? ev.target.closest("button[data-m]") : null;
+            if (!b) return;
+            exclMode = b.dataset.m;
+            renderExclDetail(cid);
+          });
+          return seg;
+        }
+        function renderExclDetail(cid) {
+          exclMode === "card" ? renderExclCards(cid) : renderExclGroups(cid);
+        }
+        function renderExclCards(cid) {
+          if (!WEL) return;
+          exclCid = cid;
+          const cname = wbContactName(cid);
+          ((WET.textContent = cname),
+            (WEBack.style.display = ""),
+            (WETip.textContent = "勾选后，这些字卡只有「" + cname + "」能使用；未勾选的全部通用"));
+          const cmap = window.__wbRead("akini_wb_exclusive_cards", {});
+          ((WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)));
+          const all = l(),
+            tabs = [["main", "主字卡"], ["emoji", "Emoji"], ["pat", "拍一拍"]];
+          let any = !1;
+          (tabs.forEach((tb) => {
+            const cards = all.filter((t) => t && (t.tab || "main") === tb[0]);
+            if (!cards.length) return;
+            any = !0;
+            const sec = document.createElement("div");
+            ((sec.style.cssText = "font-size:12px;color:#999;margin:10px 4px 6px"),
+              (sec.textContent = tb[1] + "（" + cards.length + "）"),
+              WEL.appendChild(sec),
+              cards.forEach((t) => {
+                const text = (t.text || t.content || "").trim();
+                if (!text) return;
+                const ck = tb[0] + "::" + text,
+                  owner = cmap[ck],
+                  mine = String(owner || "") === String(cid),
+                  row = document.createElement("div");
+                ((row.className = "wb-excl-card-row"),
+                  (row.dataset.ck = ck),
+                  (row.innerHTML =
+                    '<div class="t">' + text.replace(/</g, "&lt;") + "</div>" +
+                    (owner && !mine ? '<div class="wb-excl-sub">专属:' + wbContactName(owner) + "</div>" : "") +
+                    '<div class="wb-excl-check' + (mine ? " on" : "") + '">' + (mine ? "✓" : "") + "</div>"),
+                  WEL.appendChild(row));
+              }));
+          }),
+            any ||
+              (WEL.innerHTML += '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0">还没有字卡</div>'));
+        }
+        function renderExclGroups(cid) {
+          if (!WEL) return;
+          exclCid = cid;
+          const cname = wbContactName(cid);
+          ((WET.textContent = cname),
+            (WEBack.style.display = ""),
+            (WETip.textContent =
+              "勾选后，这些分组的字卡只有「" + cname + "」能使用；未勾选的全部通用"));
+          const map = window.__wbRead("akini_wb_exclusive", {});
+          ((WEL.innerHTML = ""), (WEBack.style.display = ""), WEL.appendChild(renderExclSeg(cid)));
+          const tabs = [
+            ["main", "主字卡"],
+            ["emoji", "Emoji"],
+            ["pat", "拍一拍"],
+          ];
+          let any = !1;
+          (tabs.forEach((tb) => {
+            const groups = window.__wbRead("akini_wb_groups_" + tb[0], []);
+            if (!groups.length) return;
+            any = !0;
+            const sec = document.createElement("div");
+            ((sec.style.cssText =
+              "font-size:12px;color:#999;margin:10px 4px 6px"),
+              (sec.textContent = tb[1]),
+              WEL.appendChild(sec),
+              groups.forEach((gr) => {
+                const gid = String(gr.id),
+                  owner = map[gid],
+                  mine = String(owner || "") === String(cid),
+                  row = document.createElement("div");
+                ((row.className = "wb-excl-group-row"),
+                  (row.dataset.gid = gid),
+                  (row.innerHTML =
+                    '<span style="width:10px;height:10px;border-radius:50%;background:' +
+                    (gr.color || "#a0a0a0") +
+                    ';display:inline-block;flex-shrink:0"></span><div style="flex:1;min-width:0"><div class="wb-excl-name">' +
+                    gr.name +
+                    "</div>" +
+                    (owner && !mine
+                      ? '<div class="wb-excl-sub">当前专属：' +
+                        wbContactName(owner) +
+                        "，勾选将转移</div>"
+                      : "") +
+                    '</div><div class="wb-excl-check' +
+                    (mine ? " on" : "") +
+                    '">' +
+                    (mine ? "✓" : "") +
+                    "</div>"),
+                  WEL.appendChild(row));
+              }));
+          }),
+            any ||
+              (WEL.innerHTML +=
+                '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0">还没有分组<br>请先在字卡库「分组」中创建分组</div>'));
+        }
+        WE &&
+          a(WE, function () {
+            WEO &&
+              (renderExclContacts(),
+              (WEO.style.display = "flex"),
+              WEO.classList.add("show"));
+          });
+        const WEClose = document.getElementById("wbExclClose");
+        (WEClose &&
+          a(WEClose, function () {
+            WEO && ((WEO.style.display = "none"), WEO.classList.remove("show"));
+          }),
+          WEBack &&
+            a(WEBack, function () {
+              renderExclContacts();
+            }),
+          WEL &&
+            a(WEL, function (ev) {
+              const krow = ev.target.closest
+                ? ev.target.closest(".wb-excl-card-row")
+                : null;
+              if (krow && exclCid) {
+                const cmap = window.__wbRead("akini_wb_exclusive_cards", {}),
+                  ck = String(krow.dataset.ck);
+                (String(cmap[ck] || "") === String(exclCid)
+                  ? delete cmap[ck]
+                  : (cmap[ck] = exclCid),
+                  window.__wbWrite("akini_wb_exclusive_cards", cmap),
+                  renderExclCards(exclCid));
+                return;
+              }
+              const grow = ev.target.closest
+                ? ev.target.closest(".wb-excl-group-row")
+                : null;
+              if (grow && exclCid) {
+                const map = window.__wbRead("akini_wb_exclusive", {}),
+                  gid = String(grow.dataset.gid);
+                (String(map[gid] || "") === String(exclCid)
+                  ? delete map[gid]
+                  : (map[gid] = exclCid),
+                  window.__wbWrite("akini_wb_exclusive", map),
+                  renderExclGroups(exclCid));
+                return;
+              }
+              const crow = ev.target.closest
+                ? ev.target.closest(".wb-excl-contact")
+                : null;
+              crow && ((exclMode = "group"), renderExclGroups(crow.dataset.cid));
+            }));
         const N = document.getElementById("wbSelectCancelBtn");
         function P() {
           const t = document.getElementById("groupSelect");
@@ -8355,6 +8874,7 @@ document.addEventListener("DOMContentLoaded", function () {
         (j &&
           a(j, function () {
             ($ && (($.style.display = "none"), $.classList.remove("show")),
+              bm && exitBlockMode(),
               o(""));
           }),
           H &&
@@ -14056,12 +14576,13 @@ document.addEventListener("DOMContentLoaded", function () {
               (this.value = ""));
           });
       })(),
-      (window.pickWordCards = function (t) {
+      (window.pickWordCards = function (t, contactId) {
         var e = i("akini_wordbank", []).filter(function (t) {
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
           return "pat" !== e && "pat" !== n;
         });
+        if (window.__wbFilter) e = window.__wbFilter(e, contactId);
         if (!e.length) {
           // 用户明确要求删除默认字卡，没有自定义字卡时直接返回空字符串
           return "";
@@ -14972,15 +15493,30 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? (i += " · " + sanitized.name)
                 : sanitized.groupName && (i += " · " + sanitized.groupName);
             // 每条消息使用唯一 tag（chatId+时间戳），确保同时收到多条消息时各自独立通知、不会重叠成一条
-            var d = new Notification(i, {
+            window.__akiniSystemNotify = function (title, opts, onTap) {
+              opts = opts || {};
+              function fallbackNotify() {
+                try {
+                  var d = new Notification(title, opts);
+                  d.onclick = function () { window.focus && window.focus(); d.close(); onTap && onTap(); };
+                } catch (e) {}
+              }
+              try {
+                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                  navigator.serviceWorker.ready.then(function (reg) {
+                    if (reg && reg.showNotification) { reg.showNotification(title, opts); return; }
+                    fallbackNotify();
+                  }).catch(fallbackNotify);
+                } else { fallbackNotify(); }
+              } catch (e) { fallbackNotify(); }
+            };
+
+            window.__akiniSystemNotify(i, {
               body: body,
               icon: "./favicon.png",
               tag: "akini_" + (sanitized.chatId || "msg") + "_" + (sanitized.ts || Date.now()),
               renotify: true,
-            });
-            d.onclick = function () {
-              (window.focus && window.focus(), d.close(), t.onTap && t.onTap());
-            };
+            }, function () { t.onTap && t.onTap(); });
           } catch (t) {}
       }),
         (window._requestNotificationPermission = function () {
@@ -16219,14 +16755,24 @@ document.addEventListener("DOMContentLoaded", function () {
                     var e = T.findIndex(function (e) {
                       return e.id === t.id;
                     });
-                    e >= 0
-                      ? T.splice(e, 1)
-                      : (T.length >= 2 && T.shift(),
-                        T.push({ id: t.id, name: t.name, avatar: t.avatar }));
+                    if (e >= 0) {
+                      T.splice(e, 1);
+                    } else {
+                      // 最多 2 人：超限时替换最早选择的人，并明确提示，避免"只选1人却显示3头像"的困惑
+                      if (T.length >= 2) {
+                        var kicked = T.shift();
+                        try {
+                          "function" == typeof pt && pt("最多 2 人一起听，已替换「" + (kicked && kicked.name || "之前选择的人") + "」");
+                        } catch (e2) {}
+                      }
+                      T.push({ id: t.id, name: t.name, avatar: t.avatar });
+                    }
                     saveMusicContacts();
                   })(t),
                     zt(),
                     Ot());
+                  // 点选后立即刷新顶部头像，所见即所得
+                  try { "function" == typeof syncAvatars && syncAvatars(); } catch (e) {}
                 }),
                 e.contactList.appendChild(a));
             }),
@@ -16370,7 +16916,13 @@ document.addEventListener("DOMContentLoaded", function () {
         (isNaN(i) && (i = 2), isNaN(a) && (a = 5));
         var o = 1e3 * (i + Math.random() * Math.max(0, a - i));
         setTimeout(function () {
-          var e = window.pickWordCards ? window.pickWordCards(1) : "";
+          var _gc =
+              window.akiniContacts && window.akiniContacts.getChatTarget
+                ? window.akiniContacts.getChatTarget(t)
+                : null,
+            e = window.pickWordCards
+              ? window.pickWordCards(1, _gc && _gc.id)
+              : "";
           e && Jt(e, !1, t);
         }, o);
       }
@@ -19186,7 +19738,7 @@ document.addEventListener("DOMContentLoaded", function () {
         window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
       } catch (e) {}
     }
-    setInterval(_akiniImmediateBackup, 20000);
+    setInterval(_akiniImmediateBackup, 120000);
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) _akiniImmediateBackup();
     });
@@ -19316,15 +19868,14 @@ document.addEventListener("DOMContentLoaded", function () {
     tp.addEventListener("click", function () {
       if (!("Notification" in window)) { alert("当前浏览器不支持系统通知"); return; }
       var send = function () {
-        try {
-          var n = new Notification("Akini · 测试推送", {
-            body: "这是一条测试通知，推送功能正常",
-            icon: "./favicon.png",
-            tag: "akini_test_" + Date.now(),
-            renotify: true
-          });
-          n.onclick = function () { window.focus && window.focus(); n.close(); };
-        } catch (e) { alert("通知发送失败：" + e.message); }
+        var opts = {
+          body: "这是一条测试通知，推送功能正常",
+          icon: "./favicon.png",
+          tag: "akini_test_" + Date.now(),
+          renotify: true
+        };
+        if (window.__akiniSystemNotify) { window.__akiniSystemNotify("Akini · 测试推送", opts); return; }
+        try { new Notification("Akini · 测试推送", opts); } catch (e) { alert("通知发送失败：" + e.message); }
       };
       if (Notification.permission === "granted") { send(); return; }
       Notification.requestPermission().then(function (p) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20261024';
+const CACHE_NAME = 'akini-cache-v20261027';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -56,6 +56,22 @@ self.addEventListener('fetch', function(event) {
       });
     })
   );
+});
+
+self.addEventListener('message', function(event) {
+  var d = event && event.data;
+  if (d && d.type === 'GET_CACHE_NAME') {
+    var reply = { type: 'CACHE_NAME', name: CACHE_NAME };
+    try {
+      if (event.source && event.source.postMessage) {
+        event.source.postMessage(reply);
+      } else if (self.clients && self.clients.matchAll) {
+        self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(function(clients) {
+          clients.forEach(function(c) { c.postMessage(reply); });
+        });
+      }
+    } catch (e) {}
+  }
 });
 
 self.addEventListener('push', function(event) {
