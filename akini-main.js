@@ -8847,7 +8847,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // 先无条件展开专属页，再渲染内容——渲染即使异常也绝不挡住打开动作
             WEO &&
               ((WEO.style.display = "flex"),
-              (WEO.style.zIndex = "320"),
+              (WEO.style.zIndex = "1000002"),
               WEO.classList.add("show"));
             try { renderExclContacts(); } catch (e) { console.warn("renderExclContacts", e); }
           }),

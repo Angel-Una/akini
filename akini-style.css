@@ -502,7 +502,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   user-select: text;
   cursor: text;
   word-break: break-word;
-  max-width: 160px;
+  max-width: min(240px, 64vw); /* 8 个汉字一行完整放得下，不被省略号截断 */
 }
 /* 8 字以内的预览气泡文字强制单行，不折行 */
 .preview-bubble.no-wrap {
