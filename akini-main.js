@@ -16874,8 +16874,12 @@ document.addEventListener("DOMContentLoaded", function () {
                       // 再点同一人：取消选择
                       T.splice(e, 1);
                     } else {
-                      // 单选语义：点选谁就和谁一起听，替换掉之前选择的人
-                      T = [{ id: t.id, name: t.name, avatar: t.avatar }];
+                      // 多选上限 2 人：选 1 人双人模式，选 2 人三人模式
+                      if (T.length >= 2) {
+                        alert("最多选 2 个人哦，你 + 两个 TA 就是三人一起听啦");
+                      } else {
+                        T.push({ id: t.id, name: t.name, avatar: t.avatar });
+                      }
                     }
                     saveMusicContacts();
                   })(t),
@@ -17233,7 +17237,7 @@ document.addEventListener("DOMContentLoaded", function () {
           var M = localStorage.getItem("akini_music_selected_contacts");
           // 单选模式：历史存档可能存了多人，恢复时只保留第一个，多余的一律丢弃
           M && (T = JSON.parse(M));
-          Array.isArray(T) && T.length > 1 && (T = T.slice(0, 1));
+          Array.isArray(T) && T.length > 2 && (T = T.slice(0, 2));
         } catch (t) {
           T = [];
         }
