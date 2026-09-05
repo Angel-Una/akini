@@ -8782,11 +8782,14 @@ document.addEventListener("DOMContentLoaded", function () {
           ((seg.className = "wb-excl-seg"),
             (seg.innerHTML =
               '<button type="button" data-m="group"' + (exclMode === "group" ? ' class="on"' : "") + '>按分组</button><button type="button" data-m="card"' + (exclMode === "card" ? ' class="on"' : "") + '>按字卡</button>'));
-          seg.addEventListener("click", function (ev) {
+          let _segLastTs = 0;
+          const _segHandler = function (ev) {
             const b = ev.target && ev.target.closest ? ev.target.closest("button[data-m]") : null;
             if (!b) return;
+            const now = Date.now();
+            if (now - _segLastTs < 400) return;
+            _segLastTs = now;
             exclMode = b.dataset.m === "card" ? "card" : "group";
-            // 立即更新激活态，保证按钮高亮与即将渲染的列表一致
             seg.querySelectorAll("button[data-m]").forEach(function (x) {
               x.classList.toggle("on", x === b);
             });
@@ -8795,8 +8798,11 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (err) {
               try { console.warn("[专属字卡] 切换视图失败", err); } catch (e2) {}
             }
+            ev.preventDefault();
             ev.stopPropagation();
-          });
+          };
+          seg.addEventListener("click", _segHandler);
+          seg.addEventListener("touchend", _segHandler, { passive: false });
           return seg;
         }
         function renderExclDetail(cid) {
