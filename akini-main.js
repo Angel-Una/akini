@@ -167,6 +167,43 @@ window.__akiniBootStep = "start";
     });
   } catch (e) {}
 })();
+/* ====== 缺失函数补齐：联系人表情包同步读取 + 我最近一条消息文本 ====== */
+window.getContactStickersSync = function (id) {
+  try {
+    var k = "akini_stickers_" + id;
+    if (window.__csCache && Array.isArray(window.__csCache[k])) return window.__csCache[k];
+    var v = localStorage.getItem(k);
+    if (v) {
+      var arr = JSON.parse(v);
+      if (Array.isArray(arr)) {
+        (window.__csCache = window.__csCache || {})[k] = arr;
+        return arr;
+      }
+    }
+  } catch (e) {}
+  return [];
+};
+window.getMyLatestMessageText = function (chatId) {
+  try {
+    if (!window.akiniContacts) return "";
+    var id = chatId || (window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null);
+    if (!id) return "";
+    var e = window.akiniContacts.getSession(id),
+      n = (e && e.messagesHTML) || "";
+    if (!n) return "";
+    var i = document.createElement("div");
+    i.innerHTML = n;
+    var a = i.querySelectorAll(".msg-row.me");
+    for (var o = a.length - 1; o >= 0; o--) {
+      var r = a[o].querySelector(".bubble");
+      if (r && !r.classList.contains("transfer-bubble")) {
+        var tx = (r.textContent || "").trim();
+        if (tx) return tx.slice(0, 60);
+      }
+    }
+  } catch (e2) {}
+  return "";
+};
 /* ====== AKR（Akini 随机内核）：随机行为/概率/时间范围控制 ====== */
 window.__akiniToggleOn = function (key, defaultOn) {
   try {
@@ -184,6 +221,7 @@ window.AKR = (function () {
     groupTransferMe: 0.08,
     noReply: 0.2,
     sticker: 0.2,
+    emojiMix: 0.2,
     incomingCall: 0.03,
     groupCall: 0.03,
     answerCall: 0.65,
@@ -3777,7 +3815,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function mixEmojiToText(text) {
         if (!ex.emojiMix || !text) return text;
-        if (Math.random() >= 0.2) return text;
+        if (Math.random() >= window.AKR.getProb("emojiMix")) return text;
         var emojis = [];
         try {
           var wb = i("akini_wordbank", []);

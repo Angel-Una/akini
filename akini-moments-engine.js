@@ -37,12 +37,12 @@
   }
 
   function getContactAvatar(contact, app) {
-    if (!contact) return '🐰';
+    if (!contact) return '👤';
     if (app === 'icity' && window.getIcityContactProfile) {
       var p = window.getIcityContactProfile(contact.id);
       if (p && p.avatar) return p.avatar;
     }
-    return contact.avatar || '🐰';
+    return contact.avatar || '👤';
   }
 
   // 读取该联系人的专属表情包（akini_stickers_<contactId>）

@@ -1066,7 +1066,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body .msg-row > .msg-ts {
   width: 38px !important;
   text-align: center !important;
-  margin-top: 1px;
+  margin-top: 5px;
   flex: none !important;
 }
 .chat-body .msg-row.me > .msg-ts {
@@ -1747,7 +1747,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body .msg-row {
   display: flex;
   flex-direction: column;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
   width: 100%;
   position: relative;
 }
