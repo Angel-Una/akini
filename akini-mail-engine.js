@@ -120,13 +120,14 @@
   var autoTimer = null;
   function manageAutoSendTimer(forceReset) {
     if (autoTimer) clearTimeout(autoTimer);
-    var enabled = localStorage.getItem("akini_mailAutoSendEnabled");
-    if (enabled === "0") return;
-    var min = parseFloat(localStorage.getItem("akini_num_mailAutoSendMin") || "30");
-    var max = parseFloat(localStorage.getItem("akini_num_mailAutoSendMax") || "90");
-    if (isNaN(min) || min < 1) min = 30;
-    if (isNaN(max) || max < min) max = min + 30;
-    var delay = (min + Math.random() * (max - min)) * 60 * 1000;
+    // 统一走设置页「联系人写信」开关（默认开启）；旧 mailAutoSendEnabled 键在 UI 中无入口，易造成死锁，废弃
+    if (window.__akiniToggleOn && !window.__akiniToggleOn("contactMailToggle", true)) return;
+    // 统一读取设置页「主动写信间隔」（单位：小时，默认 3-6 小时）
+    var min = parseFloat(localStorage.getItem("akini_num_activeMailMin") || "3");
+    var max = parseFloat(localStorage.getItem("akini_num_activeMailMax") || "6");
+    if (isNaN(min) || min <= 0) min = 3;
+    if (isNaN(max) || max < min) max = min;
+    var delay = (min + Math.random() * (max - min)) * 3600 * 1000;
     // 跨重启续跑：已有未到期计划按剩余时间继续；已过期（关闭期间错过）则尽快补发
     try {
       if (forceReset) {
