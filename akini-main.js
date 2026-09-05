@@ -15515,11 +15515,30 @@ document.addEventListener("DOMContentLoaded", function () {
               window.__akiniRefreshChatMeta();
           });
       }
+      // 平台检测：安卓不开放后台消息通知与保活（保活音频会触发浏览器常驻系统通知且易发烫），仅 iOS 支持
+      var __akiniIsAndroid = /Android/i.test(navigator.userAgent || "");
+      window.__akiniIsAndroid = __akiniIsAndroid;
       (t("keepAliveToggle", !1),
         t("pushNotifyToggle", !1),
         t("msgPopupToggle", !1));
+      if (__akiniIsAndroid) {
+        ["keepAliveToggle", "pushNotifyToggle"].forEach(function (id) {
+          var el = document.getElementById(id);
+          if (!el) return;
+          el.classList.remove("on");
+          localStorage.setItem("akini_toggle_" + id, "0");
+          el.style.opacity = "0.4";
+          el.style.pointerEvents = "none";
+          var row = el.closest(".settings-row");
+          var desc = row && row.querySelector(".desc");
+          if (desc) desc.textContent = "目前仅 iOS 支持后台消息通知";
+        });
+        var tpBtn = document.getElementById("testPushBtn");
+        if (tpBtn) tpBtn.style.display = "none";
+      }
       var e = null;
       async function n() {
+        if (__akiniIsAndroid) return;
         if ("wakeLock" in navigator)
           try {
             (e = await navigator.wakeLock.request("screen")).addEventListener(
@@ -15550,6 +15569,12 @@ document.addEventListener("DOMContentLoaded", function () {
         document
           .getElementById("keepAliveToggle")
           .addEventListener("click", function () {
+            if (__akiniIsAndroid) {
+              this.classList.remove("on");
+              localStorage.setItem("akini_toggle_keepAliveToggle", "0");
+              alert("目前仅 iOS 支持后台消息通知");
+              return;
+            }
             this.classList.contains("on")
               ? (n(),
                 "function" == typeof startKeepAliveIsland &&
@@ -15561,6 +15586,12 @@ document.addEventListener("DOMContentLoaded", function () {
         document
           .getElementById("pushNotifyToggle")
           .addEventListener("click", function () {
+            if (__akiniIsAndroid) {
+              this.classList.remove("on");
+              localStorage.setItem("akini_toggle_pushNotifyToggle", "0");
+              alert("目前仅 iOS 支持后台消息通知");
+              return;
+            }
             if (this.classList.contains("on"))
               if ("Notification" in window) {
                 if ("default" === Notification.permission)
@@ -15650,6 +15681,7 @@ document.addEventListener("DOMContentLoaded", function () {
         o && o(sanitized);
         var e = document.getElementById("pushNotifyToggle"),
           n =
+            !__akiniIsAndroid &&
             e &&
             e.classList.contains("on") &&
             "Notification" in window &&
@@ -20071,6 +20103,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!tp || tp._akiniBound) return;
     tp._akiniBound = 1;
     tp.addEventListener("click", function () {
+      if (window.__akiniIsAndroid) { alert("目前仅 iOS 支持后台消息通知"); return; }
       if (!("Notification" in window)) { alert("当前浏览器不支持系统通知"); return; }
       var send = function () {
         var opts = {
