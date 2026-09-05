@@ -6519,7 +6519,28 @@ document.addEventListener("DOMContentLoaded", function () {
     function st(t) {
       const e = document.getElementById("chatBody");
       if (!e || !window.loadBgFromStorage) return;
+      /* 防闪烁：先同步读内存缓存，有值立即应用；无值立即清空（避免残留上一聊天的背景），再异步校正 */
+      var _memV = "";
+      try { if (window.akiniStore && window.akiniStore.memoryGet) _memV = window.akiniStore.memoryGet("akini_chat_bg_" + t) || ""; } catch (err) {}
+      if (_memV) {
+        if (e.getAttribute("data-current-bg") !== _memV) {
+          e.style.backgroundImage = "url(" + _memV + ")";
+          e.style.backgroundSize = "cover";
+          e.style.backgroundPosition = "center";
+          e.style.backgroundRepeat = "no-repeat";
+          e.setAttribute("data-current-bg", _memV);
+        }
+        return;
+      }
+      if (e.getAttribute("data-current-bg")) {
+        e.style.backgroundImage = "";
+        e.style.backgroundSize = "";
+        e.style.backgroundPosition = "";
+        e.style.backgroundRepeat = "";
+        e.setAttribute("data-current-bg", "");
+      }
       window.loadBgFromStorage("akini_chat_bg_" + t, function (n) {
+        if (n) { try { window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet("akini_chat_bg_" + t, n); } catch (err) {} }
         if (!n) {
           e.style.backgroundImage = "";
           e.style.backgroundSize = "";
@@ -19278,3 +19299,44 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   } catch (e) {}
 });
+
+/* ===== v20261023: 测试推送按钮 + 一起听界面滑动锁定 ===== */
+(function () {
+  function bindTestPush() {
+    var tp = document.getElementById("testPushBtn");
+    if (!tp || tp._akiniBound) return;
+    tp._akiniBound = 1;
+    tp.addEventListener("click", function () {
+      if (!("Notification" in window)) { alert("当前浏览器不支持系统通知"); return; }
+      var send = function () {
+        try {
+          var n = new Notification("Akini · 测试推送", {
+            body: "这是一条测试通知，推送功能正常",
+            icon: "./favicon.png",
+            tag: "akini_test_" + Date.now(),
+            renotify: true
+          });
+          n.onclick = function () { window.focus && window.focus(); n.close(); };
+        } catch (e) { alert("通知发送失败：" + e.message); }
+      };
+      if (Notification.permission === "granted") { send(); return; }
+      Notification.requestPermission().then(function (p) {
+        if (p === "granted") send();
+        else alert("请先允许通知权限后再测试");
+      });
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindTestPush);
+  else bindTestPush();
+
+  /* 一起听界面锁定：app-music 显示时，除播放列表/联系人列表/菜单面板外禁止触摸滑动 */
+  document.addEventListener("touchmove", function (ev) {
+    try {
+      var mm = document.getElementById("app-music");
+      if (!mm || mm.style.display === "none") return;
+      var t = ev.target;
+      if (t && t.closest && t.closest("#musicPlaylistContainer,#musicContactList,#musicMenuPanel,#musicChatModal")) return;
+      if (mm.contains(t)) ev.preventDefault();
+    } catch (e) {}
+  }, { passive: false });
+})();
