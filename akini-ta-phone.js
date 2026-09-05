@@ -105,6 +105,19 @@
     }
   }
 
+  /* 从字卡库随机抽一张字卡作为收藏备注（无兜底：字卡库为空时不加备注） */
+  function pickWordcardRemark() {
+    try {
+      var raw = localStorage.getItem('akini_wordbank');
+      var wb = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(wb)) return '';
+      wb = wb.filter(function (t) { return t && (!t.tab || t.tab === 'main') && String(t.text || t.content || '').trim(); });
+      if (!wb.length) return '';
+      var c = wb[Math.floor(Math.random() * wb.length)];
+      return String(c.text || c.content || '').trim();
+    } catch (e) { return ''; }
+  }
+
   function addCollection(contactId, type, content, originalTime) {
     if (!content || !content.trim()) return false;
     /* 严格归属到传入的联系人：微信消息只收藏对应窗口的，朋友圈/iCity/网易云各自独立收藏 */
@@ -119,6 +132,7 @@
     data[type].unshift({
       id: Date.now() + Math.random(),
       content: content.trim(),
+      remark: pickWordcardRemark(),
       originalTime: originalTime || Date.now(),
       collectedTime: Date.now()
     });
@@ -157,6 +171,7 @@
     data.music.unshift({
       id: Date.now() + Math.random(),
       track: { title: title, artist: artist, cover: cover },
+      remark: pickWordcardRemark(),
       originalTime: originalTime || Date.now(),
       collectedTime: Date.now()
     });
@@ -174,7 +189,12 @@
     }
   };
 
+  var _lastScanAt = 0;
   function scanHistory() {
+    /* 节流：30 分钟内最多全量扫描一次，避免频繁打开 TA 手机时反复解析全部聊天 DOM 导致卡顿 */
+    var now = Date.now();
+    if (now - _lastScanAt < 30 * 60 * 1000) return;
+    _lastScanAt = now;
     try {
       var contacts = getContacts();
       if (window.akiniContacts && typeof window.akiniContacts.getChatTarget === 'function') {
@@ -340,6 +360,15 @@
       el.innerHTML = '<div class="akini-ta-phone-empty">TA 还没有收藏任何内容...</div>';
       return;
     }
+    /* 旧收藏补齐备注：无 remark 的条目现场从字卡库抽一张补上并持久化（字卡库为空则跳过，无兜底文案） */
+    var needSave = false;
+    items.forEach(function (it) {
+      if (it && !it.remark) {
+        var r = pickWordcardRemark();
+        if (r) { it.remark = r; needSave = true; }
+      }
+    });
+    if (needSave) saveCollections(currentContactId, data);
     var sorted = items.slice();
     // 所有数据统一按收藏时间倒序排列
     sorted.sort(function (a, b) { return (b.collectedTime || 0) - (a.collectedTime || 0); });
@@ -358,6 +387,7 @@
               '<div class="akini-ta-phone-music-artist">' + escapeHtml(t.artist || '未知歌手') + '</div>' +
             '</div>' +
           '</div>' +
+          (item.remark ? '<div class="akini-ta-phone-item-remark">备注：' + escapeHtml(item.remark) + '</div>' : '') +
           '<div class="akini-ta-phone-item-meta">收藏于: ' + formatTime(item.collectedTime) + '</div>' +
         '</div>';
       }).join('');
@@ -368,7 +398,7 @@
         '<button class="akini-ta-phone-item-delete" onclick="window.AkiniTaPhone.deleteCollection(\'' + currentContactId + '\',\'' + currentTab + '\',' + item.id + ')" title="删除">×</button>' +
         '<div class="akini-ta-phone-item-time">' + formatTime(item.originalTime) + '</div>' +
         '<div class="akini-ta-phone-item-text">' + escapeHtml(item.content) + '</div>' +
-        '<div class="akini-ta-phone-item-meta">发送于: ' + formatTime(item.originalTime) + ' | 收藏于: ' + formatTime(item.collectedTime) + '</div>' +
+        (item.remark ? '<div class="akini-ta-phone-item-remark">备注：' + escapeHtml(item.remark) + '</div>' : '') +
       '</div>';
     }).join('');
   }
@@ -418,6 +448,7 @@
       '.akini-ta-phone-item-time{font-size:12px;color:#999;margin-bottom:4px;}',
       '.akini-ta-phone-item-text{font-size:14px;color:#111;line-height:1.5;word-break:break-all;}',
       '.akini-ta-phone-item-meta{font-size:11px;color:#bbb;margin-top:4px;}',
+      '.akini-ta-phone-item-remark{font-size:12px;color:#999;margin-top:6px;line-height:1.5;word-break:break-word;}',
       '.akini-ta-phone-item-delete{position:absolute;top:8px;right:8px;background:none;border:none;color:#ccc;font-size:18px;cursor:pointer;line-height:1;}',
       '.akini-ta-phone-item-delete:hover{color:#ef4444;}',
       '.akini-ta-phone-empty{text-align:center;padding:40px 20px;color:#bbb;font-size:14px;}',

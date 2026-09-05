@@ -386,10 +386,12 @@
   }
 
   function exportBackupToFile() {
-    notify("备份导出", "正在打包 ZIP，媒体文件会单独存放…", "info");
+    notify("备份导出", "正在生成 JSON 备份文件…", "info");
     buildBackupPayload(function (payload) {
       var dateStr = new Date().toISOString().slice(0, 10);
-      var fileNameZip = "akini-backup-" + dateStr + ".zip";
+      /* milk 同款：直接导出单个 .json 文件（媒体内联在 JSON 内），导入仍兼容旧 ZIP 备份 */
+      fallbackJson(payload, dateStr);
+      return;
 
       if (typeof JSZip !== "undefined") {
         try {
@@ -457,9 +459,9 @@
     var blob = new Blob([str], { type: "application/json;charset=utf-8" });
     downloadBlob(blob, fileName);
     notify(
-      "导出成功（JSON）",
-      "已导出 JSON，大备份建议尽快改用 ZIP",
-      "warning"
+      "导出成功",
+      "已导出 JSON 备份文件，可随时导入恢复",
+      "success"
     );
   }
 
