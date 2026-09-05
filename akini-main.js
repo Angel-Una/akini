@@ -8838,8 +8838,9 @@ document.addEventListener("DOMContentLoaded", function () {
               (WEL.innerHTML +=
                 '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0">还没有分组<br>请先在字卡库「分组」中创建分组</div>'));
         }
+        /* 专属字卡打开：挂到 window 供内联 onclick 直接调用（最可靠的触发路径） */
         WE &&
-          a(WE, function () {
+          ((window.__wbOpenExclusive = function () {
             // 专属字卡是字卡库的子页面：无条件确保字卡库保持展开，专属页覆盖其上（z-index 320 > 300）
             const _wb = document.getElementById("wordbankOverlay");
             _wb && ((_wb.style.display = "flex"), _wb.classList.add("show"));
@@ -8849,12 +8850,11 @@ document.addEventListener("DOMContentLoaded", function () {
               (WEO.style.zIndex = "320"),
               WEO.classList.add("show"));
             try { renderExclContacts(); } catch (e) { console.warn("renderExclContacts", e); }
-          });
+          }),
+          a(WE, function () { window.__wbOpenExclusive(); }));
         const WEClose = document.getElementById("wbExclClose");
-        /* 导出字卡：打包所有 akini_wb_ 数据（分组/字卡/专属/屏蔽）为 JSON 下载 */
-        const WEExport = document.getElementById("wbExportBtn");
-        (WEExport &&
-          a(WEExport, function () {
+        /* 导出字卡：打包所有 akini_wb_ 数据（分组/字卡/专属/屏蔽）为 JSON 下载，挂 window 供 onclick 调用 */
+        window.__wbExportCards = function () {
             try {
               const dump = {};
               for (let i = 0; i < localStorage.length; i++) {
@@ -8894,7 +8894,7 @@ document.addEventListener("DOMContentLoaded", function () {
               console.warn("导出字卡失败", e);
               alert("导出失败：" + (e && e.message ? e.message : "未知错误"));
             }
-          }));
+          };
         (WEClose &&
           a(WEClose, function () {
             WEO && ((WEO.style.display = "none"), WEO.classList.remove("show"));
@@ -15677,6 +15677,7 @@ document.addEventListener("DOMContentLoaded", function () {
         })(),
         t("timestampToggle", !1),
         (function(){
+          try {
           // 时间格式选择：三个选项点击切换，存储 akini_timeFormat = "24" | "12PM" | "12AM"
           // "12:00" = 24 小时制；"12:00PM"/"12:00AM" = 12 小时制（带 AM/PM，按实际时间显示）
           var cur = localStorage.getItem("akini_timeFormat") || "24";
@@ -15686,19 +15687,24 @@ document.addEventListener("DOMContentLoaded", function () {
             "12AM": document.getElementById("timeFmt12AM")
           };
           function syncFmt(){
-            for (var k in btns) { if (btns[k]) btns[k].classList.toggle("active", k === cur); }
+            try {
+              for (var k in btns) { if (btns[k] && btns[k].classList) btns[k].classList.toggle("active", k === cur); }
+            } catch (e) { console.warn("syncFmt", e); }
           }
-          syncFmt();
+          try { syncFmt(); } catch (e) {}
           for (var key in btns) {
             (function(k){
               var btn = btns[k];
-              if (!btn) return;
+              if (!btn || !btn.addEventListener) return;
               btn.addEventListener("click", function(){
-                cur = k; localStorage.setItem("akini_timeFormat", k); syncFmt();
-                if (window.__renderMail) window.__renderMail();
+                try {
+                  cur = k; localStorage.setItem("akini_timeFormat", k); syncFmt();
+                  if (window.__renderMail) window.__renderMail();
+                } catch (e) {}
               });
             })(key);
           }
+          } catch (e) { console.warn("timeFmtInit", e); }
         })(),
         t("darkModeToggle", !1),
         document.querySelectorAll(".style-btn").forEach((t) => {

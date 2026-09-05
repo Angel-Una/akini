@@ -5796,3 +5796,8 @@ html, body {
   .wb-excl-card-row { background: #232327; }
   .wb-excl-card-row .t { color: #ddd; }
 }
+
+/* 预览气泡：空内容时隐藏（不占位、不显示空白条） */
+.preview-bubble:empty {
+  visibility: hidden !important;
+}
