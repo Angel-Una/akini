@@ -3943,16 +3943,37 @@ document.addEventListener("DOMContentLoaded", function () {
     var AKINI_CHAT_BATCH_SIZE = 100;
     function __akiniStripTypingRows(html) {
       if (!html || "string" != typeof html) return html || "";
-      if (
-        html.indexOf('typingBubbleRow_') === -1 &&
-        html.indexOf('typing-bubble') === -1
-      )
-        return html;
+      var hasTyping =
+        html.indexOf('typingBubbleRow_') !== -1 ||
+        html.indexOf('typing-bubble') !== -1;
+      var hasLoadMore = html.indexOf("加载更多聊天记录") !== -1;
+      if (!hasTyping && !hasLoadMore) return html;
       var div = document.createElement("div");
       div.innerHTML = html;
       div.querySelectorAll('[id^="typingBubbleRow_"]').forEach(function (el) {
         el.remove();
       });
+      // 清理历史版本遗留的"加载更多聊天记录"提示行（已持久化在聊天记录里）
+      if (hasLoadMore) {
+        var all = div.querySelectorAll("*");
+        var targets = [];
+        for (var i = 0; i < all.length; i++) {
+          var el = all[i];
+          if (
+            el.children.length === 0 &&
+            el.textContent &&
+            el.textContent.indexOf("加载更多聊天记录") !== -1
+          ) {
+            var row = el.closest
+              ? el.closest(".msg-row") || el.closest('[class*="load"]') || el
+              : el;
+            if (targets.indexOf(row) === -1) targets.push(row);
+          }
+        }
+        targets.forEach(function (el) {
+          el.remove();
+        });
+      }
       return div.innerHTML;
     }
     window.__akiniCountMsgRows = __akiniCountMsgRows;
@@ -4401,6 +4422,13 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
     function D(t, e) {
+      // 优先读内存镜像（写入立即可见，不受 IDB 防抖落盘时序影响），再 localStorage，最后 IDB 兜底
+      try {
+        if (window.akiniStore && window.akiniStore.memoryGet) {
+          var mv = window.akiniStore.memoryGet(t);
+          if (mv != null && mv !== "") return e(mv);
+        }
+      } catch (e0) {}
       var n = localStorage.getItem(t);
       n
         ? e(n)
@@ -8701,12 +8729,17 @@ document.addEventListener("DOMContentLoaded", function () {
           seg.addEventListener("click", function (ev) {
             const b = ev.target && ev.target.closest ? ev.target.closest("button[data-m]") : null;
             if (!b) return;
-            exclMode = b.dataset.m;
+            exclMode = b.dataset.m === "card" ? "card" : "group";
+            // 立即更新激活态，保证按钮高亮与即将渲染的列表一致
+            seg.querySelectorAll("button[data-m]").forEach(function (x) {
+              x.classList.toggle("on", x === b);
+            });
             try {
               renderExclDetail(cid);
             } catch (err) {
               try { console.warn("[专属字卡] 切换视图失败", err); } catch (e2) {}
             }
+            ev.stopPropagation();
           });
           return seg;
         }
@@ -8743,7 +8776,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ((row.className = "wb-excl-card-row"),
                   (row.dataset.ck = ck),
                   (row.innerHTML =
-                    '<div class="t">' + text.replace(/</g, "&lt;") + "</div>" +
+                    '<span style="width:10px;height:10px;border-radius:50%;background:#111;display:inline-block;flex-shrink:0"></span><div class="t">' + text.replace(/</g, "&lt;") + "</div>" +
                     (owner && !mine ? '<div class="wb-excl-sub">专属:' + wbContactName(owner) + "</div>" : "") +
                     '<div class="wb-excl-check' + (mine ? " on" : "") + '">' + (mine ? "✓" : "") + "</div>"),
                   WEL.appendChild(row));
@@ -8785,9 +8818,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ((row.className = "wb-excl-group-row"),
                   (row.dataset.gid = gid),
                   (row.innerHTML =
-                    '<span style="width:10px;height:10px;border-radius:50%;background:' +
-                    (gr.color || "#a0a0a0") +
-                    ';display:inline-block;flex-shrink:0"></span><div style="flex:1;min-width:0"><div class="wb-excl-name">' +
+                    '<span style="width:10px;height:10px;border-radius:50%;background:#111;display:inline-block;flex-shrink:0"></span><div style="flex:1;min-width:0"><div class="wb-excl-name">' +
                     gr.name +
                     "</div>" +
                     (owner && !mine
@@ -8809,11 +8840,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         WE &&
           a(WE, function () {
-            // 专属字卡是字卡库的子页面：确保字卡库保持打开，专属页覆盖其上（z-index 320 > 300）
+            // 专属字卡是字卡库的子页面：无条件确保字卡库保持展开，专属页覆盖其上（z-index 320 > 300）
             const _wb = document.getElementById("wordbankOverlay");
-            if (_wb && _wb.style.display !== "flex") {
-              (_wb.style.display = "flex"), _wb.classList.add("show");
-            }
+            _wb && ((_wb.style.display = "flex"), _wb.classList.add("show"));
             WEO &&
               (renderExclContacts(),
               (WEO.style.display = "flex"),
@@ -8824,12 +8853,20 @@ document.addEventListener("DOMContentLoaded", function () {
         (WEClose &&
           a(WEClose, function () {
             WEO && ((WEO.style.display = "none"), WEO.classList.remove("show"));
-            // 关闭专属页后回到字卡库
+            // 关闭专属页后回到字卡库（无条件确保字卡库展开）
             const _wb = document.getElementById("wordbankOverlay");
-            if (_wb && _wb.style.display !== "flex") {
-              (_wb.style.display = "flex"), _wb.classList.add("show");
-            }
+            _wb && ((_wb.style.display = "flex"), _wb.classList.add("show"));
           }),
+          (function () {
+            const backHome = document.getElementById("wbExclBackHome");
+            backHome &&
+              a(backHome, function () {
+                // 返回字卡库：只关闭专属页，字卡库保持展开
+                WEO && ((WEO.style.display = "none"), WEO.classList.remove("show"));
+                const _wb = document.getElementById("wordbankOverlay");
+                _wb && ((_wb.style.display = "flex"), _wb.classList.add("show"));
+              });
+          })(),
           WEBack &&
             a(WEBack, function () {
               renderExclContacts();
@@ -8897,6 +8934,9 @@ document.addEventListener("DOMContentLoaded", function () {
             ($ && (($.style.display = "none"), $.classList.remove("show")),
               bm && exitBlockMode(),
               o(""));
+            // 字卡库关闭时同步关闭专属字卡页，避免浮层停留在首页
+            const _exo = document.getElementById("wbExclOverlay");
+            _exo && ((_exo.style.display = "none"), _exo.classList.remove("show"));
           }),
           H &&
             a(H, function () {
@@ -16780,16 +16820,11 @@ document.addEventListener("DOMContentLoaded", function () {
                       return e.id === t.id;
                     });
                     if (e >= 0) {
+                      // 再点同一人：取消选择
                       T.splice(e, 1);
                     } else {
-                      // 最多 2 人：超限时替换最早选择的人，并明确提示，避免"只选1人却显示3头像"的困惑
-                      if (T.length >= 2) {
-                        var kicked = T.shift();
-                        try {
-                          "function" == typeof pt && pt("最多 2 人一起听，已替换「" + (kicked && kicked.name || "之前选择的人") + "」");
-                        } catch (e2) {}
-                      }
-                      T.push({ id: t.id, name: t.name, avatar: t.avatar });
+                      // 单选语义：点选谁就和谁一起听，替换掉之前选择的人
+                      T = [{ id: t.id, name: t.name, avatar: t.avatar }];
                     }
                     saveMusicContacts();
                   })(t),

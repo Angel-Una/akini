@@ -110,6 +110,8 @@
     memSet(k, v);
     var lsOk = lsSet(k, v);
     if (isCriticalKey(k)) queueIdbWrite(k, v);
+    // localStorage 写失败（配额满等）时立即落盘 IDB，不等 500ms 防抖，防退出丢数据
+    if (!lsOk) flushIdbQueue();
     if (cb) cb(true || lsOk);
   }
   function akiniRemove(k, cb) {
@@ -192,12 +194,15 @@
       var self = { memSet: memSet, memRemove: memRemove, queueIdbWrite: queueIdbWrite, isCritical: isCriticalKey, origSet: origSet, origRemove: origRemove };
       lsProto.setItem = function (k, v) {
         // 1) 原始写入永远先执行，任何异常都不影响它
-        try { self.origSet.call(this, k, v); } catch (e) {}
+        var ok = true;
+        try { self.origSet.call(this, k, v); } catch (e) { ok = false; }
         // 2) 镜像层失败无所谓，绝不影响数据本体
         try {
           if (self.isCritical(k)) {
             self.memSet(k, String(v));
             self.queueIdbWrite(k, String(v));
+            // 原始写入失败时立即落盘 IDB，不等防抖
+            if (!ok) flushIdbQueue();
           }
         } catch (e) {}
       };

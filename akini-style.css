@@ -500,6 +500,12 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   word-break: break-word;
   max-width: 160px;
 }
+/* 8 字以内的预览气泡文字强制单行，不折行 */
+.preview-bubble.no-wrap {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .preview-bubble:focus {
   background: rgba(255, 255, 255, 0.75);
 }
@@ -5718,8 +5724,8 @@ button.back-btn[type="button"] {
   font-size: 13px;
 }
 .wb-excl-check.on {
-  background: #4a90e2;
-  border-color: #4a90e2;
+  background: #111;
+  border-color: #111;
 }
 body.dark-mode .wb-excl-overlay {
   background: #1c1c1e;
@@ -5772,7 +5778,8 @@ html, body {
   flex: 1; padding: 8px 0; border-radius: 10px; border: 1px solid #e5e5e5;
   background: #f7f7f7; color: #666; font-size: 13px; cursor: pointer;
 }
-.wb-excl-seg button.on { background: #111; color: #fff; border-color: #111; }
+/* 两个 tab 统一灰色系：激活态仅加深底色+黑字加粗，不再用黑底 */
+.wb-excl-seg button.on { background: #e9e9eb; color: #111; border-color: #d5d5d5; font-weight: 600; }
 .wb-excl-card-row {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;
   background: #fff; border-radius: 12px; margin-bottom: 8px; cursor: pointer;
@@ -5781,7 +5788,7 @@ html, body {
 .wb-excl-card-row .t { flex: 1; min-width: 0; font-size: 14px; color: #333; line-height: 1.5; word-break: break-all; }
 @media (prefers-color-scheme: dark) {
   .wb-excl-seg button { background: #2a2a2e; border-color: #3a3a3e; color: #aaa; }
-  .wb-excl-seg button.on { background: #f0f0f2; color: #111; border-color: #f0f0f2; }
+  .wb-excl-seg button.on { background: #3a3a3e; color: #f0f0f2; border-color: #4a4a4e; font-weight: 600; }
   .wb-excl-card-row { background: #232327; }
   .wb-excl-card-row .t { color: #ddd; }
 }
