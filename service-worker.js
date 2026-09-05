@@ -1,121 +1,34 @@
-const CACHE_NAME = 'akini-cache-v20260906w';
-const PRECACHE_ASSETS = [
-  './akini.html',
-  './akini-style.css',
-  './akini-main.js',
-  './qrcode-bundle.js',
-  './favicon.png',
-  './localforage.min.js',
-];
-
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(PRECACHE_ASSETS);
-    }).catch(function(){})
-  );
+/* ============================================================
+ * Akini 自救 Service Worker（放在 GitHub 仓库【根目录】，与 akini 文件夹平级）
+ * 作用：解除旧版根路径 Service Worker 的死锁（旧 SW 拦截页面导致白屏）
+ * 原理：旧 SW 更新检查时会拉取根目录 /service-worker.js，拉到本文件后
+ *       自动激活 → 清空过期的缓存（仅 Cache Storage 静态资源缓存，
+ *       不碰 localStorage / IndexedDB 里的聊天记录等用户数据）
+ *       → 让打开的页面重新加载 → 注销自己，从此不再拦截任何请求
+ * ============================================================ */
+self.addEventListener('install', function () {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', function(event) {
+self.addEventListener('activate', function (event) {
   event.waitUntil(
-    caches.keys().then(function(keys) {
-      return Promise.all(
-        keys.filter(function(key) {
-          return key !== CACHE_NAME;
-        }).map(function(key) {
-          return caches.delete(key);
-        })
-      );
-    }).then(function() {
-      return self.clients.claim();
-    })
-  );
-});
-
-self.addEventListener('fetch', function(event) {
-  var req = event.request;
-  var url = new URL(req.url);
-  var isNav = req.mode === 'navigate';
-  var isSW = url.pathname.endsWith('service-worker.js');
-  if (isNav || isSW) {
-    req = new Request(req.url, { method: req.method, mode: req.mode, cache: 'no-store' });
-  }
-  event.respondWith(
-    fetch(req).then(function(response) {
-      if (response && response.status === 200 && response.type === 'basic') {
-        var clone = response.clone();
-        caches.open(CACHE_NAME).then(function(cache) {
-          cache.put(event.request, clone);
-        }).catch(function(){});
-      }
-      return response;
-    }).catch(function() {
-      return caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
-        return cached || fetch(event.request);
-      });
-    })
-  );
-});
-
-self.addEventListener('message', function(event) {
-  var d = event && event.data;
-  if (d && d.type === 'GET_CACHE_NAME') {
-    var reply = { type: 'CACHE_NAME', name: CACHE_NAME };
-    try {
-      if (event.source && event.source.postMessage) {
-        event.source.postMessage(reply);
-      } else if (self.clients && self.clients.matchAll) {
-        self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(function(clients) {
-          clients.forEach(function(c) { c.postMessage(reply); });
+    caches.keys()
+      .then(function (keys) {
+        return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+      })
+      .then(function () {
+        return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      })
+      .then(function (clients) {
+        clients.forEach(function (c) {
+          try { c.navigate(c.url); } catch (e) {}
         });
-      }
-    } catch (e) {}
-  }
-});
-
-self.addEventListener('push', function(event) {
-  if (!event.data) return;
-  try {
-    const payload = event.data.json();
-    const title = payload.title || 'Akini';
-    const options = {
-      body: payload.body || '你有一条新消息',
-      icon: './favicon.png',
-      badge: './favicon.png',
-      tag: payload.tag || 'akini-default',
-      data: payload.data || {}
-    };
-    event.waitUntil(self.registration.showNotification(title, options));
-  } catch (e) {
-    const title = 'Akini';
-    const options = { body: '你有一条新消息', icon: './favicon.png' };
-    event.waitUntil(self.registration.showNotification(title, options));
-  }
-});
-
-self.addEventListener('notificationclick', function(event) {
-  event.notification.close();
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      for (var i = 0; i < clientList.length; i++) {
-        var client = clientList[i];
-        if (client.url && client.url.indexOf('/akini') > -1) {
-          client.focus();
-          return;
-        }
-      }
-      self.clients.openWindow('./akini.html');
-    }).catch(function() {
-      self.clients.openWindow('./akini.html');
-    })
+        return self.registration.unregister();
+      })
+      .catch(function () {
+        return self.registration.unregister();
+      })
   );
 });
 
-self.addEventListener('message', function(event){
-  if(event.data && event.data.type === 'GET_CACHE_NAME'){
-    if(event.ports && event.ports[0]){
-      event.ports[0].postMessage({cacheName: CACHE_NAME});
-    }
-  }
-});
+/* 不注册 fetch 拦截：所有请求直接走网络，不再干预 */
