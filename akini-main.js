@@ -5631,9 +5631,9 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 1500);
         setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 4000);
         try { if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge(); } catch (e) {}
-        if ("function" == typeof window.renderChatList) window.renderChatList();
-        if ("function" == typeof window._renderIcity) window._renderIcity();
-        if ("function" == typeof window.updatePreview) window.updatePreview();
+        try { if ("function" == typeof window.renderChatList) window.renderChatList(); } catch (e) {}
+        try { if ("function" == typeof window._renderIcity) window._renderIcity(); } catch (e) {}
+        try { if ("function" == typeof window.updatePreview) window.updatePreview(); } catch (e) {}
         // 数据恢复后多次延迟刷新所有依赖头像/列表的界面，覆盖 IDB 异步恢复时序
         function _bootRefresh() {
           try { if ("function" == typeof window.renderChatList) window.renderChatList(); } catch (e) {}

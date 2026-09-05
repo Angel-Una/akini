@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20260906y';
+const CACHE_NAME = 'akini-cache-v20260906z';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -54,7 +54,7 @@ self.addEventListener('fetch', function(event) {
       return response;
     }).catch(function() {
       return caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
-        return cached || fetch(event.request);
+        return cached || fetch(new Request(event.request, { cache: 'no-cache' }));
       });
     })
   );
