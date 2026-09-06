@@ -5901,24 +5901,51 @@ html, body {
 .app-item { width: 60px; flex-shrink: 0; }
 </style><script>
 (function () {
-  /* 启动屏按钮兜底：8 秒后无论数据恢复进度如何都强制启用"进入"按钮（不自动进入，仍需用户手动点击） */
+  /* 启动屏兜底：不依赖 akini-main.js，独立处理 splash 隐藏 */
   var t0 = Date.now();
-  function forceEnable() {
+  function autoEnter() {
     var btn = document.getElementById("akiniSplashEnterBtn");
     var st = document.getElementById("akiniSplashStatus");
-    if (btn && btn.disabled) {
-      btn.disabled = false;
-      if (st && /正在|加载/.test(st.textContent || "")) st.textContent = "可以进入了";
-    }
     var bar = document.getElementById("akiniSplashBar");
-    if (bar && btn && !btn.disabled) bar.style.width = "100%";
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "进入";
+    }
+    if (st) st.textContent = "可以进入了";
+    if (bar) bar.style.width = "100%";
   }
+  function hideSplash() {
+    var el = document.getElementById("akiniSplash");
+    if (el) {
+      el.classList.add("hidden");
+      setTimeout(function () {
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      }, 520);
+    }
+  }
+  function forceEnter() {
+    autoEnter();
+    hideSplash();
+  }
+  // 8秒后启用按钮
+  setTimeout(autoEnter, 8000);
+  // 10秒后自动进入（无论主 JS 是否加载完成）
+  setTimeout(forceEnter, 10000);
+  // 点击按钮进入
+  document.addEventListener("click", function (e) {
+    if (e.target && e.target.id === "akiniSplashEnterBtn") {
+      hideSplash();
+    }
+  });
+  // 每秒检查一次，按钮启用后进度条直接满
   var iv = setInterval(function () {
-    forceEnable();
     var btn = document.getElementById("akiniSplashEnterBtn");
-    if ((btn && !btn.disabled) || Date.now() - t0 > 20000) clearInterval(iv);
+    if (btn && !btn.disabled) {
+      var bar = document.getElementById("akiniSplashBar");
+      if (bar) bar.style.width = "100%";
+    }
+    if (Date.now() - t0 > 20000) clearInterval(iv);
   }, 1000);
-  setTimeout(forceEnable, 8000);
 })();
 </script>
 </head><body>

@@ -8058,10 +8058,10 @@ document.addEventListener("DOMContentLoaded", function () {
           h &&
             h.addEventListener("input", function () {
               ((e = this.value.trim()), f());
-            });
+            }),
             h.addEventListener("keyup", function () {
               ((e = this.value.trim()), f());
-            });
+            }),
             h.addEventListener("search", function () {
               ((e = this.value.trim()), f());
             }),
@@ -8861,14 +8861,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 const t = r.querySelector(".t");
                 r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
               });
-            });
+            }),
             _exclSearch.addEventListener("keyup", function () {
               const q = _exclSearch.value.trim();
               WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
                 const t = r.querySelector(".t");
                 r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
               });
-            });
+            }),
             _exclSearch.addEventListener("search", function () {
               const q = _exclSearch.value.trim();
               WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
