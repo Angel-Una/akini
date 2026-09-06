@@ -127,7 +127,7 @@
     if (isNaN(min) || min < 1) min = 30;
     if (isNaN(max) || max < min) max = min + 30;
     var delay = (min + Math.random() * (max - min)) * 60 * 1000;
-    // 跨重启续跑：已有未到期计划按剩余时间继续；已过期（关闭期间错过）则尽快补发
+    // 跨重启续跑：已有未到期计划按剩余时间继续；已过期（关闭期间错过）则用完整新间隔，避免秒发
     try {
       if (forceReset) {
         localStorage.removeItem("akini_next_mailAutoSend");
@@ -135,7 +135,7 @@
         var existing = parseFloat(localStorage.getItem("akini_next_mailAutoSend") || "0");
         var now0 = Date.now();
         if (existing) {
-          delay = existing > now0 ? (existing - now0) : (8000 + Math.floor(Math.random() * 15000));
+          delay = existing > now0 ? (existing - now0) : delay;
         }
       }
       localStorage.setItem("akini_next_mailAutoSend", String(Date.now() + delay));

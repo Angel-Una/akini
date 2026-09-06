@@ -6174,32 +6174,86 @@ document.addEventListener("DOMContentLoaded", function () {
           __akiniBootApp();
         }
       }, 5000),
-      window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30),
-      window._idbStore.restoreAll(function () {
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(68);
-        window.akiniContacts && window.akiniContacts.tryRestoreFromBackup
-          ? window.akiniContacts.tryRestoreFromBackup(__akiniBootApp)
-          : __akiniBootApp();
-        try {
-          window.__csCache = window.__csCache || {};
-          if (window.akiniContacts && window.akiniContacts.getContacts) {
-            window.akiniContacts.getContacts().forEach(function (c) {
-              var k = "akini_stickers_" + c.id;
-              if (window._idbStore && window._idbStore.get) {
-                window._idbStore.get(k, function (v) {
-                  try {
-                    window.__csCache[k] = JSON.parse(v || "[]");
-                  } catch (e) {
-                    window.__csCache[k] = [];
-                  }
-                });
-              }
-            });
+      // 进度条平滑动画兜底：即使异步恢复卡住，进度条也会缓慢推进到 90%，避免完全不动
+      (function () {
+        var _pBar = document.getElementById("akiniSplashBar");
+        var _curP = 0;
+        var _targetP = 30;
+        var _animTimer = setInterval(function () {
+          if (window.__akiniSplashDone || window.__akiniSplashProgress >= 100) {
+            clearInterval(_animTimer);
+            return;
           }
-        } catch (e) {
-          console.warn("[Akini] csCache load error", e);
+          // 缓慢追赶到当前真实进度的 95%，制造平滑加载感
+          _targetP = Math.max(_targetP, Math.min(90, window.__akiniSplashProgress || 0));
+          if (_curP < _targetP * 0.95) {
+            _curP += (_targetP * 0.95 - _curP) * 0.08;
+            if (_pBar) _pBar.style.width = _curP + "%";
+          }
+          // 如果长时间卡在 30% 附近，缓慢推进到 85% 给用户希望
+          if (_targetP <= 32 && _curP < 85) {
+            _curP += 0.15;
+            if (_pBar) _pBar.style.width = _curP + "%";
+          }
+        }, 80);
+        // 最终在 boot 时清理
+        var _oldBoot = __akiniBootApp;
+        __akiniBootApp = function () {
+          clearInterval(_animTimer);
+          _oldBoot && _oldBoot();
+        };
+      })(),
+      window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30),
+      (function () {
+        var _restoreDone = false;
+        var _restoreTimer = setTimeout(function () {
+          if (!_restoreDone) {
+            console.warn("[Akini] IDB restoreAll timeout, proceeding with localStorage data");
+            _restoreDone = true;
+            doContactRestore();
+          }
+        }, 4000);
+        function doContactRestore() {
+          window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(68);
+          window.akiniContacts && window.akiniContacts.tryRestoreFromBackup
+            ? window.akiniContacts.tryRestoreFromBackup(__akiniBootApp)
+            : __akiniBootApp();
+          try {
+            window.__csCache = window.__csCache || {};
+            if (window.akiniContacts && window.akiniContacts.getContacts) {
+              window.akiniContacts.getContacts().forEach(function (c) {
+                var k = "akini_stickers_" + c.id;
+                if (window._idbStore && window._idbStore.get) {
+                  window._idbStore.get(k, function (v) {
+                    try {
+                      window.__csCache[k] = JSON.parse(v || "[]");
+                    } catch (e) {
+                      window.__csCache[k] = [];
+                    }
+                  });
+                }
+              });
+            }
+          } catch (e) {
+            console.warn("[Akini] csCache load error", e);
+          }
         }
-      }),
+        try {
+          window._idbStore.restoreAll(function () {
+            if (_restoreDone) return;
+            _restoreDone = true;
+            clearTimeout(_restoreTimer);
+            doContactRestore();
+          });
+        } catch (e) {
+          console.warn("[Akini] restoreAll error, proceeding", e);
+          if (!_restoreDone) {
+            _restoreDone = true;
+            clearTimeout(_restoreTimer);
+            doContactRestore();
+          }
+        }
+      })(),
       setInterval(function () {
         if (document.hidden || window._restoringData) return;
         window._idbStore &&
