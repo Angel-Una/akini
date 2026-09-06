@@ -5476,7 +5476,7 @@ button.back-btn[type="button"] {
   text-align: center !important;
   white-space: nowrap;
   font-size: 10px;
-  color: #aaa;
+  color: #777;
   line-height: 1.2;
   flex: none !important;
 }
@@ -5568,14 +5568,15 @@ button.back-btn[type="button"] {
 }
 /* 已读回执：固定聊天气泡（及引用块）正下方 2px，右缘对齐气泡右缘再往左 3px */
 .chat-body .msg-row.me .msg-content-line > .bubble-wrap > .msg-rr {
-  margin: 2px 3px 0 0 !important;
+  margin: 2px 0 0 0 !important;
   padding: 0 !important;
   font-size: 10px !important;
-  color: #aaa !important;
+  color: #777 !important;
   line-height: 1.2 !important;
   white-space: nowrap;
 }
-.chat-body .msg-row.me {
+.chat-body .msg-row.me,
+.chat-body .msg-row.other {
   padding-bottom: 0;
 }
 
