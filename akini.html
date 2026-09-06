@@ -5919,27 +5919,44 @@ html, body {
 </div>
 <script>
 (function () {
-  /* 启动屏按钮：4 秒后启用"进入"按钮，手动点击进入，不自动隐藏 */
-  var s = document.getElementById('akiniSplash');
-  if (s) { s.classList.add('loaded'); }
-  var t0 = Date.now();
-  function enableBtn() {
-    var btn = document.getElementById("akiniSplashEnterBtn");
-    var st = document.getElementById("akiniSplashStatus");
-    if (btn && btn.disabled) {
-      btn.disabled = false;
-      if (st && /正在|加载/.test(st.textContent || "")) st.textContent = "可以进入了";
-    }
-    var bar = document.getElementById("akiniSplashBar");
-    if (bar && btn && !btn.disabled) bar.style.width = "100%";
+  /* 启动屏独立初始化：立即启用按钮、设置进度条、绑定点击事件，不依赖任何外部 JS */
+  var splash = document.getElementById('akiniSplash');
+  if (splash) splash.classList.add('loaded');
+
+  var btn = document.getElementById("akiniSplashEnterBtn");
+  var st = document.getElementById("akiniSplashStatus");
+  var bar = document.getElementById("akiniSplashBar");
+
+  function setReady() {
+    if (btn) btn.disabled = false;
+    if (st) st.textContent = "可以进入了";
+    if (bar) bar.style.width = "100%";
   }
-  enableBtn(); // 立即尝试（此时 DOM 已就绪）
-  var iv = setInterval(function () {
-    enableBtn();
-    var btn = document.getElementById("akiniSplashEnterBtn");
-    if ((btn && !btn.disabled) || Date.now() - t0 > 20000) clearInterval(iv);
-  }, 1000);
-  setTimeout(enableBtn, 4000);
+
+  // 标记已就绪，防止 akini-main.js 中的 __akiniSetSplashProgress 覆盖进度条
+  window.__akiniSplashReady = true;
+  setReady();
+
+  // 点击"进入"按钮后隐藏 splash
+  if (btn) {
+    btn.addEventListener("click", function () {
+      window.__akiniSplashClick = true;
+      if (window.__akiniHideSplash) {
+        window.__akiniHideSplash();
+      } else {
+        // 兜底：即使 akini-main.js 未加载也能隐藏 splash
+        if (splash) {
+          splash.classList.add("hidden");
+          setTimeout(function () {
+            if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+          }, 600);
+        }
+      }
+    });
+  }
+
+  // 10 秒兜底：无论任何原因，10 秒后强制启用按钮
+  setTimeout(setReady, 10000);
 })();
 </script>
 <style>

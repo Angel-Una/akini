@@ -5623,6 +5623,8 @@ document.addEventListener("DOMContentLoaded", function () {
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
+        // 如果 inline 脚本已标记 splash 就绪，不再覆盖进度条和按钮状态
+        if (window.__akiniSplashReady) return;
         if (p >= 100) {
           var elapsed = Date.now() - (window.__akiniSplashStartAt || Date.now());
           var remain = Math.max(0, (window.__akiniSplashMinMs || 0) - elapsed);
@@ -5652,15 +5654,15 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         if (window.__akiniSplashDone) return;
         window.__akiniSplashDone = !0;
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
         var el = document.getElementById("akiniSplash");
         if (!el) return;
         el.classList.add("hidden");
         setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 520);
       } catch (e) {}
     };
-    // 绑定手动进入按钮：加载完成前不隐藏，点击后才进入主界面
+    // 绑定手动进入按钮（仅当 inline 脚本未绑定时）
     (function bindSplashEnter() {
+      if (window.__akiniSplashClick) return;
       var btn = document.getElementById("akiniSplashEnterBtn");
       if (!btn) return;
       btn.addEventListener("click", function () {
