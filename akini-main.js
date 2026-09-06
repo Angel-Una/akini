@@ -167,43 +167,6 @@ window.__akiniBootStep = "start";
     });
   } catch (e) {}
 })();
-/* ====== 缺失函数补齐：联系人表情包同步读取 + 我最近一条消息文本 ====== */
-window.getContactStickersSync = function (id) {
-  try {
-    var k = "akini_stickers_" + id;
-    if (window.__csCache && Array.isArray(window.__csCache[k])) return window.__csCache[k];
-    var v = localStorage.getItem(k);
-    if (v) {
-      var arr = JSON.parse(v);
-      if (Array.isArray(arr)) {
-        (window.__csCache = window.__csCache || {})[k] = arr;
-        return arr;
-      }
-    }
-  } catch (e) {}
-  return [];
-};
-window.getMyLatestMessageText = function (chatId) {
-  try {
-    if (!window.akiniContacts) return "";
-    var id = chatId || (window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null);
-    if (!id) return "";
-    var e = window.akiniContacts.getSession(id),
-      n = (e && e.messagesHTML) || "";
-    if (!n) return "";
-    var i = document.createElement("div");
-    i.innerHTML = n;
-    var a = i.querySelectorAll(".msg-row.me");
-    for (var o = a.length - 1; o >= 0; o--) {
-      var r = a[o].querySelector(".bubble");
-      if (r && !r.classList.contains("transfer-bubble")) {
-        var tx = (r.textContent || "").trim();
-        if (tx) return tx.slice(0, 60);
-      }
-    }
-  } catch (e2) {}
-  return "";
-};
 /* ====== AKR（Akini 随机内核）：随机行为/概率/时间范围控制 ====== */
 window.__akiniToggleOn = function (key, defaultOn) {
   try {
@@ -221,8 +184,6 @@ window.AKR = (function () {
     groupTransferMe: 0.08,
     noReply: 0.2,
     sticker: 0.2,
-    quote: 0.15,
-    emojiMix: 0.2,
     incomingCall: 0.03,
     groupCall: 0.03,
     answerCall: 0.65,
@@ -276,13 +237,8 @@ window.AKR = (function () {
     }
     var extra = {};
     if (Math.random() < getProb("poke")) extra.poke = true;
-    if (Math.random() < getProb("sticker")) extra.sticker = true;
-    if (Math.random() < getProb("taTransfer")) extra.transfer = true;
-    if (Math.random() < getProb("quote")) extra.quote = true;
     if (localStorage.getItem("akini_toggle_emojiMixToggle") === "1")
       extra.emojiMix = true;
-    // 打印调试日志
-    try{ console.log("[pickReplyBehavior] 概率: poke="+getProb("poke")+" sticker="+getProb("sticker")+" taTransfer="+getProb("taTransfer")+" quote="+getProb("quote")); }catch(e){}
     return {
       type: "text",
       extra: extra,
@@ -337,18 +293,6 @@ function requestPersistentStorage() {
     }
   }
 }
-// DOMContentLoaded 8秒安全兜底：如果事件迟迟不触发（defer脚本阻塞等），手动派发
-(function() {
-  var fired = false;
-  document.addEventListener("DOMContentLoaded", function() { fired = true; });
-  setTimeout(function() {
-    if (!fired && document.readyState === "loading") {
-      console.warn("[Akini] DOMContentLoaded timeout (8s), manual dispatch");
-      try { document.dispatchEvent(new Event("DOMContentLoaded")); } catch (e) {}
-      try { document.dispatchEvent(new Event("readystatechange")); } catch (e) {}
-    }
-  }, 8000);
-})();
 document.addEventListener("DOMContentLoaded", function () {
   try {
     window.__akiniBootStep = "dom-ready";
@@ -1056,16 +1000,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     delayMs = freshDelay;
                   }
                 } else {
-                  // 朋友圈/iCity/互动等周期任务过期不补发，直接按新间隔重排（避免上线秒发）
-                  if (
-                    name === "friendsPost" ||
-                    name === "icityPost" ||
-                    name === "friendsInteract"
-                  ) {
-                    delayMs = freshDelay;
-                  } else {
-                    delayMs = 5000 + Math.floor(Math.random() * 10000);
-                  }
+                  delayMs = 5000 + Math.floor(Math.random() * 10000);
                 }
               }
             }
@@ -1647,14 +1582,14 @@ document.addEventListener("DOMContentLoaded", function () {
           var _myAv = _memOrLs("akini_my_avatar", "akini_icity_my_avatar");
           var _restoredAny = !1;
           e.forEach(function (c) {
-            if (c && (!c.avatar || !String(c.avatar).trim() || c.avatar === window.__AKINI_DEF_TA)) {
-              if (c.isDefault) c.avatar = _taAv || window.__AKINI_DEF_TA;
-              else if (c.id === "me" || c.id === "my") c.avatar = _myAv || window.__AKINI_DEF_MY;
+            if (c && (!c.avatar || !String(c.avatar).trim() || c.avatar === "🐰")) {
+              if (c.isDefault) c.avatar = _taAv || "🐰";
+              else if (c.id === "me" || c.id === "my") c.avatar = _myAv || "🐱";
               else {
                 // 用户创建的联系人：优先从专用头像键恢复（IDB 权威数据）
                 var _av = _memOrLs("akini_contact_avatar_" + c.id, "");
                 if (_av) { c.avatar = _av; _restoredAny = !0; }
-                else c.avatar = _taAv || window.__AKINI_DEF_TA;
+                else c.avatar = _taAv || "🐰";
               }
             }
           });
@@ -1682,7 +1617,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try { sessionStorage.setItem("akini_contacts_emergency", JSON.stringify(e)); } catch (_e) {}
         // 冗余备份：每个联系人头像单独存一份，便于刷新后恢复
         e.forEach(function (c) {
-          if (c && c.id && c.avatar && String(c.avatar).trim() && c.avatar !== window.__AKINI_DEF_TA && c.avatar !== window.__AKINI_DEF_MY) {
+          if (c && c.id && c.avatar && String(c.avatar).trim() && c.avatar !== "🐰" && c.avatar !== "🐱") {
             try { L("akini_contact_avatar_" + c.id, c.avatar); } catch (err) {}
           }
         });
@@ -1753,7 +1688,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? window.getMyAvatar()
                 : localStorage.getItem("akini_my_avatar") ||
                   (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-                  window.__AKINI_DEF_MY,
+                  "🐱",
           };
         var e = v(t);
         if (e) {
@@ -1763,7 +1698,7 @@ document.addEventListener("DOMContentLoaded", function () {
               a = localStorage.getItem("akini_ta_avatar") || "";
             } catch (e) {}
           }
-          if (!a || a === window.__AKINI_DEF_TA) {
+          if (!a || a === "🐰") {
             try {
               a = localStorage.getItem("akini_contact_avatar_" + e.id) || a;
             } catch (err) {}
@@ -1963,7 +1898,7 @@ document.addEventListener("DOMContentLoaded", function () {
             a = {
               id: s("ta"),
               name: t || "新联系人",
-              avatar: e || i || window.__AKINI_DEF_TA,
+              avatar: e || i || "🐰",
               note: window.pickWordCards ? window.pickWordCards(1) : "",
               createdAt: Date.now(),
             };
@@ -2800,19 +2735,19 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.getItem("akini_icity_my_avatar");
       if (n) {
         window.__akiniAvatarCache.my = n;
-        return it(n, window.__AKINI_DEF_MY) === window.__AKINI_DEF_MY ? window.__AKINI_DEF_MY : it(n, window.__AKINI_DEF_MY);
+        return it(n, "🐱") === "🐱" ? "🐱" : it(n, "🐱");
       }
       const t = window.__akiniAvatarCache.my;
       if (t) {
-        const av = it(t, window.__AKINI_DEF_MY);
-        return av === window.__AKINI_DEF_MY ? window.__AKINI_DEF_MY : av;
+        const av = it(t, "🐱");
+        return av === "🐱" ? "🐱" : av;
       }
       const e = document.getElementById("myMsgAvatar");
       if (e && e.innerHTML) {
-        const av = it(e.innerHTML, window.__AKINI_DEF_MY);
-        return av === window.__AKINI_DEF_MY ? window.__AKINI_DEF_MY : av;
+        const av = it(e.innerHTML, "🐱");
+        return av === "🐱" ? "🐱" : av;
       }
-      return (m("my", "akini_my_avatar", "akini_icity_my_avatar"), window.__AKINI_DEF_MY);
+      return (m("my", "akini_my_avatar", "akini_icity_my_avatar"), "🐱");
     }
     function g() {
       return localStorage.getItem("akini_my_name") || "我";
@@ -2825,7 +2760,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (ct) {
           if (ct.avatar && ct.avatar.trim()) {
             window.__akiniAvatarCache.ta = ct.avatar;
-            return it(ct.avatar, window.__AKINI_DEF_TA);
+            return it(ct.avatar, "🐰");
           }
           // 联系人对象无头像时，回退到内存缓存/本地保存的对方头像，避免直接显示 emoji 兜底
           var _lsTa =
@@ -2835,12 +2770,12 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.getItem("akini_icity_ta_avatar");
           if (_lsTa) {
             window.__akiniAvatarCache.ta = _lsTa;
-            return it(_lsTa, window.__AKINI_DEF_TA);
+            return it(_lsTa, "🐰");
           }
           // 无头像时用成员自身的 emoji/名字首字作为兜底，避免显示群头像
           var _fb =
             (ct.emoji && String(ct.emoji).trim()) ||
-            (ct.name ? String(ct.name).charAt(0) : window.__AKINI_DEF_TA);
+            (ct.name ? String(ct.name).charAt(0) : "🐰");
           return nt(_fb, 38);
         }
       }
@@ -2851,13 +2786,13 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.getItem("akini_icity_ta_avatar");
       if (n) {
         window.__akiniAvatarCache.ta = n;
-        return it(n, window.__AKINI_DEF_TA);
+        return it(n, "🐰");
       }
       const t = window.__akiniAvatarCache.ta;
-      if (t) return it(t, window.__AKINI_DEF_TA);
+      if (t) return it(t, "🐰");
       const e = document.getElementById("taMsgAvatar");
-      if (e && e.innerHTML) return it(e.innerHTML, window.__AKINI_DEF_TA);
-      return (m("ta", "akini_ta_avatar", "akini_icity_ta_avatar"), window.__AKINI_DEF_TA);
+      if (e && e.innerHTML) return it(e.innerHTML, "🐰");
+      return (m("ta", "akini_ta_avatar", "akini_icity_ta_avatar"), "🐰");
     }
     function p() {
       const t = document.getElementById("chatTaName");
@@ -2914,13 +2849,8 @@ document.addEventListener("DOMContentLoaded", function () {
           k = null,
           _ = o.quoteText || "",
           b = o.quoteName || "";
-        if (
-          !_ &&
-          !s &&
-          window.__akiniToggleOn("quoteReplyToggle", false) &&
-          Math.random() < window.AKR.getProb("quote")
-        ) {
-          var I = getMyLatestMessageText(t);
+        if (!_ && l && !s && Math.random() < window.AKR.getProb("quote")) {
+          var I = getMyLatestMessageText();
           I && ((_ = I), (b = g() || "我"));
         }
         var B = "";
@@ -3026,8 +2956,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         if (0 === msgArr.length) return;
         var $ = "";
-        // 引用文本已在上方按概率选定，此处不再二次掷骰（修复双重概率导致几乎不触发）
-        if (_) {
+        if (_ && Math.random() < window.AKR.getProb("quote")) {
           var W = b || "我",
             J = _.slice(0, 40) + (_.length > 40 ? "…" : "");
           $ =
@@ -3339,7 +3268,7 @@ document.addEventListener("DOMContentLoaded", function () {
       window.__akiniTypingMap = window.__akiniTypingMap || {};
       var target =
         window.akiniContacts && window.akiniContacts.getChatTarget(t);
-      var avatar = window.__AKINI_DEF_TA;
+      var avatar = "🐰";
       if (memberId && window.akiniContacts) {
         var member = window.akiniContacts.getContactById(memberId);
         if (member) avatar = nt(member.avatar, 38);
@@ -3546,7 +3475,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
-      }, 120000);
+      }, 60000);
     })();
     window._akiniTransferAmount = e;
     window._akiniTransferNote = n;
@@ -3833,7 +3762,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function mixEmojiToText(text) {
         if (!ex.emojiMix || !text) return text;
-        if (Math.random() >= window.AKR.getProb("emojiMix")) return text;
+        if (Math.random() >= 0.2) return text;
         var emojis = [];
         try {
           var wb = i("akini_wordbank", []);
@@ -3856,9 +3785,8 @@ document.addEventListener("DOMContentLoaded", function () {
             return it.text;
           });
         } catch (err) {}
-        // 无自定义 emoji 字卡时使用内置常用表情兜底，确保开关开启后功能可见
-        if (!emojis.length)
-          emojis = ["🥺", "😭", "🥰", "😤", "🙄", "😳", "🫶", "💢", "✨", "🫠"];
+        // 无自定义 emoji 时不混入（联系人只能用字卡库内容，无兜底）
+        if (!emojis.length) return text;
         var emoji = emojis[Math.floor(Math.random() * emojis.length)];
         return Math.random() < 0.5 ? emoji + " " + text : text + " " + emoji;
       }
@@ -4446,7 +4374,7 @@ document.addEventListener("DOMContentLoaded", function () {
               .find(function (c) {
                 return c.isDefault;
               });
-            if (_defC && (!_defC.avatar || _defC.avatar === window.__AKINI_DEF_TA)) {
+            if (_defC && (!_defC.avatar || _defC.avatar === "🐰")) {
               window.akiniContacts.updateContact(_defC.id, { avatar: e });
             }
           }
@@ -5618,20 +5546,31 @@ document.addEventListener("DOMContentLoaded", function () {
     // ========== 开屏动画：进度条 + 收尾隐藏 ==========
     window.__akiniSplashProgress = 0;
     window.__akiniSplashDone = !1;
+    window.__akiniSplashStartAt = Date.now();
+    window.__akiniSplashMinMs = 3000; // 固定 3s 引导加载，确保核心数据准备完成
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
-        p = Math.min(100, Math.max(0, p));
-        window.__akiniSplashProgress = p;
+        if (p >= 100) {
+          var elapsed = Date.now() - (window.__akiniSplashStartAt || Date.now());
+          var remain = Math.max(0, (window.__akiniSplashMinMs || 0) - elapsed);
+          if (remain > 0 && !window.__akiniSplashPendingDone) {
+            window.__akiniSplashPendingDone = !0;
+            setTimeout(function () { window.__akiniSetSplashProgress(100, statusText); }, remain);
+            return;
+          }
+        }
+        window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(99, p));
+        if (p >= 100) window.__akiniSplashProgress = 100;
         var bar = document.getElementById("akiniSplashBar");
-        if (bar) bar.style.width = p + "%";
+        if (bar) bar.style.width = window.__akiniSplashProgress + "%";
         var st = document.getElementById("akiniSplashStatus");
         if (st) {
-          if (p >= 100) st.textContent = "已准备好";
+          if (window.__akiniSplashProgress >= 100) st.textContent = "已准备好";
           else st.textContent = statusText || "正在进入";
         }
         var btn = document.getElementById("akiniSplashEnterBtn");
-        if (btn && p >= 100) {
+        if (btn && window.__akiniSplashProgress >= 100) {
           btn.disabled = !1;
           btn.textContent = "进入";
         }
@@ -5641,22 +5580,21 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         if (window.__akiniSplashDone) return;
         window.__akiniSplashDone = !0;
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
         var el = document.getElementById("akiniSplash");
         if (!el) return;
         el.classList.add("hidden");
         setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 520);
       } catch (e) {}
     };
-    // 绑定手动进入按钮（仅当 inline 脚本未绑定时）
+    // 绑定手动进入按钮：加载完成前不隐藏，点击后才进入主界面
     (function bindSplashEnter() {
-      if (window.__akiniSplashClick) return;
       var btn = document.getElementById("akiniSplashEnterBtn");
       if (!btn) return;
       btn.addEventListener("click", function () {
         if (window.__akiniHideSplash) window.__akiniHideSplash();
       });
     })();
-    // 不再自动隐藏 splash，用户必须手动点击"进入"按钮
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
       window.__akiniBooted = !0;
@@ -5677,9 +5615,9 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 1500);
         setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 4000);
         try { if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge(); } catch (e) {}
-        try { if ("function" == typeof window.renderChatList) window.renderChatList(); } catch (e) {}
-        try { if ("function" == typeof window._renderIcity) window._renderIcity(); } catch (e) {}
-        try { if ("function" == typeof window.updatePreview) window.updatePreview(); } catch (e) {}
+        if ("function" == typeof window.renderChatList) window.renderChatList();
+        if ("function" == typeof window._renderIcity) window._renderIcity();
+        if ("function" == typeof window.updatePreview) window.updatePreview();
         // 数据恢复后多次延迟刷新所有依赖头像/列表的界面，覆盖 IDB 异步恢复时序
         function _bootRefresh() {
           try { if ("function" == typeof window.renderChatList) window.renderChatList(); } catch (e) {}
@@ -5690,21 +5628,11 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(_bootRefresh, 500);
         setTimeout(_bootRefresh, 1500);
         setTimeout(_bootRefresh, 3000);
-        // 开屏动画：5 秒内平滑增加进度条，给异步恢复预留时间
-        (function () {
-          var _progress = 0;
-          var _totalDuration = 5000;
-          var _stepInterval = 80;
-          var _steps = _totalDuration / _stepInterval;
-          var _step = 0;
-          function _tick() {
-            _step++;
-            _progress = Math.min(100, Math.round((_step / _steps) * 100));
-            window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(_progress);
-            if (_progress < 100) setTimeout(_tick, _stepInterval);
-          }
-          setTimeout(_tick, 200);
-        })();
+        // 开屏动画：关键数据与界面渲染完成后，给头像/聊天记录等异步恢复预留时间，再显示「进入」
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(92);
+        setTimeout(function () {
+          window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
+        }, 900);
         // 不自动调用 __akiniHideSplash，等待用户点击 #akiniSplashEnterBtn
       }, 300);
       if (
@@ -5943,7 +5871,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function nt(t, e) {
       return (
         (e = e || 40),
-        (t && "string" == typeof t && t.trim()) || (t = window.__AKINI_DEF_TA),
+        (t && "string" == typeof t && t.trim()) || (t = "🐰"),
         0 === t.indexOf("<img")
           ? t
           : 0 === t.indexOf("data:") || 0 === t.indexOf("http")
@@ -5982,14 +5910,14 @@ document.addEventListener("DOMContentLoaded", function () {
       try { if (typeof window.updatePreview === 'function') window.updatePreview(); } catch (e) {}
     };
     ((window._restoringData = !0),
-      // 安全兜底：3 秒后强制打开恢复门（减少等待时间）
+      // 安全兜底：无论异步恢复链是否正常回调，最多 6 秒后强制打开恢复门，
       // 防止 tryRestoreFromBackup 异常导致 _restoringData 永久卡住、数据无法读写
       setTimeout(function () {
         if (window._restoringData) {
           console.warn("[Akini] restore timeout, force opening data gate");
           __akiniBootApp();
         }
-      }, 3000),
+      }, 5000),
       window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(30),
       window._idbStore.restoreAll(function () {
         window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(68);
@@ -6018,7 +5946,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       setInterval(function () {
         if (document.hidden || window._restoringData) return;
-        try { if (typeof flushAllData === "function") flushAllData(); else if (window._flushAllData) window._flushAllData(); } catch(e) {}
         window._idbStore &&
           window._idbStore.backupAll &&
           window._idbStore.backupAll();
@@ -7047,7 +6974,7 @@ document.addEventListener("DOMContentLoaded", function () {
       (Bt.addEventListener("click", Tt),
         Bt.addEventListener("touchend", Tt, { passive: !1 }));
     }
-    var Mt = window.__AKINI_DEF_TA,
+    var Mt = "🐰",
       Lt = document.getElementById("addContactAvatarPreview"),
       Dt = document.getElementById("fileInputAddContactAvatar");
     function Nt() {
@@ -7094,10 +7021,10 @@ document.addEventListener("DOMContentLoaded", function () {
               ));
           } catch (t) {}
           (e && (e.value = ""),
-            (Mt = window.__AKINI_DEF_TA),
+            (Mt = "🐰"),
             Lt &&
-              (setHtmlKeepInput(Lt, nt(window.__AKINI_DEF_TA, 80)),
-              Lt.setAttribute("data-avatar", window.__AKINI_DEF_TA)),
+              (setHtmlKeepInput(Lt, nt("🐰", 80)),
+              Lt.setAttribute("data-avatar", "🐰")),
             xt(),
             ot(),
             renderHomeAvatarContacts(),
@@ -7861,16 +7788,16 @@ document.addEventListener("DOMContentLoaded", function () {
           if (!i) return;
           let a = l()
             .map((t, e) => ({ item: t, idx: e }))
-            .filter(({ item: it }) => (it.tab || "main") === t);
+            .filter(({ item: e }) => (e.tab || "main") === t);
           if ("" !== n) {
-            if ("__ungrouped__" === n) a = a.filter(({ item: it }) => !it.gid);
+            if ("__ungrouped__" === n) a = a.filter(({ item: t }) => !t.gid);
             else
-              a = a.filter(({ item: it }) => String(it.gid || "") === String(n));
+              a = a.filter(({ item: t }) => String(t.gid || "") === String(n));
           }
           if (e) {
-            const kw = e.toLowerCase();
-            a = a.filter(({ item: it }) =>
-              (it.text || it.content || "").toLowerCase().includes(kw),
+            const t = e.toLowerCase();
+            a = a.filter(({ item: e }) =>
+              (e.text || e.content || "").toLowerCase().includes(t),
             );
           }
           if (0 === a.length) {
@@ -8051,12 +7978,6 @@ document.addEventListener("DOMContentLoaded", function () {
           }),
           h &&
             h.addEventListener("input", function () {
-              ((e = this.value.trim()), f());
-            }),
-            h.addEventListener("keyup", function () {
-              ((e = this.value.trim()), f());
-            }),
-            h.addEventListener("search", function () {
               ((e = this.value.trim()), f());
             }),
           w &&
@@ -8752,8 +8673,6 @@ document.addEventListener("DOMContentLoaded", function () {
           ((exclCid = null),
             (WET.textContent = "专属字卡"),
             (WEBack.style.display = "none"),
-            // 主页：隐藏「关闭」按钮（用户要求删除），退出走左上角「‹」返回字卡库
-            (function(){var c=document.getElementById("wbExclClose");c&&(c.style.display="none");var bh=document.getElementById("wbExclBackHome");bh&&(bh.style.display="");})(),
             (WETip.textContent =
               "专属分组内的字卡只有该联系人能使用，其他联系人不会抽到"));
           const cs =
@@ -8807,29 +8726,21 @@ document.addEventListener("DOMContentLoaded", function () {
           ((seg.className = "wb-excl-seg"),
             (seg.innerHTML =
               '<button type="button" data-m="group"' + (exclMode === "group" ? ' class="on"' : "") + '>按分组</button><button type="button" data-m="card"' + (exclMode === "card" ? ' class="on"' : "") + '>按字卡</button>'));
-          let _segLastTs = 0;
-          const _segHandler = function (ev) {
+          seg.addEventListener("click", function (ev) {
             const b = ev.target && ev.target.closest ? ev.target.closest("button[data-m]") : null;
             if (!b) return;
-            const now = Date.now();
-            if (now - _segLastTs < 400) return;
-            _segLastTs = now;
             exclMode = b.dataset.m === "card" ? "card" : "group";
+            // 立即更新激活态，保证按钮高亮与即将渲染的列表一致
             seg.querySelectorAll("button[data-m]").forEach(function (x) {
               x.classList.toggle("on", x === b);
             });
-            // 强制刷新当前联系人专属字卡视图
             try {
               renderExclDetail(cid);
             } catch (err) {
               try { console.warn("[专属字卡] 切换视图失败", err); } catch (e2) {}
             }
-            try { ev.preventDefault(); } catch(e3) {}
-            try { ev.stopPropagation(); } catch(e4) {}
-          };
-          seg.addEventListener("click", _segHandler, true);
-          seg.addEventListener("touchend", _segHandler, { passive: true });
-          seg.addEventListener("touchstart", function(ev){ ev.preventDefault(); }, { passive: false });
+            ev.stopPropagation();
+          });
           return seg;
         }
         function renderExclDetail(cid) {
@@ -8843,37 +8754,7 @@ document.addEventListener("DOMContentLoaded", function () {
             (WEBack.style.display = ""),
             (WETip.textContent = "勾选后，这些字卡只有「" + cname + "」能使用；未勾选的全部通用"));
           const cmap = window.__wbRead("akini_wb_exclusive_cards", {});
-          // 设置页：隐藏左上角「‹」（用户要求删除），退出走右上角「返回/关闭」
-          (function(){var bh=document.getElementById("wbExclBackHome");bh&&(bh.style.display="none");var c=document.getElementById("wbExclClose");c&&(c.style.display="");})();
           ((WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)));
-          // 搜索框：固定在第一张字卡上面，输入即过滤列表
-          const _exclSearch = document.createElement("input");
-          ((_exclSearch.type = "search"),
-            (_exclSearch.placeholder = "搜索字卡内容…"),
-            (_exclSearch.style.cssText = "width:100%;box-sizing:border-box;margin:10px 0 2px;padding:9px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:14px;outline:0;background:#fff"),
-            _exclSearch.addEventListener("input", function () {
-              const q = _exclSearch.value.trim();
-              // 同时搜索卡片和分组
-              WEL.querySelectorAll(".wb-excl-card-row, .wb-excl-group-item").forEach(function (r) {
-                const t = r.querySelector(".t, .wb-excl-group-name");
-                r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
-              });
-            }),
-            _exclSearch.addEventListener("keyup", function () {
-              const q = _exclSearch.value.trim();
-              WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
-                const t = r.querySelector(".t");
-                r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
-              });
-            }),
-            _exclSearch.addEventListener("search", function () {
-              const q = _exclSearch.value.trim();
-              WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
-                const t = r.querySelector(".t");
-                r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
-              });
-            }),
-            WEL.appendChild(_exclSearch));
           const all = window.__wbRead("akini_wordbank", []) || [],
             tabs = [["main", "主字卡"], ["emoji", "Emoji"], ["pat", "拍一拍"]];
           let any = !1;
@@ -8895,7 +8776,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ((row.className = "wb-excl-card-row"),
                   (row.dataset.ck = ck),
                   (row.innerHTML =
-                    '<span style="width:10px;height:10px;border-radius:50%;background:#ddd;display:inline-block;flex-shrink:0"></span><div class="t">' + text.replace(/</g, "&lt;") + "</div>" +
+                    '<span style="width:10px;height:10px;border-radius:50%;background:#111;display:inline-block;flex-shrink:0"></span><div class="t">' + text.replace(/</g, "&lt;") + "</div>" +
                     (owner && !mine ? '<div class="wb-excl-sub">专属:' + wbContactName(owner) + "</div>" : "") +
                     '<div class="wb-excl-check' + (mine ? " on" : "") + '">' + (mine ? "✓" : "") + "</div>"),
                   WEL.appendChild(row));
@@ -8913,8 +8794,6 @@ document.addEventListener("DOMContentLoaded", function () {
             (WETip.textContent =
               "勾选后，这些分组的字卡只有「" + cname + "」能使用；未勾选的全部通用"));
           const map = window.__wbRead("akini_wb_exclusive", {});
-          // 设置页：隐藏左上角「‹」（用户要求删除），退出走右上角「返回/关闭」
-          (function(){var bh=document.getElementById("wbExclBackHome");bh&&(bh.style.display="none");var c=document.getElementById("wbExclClose");c&&(c.style.display="");})();
           ((WEL.innerHTML = ""), (WEBack.style.display = ""), WEL.appendChild(renderExclSeg(cid)));
           const tabs = [
             ["main", "主字卡"],
@@ -8959,64 +8838,18 @@ document.addEventListener("DOMContentLoaded", function () {
               (WEL.innerHTML +=
                 '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0">还没有分组<br>请先在字卡库「分组」中创建分组</div>'));
         }
-        /* 专属字卡打开：挂到 window 供内联 onclick 直接调用（最可靠的触发路径） */
         WE &&
-          ((window.__wbOpenExclusive = function () {
+          a(WE, function () {
             // 专属字卡是字卡库的子页面：无条件确保字卡库保持展开，专属页覆盖其上（z-index 320 > 300）
             const _wb = document.getElementById("wordbankOverlay");
             _wb && ((_wb.style.display = "flex"), _wb.classList.add("show"));
-            // 先无条件展开专属页，再渲染内容——渲染即使异常也绝不挡住打开动作
             WEO &&
-              ((WEO.style.display = "flex"),
-              (WEO.style.zIndex = "1000002"),
+              (renderExclContacts(),
+              (WEO.style.display = "flex"),
+              (WEO.style.zIndex = "320"),
               WEO.classList.add("show"));
-            try { renderExclContacts(); } catch (e) { console.warn("renderExclContacts", e); }
-          }),
-          (window.__wbRenderExcl = function () { try { renderExclContacts(); } catch (e) {} }),
-          a(WE, function () { window.__wbOpenExclusive(); }));
+          });
         const WEClose = document.getElementById("wbExclClose");
-        /* 导出字卡：打包所有 akini_wb_ 数据（分组/字卡/专属/屏蔽）为 JSON 下载，挂 window 供 onclick 调用 */
-        window.__wbExportCards = function () {
-            try {
-              const dump = {};
-              for (let i = 0; i < localStorage.length; i++) {
-                const k = localStorage.key(i);
-                if (k && k.indexOf("akini_wb_") === 0) {
-                  const v = localStorage.getItem(k);
-                  if (v != null) dump[k] = v;
-                }
-              }
-              // 内存镜像补缺（localStorage 写满时数据可能只在内存）
-              if (window.akiniStore && window.akiniStore.memoryGet) {
-                ["akini_wb_groups", "akini_wb_groups_main", "akini_wb_blocked", "akini_wb_exclusive", "akini_wb_exclusive_cards"].forEach(function (k) {
-                  if (!dump[k]) {
-                    const mv = window.akiniStore.memoryGet(k);
-                    if (mv != null && mv !== "") dump[k] = mv;
-                  }
-                });
-              }
-              const keys = Object.keys(dump);
-              if (!keys.length) {
-                window.__akiniToast ? window.__akiniToast("暂无字卡数据") : alert("暂无字卡数据");
-                return;
-              }
-              const pad = function (n) { return n < 10 ? "0" + n : n; };
-              const d = new Date();
-              const name = "akini-wordcards-" + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + "-" + pad(d.getHours()) + pad(d.getMinutes()) + ".json";
-              const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
-              const url = URL.createObjectURL(blob);
-              const aEl = document.createElement("a");
-              aEl.href = url;
-              aEl.download = name;
-              document.body.appendChild(aEl);
-              aEl.click();
-              setTimeout(function () { document.body.removeChild(aEl); URL.revokeObjectURL(url); }, 500);
-              window.__akiniToast ? window.__akiniToast("已导出 " + keys.length + " 项字卡数据") : null;
-            } catch (e) {
-              console.warn("导出字卡失败", e);
-              alert("导出失败：" + (e && e.message ? e.message : "未知错误"));
-            }
-          };
         (WEClose &&
           a(WEClose, function () {
             WEO && ((WEO.style.display = "none"), WEO.classList.remove("show"));
@@ -9280,7 +9113,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 return (
                 localStorage.getItem("akini_my_avatar") ||
                 (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-                window.__AKINI_DEF_MY
+                "🐱"
               );
               if (window.akiniContacts) {
                 if (t.authorId) {
@@ -9292,7 +9125,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
                 if (n) return n.avatar;
               }
-              return localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA;
+              return localStorage.getItem("akini_ta_avatar") || "🐰";
             })(t),
             o = t.author || a,
             r = nt(i, 36);
@@ -9680,7 +9513,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 a =
                   (n ? n.avatar : null) ||
                   localStorage.getItem("akini_ta_avatar") ||
-                  window.__AKINI_DEF_TA;
+                  "🐰";
               window.startCall && window.startCall(i, a);
             }),
           t.addEventListener("click", function () {
@@ -9695,7 +9528,7 @@ document.addEventListener("DOMContentLoaded", function () {
               r =
                 (i ? i.avatar : null) ||
                 localStorage.getItem("akini_ta_avatar") ||
-                window.__AKINI_DEF_TA,
+                "🐰",
               c = document.getElementById("phoneDialAvatar"),
               l = document.getElementById("phoneDialName");
             (l && (l.textContent = a),
@@ -10507,7 +10340,7 @@ document.addEventListener("DOMContentLoaded", function () {
           n =
             e && e.avatar
               ? e.avatar
-              : localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA;
+              : localStorage.getItem("akini_ta_avatar") || "🐰";
         window.startCall && window.startCall(t, n);
       }
     });
@@ -10761,7 +10594,7 @@ document.addEventListener("DOMContentLoaded", function () {
               n =
                 o && o.avatar
                   ? o.avatar
-                  : localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA;
+                  : localStorage.getItem("akini_ta_avatar") || "🐰";
             if (
               o &&
               "group" === o.type &&
@@ -11675,7 +11508,7 @@ document.addEventListener("DOMContentLoaded", function () {
               localStorage.getItem("akini_icity_my_avatar") ||
               (window.__akiniAvatarCache &&
                 window.__akiniAvatarCache.my) ||
-              window.__AKINI_DEF_MY,
+              "🐱",
             e =
               localStorage.getItem("akini_icity_my_nick") ||
               localStorage.getItem("akini_my_name") ||
@@ -11697,8 +11530,8 @@ document.addEventListener("DOMContentLoaded", function () {
         var t =
             localStorage.getItem("akini_my_avatar") ||
             (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-            window.__AKINI_DEF_MY,
-          i = localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA,
+            "🐱",
+          i = localStorage.getItem("akini_ta_avatar") || "🐰",
           a = localStorage.getItem("akini_icity_my_nick") || "我",
           o = localStorage.getItem("akini_icity_my_handle") || a,
           r = localStorage.getItem("akini_icity_ta_nick") || "对方",
@@ -11777,7 +11610,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (d) ((n = t), (l = a), (s = o));
                 else if (e.authorId && window.akiniContacts) {
                   var u = w(e.authorId);
-                  ((n = u.avatar || window.__AKINI_DEF_TA), (l = u.name), (s = u.handle));
+                  ((n = u.avatar || "🐰"), (l = u.name), (s = u.handle));
                 } else ((n = i), (l = r), (s = c));
                 var m = nt(n, 40),
                   g = document.createElement("div");
@@ -11987,7 +11820,7 @@ document.addEventListener("DOMContentLoaded", function () {
                           ? '<img src="' +
                             l +
                             '" style="width:100%;height:100%;object-fit:cover;">'
-                          : l || (c ? window.__AKINI_DEF_MY : window.__AKINI_DEF_TA),
+                          : l || (c ? "🐱" : "🐰"),
                       m = new Date(t.ts || Date.now()),
                       f =
                         String(m.getHours()).padStart(2, "0") +
@@ -12085,10 +11918,10 @@ document.addEventListener("DOMContentLoaded", function () {
             u =
               localStorage.getItem("akini_my_avatar") ||
               (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-              window.__AKINI_DEF_MY,
-            m = localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA,
+              "🐱",
+            m = localStorage.getItem("akini_ta_avatar") || "🐰",
             f = function (t) {
-              if (!t) return window.__AKINI_DEF_TA;
+              if (!t) return "🐰";
               if (t.avatar) return t.avatar;
               if (t.authorId && t.authorId !== "me") {
                 var e = window.getIcityContactProfile
@@ -12106,9 +11939,9 @@ document.addEventListener("DOMContentLoaded", function () {
               if (window.akiniContacts) {
                 var i = window.akiniContacts.getContacts();
                 for (var o = 0; o < i.length; o++)
-                  if (i[o].name === a) return i[o].avatar || window.__AKINI_DEF_TA;
+                  if (i[o].name === a) return i[o].avatar || "🐰";
               }
-              return window.__AKINI_DEF_TA;
+              return "🐰";
             },
             h = function (t) {
               if (!t) return "";
@@ -12242,14 +12075,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   localStorage.getItem("akini_my_avatar") ||
                   (window.__akiniAvatarCache &&
                     window.__akiniAvatarCache.my) ||
-                  window.__AKINI_DEF_MY));
+                  "🐱"));
             else if (t.authorId && window.akiniContacts) {
               var s = w(t.authorId);
-              ((n = s.name), (i = s.handle), (a = s.avatar || window.__AKINI_DEF_TA));
+              ((n = s.name), (i = s.handle), (a = s.avatar || "🐰"));
             } else
               ((n = localStorage.getItem("akini_icity_ta_nick") || "对方"),
                 (i = localStorage.getItem("akini_icity_ta_handle") || n),
-                (a = localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA));
+                (a = localStorage.getItem("akini_ta_avatar") || "🐰"));
             var d = nt(a, 48),
               u = document.getElementById("icityDetailAuthor");
             u && (u.textContent = n + " · 日记");
@@ -12317,7 +12150,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   var av =
                     localStorage.getItem("akini_my_avatar") ||
                     (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-                    window.__AKINI_DEF_MY;
+                    "🐱";
                   a[r].comments = a[r].comments || [];
                   var l = {
                     id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
@@ -12812,7 +12645,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                             (t.textBaseline = "middle"),
                                             t.fillText(
                                               a.avatar ||
-                                                (a.isMe ? window.__AKINI_DEF_MY : window.__AKINI_DEF_TA),
+                                                (a.isMe ? "🐱" : "🐰"),
                                               e + i / 2,
                                               n + i / 2,
                                             ));
@@ -12822,7 +12655,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                           (t.textAlign = "center"),
                                           (t.textBaseline = "middle"),
                                           t.fillText(
-                                            a.avatar || (a.isMe ? window.__AKINI_DEF_MY : window.__AKINI_DEF_TA),
+                                            a.avatar || (a.isMe ? "🐱" : "🐰"),
                                             e + i / 2,
                                             n + i / 2,
                                           ));
@@ -13361,7 +13194,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         '<img src="' +
                         i.avatar +
                         '" style="width:100%;height:100%;object-fit:cover;">')
-                    : (r.textContent = i.avatar || window.__AKINI_DEF_TA));
+                    : (r.textContent = i.avatar || "🐰"));
                 var c = document.getElementById("icityTaNameDisplay");
                 c && (c.textContent = i.name);
                 var l = document.getElementById("icityTaHandleDisplay");
@@ -13480,7 +13313,7 @@ document.addEventListener("DOMContentLoaded", function () {
         (n && (n.value = e.name),
           i && (i.value = e.handle),
           a && (a.value = e.bio),
-          window.fillPreview("icityEditTaAvatarPreview", e.avatar || window.__AKINI_DEF_TA));
+          window.fillPreview("icityEditTaAvatarPreview", e.avatar || "🐰"));
         var o = document.getElementById("icityEditTaBgPreview");
         D("akini_icity_ta_bg_" + t, function (t) {
           o && t
@@ -13515,7 +13348,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "icityEditMyAvatarPreview",
                 localStorage.getItem("akini_my_avatar") ||
                   localStorage.getItem("akini_icity_my_avatar") ||
-                  window.__AKINI_DEF_MY,
+                  "🐱",
               ));
             var c = document.getElementById("icityEditMyBgPreview");
             (D("akini_icity_my_bg", function (t) {
@@ -13552,7 +13385,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   "icityEditMyAvatarPreview",
                   localStorage.getItem("akini_my_avatar") ||
                     localStorage.getItem("akini_icity_my_avatar") ||
-                    window.__AKINI_DEF_MY,
+                    "🐱",
                 ));
               var r = document.getElementById("icityEditMyBgPreview");
               D("akini_icity_my_bg", function (t) {
@@ -13895,14 +13728,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   // 信件详情：我寄/回显示我的头像，联系人寄/回显示联系人的头像；姓名始终显示联系人
                   var senderAvatar;
                   if ("sent" === e) {
-                    senderAvatar = localStorage.getItem("akini_my_avatar") || window.__AKINI_DEF_MY;
+                    senderAvatar = localStorage.getItem("akini_my_avatar") || "🐱";
                   } else {
-                    senderAvatar = otherContact ? (otherContact.avatar || window.__AKINI_DEF_TA) : (localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA);
+                    senderAvatar = otherContact ? (otherContact.avatar || "🐰") : (localStorage.getItem("akini_ta_avatar") || "🐰");
                   }
                   if (avatarEl) {
                     avatarEl.innerHTML = "";
                     avatarEl.innerHTML = nt(senderAvatar, 44);
-                    if (!avatarEl.innerHTML.trim()) avatarEl.innerHTML = window.__AKINI_DEF_TA;
+                    if (!avatarEl.innerHTML.trim()) avatarEl.innerHTML = "🐰";
                   }
                   if (nameEl) {
                     nameEl.textContent = a;
@@ -14237,7 +14070,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   !__myAv.trim() ||
                   "null" === __myAv.trim() ||
                   "undefined" === __myAv.trim() ||
-                  window.__AKINI_DEF_MY === __myAv.trim()) &&
+                  "🐱" === __myAv.trim()) &&
                 !window.__akiniAvatarRestoreTried
               ) {
                 window.__akiniAvatarRestoreTried = !0;
@@ -14249,7 +14082,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   "function" == typeof et && et();
                 } catch (e2) {}
               }
-              const n = it(__myAv, window.__AKINI_DEF_MY);
+              const n = it(__myAv, "🐱");
               var i = null;
               window.akiniContacts &&
                 (i = window.akiniContacts.getChatTarget(
@@ -14260,7 +14093,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   : localStorage.getItem("akini_ta_name") || "哥哥",
                 o = it(
                   i ? i.avatar : localStorage.getItem("akini_ta_avatar"),
-                  window.__AKINI_DEF_TA,
+                  "🐰",
                 ),
                 /* “我”的头像永远以 localStorage/缓存为准（左位固定是我），禁止被联系人头像覆盖 */
                 r = { name: e, avatar: n },
@@ -14268,7 +14101,7 @@ document.addEventListener("DOMContentLoaded", function () {
               if (window.akiniContacts) {
                 var l = window.akiniContacts.getHomeAvatars(),
                   d = window.akiniContacts.getChatTarget(l.right);
-                d && (c = { name: d.name, avatar: it(d.avatar, window.__AKINI_DEF_TA) });
+                d && (c = { name: d.name, avatar: it(d.avatar, "🐰") });
               }
               var u = r,
                 ta = c;
@@ -14928,15 +14761,15 @@ document.addEventListener("DOMContentLoaded", function () {
             if (ava) {
               var nameInitial = "";
               try {
-                nameInitial = ((i.name || "").trim() || window.__AKINI_DEF_TA).charAt(0);
+                nameInitial = ((i.name || "").trim() || "🐰").charAt(0);
               } catch (e) {
-                nameInitial = window.__AKINI_DEF_TA;
+                nameInitial = "🐰";
               }
               var ic = (i.avatar || i.appIcon || nameInitial) + "";
               if (!ic || ic === "null" || ic === "undefined") {
-                ic = nameInitial || window.__AKINI_DEF_TA;
+                ic = nameInitial || "🐰";
               }
-              if (!ic || ic === window.__AKINI_DEF_TA) {
+              if (!ic || ic === "🐰") {
                 try {
                   var _ct = i.chatId;
                   if (_ct && window.akiniContacts) {
@@ -14949,7 +14782,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       String(_targ.avatar).trim() !== "undefined"
                     )
                       ic = String(_targ.avatar).trim();
-                    else ic = window.__AKINI_DEF_TA;
+                    else ic = "🐰";
                   }
                 } catch (e) {}
               }
@@ -14968,7 +14801,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     _img.style.display = "none";
                     ava.innerHTML =
                       '<span style="font-size:20px;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">' +
-                      (nameInitial || window.__AKINI_DEF_TA) +
+                      (nameInitial || "🐰") +
                       "</span>";
                   };
                 }
@@ -15386,34 +15219,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 (u = !0)),
               (isNaN(s) || s <= 0) && (s = 1),
               (isNaN(d) || d < s) && (d = s));
-            // 首次触发：检查上次写信时间，如果错过间隔就尽快补发（5-15秒后）
-            // 防止每次打开页面都重置倒计时导致永远等不到信
-            if (isFirst) {
-              var _lastMailRun = parseFloat(localStorage.getItem("akini_last_mail_run") || "0");
-              if (_lastMailRun > 0) {
-                var _elapsed = (Date.now() - _lastMailRun) / 3600000; // 已过小时数
-                if (_elapsed >= s) {
-                  // 已过最小间隔 → 5-15秒后触发（尽快补发）
-                  var delay = 5 + Math.random() * 10;
-                  var m = delay * 1000;
-                  console.log("[Akini 信箱] 跨重启续跑：上次写信", _elapsed.toFixed(1), "小时前，已过最小间隔", s, "小时，", delay.toFixed(0), "秒后补发");
-                } else {
-                  // 未过最小间隔 → 按剩余时间等待
-                  var remaining = (s - _elapsed) * 3600;
-                  var delay = Math.max(remaining, 1);
-                  var m = delay * 1000;
-                  console.log("[Akini 信箱] 跨重启续跑：上次写信", _elapsed.toFixed(1), "小时前，剩余", (s - _elapsed).toFixed(1), "小时，", delay.toFixed(0), "秒后触发");
-                }
-              } else {
-                var delay = s;
-                var m = delay * 3600 * 1000;
-                console.log("[Akini 信箱] 首次调度：", delay.toFixed(1), "小时后触发");
-              }
-            } else {
-              var delay = s + Math.random() * (d - s);
-              var m = delay * 3600 * 1000;
-              console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "小时后触发");
-            }
+            // 首次触发使用最小间隔，之后按随机范围；便于用户验证设置已生效
+            var delay = isFirst ? s : (s + Math.random() * (d - s));
+            var m = delay * 3600 * 1000;
+            console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "小时后触发");
             function mailAction() {
               // 防止短时间内多次执行：距上次实际执行不足最小间隔则跳过
               var _minGap = s * 3600 * 1000 * 0.9;
@@ -15625,30 +15434,11 @@ document.addEventListener("DOMContentLoaded", function () {
               window.__akiniRefreshChatMeta();
           });
       }
-      // 平台检测：安卓不开放后台消息通知与保活（保活音频会触发浏览器常驻系统通知且易发烫），仅 iOS 支持
-      var __akiniIsAndroid = /Android/i.test(navigator.userAgent || "");
-      window.__akiniIsAndroid = __akiniIsAndroid;
       (t("keepAliveToggle", !1),
         t("pushNotifyToggle", !1),
         t("msgPopupToggle", !1));
-      if (__akiniIsAndroid) {
-        ["keepAliveToggle", "pushNotifyToggle"].forEach(function (id) {
-          var el = document.getElementById(id);
-          if (!el) return;
-          el.classList.remove("on");
-          localStorage.setItem("akini_toggle_" + id, "0");
-          el.style.opacity = "0.4";
-          el.style.pointerEvents = "none";
-          var row = el.closest(".settings-row");
-          var desc = row && row.querySelector(".desc");
-          if (desc) desc.textContent = "目前仅 iOS 支持后台消息通知";
-        });
-        var tpBtn = document.getElementById("testPushBtn");
-        if (tpBtn) tpBtn.style.display = "none";
-      }
       var e = null;
       async function n() {
-        if (__akiniIsAndroid) return;
         if ("wakeLock" in navigator)
           try {
             (e = await navigator.wakeLock.request("screen")).addEventListener(
@@ -15679,12 +15469,6 @@ document.addEventListener("DOMContentLoaded", function () {
         document
           .getElementById("keepAliveToggle")
           .addEventListener("click", function () {
-            if (__akiniIsAndroid) {
-              this.classList.remove("on");
-              localStorage.setItem("akini_toggle_keepAliveToggle", "0");
-              alert("目前仅 iOS 支持后台消息通知");
-              return;
-            }
             this.classList.contains("on")
               ? (n(),
                 "function" == typeof startKeepAliveIsland &&
@@ -15696,12 +15480,6 @@ document.addEventListener("DOMContentLoaded", function () {
         document
           .getElementById("pushNotifyToggle")
           .addEventListener("click", function () {
-            if (__akiniIsAndroid) {
-              this.classList.remove("on");
-              localStorage.setItem("akini_toggle_pushNotifyToggle", "0");
-              alert("目前仅 iOS 支持后台消息通知");
-              return;
-            }
             if (this.classList.contains("on"))
               if ("Notification" in window) {
                 if ("default" === Notification.permission)
@@ -15748,32 +15526,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
               } else alert("此浏览器不支持通知功能");
           }));
-      // 系统通知发送器：提升到顶层定义（不依赖后台条件），确保测试推送与后台通知
-      // 都优先走 ServiceWorker 的 showNotification（iOS 主屏 PWA 唯一可用通道）；
-      // ready 2 秒未 resolve 则兜底 new Notification，避免 SW 异常时通知彻底消失
-      window.__akiniSystemNotify = function (title, opts, onTap) {
-        opts = opts || {};
-        var done = false;
-        function fallbackNotify() {
-          if (done) return;
-          done = true;
-          try {
-            var d = new Notification(title, opts);
-            d.onclick = function () { window.focus && window.focus(); d.close(); onTap && onTap(); };
-          } catch (e) {}
-        }
-        try {
-          if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-            var to = setTimeout(fallbackNotify, 2000);
-            navigator.serviceWorker.ready.then(function (reg) {
-              if (done) return;
-              clearTimeout(to);
-              if (reg && reg.showNotification) { done = true; reg.showNotification(title, opts); return; }
-              fallbackNotify();
-            }).catch(function () { clearTimeout(to); fallbackNotify(); });
-          } else { fallbackNotify(); }
-        } catch (e) { fallbackNotify(); }
-      };
       var o = window.showInAppNotif,
         r = Date.now();
       ((window.showInAppNotif = function (t) {
@@ -15791,7 +15543,6 @@ document.addEventListener("DOMContentLoaded", function () {
         o && o(sanitized);
         var e = document.getElementById("pushNotifyToggle"),
           n =
-            !__akiniIsAndroid &&
             e &&
             e.classList.contains("on") &&
             "Notification" in window &&
@@ -15806,6 +15557,24 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? (i += " · " + sanitized.name)
                 : sanitized.groupName && (i += " · " + sanitized.groupName);
             // 每条消息使用唯一 tag（chatId+时间戳），确保同时收到多条消息时各自独立通知、不会重叠成一条
+            window.__akiniSystemNotify = function (title, opts, onTap) {
+              opts = opts || {};
+              function fallbackNotify() {
+                try {
+                  var d = new Notification(title, opts);
+                  d.onclick = function () { window.focus && window.focus(); d.close(); onTap && onTap(); };
+                } catch (e) {}
+              }
+              try {
+                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
+                  navigator.serviceWorker.ready.then(function (reg) {
+                    if (reg && reg.showNotification) { reg.showNotification(title, opts); return; }
+                    fallbackNotify();
+                  }).catch(fallbackNotify);
+                } else { fallbackNotify(); }
+              } catch (e) { fallbackNotify(); }
+            };
+
             window.__akiniSystemNotify(i, {
               body: body,
               icon: "./favicon.png",
@@ -15863,7 +15632,6 @@ document.addEventListener("DOMContentLoaded", function () {
         })(),
         t("timestampToggle", !1),
         (function(){
-          try {
           // 时间格式选择：三个选项点击切换，存储 akini_timeFormat = "24" | "12PM" | "12AM"
           // "12:00" = 24 小时制；"12:00PM"/"12:00AM" = 12 小时制（带 AM/PM，按实际时间显示）
           var cur = localStorage.getItem("akini_timeFormat") || "24";
@@ -15873,24 +15641,19 @@ document.addEventListener("DOMContentLoaded", function () {
             "12AM": document.getElementById("timeFmt12AM")
           };
           function syncFmt(){
-            try {
-              for (var k in btns) { if (btns[k] && btns[k].classList) btns[k].classList.toggle("active", k === cur); }
-            } catch (e) { console.warn("syncFmt", e); }
+            for (var k in btns) { if (btns[k]) btns[k].classList.toggle("active", k === cur); }
           }
-          try { syncFmt(); } catch (e) {}
+          syncFmt();
           for (var key in btns) {
             (function(k){
               var btn = btns[k];
-              if (!btn || !btn.addEventListener) return;
+              if (!btn) return;
               btn.addEventListener("click", function(){
-                try {
-                  cur = k; localStorage.setItem("akini_timeFormat", k); syncFmt();
-                  if (window.__renderMail) window.__renderMail();
-                } catch (e) {}
+                cur = k; localStorage.setItem("akini_timeFormat", k); syncFmt();
+                if (window.__renderMail) window.__renderMail();
               });
             })(key);
           }
-          } catch (e) { console.warn("timeFmtInit", e); }
         })(),
         t("darkModeToggle", !1),
         document.querySelectorAll(".style-btn").forEach((t) => {
@@ -16049,7 +15812,7 @@ document.addEventListener("DOMContentLoaded", function () {
               o = window.akiniContacts.getChatTarget(a.left),
               r = window.akiniContacts.getChatTarget(a.right);
             // 左侧固定为“我”
-            t && (t.innerHTML = nt(window.getMyAvatar ? window.getMyAvatar() : window.__AKINI_DEF_MY, 56));
+            t && (t.innerHTML = nt(window.getMyAvatar ? window.getMyAvatar() : "🐱", 56));
             r && e && (e.innerHTML = nt(r.avatar, 56));
             n && (n.textContent = "我");
             r && i && (i.textContent = r.name);
@@ -16113,54 +15876,17 @@ document.addEventListener("DOMContentLoaded", function () {
       (window.getContactStickersSync = function (t) {
         var e = "akini_stickers_" + t;
         if (window.__csCache && window.__csCache[e]) return window.__csCache[e];
-        var n = null;
-        try {
-          if (window.akiniStore && window.akiniStore.memoryGet) {
-            var _mv = window.akiniStore.memoryGet(e);
-            if (_mv != null && _mv !== "") n = _mv;
-          }
-        } catch (e0) {}
-        if (n == null) n = localStorage.getItem(e);
-        var p = [];
+        var n = localStorage.getItem(e);
         if (n)
           try {
-            p = JSON.parse(n) || [];
+            var p = JSON.parse(n);
+            ((window.__csCache = window.__csCache || {}),
+              (window.__csCache[e] = p));
+            return p;
           } catch (t) {
-            p = [];
+            return [];
           }
-        // 该联系人无专属表情包时，聚合全库所有表情包兜底（否则表情包回复永远不触发）
-        if (!p.length) {
-          try {
-            var _keys = [];
-            for (var i = 0; i < localStorage.length; i++) {
-              var k0 = localStorage.key(i);
-              if (k0) _keys.push(k0);
-            }
-            if (window.akiniStore && window.akiniStore.memoryKeys)
-              _keys = _keys.concat(window.akiniStore.memoryKeys());
-            var _seen = {};
-            for (var j = 0; j < _keys.length; j++) {
-              var k = _keys[j];
-              if (!k || _seen[k]) continue;
-              _seen[k] = 1;
-              if (/^akini_stickers_.+/.test(k) && k.slice(-7) !== "_backup" && k !== "akini_stickers_idx") {
-                var _raw = null;
-                try {
-                  if (window.akiniStore && window.akiniStore.memoryGet) {
-                    var _mv2 = window.akiniStore.memoryGet(k);
-                    if (_mv2 != null && _mv2 !== "") _raw = _mv2;
-                  }
-                } catch (e1) {}
-                if (_raw == null) _raw = localStorage.getItem(k);
-                var arr = JSON.parse(_raw || "[]");
-                if (arr && arr.length) p = p.concat(arr);
-              }
-            }
-          } catch (t) {}
-        }
-        ((window.__csCache = window.__csCache || {}),
-          (window.__csCache[e] = p));
-        return p;
+        return [];
       }));
     !(function __amt(isFirst) {
       const e = parseFloat(
@@ -16375,7 +16101,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return {
           id: e.id,
           name: (n && n.name) || e.name || "对方",
-          avatar: (n && n.avatar) || e.avatar || window.__AKINI_DEF_TA,
+          avatar: (n && n.avatar) || e.avatar || "🐰",
         };
       }
       function a(t) {
@@ -16436,7 +16162,7 @@ document.addEventListener("DOMContentLoaded", function () {
           avatar:
             localStorage.getItem("akini_icity_ta_avatar") ||
             localStorage.getItem("akini_ta_avatar") ||
-            window.__AKINI_DEF_TA,
+            "🐰",
         };
       }
       function c(n) {
@@ -17051,7 +16777,7 @@ document.addEventListener("DOMContentLoaded", function () {
               {
                 id: "ta",
                 name: localStorage.getItem("akini_ta_name") || "TA",
-                avatar: localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA,
+                avatar: localStorage.getItem("akini_ta_avatar") || "🐰",
                 isDefault: !0,
               },
             ];
@@ -17061,7 +16787,7 @@ document.addEventListener("DOMContentLoaded", function () {
               {
                 id: "ta",
                 name: p ? p() : "对方",
-                avatar: y ? y() : window.__AKINI_DEF_TA,
+                avatar: y ? y() : "🐰",
                 isDefault: !0,
               },
             ]),
@@ -17097,12 +16823,8 @@ document.addEventListener("DOMContentLoaded", function () {
                       // 再点同一人：取消选择
                       T.splice(e, 1);
                     } else {
-                      // 多选上限 2 人：选 1 人双人模式，选 2 人三人模式
-                      if (T.length >= 2) {
-                        alert("最多选 2 个人哦，你 + 两个 TA 就是三人一起听啦");
-                      } else {
-                        T.push({ id: t.id, name: t.name, avatar: t.avatar });
-                      }
+                      // 单选语义：点选谁就和谁一起听，替换掉之前选择的人
+                      T = [{ id: t.id, name: t.name, avatar: t.avatar }];
                     }
                     saveMusicContacts();
                   })(t),
@@ -17169,7 +16891,7 @@ document.addEventListener("DOMContentLoaded", function () {
             r = $(),
             c = "function" == typeof isSwapped && isSwapped(),
             l = "对方",
-            s = window.__AKINI_DEF_TA;
+            s = "🐰";
           if ("triple" === r && T.length >= 2)
             if (n) a = e.chatCenter;
             else {
@@ -17458,9 +17180,7 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.getItem("akini_music_selected_option");
         try {
           var M = localStorage.getItem("akini_music_selected_contacts");
-          // 单选模式：历史存档可能存了多人，恢复时只保留第一个，多余的一律丢弃
           M && (T = JSON.parse(M));
-          Array.isArray(T) && T.length > 2 && (T = T.slice(0, 2));
         } catch (t) {
           T = [];
         }
@@ -19905,7 +19625,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function setAvatar(el, avatar) {
       if (!el) return;
       if (!avatar) {
-        el.textContent = window.__AKINI_DEF_TA;
+        el.textContent = "🐰";
         return;
       }
       if (
@@ -19931,7 +19651,7 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("[MusicInvite] no contacts");
         return;
       }
-      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : window.__AKINI_DEF_MY;
+      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : "🐱";
       var fromAvatarEl = document.getElementById("musicInviteFromAvatar");
       var myAvatarEl = document.getElementById("musicInviteMyAvatar");
       var fromNameEl = document.getElementById("musicInviteFromName");
@@ -19948,8 +19668,8 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     window._showMusicInviteWaiting = function (contact) {
-      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : window.__AKINI_DEF_MY;
-      var otherAvatar = contact && contact.avatar ? contact.avatar : window.__AKINI_DEF_TA;
+      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : "🐱";
+      var otherAvatar = contact && contact.avatar ? contact.avatar : "🐰";
       var myEl = document.getElementById("musicInviteWaitingMyAvatar");
       var otherEl = document.getElementById("musicInviteWaitingOtherAvatar");
       setAvatar(myEl, myAvatar);
@@ -20098,7 +19818,6 @@ document.addEventListener("DOMContentLoaded", function () {
       if (document.hidden) return;
       if (window._restoringData || window._restoringChatHistory) return;
       try {
-        try { if (typeof flushAllData === "function") flushAllData(); else if (window._flushAllData) window._flushAllData(); } catch(e) {}
         if (window.akiniContacts && window.akiniContacts.getContacts) {
           var contactsEmpty = window.akiniContacts.getContacts().length === 0;
           var sessions = window.akiniContacts.getSessions ? window.akiniContacts.getSessions() : {};
@@ -20214,7 +19933,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!tp || tp._akiniBound) return;
     tp._akiniBound = 1;
     tp.addEventListener("click", function () {
-      if (window.__akiniIsAndroid) { alert("目前仅 iOS 支持后台消息通知"); return; }
       if (!("Notification" in window)) { alert("当前浏览器不支持系统通知"); return; }
       var send = function () {
         var opts = {

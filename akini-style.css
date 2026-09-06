@@ -457,11 +457,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: translateX(-20px);
 }
 .preview-row:first-child .preview-bubble {
-  margin-right: 20px;
-  font-size: 10px; /* 原 50px 吃掉近半行宽，导致 8 字被省略号截成 5 字 */
+  margin-right: 50px;
 }
 .preview-row:nth-child(2) .preview-bubble {
-  margin-left: 20px;
+  margin-left: 50px;
 }
 .preview-avatar {
   width: 42px;
@@ -489,21 +488,17 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   -webkit-backdrop-filter: blur(10px);
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  padding: 7px 11px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
   color: #333;
   line-height: 1.5;
-  /* 预览气泡永不换行：任何字数、任何屏幕都单行显示，超出截断 */
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   outline: 0;
   -webkit-user-modify: read-write;
   user-select: text;
   cursor: text;
   word-break: break-word;
-  max-width: min(240px, 64vw); /* 8 个汉字一行完整放得下，不被省略号截断 */
+  max-width: 160px;
 }
 /* 8 字以内的预览气泡文字强制单行，不折行 */
 .preview-bubble.no-wrap {
@@ -1067,7 +1062,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body .msg-row > .msg-ts {
   width: 38px !important;
   text-align: center !important;
-  margin-top: 5px;
+  margin-top: 1px;
   flex: none !important;
 }
 .chat-body .msg-row.me > .msg-ts {
@@ -1748,7 +1743,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body .msg-row {
   display: flex;
   flex-direction: column;
-  margin-bottom: 26px;
+  margin-bottom: 14px;
   width: 100%;
   position: relative;
 }
@@ -2125,8 +2120,7 @@ body:not(.bubble-css-on)
   justify-content: flex-start;
   margin-top: 2px;
   font-size: 11px;
-  color: #666;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+  color: #999;
   gap: 4px;
   line-height: 1.2;
 }
@@ -2349,8 +2343,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .music-chat-bubble {
   position: relative;
-  max-width: 56px;
-  min-width: 56px;
+  max-width: 120px;
   padding: 8px 12px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.76);
@@ -3765,7 +3758,7 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   position: fixed;
   width: 300px;
   height: 440px;
-  background: rgba(255, 255, 255, 0.78) !important;
+  background: rgba(255, 255, 255, 0.35) !important;
   backdrop-filter: blur(28px) saturate(1.8) !important;
   -webkit-backdrop-filter: blur(28px) saturate(1.8) !important;
   border-radius: 28px;
@@ -4491,8 +4484,8 @@ body {
   margin: 0 auto;
 }
 .call-fullscreen {
-  background: rgba(255, 255, 255, 0.55) !important;
-  backdrop-filter: blur(40px) saturate(2) !important;
+  background: rgba(255, 255, 255, 0.35) !important;
+  backdrop-filter: blur(28px) saturate(1.8) !important;
   -webkit-backdrop-filter: blur(28px) saturate(1.8) !important;
   max-width: none;
   left: 50% !important;
@@ -5483,8 +5476,7 @@ button.back-btn[type="button"] {
   text-align: center !important;
   white-space: nowrap;
   font-size: 10px;
-  color: #666;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+  color: #aaa;
   line-height: 1.2;
   flex: none !important;
 }
@@ -5561,40 +5553,27 @@ button.back-btn[type="button"] {
 .chat-body .msg-row .msg-content-line > .bubble-wrap > div[style*="flex-basis:100%"] {
   flex-basis: auto !important;
 }
-/* me 行 row 级已读回执：绝对定位挂在行尾下方，不占行高（与对方连发间距保持一致） */
+/* me 行 row 级已读回执：引用块保持原始整行样式，已读固定在其下一行、与引用右缘对齐 */
 .chat-body .msg-row.me > .msg-rr {
-  position: absolute;
-  right: 50px;
-  bottom: -13px;
   display: block;
-  width: auto;
+  width: 100%;
   box-sizing: border-box;
   text-align: right;
-  padding: 0;
-  margin: 0;
+  padding: 0 47px 0 0;
+  margin: 1px 0 0 0;
   font-size: 10px;
-  color: #666;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+  color: #aaa;
   line-height: 1.2;
   white-space: nowrap;
-  pointer-events: none;
 }
-/* 已读回执：固定聊天气泡（及引用块）正下方，绝对定位不撑高气泡列（连发间距与对方一致），右缘对齐气泡右缘再往左 6px */
-.chat-body .msg-row.me .msg-content-line > .bubble-wrap {
-  position: relative;
-}
+/* 已读回执：固定聊天气泡（及引用块）正下方 2px，右缘对齐气泡右缘再往左 3px */
 .chat-body .msg-row.me .msg-content-line > .bubble-wrap > .msg-rr {
-  position: absolute !important;
-  right: 6px !important;
-  bottom: -13px !important;
-  margin: 0 !important;
+  margin: 2px 3px 0 0 !important;
   padding: 0 !important;
   font-size: 10px !important;
-  color: #666 !important;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55) !important;
+  color: #aaa !important;
   line-height: 1.2 !important;
   white-space: nowrap;
-  pointer-events: none;
 }
 .chat-body .msg-row.me {
   padding-bottom: 0;
@@ -5812,41 +5791,4 @@ html, body {
   .wb-excl-seg button.on { background: #3a3a3e; color: #f0f0f2; border-color: #4a4a4e; font-weight: 600; }
   .wb-excl-card-row { background: #232327; }
   .wb-excl-card-row .t { color: #ddd; }
-}
-
-/* 预览气泡：空内容时显示为可点击输入的占位虚线框（不是空白消息条） */
-.preview-bubble.is-empty {
-  background: transparent !important;
-  border: 1.5px dashed rgba(0, 0, 0, 0.2) !important;
-  box-shadow: none !important;
-  color: rgba(0, 0, 0, 0.35) !important;
-}
-.preview-bubble.is-empty::before {
-  content: "点我输入";
-  font-size: 12px;
-}
-
-
-/* ===== 低内存设备减负（防卡顿发烫崩溃，mochi 同款思路） ===== */
-/* backdrop-filter 毛玻璃是手机 GPU 发热头号大户，低端机直接关闭（保留底色半透明观感） */
-/* 预览气泡例外：低端机也保留磨砂底（面积小、仅 2 个，发热可忽略） */
-.low-mem .preview-bubble,
-.low-mem .preview-bubble::before,
-.low-mem .preview-bubble::after {
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-}
-.low-mem .preview-bubble { background: rgba(255, 255, 255, 0.55) !important; }
-.low-mem *,
-.low-mem *::before,
-.low-mem *::after {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
-/* 关闭低端机上的循环装饰动画，GPU/CPU 占用清零 */
-.low-mem [class*="cloud"],
-.low-mem [class*="float"],
-.low-mem [class*="sparkle"],
-.low-mem [class*="shine"] {
-  animation: none !important;
 }

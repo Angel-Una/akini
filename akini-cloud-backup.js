@@ -40,11 +40,10 @@
         if (v != null) data[k] = v;
       }
     } catch (e) {}
-    // 内存镜像补充：大键（>200KB 图片等）只存在内存/IDB，必须全量遍历内存键，否则会漏备
+    // 内存镜像补充（localStorage 写满时数据可能只在内存里）
     try {
-      if (window.akiniStore && window.akiniStore.memoryKeys && window.akiniStore.memoryGet) {
-        window.akiniStore.memoryKeys().forEach(function (k) {
-          if (!k || k.indexOf("akini_") !== 0 || SKIP_RE.test(k)) return;
+      if (window.akiniStore && window.akiniStore.memoryGet) {
+        Object.keys(data).forEach(function (k) {
           var mv = window.akiniStore.memoryGet(k);
           if (mv != null && mv !== "") data[k] = mv;
         });
@@ -78,7 +77,6 @@
 
   function backup(immediate) {
     if (_backingUp && !immediate) return;
-    if (document.hidden && !immediate) return; // 页面在后台时不跑周期备份，省电省 CPU（切后台瞬间已有 immediate 备份兜底）
     if (_backupTimer) { clearTimeout(_backupTimer); _backupTimer = null; }
     var run = function () {
       try {
@@ -147,18 +145,12 @@
           try { if (window._idbStore && window._idbStore.set) { window._idbStore.set(k, cloud[k]); window._idbStore.set(k + "_backup", cloud[k]); } } catch (e) {}
         });
         console.warn("[云备份] 已从云端恢复 " + missing.length + " 项缺失数据");
-        // 缺失较多说明本地被清理过：回填后重新渲染界面（不再强制 reload，避免白屏/数据中断）
+        // 缺失较多说明本地被清理过：回填后刷新一次让界面用上恢复的数据（防循环）
         if (missing.length >= 3) {
           try {
             if (!sessionStorage.getItem("akini_cloud_restored")) {
               sessionStorage.setItem("akini_cloud_restored", "1");
-              // 触发 UI 重渲染，不刷新页面
-              if (typeof window.__akiniBootApp === 'function') {
-                try { window.__akiniBootApp(); } catch (e) {}
-              }
-              if (typeof window.renderChatList === 'function') {
-                try { window.renderChatList(); } catch (e) {}
-              }
+              location.reload();
             }
           } catch (e) {}
         }
@@ -172,8 +164,8 @@
   });
   window.addEventListener("pagehide", function () { backup(true); });
   window.addEventListener("beforeunload", function () { backup(true); });
-  // 每 150 秒周期检测（有变化才上传；降低低配机 CPU 峰值，切后台时仍有即时备份）
-  setInterval(function () { backup(false); }, 150000);
+  // 每 90 秒周期检测（有变化才上传）
+  setInterval(function () { backup(false); }, 90000);
   // 启动：先恢复（补缺），30 秒后开始周期备份
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () { setTimeout(restore, 1500); });

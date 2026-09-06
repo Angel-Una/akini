@@ -8,78 +8,16 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,shrink-to-fit=no">
   <title>Akini</title>
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#f5f5f5">
+  <meta name="theme-color" content="#000000">
   <link rel="icon" sizes="96x96" type="image/png" href="favicon-96.png">
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{background:linear-gradient(180deg,#f5f5f5 0%,#ececec 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
-    .splash-card{width:280px;text-align:center;clip-path:inset(0 0 100% 0);transition:clip-path .9s cubic-bezier(.22,.61,.36,1)}
-    .splash-card.loaded{clip-path:inset(0 0 0 0)}
-    .splash-logo{opacity:0;transform:translateY(-12px);transition:opacity .55s ease,transform .55s cubic-bezier(.25,.46,.45,.94);transition-delay:.12s;margin-bottom:18px}
-    .splash-card.loaded .splash-logo{opacity:1;transform:translateY(0)}
-    .splash-title{opacity:0;transform:translateY(-12px);transition:opacity .55s ease,transform .55s cubic-bezier(.25,.46,.45,.94);transition-delay:.26s;font-size:28px;font-weight:600;color:#222;margin-bottom:8px;letter-spacing:2px}
-    .splash-card.loaded .splash-title{opacity:1;transform:translateY(0)}
-    .splash-subtitle{opacity:0;transform:translateY(-12px);transition:opacity .55s ease,transform .55s cubic-bezier(.25,.46,.45,.94);transition-delay:.4s;font-size:13px;color:#888;margin-bottom:28px;line-height:1.5}
-    .splash-card.loaded .splash-subtitle{opacity:1;transform:translateY(0)}
-    .splash-bar-wrap{opacity:0;transform:translateY(-12px);transition:opacity .55s ease,transform .55s cubic-bezier(.25,.46,.45,.94);transition-delay:.54s;width:100%;height:6px;background:rgba(0,0,0,.06);border-radius:999px;overflow:hidden;margin-bottom:18px}
-    .splash-card.loaded .splash-bar-wrap{opacity:1;transform:translateY(0)}
-    .splash-bar{height:100%;background:linear-gradient(90deg,#666,#999);border-radius:999px;transition:width .55s cubic-bezier(.25,.46,.45,.94);width:0%}
-    .splash-status{opacity:0;transform:translateY(-12px);transition:opacity .55s ease,transform .55s cubic-bezier(.25,.46,.45,.94);transition-delay:.68s;font-size:13px;color:#999;margin-bottom:18px;min-height:20px}
-    .splash-card.loaded .splash-status{opacity:1;transform:translateY(0)}
-    .splash-enter{opacity:0;transform:translateY(-12px);transition:opacity .55s ease,transform .55s cubic-bezier(.25,.46,.45,.94);transition-delay:.82s;background:#222;color:#fff;border:none;border-radius:24px;padding:10px 40px;font-size:15px;font-weight:500;cursor:pointer;transition:background .25s,opacity .55s ease .82s,transform .55s cubic-bezier(.25,.46,.45,.94) .82s;letter-spacing:1px;min-width:140px}
-    .splash-card.loaded .splash-enter{opacity:1;transform:translateY(0)}
-    .splash-enter:disabled{background:#ccc;cursor:default;opacity:0.5}
-    .splash-enter:not(:disabled):active{background:#444}
-  </style>
+  <script>location.replace("akini.html" + (location.search || ""));</script>
+  <meta http-equiv="refresh" content="0;url=akini.html">
+  <style>html,body{height:100%;margin:0;background:#000;color:#fff;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center}a{color:#4a90e2;text-decoration:none}</style>
 </head>
 <body>
-<div class="splash-card" id="splashCard">
-  <div class="splash-logo"><svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M32 8 C42 8 50 16 50 26 C50 36 42 44 32 56 C22 44 14 36 14 26 C14 16 22 8 32 8 Z"/><circle cx="32" cy="26" r="3.5"/></svg></div>
-  <div class="splash-title">Akini</div>
-  <div class="splash-subtitle">你的出现，是天意，是命运</div>
-  <div class="splash-bar-wrap"><div class="splash-bar" id="splashBar"></div></div>
-  <div class="splash-status" id="splashStatus">正在进入</div>
-  <button class="splash-enter" id="splashEnterBtn" disabled>进入</button>
-</div>
-<script>
-(function(){
-  var card = document.getElementById('splashCard');
-  if (card) card.classList.add('loaded');
-
-  var bar = document.getElementById('splashBar');
-  var status = document.getElementById('splashStatus');
-  var btn = document.getElementById('splashEnterBtn');
-
-  // 5 秒进度条
-  var startTime = Date.now();
-  var DURATION = 5000;
-  function tick() {
-    var elapsed = Date.now() - startTime;
-    var p = Math.min(100, (elapsed / DURATION) * 100);
-    if (bar) bar.style.width = p + '%';
-    if (p >= 100) {
-      if (btn) btn.disabled = false;
-      if (status) status.textContent = '可以进入了';
-      return;
-    }
-    requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
-
-  // 点击"进入" → 跳转到 akini.html
-  if (btn) {
-    btn.addEventListener('click', function(){
-      window.location.href = 'akini.html?skipsplash=1';
-    });
-  }
-
-  // 10 秒兜底
-  setTimeout(function(){
-    if (btn) btn.disabled = false;
-    if (status) status.textContent = '可以进入了';
-    if (bar) bar.style.width = '100%';
-  }, 10000);
-})();
-</script>
+  <div>
+    <p>正在进入 Akini…</p>
+    <p>如果没有自动跳转，请<a href="akini.html">点击这里</a>。</p>
+  </div>
 </body>
 </html>

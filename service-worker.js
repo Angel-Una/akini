@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20260906v40';
+const CACHE_NAME = 'akini-cache-v20260905h';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -6,8 +6,6 @@ const PRECACHE_ASSETS = [
   './qrcode-bundle.js',
   './favicon.png',
   './localforage.min.js',
-  './html2canvas.min.js',
-  './jszip.min.js',
 ];
 
 self.addEventListener('install', function(event) {
@@ -54,7 +52,7 @@ self.addEventListener('fetch', function(event) {
       return response;
     }).catch(function() {
       return caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
-        return cached || fetch(new Request(event.request, { cache: 'no-cache' }));
+        return cached || fetch(event.request);
       });
     })
   );
