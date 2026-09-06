@@ -5944,6 +5944,13 @@ html, body {
 (function () {
   var splash = document.getElementById('akiniSplash');
   if (!splash) return;
+
+  // 如果是从 index.html 开屏跳转过来的（?skipsplash=1），立即隐藏 splash
+  if (window.location.search.indexOf('skipsplash=1') !== -1) {
+    splash.style.display = 'none';
+    return;
+  }
+
   // 触发 clip-path 渐显入场动画
   splash.classList.add('loaded');
 
@@ -5983,7 +5990,6 @@ html, body {
       if (window.__akiniHideSplash) {
         window.__akiniHideSplash();
       } else {
-        // 兜底：即使 akini-main.js 未加载也能隐藏 splash
         splash.classList.add('hidden');
         setTimeout(function () {
           if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
