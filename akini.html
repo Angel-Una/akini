@@ -5905,7 +5905,19 @@ html, body {
 <style>.back-btn{font-size:24px;background:transparent;border:none;color:#1a1a1a;padding:0 8px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px;box-sizing:border-box}.music-player-info{align-self:stretch!important;width:100%;min-width:0!important}.music-player-meta{width:100%;min-width:0}.music-player-title,.music-player-artist{width:100%;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}/* app-grid-fix */
 .app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
 .app-item { width: 60px; flex-shrink: 0; }
-</style><script>
+</style>
+</head><body>
+<div id="akiniSplash">
+  <div class="akini-splash-card">
+    <div class="akini-splash-logo"><svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M32 8 C42 8 50 16 50 26 C50 36 42 44 32 56 C22 44 14 36 14 26 C14 16 22 8 32 8 Z"/><circle cx="32" cy="26" r="3.5"/></svg></div>
+    <div class="akini-splash-title">Akini</div>
+    <div class="akini-splash-subtitle">你的出现，是天意，是命运</div>
+    <div class="akini-splash-bar-wrap"><div id="akiniSplashBar" style="width:0%"></div></div>
+    <div id="akiniSplashStatus" class="akini-splash-status">正在进入</div>
+    <button id="akiniSplashEnterBtn" class="akini-splash-enter" type="button" disabled>进入</button>
+  </div>
+</div>
+<script>
 (function () {
   /* 启动屏按钮：4 秒后启用"进入"按钮，手动点击进入，不自动隐藏 */
   var s = document.getElementById('akiniSplash');
@@ -5921,6 +5933,7 @@ html, body {
     var bar = document.getElementById("akiniSplashBar");
     if (bar && btn && !btn.disabled) bar.style.width = "100%";
   }
+  enableBtn(); // 立即尝试（此时 DOM 已就绪）
   var iv = setInterval(function () {
     enableBtn();
     var btn = document.getElementById("akiniSplashEnterBtn");
@@ -5929,17 +5942,6 @@ html, body {
   setTimeout(enableBtn, 4000);
 })();
 </script>
-</head><body>
-<div id="akiniSplash">
-  <div class="akini-splash-card">
-    <div class="akini-splash-logo"><svg width="64" height="64" viewBox="0 0 64 64" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M32 8 C42 8 50 16 50 26 C50 36 42 44 32 56 C22 44 14 36 14 26 C14 16 22 8 32 8 Z"/><circle cx="32" cy="26" r="3.5"/></svg></div>
-    <div class="akini-splash-title">Akini</div>
-    <div class="akini-splash-subtitle">你的出现，是天意，是命运</div>
-    <div class="akini-splash-bar-wrap"><div id="akiniSplashBar" style="width:0%"></div></div>
-    <div id="akiniSplashStatus" class="akini-splash-status">正在进入</div>
-    <button id="akiniSplashEnterBtn" class="akini-splash-enter" type="button" disabled>进入</button>
-  </div>
-</div>
 <style>
 #akiniSplash{position:fixed;inset:0;z-index:9999999;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#f5f5f5 0%,#ececec 100%);opacity:1}
 #akiniSplash.loaded{opacity:1}
