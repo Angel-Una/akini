@@ -63,6 +63,8 @@
   // ========== 离线回信投递：检查所有已预约 replyTime 且到点的回信 ==========
   function checkStatus() {
     try {
+      // 检查开关：未开启则跳过
+      if (window.__akiniToggleOn && !window.__akiniToggleOn("contactMailToggle", true)) return;
       var now = Date.now();
       var sent = getSent();
       var changed = false;
@@ -148,11 +150,18 @@
           manageAutoSendTimer();
           return;
         }
+        // 检查开关：未开启则跳过，但继续调度
+        if (window.__akiniToggleOn && !window.__akiniToggleOn("contactMailToggle", true)) {
+          manageAutoSendTimer();
+          return;
+        }
         var contacts = window.akiniContacts ? window.akiniContacts.getContacts() : [];
         if (!contacts || !contacts.length) { manageAutoSendTimer(); return; }
         var c = contacts[Math.floor(Math.random() * contacts.length)];
         var content = genLetter();
         if (!content) { manageAutoSendTimer(); return; }
+        // 记录写信时间，用于跨重启续跑
+        try { localStorage.setItem("akini_last_mail_run", String(Date.now())); } catch (e) {}
         var recv = getReceived();
         recv.push({
           content: content,
@@ -162,6 +171,8 @@
           subtype: "letter",
         });
         saveReceived(recv);
+        // 同时保存到 localStorage 冗余
+        try { localStorage.setItem("akini_mail_received", JSON.stringify(recv)); } catch (e) {}
         if (window.showInAppNotif) {
           window.showInAppNotif({
             app: "信箱",
@@ -179,6 +190,8 @@
         if (window.__renderMail) window.__renderMail();
       } catch (e) {
         console.warn("[akini-mail-engine] autoSend error", e);
+        // 出错后重试调度
+        try { manageAutoSendTimer(); } catch (e2) {}
       }
       manageAutoSendTimer();
     }, delay);
@@ -196,19 +209,26 @@
     checkStatus: checkStatus,
     start: start,
     markActive: markActive,
+    _started: false,
   };
+  // 在 start 中标记已启动
+  var _origStart = start;
+  start = function(){ window.akiniMailEngine._started = true; _origStart(); };
 
   // 等待数据恢复完成后启动
   function boot() {
     if (window.__akiniBooted) { start(); return; }
+    // 强制立即启动：即使 __akiniBooted 未设置，也尽快启动
     var waited = 0;
     var iv = setInterval(function () {
       waited += 200;
-      if (window.__akiniBooted || waited > 8000) {
+      if (window.__akiniBooted || waited > 3000) {
         clearInterval(iv);
         start();
       }
     }, 200);
+    // 兜底：1秒后即使没检测到也启动
+    setTimeout(function(){ if(!window.akiniMailEngine || !window.akiniMailEngine._started){ try{ clearInterval(iv); start(); }catch(e){} } }, 1000);
   }
   boot();
 

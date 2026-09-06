@@ -221,6 +221,7 @@ window.AKR = (function () {
     groupTransferMe: 0.08,
     noReply: 0.2,
     sticker: 0.2,
+    quote: 0.15,
     emojiMix: 0.2,
     incomingCall: 0.03,
     groupCall: 0.03,
@@ -275,8 +276,13 @@ window.AKR = (function () {
     }
     var extra = {};
     if (Math.random() < getProb("poke")) extra.poke = true;
+    if (Math.random() < getProb("sticker")) extra.sticker = true;
+    if (Math.random() < getProb("taTransfer")) extra.transfer = true;
+    if (Math.random() < getProb("quote")) extra.quote = true;
     if (localStorage.getItem("akini_toggle_emojiMixToggle") === "1")
       extra.emojiMix = true;
+    // 打印调试日志
+    try{ console.log("[pickReplyBehavior] 概率: poke="+getProb("poke")+" sticker="+getProb("sticker")+" taTransfer="+getProb("taTransfer")+" quote="+getProb("quote")); }catch(e){}
     return {
       type: "text",
       extra: extra,
@@ -3540,7 +3546,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
-      }, 60000);
+      }, 120000);
     })();
     window._akiniTransferAmount = e;
     window._akiniTransferNote = n;
@@ -8824,16 +8830,18 @@ document.addEventListener("DOMContentLoaded", function () {
             seg.querySelectorAll("button[data-m]").forEach(function (x) {
               x.classList.toggle("on", x === b);
             });
+            // 强制刷新当前联系人专属字卡视图
             try {
               renderExclDetail(cid);
             } catch (err) {
               try { console.warn("[专属字卡] 切换视图失败", err); } catch (e2) {}
             }
-            ev.preventDefault();
-            ev.stopPropagation();
+            try { ev.preventDefault(); } catch(e3) {}
+            try { ev.stopPropagation(); } catch(e4) {}
           };
-          seg.addEventListener("click", _segHandler);
-          seg.addEventListener("touchend", _segHandler, { passive: false });
+          seg.addEventListener("click", _segHandler, true);
+          seg.addEventListener("touchend", _segHandler, { passive: true });
+          seg.addEventListener("touchstart", function(ev){ ev.preventDefault(); }, { passive: false });
           return seg;
         }
         function renderExclDetail(cid) {
@@ -15389,10 +15397,34 @@ document.addEventListener("DOMContentLoaded", function () {
                 (u = !0)),
               (isNaN(s) || s <= 0) && (s = 1),
               (isNaN(d) || d < s) && (d = s));
-            // 首次触发使用最小间隔，之后按随机范围；便于用户验证设置已生效
-            var delay = isFirst ? s : (s + Math.random() * (d - s));
-            var m = delay * 3600 * 1000;
-            console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "小时后触发");
+            // 首次触发：检查上次写信时间，如果错过间隔就尽快补发（5-15秒后）
+            // 防止每次打开页面都重置倒计时导致永远等不到信
+            if (isFirst) {
+              var _lastMailRun = parseFloat(localStorage.getItem("akini_last_mail_run") || "0");
+              if (_lastMailRun > 0) {
+                var _elapsed = (Date.now() - _lastMailRun) / 3600000; // 已过小时数
+                if (_elapsed >= s) {
+                  // 已过最小间隔 → 5-15秒后触发（尽快补发）
+                  var delay = 5 + Math.random() * 10;
+                  var m = delay * 1000;
+                  console.log("[Akini 信箱] 跨重启续跑：上次写信", _elapsed.toFixed(1), "小时前，已过最小间隔", s, "小时，", delay.toFixed(0), "秒后补发");
+                } else {
+                  // 未过最小间隔 → 按剩余时间等待
+                  var remaining = (s - _elapsed) * 3600;
+                  var delay = Math.max(remaining, 1);
+                  var m = delay * 1000;
+                  console.log("[Akini 信箱] 跨重启续跑：上次写信", _elapsed.toFixed(1), "小时前，剩余", (s - _elapsed).toFixed(1), "小时，", delay.toFixed(0), "秒后触发");
+                }
+              } else {
+                var delay = s;
+                var m = delay * 3600 * 1000;
+                console.log("[Akini 信箱] 首次调度：", delay.toFixed(1), "小时后触发");
+              }
+            } else {
+              var delay = s + Math.random() * (d - s);
+              var m = delay * 3600 * 1000;
+              console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "小时后触发");
+            }
             function mailAction() {
               // 防止短时间内多次执行：距上次实际执行不足最小间隔则跳过
               var _minGap = s * 3600 * 1000 * 0.9;

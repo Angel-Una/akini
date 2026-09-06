@@ -98,7 +98,7 @@
     });
   }
   function scheduleIdbFlush() { if (!_idbFlushTimer) _idbFlushTimer = setTimeout(flushIdbQueue, 500); }
-  function queueIdbWrite(k, v) { _idbQueue[k] = v == null ? null : String(v); scheduleIdbFlush(); }
+  function queueIdbWrite(k, v) { _idbQueue[k] = v == null ? null : String(v); flushIdbQueue(); }
   try {
     document.addEventListener('visibilitychange', function () { if (document.hidden) flushIdbQueue(); });
     window.addEventListener('pagehide', flushIdbQueue);
@@ -189,7 +189,7 @@
                   // LS 丢失 / LS 是脏键（上次写失败残留旧值）→ 一律信 IDB 镜像回填，杜绝旧数据回滚
                   var ls = lsGet(k);
                   var big = isBigVal(v);
-                  if (ls != null && ls !== '' && !_lsDirty[k]) {
+                  if (ls != null && ls !== '') {
                     if (big && _bigMemUsed + ls.length > BIG_MEM_BUDGET) {
                       window.__akiniDeferredKeys[k] = 1; // 超预算：不驻留，按需水合
                     } else {

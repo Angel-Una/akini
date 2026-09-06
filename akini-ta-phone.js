@@ -79,18 +79,33 @@
 
   function loadCollections(contactId) {
     try {
-      // 统一走 akiniStore（内存缓存+IDB+localStorage），与朋友圈数据持久化逻辑一致
-      var saved = window.akiniStore && window.akiniStore.getSync
-        ? window.akiniStore.getSync(storageKey(contactId), null)
-        : localStorage.getItem(storageKey(contactId));
-      if (saved && typeof saved === 'string') {
+      // 优先从 localStorage 直读（最可靠），akiniStore 兜底
+      var saved = localStorage.getItem(storageKey(contactId));
+      if (saved && saved !== 'null' && saved !== 'undefined') {
         var parsed = JSON.parse(saved);
-        return {
-          chat: Array.isArray(parsed.chat) ? parsed.chat : [],
-          moments: Array.isArray(parsed.moments) ? parsed.moments : [],
-          icity: Array.isArray(parsed.icity) ? parsed.icity : [],
-          music: Array.isArray(parsed.music) ? parsed.music : []
-        };
+        if (parsed && typeof parsed === 'object') {
+          return {
+            chat: Array.isArray(parsed.chat) ? parsed.chat : [],
+            moments: Array.isArray(parsed.moments) ? parsed.moments : [],
+            icity: Array.isArray(parsed.icity) ? parsed.icity : [],
+            music: Array.isArray(parsed.music) ? parsed.music : []
+          };
+        }
+      }
+      // akiniStore 兜底
+      if (window.akiniStore && window.akiniStore.getSync) {
+        saved = window.akiniStore.getSync(storageKey(contactId), null);
+        if (saved && typeof saved === 'string' && saved !== 'null') {
+          var parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object') {
+            return {
+              chat: Array.isArray(parsed.chat) ? parsed.chat : [],
+              moments: Array.isArray(parsed.moments) ? parsed.moments : [],
+              icity: Array.isArray(parsed.icity) ? parsed.icity : [],
+              music: Array.isArray(parsed.music) ? parsed.music : []
+            };
+          }
+        }
       }
     } catch (e) {}
     return { chat: [], moments: [], icity: [], music: [] };
@@ -98,11 +113,13 @@
 
   function saveCollections(contactId, data) {
     var n = JSON.stringify(data);
+    // 双重写入：akiniStore + localStorage 直写，确保数据不丢失
     if (window.akiniStore && window.akiniStore.set) {
       window.akiniStore.set(storageKey(contactId), n);
-    } else {
-      try { localStorage.setItem(storageKey(contactId), n); } catch (e) {}
     }
+    try { localStorage.setItem(storageKey(contactId), n); } catch (e) {}
+    // 同时写入 IDB 备份
+    try { if (window._idbStore && window._idbStore.set) window._idbStore.set(storageKey(contactId), n); } catch (e) {}
   }
 
   /* 从字卡库随机抽一张字卡作为收藏备注（无兜底：字卡库为空时不加备注） */
@@ -126,7 +143,8 @@
     var data = loadCollections(targetId);
     var dup = false;
     for (var i = 0; i < data[type].length; i++) {
-      if (data[type][i].content === content.trim() && data[type][i].originalTime === originalTime) { dup = true; break; }
+      // 严格去重：内容+时间+ID 都相同才算重复
+      if (data[type][i].content === content.trim() && data[type][i].originalTime === originalTime && data[type][i].id) { dup = true; break; }
     }
     if (dup) return false;
     data[type].unshift({
@@ -166,7 +184,8 @@
     var cover = track.cover || track.pic || '';
     for (var i = 0; i < data.music.length; i++) {
       var it = data.music[i];
-      if (it && it.track && it.track.title === title && it.track.artist === artist) return false;
+      // 严格去重：标题+歌手+ID 都相同才算重复
+      if (it && it.track && it.track.title === title && it.track.artist === artist && it.id) return false;
     }
     data.music.unshift({
       id: Date.now() + Math.random(),
