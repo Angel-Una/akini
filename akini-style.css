@@ -457,7 +457,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: translateX(-20px);
 }
 .preview-row:first-child .preview-bubble {
-  margin-right: 20px; /* 原 50px 吃掉近半行宽，导致 8 字被省略号截成 5 字 */
+  margin-right: 20px;
+  font-size: 10px; /* 原 50px 吃掉近半行宽，导致 8 字被省略号截成 5 字 */
 }
 .preview-row:nth-child(2) .preview-bubble {
   margin-left: 20px;
@@ -2348,7 +2349,8 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .music-chat-bubble {
   position: relative;
-  max-width: 120px;
+  max-width: 56px;
+  min-width: 56px;
   padding: 8px 12px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.76);
@@ -4489,8 +4491,8 @@ body {
   margin: 0 auto;
 }
 .call-fullscreen {
-  background: rgba(255, 255, 255, 0.35) !important;
-  backdrop-filter: blur(28px) saturate(1.8) !important;
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: blur(40px) saturate(2) !important;
   -webkit-backdrop-filter: blur(28px) saturate(1.8) !important;
   max-width: none;
   left: 50% !important;

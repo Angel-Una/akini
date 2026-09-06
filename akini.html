@@ -5858,10 +5858,16 @@ html, body {
   animation: none !important;
 }
 
+/* app-grid-fix */
+.app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
+.app-item { width: 60px; flex-shrink: 0; }
 </style><style id="akini-bubble-force">
   /* 强制胶囊形气泡 + 浅灰默认色（内联，随 HTML 一起加载，确保生效）；问卷卡片等富媒体卡片不参与；应用了自定义气泡 CSS（body.bubble-css-on）时整体停用，让美化样式完全接管 */
   body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { border-radius: 999px !important; }
   body:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { background: #e9e9eb !important; color: #111 !important; }
+/* app-grid-fix */
+.app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
+.app-item { width: 60px; flex-shrink: 0; }
 </style><style id="akini-override-style-z">
   .music-player-right::before{left:-12px !important;background:rgba(255,255,255,0.12) !important}
   .music-player-left{justify-content:flex-start !important;gap:8px !important}
@@ -5882,9 +5888,18 @@ html, body {
   .middle-row{overflow-y:auto !important;-webkit-overflow-scrolling:touch}
   .left-apps-container{overflow-y:auto !important;-webkit-overflow-scrolling:touch}
   .anniversary-container{overflow:hidden !important}
-</style><script>function hideEmojiPanel(){var e=document.getElementById("emojiPanel");e&&(e.style.display="none",e.style.visibility="hidden",e.style.pointerEvents="none")}function getMyLatestMessageText(t){if(!window.akiniContacts)return"";var e=window.akiniContacts.getSession(t||window.akiniContacts.getActiveChatId()),n=e&&e.messagesHTML||"";if(!n)return"";var i=document.createElement("div");i.innerHTML=n;var a=Array.from(i.querySelectorAll(".msg-row.me")),texts=[];for(var o=a.length-1;o>=0;o--){var r=a[o].querySelector(".bubble");if(r&&!r.classList.contains("transfer-bubble")){if(r.querySelector("img")&&!(r.textContent||"").trim()){texts.push("【表情包】");continue}if(!r.querySelector("img")){var c=r.textContent.trim();if(c)texts.push(c)}}}if(!texts.length)return"";return texts[Math.floor(Math.random()*texts.length)]}</script><style id="akiniTopCardOpacityStyle">#topCard,.top-card,body.dark-mode #topCard,body.dark-mode .top-card{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}</style>
+/* app-grid-fix */
+.app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
+.app-item { width: 60px; flex-shrink: 0; }
+</style><script>function hideEmojiPanel(){var e=document.getElementById("emojiPanel");e&&(e.style.display="none",e.style.visibility="hidden",e.style.pointerEvents="none")}function getMyLatestMessageText(t){if(!window.akiniContacts)return"";var e=window.akiniContacts.getSession(t||window.akiniContacts.getActiveChatId()),n=e&&e.messagesHTML||"";if(!n)return"";var i=document.createElement("div");i.innerHTML=n;var a=Array.from(i.querySelectorAll(".msg-row.me")),texts=[];for(var o=a.length-1;o>=0;o--){var r=a[o].querySelector(".bubble");if(r&&!r.classList.contains("transfer-bubble")){if(r.querySelector("img")&&!(r.textContent||"").trim()){texts.push("【表情包】");continue}if(!r.querySelector("img")){var c=r.textContent.trim();if(c)texts.push(c)}}}if(!texts.length)return"";return texts[Math.floor(Math.random()*texts.length)]}</script><style id="akiniTopCardOpacityStyle">#topCard,.top-card,body.dark-mode #topCard,body.dark-mode .top-card{background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}/* app-grid-fix */
+.app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
+.app-item { width: 60px; flex-shrink: 0; }
+</style>
 <script>(function(){try{var op=parseInt(localStorage.getItem('akini_opacity')||'25',10);if(isNaN(op))op=25;var val=op/50;var alpha=val.toFixed(2);var bg=op>0?'rgba(255,255,255,'+alpha+')':'transparent';var s=document.getElementById('akiniTopCardOpacityStyle');if(s){s.textContent='#topCard,.top-card,body.dark-mode #topCard,body.dark-mode .top-card{background:'+bg+'!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}'}}catch(e){}})();</script>
-<style>.back-btn{font-size:24px;background:transparent;border:none;color:#1a1a1a;padding:0 8px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px;box-sizing:border-box}.music-player-info{align-self:stretch!important;width:100%;min-width:0!important}.music-player-meta{width:100%;min-width:0}.music-player-title,.music-player-artist{width:100%;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style><script>
+<style>.back-btn{font-size:24px;background:transparent;border:none;color:#1a1a1a;padding:0 8px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px;box-sizing:border-box}.music-player-info{align-self:stretch!important;width:100%;min-width:0!important}.music-player-meta{width:100%;min-width:0}.music-player-title,.music-player-artist{width:100%;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}/* app-grid-fix */
+.app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
+.app-item { width: 60px; flex-shrink: 0; }
+</style><script>
 (function () {
   /* 启动屏按钮兜底：8 秒后无论数据恢复进度如何都强制启用"进入"按钮（不自动进入，仍需用户手动点击） */
   var t0 = Date.now();
@@ -5940,6 +5955,9 @@ html, body {
 .akini-splash-enter{min-height:46px;min-width:132px;display:inline-flex;align-items:center;justify-content:center;line-height:1.3;box-sizing:border-box;-webkit-appearance:none;appearance:none}
 #akiniSplash .akini-splash-card{overflow:visible!important;clip-path:none!important}
 #akiniSplash.loaded .akini-splash-card>*{opacity:1;transform:translateY(0)}
+/* app-grid-fix */
+.app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
+.app-item { width: 60px; flex-shrink: 0; }
 </style>
 <script>(function(){var s=document.getElementById('akiniSplash');function show(){if(s)s.classList.add('loaded');}function forceHide(){if(s){s.classList.add('hidden');setTimeout(function(){s&&s.parentNode&&s.parentNode.removeChild(s);},600);}}if(s){requestAnimationFrame(show);setTimeout(show,60);setTimeout(forceHide,4000);}})();</script>
 <script>

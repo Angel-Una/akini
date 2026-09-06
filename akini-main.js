@@ -5988,7 +5988,7 @@ document.addEventListener("DOMContentLoaded", function () {
       try { if (typeof window.updatePreview === 'function') window.updatePreview(); } catch (e) {}
     };
     ((window._restoringData = !0),
-      // 安全兜底：无论异步恢复链是否正常回调，最多 6 秒后强制打开恢复门，
+      // 安全兜底：3 秒后强制打开恢复门（减少等待时间）
       // 防止 tryRestoreFromBackup 异常导致 _restoringData 永久卡住、数据无法读写
       setTimeout(function () {
         if (window._restoringData) {
@@ -6024,6 +6024,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       setInterval(function () {
         if (document.hidden || window._restoringData) return;
+        try { if (typeof flushAllData === "function") flushAllData(); else if (window._flushAllData) window._flushAllData(); } catch(e) {}
         window._idbStore &&
           window._idbStore.backupAll &&
           window._idbStore.backupAll();
@@ -8057,6 +8058,12 @@ document.addEventListener("DOMContentLoaded", function () {
           h &&
             h.addEventListener("input", function () {
               ((e = this.value.trim()), f());
+            });
+            h.addEventListener("keyup", function () {
+              ((e = this.value.trim()), f());
+            });
+            h.addEventListener("search", function () {
+              ((e = this.value.trim()), f());
             }),
           w &&
             a(w, function () {
@@ -8854,6 +8861,20 @@ document.addEventListener("DOMContentLoaded", function () {
                 const t = r.querySelector(".t");
                 r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
               });
+            });
+            _exclSearch.addEventListener("keyup", function () {
+              const q = _exclSearch.value.trim();
+              WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
+                const t = r.querySelector(".t");
+                r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
+              });
+            });
+            _exclSearch.addEventListener("search", function () {
+              const q = _exclSearch.value.trim();
+              WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
+                const t = r.querySelector(".t");
+                r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
+              });
             }),
             WEL.appendChild(_exclSearch));
           const all = window.__wbRead("akini_wordbank", []) || [],
@@ -8877,7 +8898,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ((row.className = "wb-excl-card-row"),
                   (row.dataset.ck = ck),
                   (row.innerHTML =
-                    '<span style="width:10px;height:10px;border-radius:50%;background:#111;display:inline-block;flex-shrink:0"></span><div class="t">' + text.replace(/</g, "&lt;") + "</div>" +
+                    '<span style="width:10px;height:10px;border-radius:50%;background:#ddd;display:inline-block;flex-shrink:0"></span><div class="t">' + text.replace(/</g, "&lt;") + "</div>" +
                     (owner && !mine ? '<div class="wb-excl-sub">专属:' + wbContactName(owner) + "</div>" : "") +
                     '<div class="wb-excl-check' + (mine ? " on" : "") + '">' + (mine ? "✓" : "") + "</div>"),
                   WEL.appendChild(row));
@@ -20056,6 +20077,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (document.hidden) return;
       if (window._restoringData || window._restoringChatHistory) return;
       try {
+        try { if (typeof flushAllData === "function") flushAllData(); else if (window._flushAllData) window._flushAllData(); } catch(e) {}
         if (window.akiniContacts && window.akiniContacts.getContacts) {
           var contactsEmpty = window.akiniContacts.getContacts().length === 0;
           var sessions = window.akiniContacts.getSessions ? window.akiniContacts.getSessions() : {};
