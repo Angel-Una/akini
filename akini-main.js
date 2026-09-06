@@ -5618,31 +5618,20 @@ document.addEventListener("DOMContentLoaded", function () {
     // ========== 开屏动画：进度条 + 收尾隐藏 ==========
     window.__akiniSplashProgress = 0;
     window.__akiniSplashDone = !1;
-    window.__akiniSplashStartAt = Date.now();
-    window.__akiniSplashMinMs = 3000; // 固定 3s 引导加载，确保核心数据准备完成
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
-        if (p >= 100) {
-          var elapsed = Date.now() - (window.__akiniSplashStartAt || Date.now());
-          var remain = Math.max(0, (window.__akiniSplashMinMs || 0) - elapsed);
-          if (remain > 0 && !window.__akiniSplashPendingDone) {
-            window.__akiniSplashPendingDone = !0;
-            setTimeout(function () { window.__akiniSetSplashProgress(100, statusText); }, remain);
-            return;
-          }
-        }
-        window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(99, p));
-        if (p >= 100) window.__akiniSplashProgress = 100;
+        p = Math.min(100, Math.max(0, p));
+        window.__akiniSplashProgress = p;
         var bar = document.getElementById("akiniSplashBar");
-        if (bar) bar.style.width = window.__akiniSplashProgress + "%";
+        if (bar) bar.style.width = p + "%";
         var st = document.getElementById("akiniSplashStatus");
         if (st) {
-          if (window.__akiniSplashProgress >= 100) st.textContent = "已准备好";
+          if (p >= 100) st.textContent = "已准备好";
           else st.textContent = statusText || "正在进入";
         }
         var btn = document.getElementById("akiniSplashEnterBtn");
-        if (btn && window.__akiniSplashProgress >= 100) {
+        if (btn && p >= 100) {
           btn.disabled = !1;
           btn.textContent = "进入";
         }

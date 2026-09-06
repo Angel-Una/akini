@@ -5906,9 +5906,9 @@ html, body {
 .app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
 .app-item { width: 60px; flex-shrink: 0; }
 <style>
-#akiniSplash{position:fixed;inset:0;z-index:9999999;display:flex;align-items:center;justify-content:center;background:linear-gradient(180deg,#f5f5f5 0%,#ececec 100%);opacity:1}
-#akiniSplash.loaded{opacity:1}
-#akiniSplash.hidden{pointer-events:none;opacity:0;animation:splashFadeOut .5s ease forwards}
+#akiniSplash{position:fixed;inset:0;z-index:9999999;display:flex !important;visibility:visible !important;opacity:1 !important;align-items:center;justify-content:center;background:linear-gradient(180deg,#f5f5f5 0%,#ececec 100%)}
+#akiniSplash.loaded{opacity:1 !important}
+#akiniSplash.hidden{pointer-events:none !important;opacity:0 !important;animation:splashFadeOut .5s ease forwards}
 @keyframes splashFadeIn{from{opacity:0}to{opacity:1}}
 @keyframes splashFadeOut{from{opacity:1}to{opacity:0}}
 .akini-splash-card{width:min(320px,80vw);background:transparent;border-radius:28px;padding:38px 28px 32px;text-align:center;box-shadow:none;transform:scale(1);clip-path:inset(0 0 100% 0);transition:clip-path .9s cubic-bezier(.22,.61,.36,1)}
@@ -5942,20 +5942,49 @@ html, body {
 </div>
 <script>
 (function () {
-  /* 启动屏：添加 loaded 类触发 clip-path 渐显动画，进度条由 akini-main.js 的 __akiniSetSplashProgress 管理 */
   var splash = document.getElementById('akiniSplash');
-  if (splash) splash.classList.add('loaded');
+  if (!splash) return;
+  // 触发 clip-path 渐显入场动画
+  splash.classList.add('loaded');
 
-  // 点击"进入"按钮后隐藏 splash
-  var btn = document.getElementById("akiniSplashEnterBtn");
+  var bar = document.getElementById('akiniSplashBar');
+  var status = document.getElementById('akiniSplashStatus');
+  var btn = document.getElementById('akiniSplashEnterBtn');
+
+  // ========== 5 秒内进度条从 0% 平滑增加到 100% ==========
+  var PROGRESS_DURATION = 5000;
+  var startTime = Date.now();
+
+  function updateProgress() {
+    var elapsed = Date.now() - startTime;
+    var p = Math.min(100, (elapsed / PROGRESS_DURATION) * 100);
+    // 更新进度条
+    if (bar) bar.style.width = p + '%';
+    // 更新状态文字
+    if (status) {
+      status.textContent = p >= 100 ? '已准备好' : '正在进入';
+    }
+    // 进度读完 → 启用"进入"按钮
+    if (p >= 100) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '进入';
+      }
+      return; // 停止动画
+    }
+    requestAnimationFrame(updateProgress);
+  }
+  requestAnimationFrame(updateProgress);
+
+  // ========== 点击"进入"按钮隐藏开屏界面 ==========
   if (btn) {
-    btn.addEventListener("click", function () {
+    btn.addEventListener('click', function () {
       window.__akiniSplashClick = true;
       if (window.__akiniHideSplash) {
         window.__akiniHideSplash();
       } else {
         // 兜底：即使 akini-main.js 未加载也能隐藏 splash
-        splash.classList.add("hidden");
+        splash.classList.add('hidden');
         setTimeout(function () {
           if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
         }, 600);
@@ -5963,14 +5992,14 @@ html, body {
     });
   }
 
-  // 10 秒兜底：无论任何原因，10 秒后强制启用按钮（不自动隐藏）
-  setTimeout(function() {
-    var btn = document.getElementById("akiniSplashEnterBtn");
-    var st = document.getElementById("akiniSplashStatus");
-    var bar = document.getElementById("akiniSplashBar");
-    if (btn) btn.disabled = false;
-    if (st) st.textContent = "可以进入了";
-    if (bar) bar.style.width = "100%";
+  // ========== 10 秒兜底：强制启用按钮（不自动隐藏） ==========
+  setTimeout(function () {
+    var btn2 = document.getElementById('akiniSplashEnterBtn');
+    var st2 = document.getElementById('akiniSplashStatus');
+    var bar2 = document.getElementById('akiniSplashBar');
+    if (btn2) btn2.disabled = false;
+    if (st2) st2.textContent = '可以进入了';
+    if (bar2) bar2.style.width = '100%';
   }, 10000);
 })();
 </script>
