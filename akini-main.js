@@ -15641,7 +15641,10 @@ document.addEventListener("DOMContentLoaded", function () {
             "12AM": document.getElementById("timeFmt12AM")
           };
           function syncFmt(){
-            for (var k in btns) { if (btns[k]) btns[k].classList.toggle("active", k === cur); }
+            Object.keys(btns).forEach(function(k) {
+              var btn = btns[k];
+              if (btn) btn.classList.toggle("active", k === cur);
+            });
           }
           syncFmt();
           for (var key in btns) {
