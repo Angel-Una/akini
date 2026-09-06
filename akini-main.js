@@ -294,7 +294,7 @@ function requestPersistentStorage() {
   }
 }
 document.addEventListener("DOMContentLoaded", function () {
-  try {
+  try { /* FIX_OPEN */
     window.__akiniBootStep = "dom-ready";
     requestPersistentStorage();
     // === 健壮的导航按钮绑定（确保点击可用）===
@@ -2320,13 +2320,25 @@ document.addEventListener("DOMContentLoaded", function () {
             c = i(e, []),
             s = i(n, {}),
             d = !1,
-            u = 0;
+            u = 0,
+            _finished = false;
           function m() {
+            if (_finished) return;
+            _finished = true;
+            clearTimeout(_safetyTimer);
             a && a(d);
           }
           function f() {
+            if (_finished) return;
             0 === u && m();
           }
+          // 安全兜底：3 秒后强制完成，防止 IDB 任何异步回调挂起导致启动卡死
+          var _safetyTimer = setTimeout(function () {
+            if (!_finished) {
+              console.warn("[Akini] tryRestoreFromBackup timeout, force finish, pending=" + u);
+              m();
+            }
+          }, 3000);
           function mergeSessions(cur, idb) {
             var merged = {};
             for (var k in cur) cur.hasOwnProperty(k) && (merged[k] = cur[k]);
@@ -5170,8 +5182,78 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           }
         } catch (e) {}
+        // 聊天记录抢救：sessionStorage 应急备份 → localStorage → IDB
+        try {
+          if (window.akiniContacts && window.akiniContacts.getSessions) {
+            var curSessions = window.akiniContacts.getSessions() || {};
+            var hasAnyMsg = false;
+            for (var sk in curSessions) {
+              if (curSessions.hasOwnProperty(sk) && curSessions[sk] && curSessions[sk].messagesHTML && curSessions[sk].messagesHTML.trim()) {
+                hasAnyMsg = true; break;
+              }
+            }
+            if (!hasAnyMsg && Object.keys(curSessions).length > 0) {
+              for (var sid in curSessions) {
+                if (!curSessions.hasOwnProperty(sid)) continue;
+                try {
+                  var emergencyHtml = sessionStorage.getItem("akini_chat_history_emergency_" + sid);
+                  if (emergencyHtml && emergencyHtml.trim()) {
+                    window.akiniContacts.updateSession(sid, { messagesHTML: emergencyHtml });
+                    console.log("[抢救] 聊天记录从 sessionStorage 恢复, sid:", sid);
+                  }
+                } catch (_e) {}
+              }
+            }
+          }
+        } catch (e) {}
+        // 朋友圈抢救
+        try {
+          var postsNow = (typeof F !== "undefined" && F) ? F : [];
+          if (!Array.isArray(postsNow) || postsNow.length === 0) {
+            var psrcs = [
+              sessionStorage.getItem("akini_friends_posts_emergency"),
+              localStorage.getItem("akini_friends_posts"),
+              localStorage.getItem("akini_friends_posts_backup")
+            ];
+            for (var pi = 0; pi < psrcs.length; pi++) {
+              var pp = tryParse(psrcs[pi]);
+              if (Array.isArray(pp) && pp.length > 0) {
+                if (typeof window._setPosts === "function") {
+                  window._setPosts(pp);
+                } else {
+                  try { F = pp; } catch (_e) {}
+                }
+                console.log("[抢救] 朋友圈从备份恢复,条数:", pp.length);
+                break;
+              }
+            }
+          }
+        } catch (e) {}
+        // 关键设置抢救：从 sessionStorage 回填到 localStorage
+        try {
+          var criticalKeys = [
+            "akini_ta_name", "akini_my_name", "akini_start_date",
+            "akini_my_avatar", "akini_ta_avatar",
+            "akini_icity_my_avatar", "akini_icity_ta_avatar",
+            "akini_app_version", "akini_contacts_migrated",
+            "akini_active_chat_id"
+          ];
+          criticalKeys.forEach(function (k) {
+            try {
+              var cur = localStorage.getItem(k);
+              if (!cur || cur === "null" || cur === "undefined") {
+                var emergencyVal = sessionStorage.getItem(k + "_emergency");
+                if (emergencyVal && emergencyVal !== "null" && emergencyVal !== "undefined") {
+                  localStorage.setItem(k, emergencyVal);
+                  console.log("[抢救] 关键设置从 sessionStorage 恢复:", k);
+                }
+              }
+            } catch (_e) {}
+          });
+        } catch (e) {}
       }),
       // 同步写全量应急快照到 sessionStorage：刷新/返回时 IDB 事务可能未落盘，sessionStorage 同步可靠
+      // v20261025 增强：覆盖所有关键数据，确保刷新/退出后数据不丢
       (window._akiniEmergencySnapshot = function () {
         try {
           var diaries = q();
@@ -5205,8 +5287,43 @@ document.addEventListener("DOMContentLoaded", function () {
             var sessions = window.akiniContacts.getSessions();
             if (sessions && typeof sessions === "object" && Object.keys(sessions).length > 0) {
               sessionStorage.setItem("akini_chat_sessions_emergency", JSON.stringify(sessions));
+              // 逐条备份聊天记录（sessions 元数据可能不含完整 HTML）
+              for (var sid in sessions) {
+                if (!sessions.hasOwnProperty(sid)) continue;
+                try {
+                  var html = sessions[sid] && sessions[sid].messagesHTML;
+                  if (html && html.trim()) {
+                    sessionStorage.setItem("akini_chat_history_emergency_" + sid, html);
+                  }
+                } catch (_e) {}
+              }
             }
           }
+        } catch (e) {}
+        // 朋友圈数据应急备份
+        try {
+          var posts = (typeof F !== "undefined" && F) ? F : null;
+          if (posts && Array.isArray(posts) && posts.length > 0) {
+            sessionStorage.setItem("akini_friends_posts_emergency", JSON.stringify(posts));
+          }
+        } catch (e) {}
+        // 关键设置应急备份
+        try {
+          var criticalKeys = [
+            "akini_ta_name", "akini_my_name", "akini_start_date",
+            "akini_my_avatar", "akini_ta_avatar",
+            "akini_icity_my_avatar", "akini_icity_ta_avatar",
+            "akini_app_version", "akini_contacts_migrated",
+            "akini_active_chat_id"
+          ];
+          criticalKeys.forEach(function (k) {
+            try {
+              var v = localStorage.getItem(k);
+              if (v && v !== "null" && v !== "undefined") {
+                sessionStorage.setItem(k + "_emergency", v);
+              }
+            } catch (_e) {}
+          });
         } catch (e) {}
       }),
       window.addEventListener("pagehide", function () {
@@ -5224,6 +5341,27 @@ document.addEventListener("DOMContentLoaded", function () {
           if (typeof window._akiniEmergencySnapshot === "function") window._akiniEmergencySnapshot();
         } catch (e) {}
       }));
+    // 定时应急快照：每 8 秒同步到 sessionStorage，防止页面意外终止/浏览器崩溃时丢数据
+    // sessionStorage 是同步写入，性能影响极小，数据至少保留到标签页关闭
+    (function () {
+      var _snapTimer = null;
+      function doSnap() {
+        try {
+          if (typeof window._akiniEmergencySnapshot === "function") {
+            window._akiniEmergencySnapshot();
+          }
+        } catch (e) {}
+      }
+      // 启动 3 秒后开始，之后每 8 秒一次
+      setTimeout(function () {
+        doSnap();
+        _snapTimer = setInterval(doSnap, 8000);
+      }, 3000);
+      // 页面隐藏时立即拍一次，防止后台被系统回收
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) { doSnap(); }
+      });
+    })();
     function q() {
       // 始终尝试从应急/备份源恢复评论（只增不减的合并），防止模块加载时的异步 IDB 回调
       // 已用旧版 localStorage 填充 F 后，q() 因 F 非空而跳过恢复导致评论丢失
@@ -6174,29 +6312,23 @@ document.addEventListener("DOMContentLoaded", function () {
           __akiniBootApp();
         }
       }, 5000),
-      // 进度条平滑动画兜底：即使异步恢复卡住，进度条也会缓慢推进到 90%，避免完全不动
+      // 进度条兜底动画：直接镜像 __akiniSplashProgress，CSS transition 已移除保证实时更新
       (function () {
         var _pBar = document.getElementById("akiniSplashBar");
-        var _curP = 0;
-        var _targetP = 30;
         var _animTimer = setInterval(function () {
           if (window.__akiniSplashDone || window.__akiniSplashProgress >= 100) {
             clearInterval(_animTimer);
+            if (_pBar) _pBar.style.width = "100%";
             return;
           }
-          // 缓慢追赶到当前真实进度的 95%，制造平滑加载感
-          _targetP = Math.max(_targetP, Math.min(90, window.__akiniSplashProgress || 0));
-          if (_curP < _targetP * 0.95) {
-            _curP += (_targetP * 0.95 - _curP) * 0.08;
-            if (_pBar) _pBar.style.width = _curP + "%";
-          }
-          // 如果长时间卡在 30% 附近，缓慢推进到 85% 给用户希望
-          if (_targetP <= 32 && _curP < 85) {
-            _curP += 0.15;
-            if (_pBar) _pBar.style.width = _curP + "%";
-          }
-        }, 80);
-        // 最终在 boot 时清理
+          var p = window.__akiniSplashProgress || 0;
+          // 如果实际进度落后于时间期望（超过2秒无更新），自动推进
+          var elapsed = Date.now() - (window.__akiniSplashStartAt || Date.now());
+          var expectedByTime = Math.min(85, (elapsed / 4000) * 85);
+          var displayP = Math.max(p, expectedByTime);
+          if (p > 0) displayP = Math.max(displayP, p);
+          if (_pBar) _pBar.style.width = displayP + "%";
+        }, 50);
         var _oldBoot = __akiniBootApp;
         __akiniBootApp = function () {
           clearInterval(_animTimer);
@@ -16418,7 +16550,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return [];
           }
         return [];
-      }));
+      });
     !(function __amt(isFirst) {
       const e = parseFloat(
           localStorage.getItem("akini_num_activeMsgMin") || "5",
@@ -20129,7 +20261,7 @@ document.addEventListener("DOMContentLoaded", function () {
     ((window.I = I));
     window.__akiniBootStep = "dom-ready:done";
     console.log("[Akini] v20260825s build - DOMContentLoaded 执行完毕 ✅");
-  } catch (__bootErr) {
+  })); } catch (__bootErr) {
     console.error("[Akini] BOOT ERROR", __bootErr);
     var __stack = "";
     try {
@@ -20361,10 +20493,18 @@ document.addEventListener("DOMContentLoaded", function () {
           if (contactsEmpty || (!anyMsg && Object.keys(sessions).length === 0)) {
             // 内存数据疑似被回收清空：从 IDB 恢复
             window._restoringData = !0;
+            var _visRestoreTimer = setTimeout(function () {
+              if (window._restoringData) {
+                console.warn("[Akini] visibility restore timeout, force boot");
+                window._restoringData = !1;
+                if ("function" == typeof __akiniBootApp) { try { __akiniBootApp(); } catch (e) {} }
+              }
+            }, 4000);
             window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll(function () {
               window.akiniContacts && window.akiniContacts.tryRestoreFromBackup && window.akiniContacts.tryRestoreFromBackup(function () {
                 window.akiniContacts.resetCache && window.akiniContacts.resetCache();
                 window._akiniRestoreFromSnapshot && window._akiniRestoreFromSnapshot(function () {
+                  clearTimeout(_visRestoreTimer);
                   window._restoringData = !1;
                   if ("function" == typeof __akiniBootApp) { try { __akiniBootApp(); } catch (e) {} }
                   if ("function" == typeof window._renderPosts) window._renderPosts();
