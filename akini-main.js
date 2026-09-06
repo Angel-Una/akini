@@ -5623,8 +5623,6 @@ document.addEventListener("DOMContentLoaded", function () {
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
-        // 如果 inline 脚本已标记 splash 就绪，不再覆盖进度条和按钮状态
-        if (window.__akiniSplashReady) return;
         if (p >= 100) {
           var elapsed = Date.now() - (window.__akiniSplashStartAt || Date.now());
           var remain = Math.max(0, (window.__akiniSplashMinMs || 0) - elapsed);
@@ -5703,11 +5701,21 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(_bootRefresh, 500);
         setTimeout(_bootRefresh, 1500);
         setTimeout(_bootRefresh, 3000);
-        // 开屏动画：关键数据与界面渲染完成后，给头像/聊天记录等异步恢复预留时间，再显示「进入」
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(92);
-        setTimeout(function () {
-          window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
-        }, 900);
+        // 开屏动画：5 秒内平滑增加进度条，给异步恢复预留时间
+        (function () {
+          var _progress = 0;
+          var _totalDuration = 5000;
+          var _stepInterval = 80;
+          var _steps = _totalDuration / _stepInterval;
+          var _step = 0;
+          function _tick() {
+            _step++;
+            _progress = Math.min(100, Math.round((_step / _steps) * 100));
+            window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(_progress);
+            if (_progress < 100) setTimeout(_tick, _stepInterval);
+          }
+          setTimeout(_tick, 200);
+        })();
         // 不自动调用 __akiniHideSplash，等待用户点击 #akiniSplashEnterBtn
       }, 300);
       if (

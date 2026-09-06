@@ -5942,47 +5942,12 @@ html, body {
 </div>
 <script>
 (function () {
-  /* 启动屏：clip-path 渐显动画 → 5秒进度条 → 启用"进入"按钮，手动点击进入 */
+  /* 启动屏：添加 loaded 类触发 clip-path 渐显动画，进度条由 akini-main.js 的 __akiniSetSplashProgress 管理 */
   var splash = document.getElementById('akiniSplash');
-  var btn = document.getElementById("akiniSplashEnterBtn");
-  var st = document.getElementById("akiniSplashStatus");
-  var bar = document.getElementById("akiniSplashBar");
-
-  // 逐步增加进度条，模拟加载过程（约 5 秒读完）
-  var progress = 0;
-  var totalDuration = 5000; // 5 秒
-  var stepInterval = 80;    // 每 80ms 更新一次
-  var steps = totalDuration / stepInterval;
-  var step = 0;
-
-  function updateProgress() {
-    step++;
-    progress = Math.min(100, Math.round((step / steps) * 100));
-    if (bar) bar.style.width = progress + "%";
-    if (st) st.textContent = progress < 100 ? "正在进入 " + progress + "%" : "可以进入了";
-    if (progress >= 100) {
-      // 进度条读完 → 启用按钮
-      if (btn) btn.disabled = false;
-      window.__akiniSplashReady = true;
-      // 添加 loaded 类触发 clip-path 动画（如果还没触发）
-      if (splash && !splash.classList.contains('loaded')) splash.classList.add('loaded');
-      return;
-    }
-    setTimeout(updateProgress, stepInterval);
-  }
-
-  // 先添加 loaded 类触发 clip-path 渐显动画
   if (splash) splash.classList.add('loaded');
 
-  // 延迟 200ms 后开始进度条（等 clip-path 动画启动）
-  setTimeout(function() {
-    updateProgress();
-  }, 200);
-
-  // 标记已就绪，防止 akini-main.js 中的 __akiniSetSplashProgress 覆盖进度条
-  window.__akiniSplashReady = true;
-
   // 点击"进入"按钮后隐藏 splash
+  var btn = document.getElementById("akiniSplashEnterBtn");
   if (btn) {
     btn.addEventListener("click", function () {
       window.__akiniSplashClick = true;
@@ -5990,18 +5955,19 @@ html, body {
         window.__akiniHideSplash();
       } else {
         // 兜底：即使 akini-main.js 未加载也能隐藏 splash
-        if (splash) {
-          splash.classList.add("hidden");
-          setTimeout(function () {
-            if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
-          }, 600);
-        }
+        splash.classList.add("hidden");
+        setTimeout(function () {
+          if (splash && splash.parentNode) splash.parentNode.removeChild(splash);
+        }, 600);
       }
     });
   }
 
-  // 10 秒兜底：无论任何原因，10 秒后强制启用按钮
+  // 10 秒兜底：无论任何原因，10 秒后强制启用按钮（不自动隐藏）
   setTimeout(function() {
+    var btn = document.getElementById("akiniSplashEnterBtn");
+    var st = document.getElementById("akiniSplashStatus");
+    var bar = document.getElementById("akiniSplashBar");
     if (btn) btn.disabled = false;
     if (st) st.textContent = "可以进入了";
     if (bar) bar.style.width = "100%";
