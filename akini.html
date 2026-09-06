@@ -498,7 +498,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   padding: 6px 10px;
-  font-size: 7px;
+  font-size: 7px !important;
   color: #333;
   line-height: 1.3;
   /* 预览气泡永不换行：任何字数、任何屏幕都单行显示，超出截断 */
@@ -5813,16 +5813,17 @@ html, body {
 /* 两个 tab 统一灰色系：激活态仅加深底色+黑字加粗，不再用黑底 */
 .wb-excl-seg button.on { background: #e9e9eb; color: #111; border-color: #d5d5d5; font-weight: 600; }
 .wb-excl-card-row {
-  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
   background: #fff !important; border-radius: 12px; margin-bottom: 8px; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  width: 100%; box-sizing: border-box;
 }
 .wb-excl-card-row .t { flex: 1; min-width: 0; font-size: 14px; color: #333; line-height: 1.5; word-break: break-all; }
 @media (prefers-color-scheme: dark) {
   .wb-excl-seg button { background: #2a2a2e; border-color: #3a3a3e; color: #aaa; }
   .wb-excl-seg button.on { background: #3a3a3e; color: #f0f0f2; border-color: #4a4a4e; font-weight: 600; }
-  .wb-excl-card-row { background: #fff !important; }
+  .wb-excl-card-row { background: #fff !important; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
   .wb-excl-card-row .t { color: #ddd; }
 }
 
@@ -5906,51 +5907,26 @@ html, body {
 .app-item { width: 60px; flex-shrink: 0; }
 </style><script>
 (function () {
-  /* 启动屏兜底：不依赖 akini-main.js，独立处理 splash 隐藏 */
+  /* 启动屏按钮：4 秒后启用"进入"按钮，手动点击进入，不自动隐藏 */
+  var s = document.getElementById('akiniSplash');
+  if (s) { s.classList.add('loaded'); }
   var t0 = Date.now();
-  function autoEnter() {
+  function enableBtn() {
     var btn = document.getElementById("akiniSplashEnterBtn");
     var st = document.getElementById("akiniSplashStatus");
-    var bar = document.getElementById("akiniSplashBar");
-    if (btn) {
+    if (btn && btn.disabled) {
       btn.disabled = false;
-      btn.textContent = "进入";
+      if (st && /正在|加载/.test(st.textContent || "")) st.textContent = "可以进入了";
     }
-    if (st) st.textContent = "可以进入了";
-    if (bar) bar.style.width = "100%";
+    var bar = document.getElementById("akiniSplashBar");
+    if (bar && btn && !btn.disabled) bar.style.width = "100%";
   }
-  function hideSplash() {
-    var el = document.getElementById("akiniSplash");
-    if (el) {
-      el.classList.add("hidden");
-      setTimeout(function () {
-        if (el && el.parentNode) el.parentNode.removeChild(el);
-      }, 520);
-    }
-  }
-  function forceEnter() {
-    autoEnter();
-    hideSplash();
-  }
-  // 25秒后启用按钮（兜底，主要靠 akini-main.js 中的 __akiniSetSplashProgress）
-  setTimeout(autoEnter, 25000);
-  // 30秒后自动进入（兜底，防止页面永远卡在开屏）
-  setTimeout(forceEnter, 30000);
-  // 点击按钮进入（需要 akini-main.js 加载完成后 __akiniHideSplash 才可用，但这不影响点击）
-  document.addEventListener("click", function (e) {
-    if (e.target && e.target.id === "akiniSplashEnterBtn") {
-      hideSplash();
-    }
-  });
-  // 每秒检查一次，按钮启用后进度条直接满
   var iv = setInterval(function () {
+    enableBtn();
     var btn = document.getElementById("akiniSplashEnterBtn");
-    if (btn && !btn.disabled) {
-      var bar = document.getElementById("akiniSplashBar");
-      if (bar) bar.style.width = "100%";
-    }
-    if (Date.now() - t0 > 60000) clearInterval(iv);
+    if ((btn && !btn.disabled) || Date.now() - t0 > 20000) clearInterval(iv);
   }, 1000);
+  setTimeout(enableBtn, 4000);
 })();
 </script>
 </head><body>
@@ -5991,7 +5967,6 @@ html, body {
 .app-row { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 8px; }
 .app-item { width: 60px; flex-shrink: 0; }
 </style>
-<script>(function(){var s=document.getElementById('akiniSplash');function show(){if(s)s.classList.add('loaded');}function forceHide(){if(s){s.classList.add('hidden');setTimeout(function(){s&&s.parentNode&&s.parentNode.removeChild(s);},600);}}if(s){requestAnimationFrame(show);setTimeout(show,60);setTimeout(forceHide,35000);}})();</script>
 <script>
 window.akiniGoBack = function(target){
   // 返回优先使用导航历史，否则按目标层级返回
@@ -11514,4 +11489,38 @@ setInterval(akiniCheckScrollText,3000);
     updateMiniPlayerAvatars();
   });
 })();
-</script><script>(function(){var modal=document.getElementById("authorNoteModal");var closeBtn=document.getElementById("authorNoteCloseBtn");function closeAuthorNote(){ if(modal) modal.style.display="none"; }window.showAuthorNote=function(){ if(modal) modal.style.display="flex"; };if(modal){ modal.addEventListener("click",function(e){ if(e.target===modal) closeAuthorNote(); }); }if(closeBtn){ closeBtn.addEventListener("click", closeAuthorNote); }})();</script></body></html>
+</script><script>(function(){var modal=document.getElementById("authorNoteModal");var closeBtn=document.getElementById("authorNoteCloseBtn");function closeAuthorNote(){ if(modal) modal.style.display="none"; }window.showAuthorNote=function(){ if(modal) modal.style.display="flex"; };if(modal){ modal.addEventListener("click",function(e){ if(e.target===modal) closeAuthorNote(); }); }if(closeBtn){ closeBtn.addEventListener("click", closeAuthorNote); }})();</script>
+<script>
+/* 搜索栏兜底: 确保 wordbankOverlay 显示时搜索按钮可正常切换搜索栏 */
+(function() {
+  var _searchBtn = document.getElementById('searchBtn');
+  var _searchBar = document.getElementById('wbSearchBar');
+  var _searchInput = document.getElementById('wbSearchInput');
+  var _searchClose = document.getElementById('wbSearchClose');
+  if (_searchBtn && _searchBar) {
+    _searchBtn.addEventListener('click', function(e) {
+      var isHidden = _searchBar.style.display === 'none' || _searchBar.style.display === '';
+      _searchBar.style.display = isHidden ? 'flex' : 'none';
+      if (isHidden && _searchInput) setTimeout(function(){ _searchInput.focus(); }, 100);
+    });
+  }
+  if (_searchClose && _searchBar) {
+    _searchClose.addEventListener('click', function() {
+      _searchBar.style.display = 'none';
+      if (_searchInput) _searchInput.value = '';
+      // 触发 filter 事件
+      var evt = new Event('input', { bubbles: true });
+      _searchInput && _searchInput.dispatchEvent(evt);
+    });
+  }
+  /* 暴露搜索函数供外部调用 */
+  window.__wbSearch = function(keyword) {
+    if (_searchInput) {
+      _searchInput.value = keyword || '';
+      var evt = new Event('input', { bubbles: true });
+      _searchInput.dispatchEvent(evt);
+    }
+  };
+})();
+</script>
+</body></html>

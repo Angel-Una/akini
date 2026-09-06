@@ -5667,18 +5667,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (window.__akiniHideSplash) window.__akiniHideSplash();
       });
     })();
-    // Splash 4秒强制隐藏兜底：无论加载是否完成，4秒后必须移除 splash，避免白屏
-    setTimeout(function () {
-      try {
-        if (window.__akiniHideSplash) {
-          console.log("[Akini] splash 4s fallback hide");
-          window.__akiniHideSplash();
-        } else {
-          var el = document.getElementById("akiniSplash");
-          if (el) { el.classList.add("hidden"); setTimeout(function(){el.parentNode&&el.parentNode.removeChild(el);},600); }
-        }
-      } catch (e) {}
-    }, 4000);
+    // 不再自动隐藏 splash，用户必须手动点击"进入"按钮
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
       window.__akiniBooted = !0;
@@ -8865,8 +8854,9 @@ document.addEventListener("DOMContentLoaded", function () {
             (_exclSearch.style.cssText = "width:100%;box-sizing:border-box;margin:10px 0 2px;padding:9px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:14px;outline:0;background:#fff"),
             _exclSearch.addEventListener("input", function () {
               const q = _exclSearch.value.trim();
-              WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
-                const t = r.querySelector(".t");
+              // 同时搜索卡片和分组
+              WEL.querySelectorAll(".wb-excl-card-row, .wb-excl-group-item").forEach(function (r) {
+                const t = r.querySelector(".t, .wb-excl-group-name");
                 r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
               });
             }),

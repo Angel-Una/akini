@@ -79,11 +79,13 @@
 
   function loadCollections(contactId) {
     try {
-      // 优先从 localStorage 直读（最可靠），akiniStore 兜底
+      // 从 localStorage 直读
       var saved = localStorage.getItem(storageKey(contactId));
       if (saved && saved !== 'null' && saved !== 'undefined') {
         var parsed = JSON.parse(saved);
         if (parsed && typeof parsed === 'object') {
+          // 同步回写 akiniStore 缓存
+          try{ if(window.akiniStore && window.akiniStore.set) window.akiniStore.set(storageKey(contactId), saved); }catch(e){}
           return {
             chat: Array.isArray(parsed.chat) ? parsed.chat : [],
             moments: Array.isArray(parsed.moments) ? parsed.moments : [],
@@ -98,6 +100,8 @@
         if (saved && typeof saved === 'string' && saved !== 'null') {
           var parsed = JSON.parse(saved);
           if (parsed && typeof parsed === 'object') {
+            // 同步回写 localStorage
+            try{ localStorage.setItem(storageKey(contactId), saved); }catch(e){}
             return {
               chat: Array.isArray(parsed.chat) ? parsed.chat : [],
               moments: Array.isArray(parsed.moments) ? parsed.moments : [],
@@ -208,12 +212,9 @@
     }
   };
 
-  var _lastScanAt = 0;
+  // 节流已移除（不再限制扫描间隔）
   function scanHistory() {
-    /* 节流：30 分钟内最多全量扫描一次，避免频繁打开 TA 手机时反复解析全部聊天 DOM 导致卡顿 */
-    var now = Date.now();
-    if (now - _lastScanAt < 30 * 60 * 1000) return;
-    _lastScanAt = now;
+    /* 节流移除：每次打开 TA 手机都允许扫描，不再限制 30 分钟间隔 */
     try {
       var contacts = getContacts();
       if (window.akiniContacts && typeof window.akiniContacts.getChatTarget === 'function') {
@@ -227,14 +228,14 @@
           var tmp = document.createElement('div');
           tmp.innerHTML = html;
           var meRows = tmp.querySelectorAll('.msg-row.me');
-          /* 只收藏该联系人自己窗口的消息；每次扫描每人最多 1 条（从最新往旧，命中即停） */
+          /* 只收藏该联系人自己窗口的消息；每次扫描可收集多条 */
           for (var ri = meRows.length - 1; ri >= 0; ri--) {
             var bubble = meRows[ri].querySelector('.bubble');
             if (!bubble) continue;
             if (bubble.querySelector('img') && !(bubble.textContent || '').trim()) continue;
             var text = (bubble.textContent || '').trim();
             if (!text) continue;
-            if (Math.random() < CHAT_HISTORY_CHANCE) { addCollection(c.id, 'chat', text, Date.now()); break; }
+            if (Math.random() < CHAT_HISTORY_CHANCE) { addCollection(c.id, 'chat', text, Date.now()); }
           }
         });
       }
@@ -257,19 +258,19 @@
       } catch (e) {}
       if (!Array.isArray(plist)) plist = [];
       /* 朋友圈/iCity/网易云：每个联系人独立判定、各自收藏到自己的手机；
-         每类每次扫描最多 1 条（从最新往旧扫，命中即停），不会一口气收藏一堆 */
+         每类每次扫描可收集多条 */
       contacts.forEach(function (c) {
         if (!c || !c.id) return;
         for (var mi = myPosts.length - 1; mi >= 0; mi--) {
-          if (Math.random() < MOMENTS_HISTORY_CHANCE) { addCollection(c.id, 'moments', myPosts[mi].text, myPosts[mi].ts || Date.now()); break; }
+          if (Math.random() < MOMENTS_HISTORY_CHANCE) { addCollection(c.id, 'moments', myPosts[mi].text, myPosts[mi].ts || Date.now()); }
         }
         for (var di = myDiaries.length - 1; di >= 0; di--) {
-          if (Math.random() < ICITY_HISTORY_CHANCE) { addCollection(c.id, 'icity', myDiaries[di].text, myDiaries[di].ts || Date.now()); break; }
+          if (Math.random() < ICITY_HISTORY_CHANCE) { addCollection(c.id, 'icity', myDiaries[di].text, myDiaries[di].ts || Date.now()); }
         }
         for (var si = plist.length - 1; si >= 0; si--) {
           var t = plist[si];
           if (!t || !(t.title || t.name)) continue;
-          if (Math.random() < MUSIC_HISTORY_CHANCE) { addMusicCollection(c.id, t, Date.now()); break; }
+          if (Math.random() < MUSIC_HISTORY_CHANCE) { addMusicCollection(c.id, t, Date.now()); }
         }
       });
     } catch (e) {}
@@ -372,12 +373,30 @@
     var el = getEl('akini-ta-phone-list');
     if (!el || !currentContactId) return;
     var data = loadCollections(currentContactId);
+    // 调试日志：确认数据内容
+    try{ console.log('[TA手机] renderList contact='+currentContactId+' tab='+currentTab+' chat_len='+(data.chat?data.chat.length:0)+' moments_len='+(data.moments?data.moments.length:0)+' icity_len='+(data.icity?data.icity.length:0)+' music_len='+(data.music?data.music.length:0)); }catch(e){}
     var items = data[currentTab] || [];
     var sortBar = getEl('akini-ta-phone-sort-bar');
     if (sortBar) sortBar.style.display = currentTab === 'chat' ? 'flex' : 'none';
     if (!items.length) {
-      el.innerHTML = '<div class="akini-ta-phone-empty">TA 还没有收藏任何内容...</div>';
-      return;
+      // 尝试从 localStorage 直读数据（绕过 akiniStore 缓存问题）
+      try{
+        var _raw = localStorage.getItem('akini_ta_phone_' + currentContactId);
+        if(_raw && _raw !== 'null'){
+          var _parsed = JSON.parse(_raw);
+          if(_parsed && _parsed[currentTab] && _parsed[currentTab].length > 0){
+            items = _parsed[currentTab];
+            // 回填到 data
+            data[currentTab] = items;
+            // 保存到 akiniStore 修复缓存
+            try{ if(window.akiniStore && window.akiniStore.set) window.akiniStore.set('akini_ta_phone_' + currentContactId, _raw); }catch(e){}
+          }
+        }
+      }catch(e){}
+      if (!items.length) {
+        el.innerHTML = '<div class="akini-ta-phone-empty">TA 还没有收藏任何内容...</div>';
+        return;
+      }
     }
     /* 旧收藏补齐备注：无 remark 的条目现场从字卡库抽一张补上并持久化（字卡库为空则跳过，无兜底文案） */
     var needSave = false;
