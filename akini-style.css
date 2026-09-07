@@ -488,8 +488,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   -webkit-backdrop-filter: blur(10px);
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  padding: 7px 11px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 13px;
   color: #333;
   line-height: 1.5;
   /* 预览气泡永不换行：任何字数、任何屏幕都单行显示，超出截断 */
@@ -5812,14 +5812,6 @@ html, body {
 
 /* ===== 低内存设备减负（防卡顿发烫崩溃，mochi 同款思路） ===== */
 /* backdrop-filter 毛玻璃是手机 GPU 发热头号大户，低端机直接关闭（保留底色半透明观感） */
-/* 预览气泡例外：低端机也保留磨砂底（面积小、仅 2 个，发热可忽略） */
-.low-mem .preview-bubble,
-.low-mem .preview-bubble::before,
-.low-mem .preview-bubble::after {
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-}
-.low-mem .preview-bubble { background: rgba(255, 255, 255, 0.55) !important; }
 .low-mem *,
 .low-mem *::before,
 .low-mem *::after {

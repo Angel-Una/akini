@@ -1582,14 +1582,14 @@ document.addEventListener("DOMContentLoaded", function () {
           var _myAv = _memOrLs("akini_my_avatar", "akini_icity_my_avatar");
           var _restoredAny = !1;
           e.forEach(function (c) {
-            if (c && (!c.avatar || !String(c.avatar).trim() || c.avatar === window.__AKINI_DEF_TA)) {
-              if (c.isDefault) c.avatar = _taAv || window.__AKINI_DEF_TA;
-              else if (c.id === "me" || c.id === "my") c.avatar = _myAv || window.__AKINI_DEF_MY;
+            if (c && (!c.avatar || !String(c.avatar).trim() || c.avatar === "🐰")) {
+              if (c.isDefault) c.avatar = _taAv || "🐰";
+              else if (c.id === "me" || c.id === "my") c.avatar = _myAv || "🐱";
               else {
                 // 用户创建的联系人：优先从专用头像键恢复（IDB 权威数据）
                 var _av = _memOrLs("akini_contact_avatar_" + c.id, "");
                 if (_av) { c.avatar = _av; _restoredAny = !0; }
-                else c.avatar = _taAv || window.__AKINI_DEF_TA;
+                else c.avatar = _taAv || "🐰";
               }
             }
           });
@@ -1617,7 +1617,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try { sessionStorage.setItem("akini_contacts_emergency", JSON.stringify(e)); } catch (_e) {}
         // 冗余备份：每个联系人头像单独存一份，便于刷新后恢复
         e.forEach(function (c) {
-          if (c && c.id && c.avatar && String(c.avatar).trim() && c.avatar !== window.__AKINI_DEF_TA && c.avatar !== window.__AKINI_DEF_MY) {
+          if (c && c.id && c.avatar && String(c.avatar).trim() && c.avatar !== "🐰" && c.avatar !== "🐱") {
             try { L("akini_contact_avatar_" + c.id, c.avatar); } catch (err) {}
           }
         });
@@ -1688,7 +1688,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? window.getMyAvatar()
                 : localStorage.getItem("akini_my_avatar") ||
                   (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-                  window.__AKINI_DEF_MY,
+                  "🐱",
           };
         var e = v(t);
         if (e) {
@@ -1698,7 +1698,7 @@ document.addEventListener("DOMContentLoaded", function () {
               a = localStorage.getItem("akini_ta_avatar") || "";
             } catch (e) {}
           }
-          if (!a || a === window.__AKINI_DEF_TA) {
+          if (!a || a === "🐰") {
             try {
               a = localStorage.getItem("akini_contact_avatar_" + e.id) || a;
             } catch (err) {}
@@ -1898,7 +1898,7 @@ document.addEventListener("DOMContentLoaded", function () {
             a = {
               id: s("ta"),
               name: t || "新联系人",
-              avatar: e || i || window.__AKINI_DEF_TA,
+              avatar: e || i || "🐰",
               note: window.pickWordCards ? window.pickWordCards(1) : "",
               createdAt: Date.now(),
             };
@@ -2735,19 +2735,19 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.getItem("akini_icity_my_avatar");
       if (n) {
         window.__akiniAvatarCache.my = n;
-        return it(n, window.__AKINI_DEF_MY) === window.__AKINI_DEF_MY ? window.__AKINI_DEF_MY : it(n, window.__AKINI_DEF_MY);
+        return it(n, "🐱") === "🐱" ? "🐱" : it(n, "🐱");
       }
       const t = window.__akiniAvatarCache.my;
       if (t) {
-        const av = it(t, window.__AKINI_DEF_MY);
-        return av === window.__AKINI_DEF_MY ? window.__AKINI_DEF_MY : av;
+        const av = it(t, "🐱");
+        return av === "🐱" ? "🐱" : av;
       }
       const e = document.getElementById("myMsgAvatar");
       if (e && e.innerHTML) {
-        const av = it(e.innerHTML, window.__AKINI_DEF_MY);
-        return av === window.__AKINI_DEF_MY ? window.__AKINI_DEF_MY : av;
+        const av = it(e.innerHTML, "🐱");
+        return av === "🐱" ? "🐱" : av;
       }
-      return (m("my", "akini_my_avatar", "akini_icity_my_avatar"), window.__AKINI_DEF_MY);
+      return (m("my", "akini_my_avatar", "akini_icity_my_avatar"), "🐱");
     }
     function g() {
       return localStorage.getItem("akini_my_name") || "我";
@@ -2760,7 +2760,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (ct) {
           if (ct.avatar && ct.avatar.trim()) {
             window.__akiniAvatarCache.ta = ct.avatar;
-            return it(ct.avatar, window.__AKINI_DEF_TA);
+            return it(ct.avatar, "🐰");
           }
           // 联系人对象无头像时，回退到内存缓存/本地保存的对方头像，避免直接显示 emoji 兜底
           var _lsTa =
@@ -2770,12 +2770,12 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.getItem("akini_icity_ta_avatar");
           if (_lsTa) {
             window.__akiniAvatarCache.ta = _lsTa;
-            return it(_lsTa, window.__AKINI_DEF_TA);
+            return it(_lsTa, "🐰");
           }
           // 无头像时用成员自身的 emoji/名字首字作为兜底，避免显示群头像
           var _fb =
             (ct.emoji && String(ct.emoji).trim()) ||
-            (ct.name ? String(ct.name).charAt(0) : window.__AKINI_DEF_TA);
+            (ct.name ? String(ct.name).charAt(0) : "🐰");
           return nt(_fb, 38);
         }
       }
@@ -2786,13 +2786,13 @@ document.addEventListener("DOMContentLoaded", function () {
         localStorage.getItem("akini_icity_ta_avatar");
       if (n) {
         window.__akiniAvatarCache.ta = n;
-        return it(n, window.__AKINI_DEF_TA);
+        return it(n, "🐰");
       }
       const t = window.__akiniAvatarCache.ta;
-      if (t) return it(t, window.__AKINI_DEF_TA);
+      if (t) return it(t, "🐰");
       const e = document.getElementById("taMsgAvatar");
-      if (e && e.innerHTML) return it(e.innerHTML, window.__AKINI_DEF_TA);
-      return (m("ta", "akini_ta_avatar", "akini_icity_ta_avatar"), window.__AKINI_DEF_TA);
+      if (e && e.innerHTML) return it(e.innerHTML, "🐰");
+      return (m("ta", "akini_ta_avatar", "akini_icity_ta_avatar"), "🐰");
     }
     function p() {
       const t = document.getElementById("chatTaName");
@@ -3268,7 +3268,7 @@ document.addEventListener("DOMContentLoaded", function () {
       window.__akiniTypingMap = window.__akiniTypingMap || {};
       var target =
         window.akiniContacts && window.akiniContacts.getChatTarget(t);
-      var avatar = window.__AKINI_DEF_TA;
+      var avatar = "🐰";
       if (memberId && window.akiniContacts) {
         var member = window.akiniContacts.getContactById(memberId);
         if (member) avatar = nt(member.avatar, 38);
@@ -4374,7 +4374,7 @@ document.addEventListener("DOMContentLoaded", function () {
               .find(function (c) {
                 return c.isDefault;
               });
-            if (_defC && (!_defC.avatar || _defC.avatar === window.__AKINI_DEF_TA)) {
+            if (_defC && (!_defC.avatar || _defC.avatar === "🐰")) {
               window.akiniContacts.updateContact(_defC.id, { avatar: e });
             }
           }
@@ -5871,7 +5871,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function nt(t, e) {
       return (
         (e = e || 40),
-        (t && "string" == typeof t && t.trim()) || (t = window.__AKINI_DEF_TA),
+        (t && "string" == typeof t && t.trim()) || (t = "🐰"),
         0 === t.indexOf("<img")
           ? t
           : 0 === t.indexOf("data:") || 0 === t.indexOf("http")
@@ -6974,7 +6974,7 @@ document.addEventListener("DOMContentLoaded", function () {
       (Bt.addEventListener("click", Tt),
         Bt.addEventListener("touchend", Tt, { passive: !1 }));
     }
-    var Mt = window.__AKINI_DEF_TA,
+    var Mt = "🐰",
       Lt = document.getElementById("addContactAvatarPreview"),
       Dt = document.getElementById("fileInputAddContactAvatar");
     function Nt() {
@@ -7021,10 +7021,10 @@ document.addEventListener("DOMContentLoaded", function () {
               ));
           } catch (t) {}
           (e && (e.value = ""),
-            (Mt = window.__AKINI_DEF_TA),
+            (Mt = "🐰"),
             Lt &&
-              (setHtmlKeepInput(Lt, nt(window.__AKINI_DEF_TA, 80)),
-              Lt.setAttribute("data-avatar", window.__AKINI_DEF_TA)),
+              (setHtmlKeepInput(Lt, nt("🐰", 80)),
+              Lt.setAttribute("data-avatar", "🐰")),
             xt(),
             ot(),
             renderHomeAvatarContacts(),
@@ -9178,7 +9178,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 return (
                 localStorage.getItem("akini_my_avatar") ||
                 (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-                window.__AKINI_DEF_MY
+                "🐱"
               );
               if (window.akiniContacts) {
                 if (t.authorId) {
@@ -9190,7 +9190,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
                 if (n) return n.avatar;
               }
-              return localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA;
+              return localStorage.getItem("akini_ta_avatar") || "🐰";
             })(t),
             o = t.author || a,
             r = nt(i, 36);
@@ -9578,7 +9578,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 a =
                   (n ? n.avatar : null) ||
                   localStorage.getItem("akini_ta_avatar") ||
-                  window.__AKINI_DEF_TA;
+                  "🐰";
               window.startCall && window.startCall(i, a);
             }),
           t.addEventListener("click", function () {
@@ -9593,7 +9593,7 @@ document.addEventListener("DOMContentLoaded", function () {
               r =
                 (i ? i.avatar : null) ||
                 localStorage.getItem("akini_ta_avatar") ||
-                window.__AKINI_DEF_TA,
+                "🐰",
               c = document.getElementById("phoneDialAvatar"),
               l = document.getElementById("phoneDialName");
             (l && (l.textContent = a),
@@ -10405,7 +10405,7 @@ document.addEventListener("DOMContentLoaded", function () {
           n =
             e && e.avatar
               ? e.avatar
-              : localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA;
+              : localStorage.getItem("akini_ta_avatar") || "🐰";
         window.startCall && window.startCall(t, n);
       }
     });
@@ -10659,7 +10659,7 @@ document.addEventListener("DOMContentLoaded", function () {
               n =
                 o && o.avatar
                   ? o.avatar
-                  : localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA;
+                  : localStorage.getItem("akini_ta_avatar") || "🐰";
             if (
               o &&
               "group" === o.type &&
@@ -11573,7 +11573,7 @@ document.addEventListener("DOMContentLoaded", function () {
               localStorage.getItem("akini_icity_my_avatar") ||
               (window.__akiniAvatarCache &&
                 window.__akiniAvatarCache.my) ||
-              window.__AKINI_DEF_MY,
+              "🐱",
             e =
               localStorage.getItem("akini_icity_my_nick") ||
               localStorage.getItem("akini_my_name") ||
@@ -11595,8 +11595,8 @@ document.addEventListener("DOMContentLoaded", function () {
         var t =
             localStorage.getItem("akini_my_avatar") ||
             (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-            window.__AKINI_DEF_MY,
-          i = localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA,
+            "🐱",
+          i = localStorage.getItem("akini_ta_avatar") || "🐰",
           a = localStorage.getItem("akini_icity_my_nick") || "我",
           o = localStorage.getItem("akini_icity_my_handle") || a,
           r = localStorage.getItem("akini_icity_ta_nick") || "对方",
@@ -11675,7 +11675,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (d) ((n = t), (l = a), (s = o));
                 else if (e.authorId && window.akiniContacts) {
                   var u = w(e.authorId);
-                  ((n = u.avatar || window.__AKINI_DEF_TA), (l = u.name), (s = u.handle));
+                  ((n = u.avatar || "🐰"), (l = u.name), (s = u.handle));
                 } else ((n = i), (l = r), (s = c));
                 var m = nt(n, 40),
                   g = document.createElement("div");
@@ -11885,7 +11885,7 @@ document.addEventListener("DOMContentLoaded", function () {
                           ? '<img src="' +
                             l +
                             '" style="width:100%;height:100%;object-fit:cover;">'
-                          : l || (c ? window.__AKINI_DEF_MY : window.__AKINI_DEF_TA),
+                          : l || (c ? "🐱" : "🐰"),
                       m = new Date(t.ts || Date.now()),
                       f =
                         String(m.getHours()).padStart(2, "0") +
@@ -11983,10 +11983,10 @@ document.addEventListener("DOMContentLoaded", function () {
             u =
               localStorage.getItem("akini_my_avatar") ||
               (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-              window.__AKINI_DEF_MY,
-            m = localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA,
+              "🐱",
+            m = localStorage.getItem("akini_ta_avatar") || "🐰",
             f = function (t) {
-              if (!t) return window.__AKINI_DEF_TA;
+              if (!t) return "🐰";
               if (t.avatar) return t.avatar;
               if (t.authorId && t.authorId !== "me") {
                 var e = window.getIcityContactProfile
@@ -12004,9 +12004,9 @@ document.addEventListener("DOMContentLoaded", function () {
               if (window.akiniContacts) {
                 var i = window.akiniContacts.getContacts();
                 for (var o = 0; o < i.length; o++)
-                  if (i[o].name === a) return i[o].avatar || window.__AKINI_DEF_TA;
+                  if (i[o].name === a) return i[o].avatar || "🐰";
               }
-              return window.__AKINI_DEF_TA;
+              return "🐰";
             },
             h = function (t) {
               if (!t) return "";
@@ -12140,14 +12140,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   localStorage.getItem("akini_my_avatar") ||
                   (window.__akiniAvatarCache &&
                     window.__akiniAvatarCache.my) ||
-                  window.__AKINI_DEF_MY));
+                  "🐱"));
             else if (t.authorId && window.akiniContacts) {
               var s = w(t.authorId);
-              ((n = s.name), (i = s.handle), (a = s.avatar || window.__AKINI_DEF_TA));
+              ((n = s.name), (i = s.handle), (a = s.avatar || "🐰"));
             } else
               ((n = localStorage.getItem("akini_icity_ta_nick") || "对方"),
                 (i = localStorage.getItem("akini_icity_ta_handle") || n),
-                (a = localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA));
+                (a = localStorage.getItem("akini_ta_avatar") || "🐰"));
             var d = nt(a, 48),
               u = document.getElementById("icityDetailAuthor");
             u && (u.textContent = n + " · 日记");
@@ -12215,7 +12215,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   var av =
                     localStorage.getItem("akini_my_avatar") ||
                     (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
-                    window.__AKINI_DEF_MY;
+                    "🐱";
                   a[r].comments = a[r].comments || [];
                   var l = {
                     id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
@@ -12710,7 +12710,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                             (t.textBaseline = "middle"),
                                             t.fillText(
                                               a.avatar ||
-                                                (a.isMe ? window.__AKINI_DEF_MY : window.__AKINI_DEF_TA),
+                                                (a.isMe ? "🐱" : "🐰"),
                                               e + i / 2,
                                               n + i / 2,
                                             ));
@@ -12720,7 +12720,7 @@ document.addEventListener("DOMContentLoaded", function () {
                                           (t.textAlign = "center"),
                                           (t.textBaseline = "middle"),
                                           t.fillText(
-                                            a.avatar || (a.isMe ? window.__AKINI_DEF_MY : window.__AKINI_DEF_TA),
+                                            a.avatar || (a.isMe ? "🐱" : "🐰"),
                                             e + i / 2,
                                             n + i / 2,
                                           ));
@@ -13259,7 +13259,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         '<img src="' +
                         i.avatar +
                         '" style="width:100%;height:100%;object-fit:cover;">')
-                    : (r.textContent = i.avatar || window.__AKINI_DEF_TA));
+                    : (r.textContent = i.avatar || "🐰"));
                 var c = document.getElementById("icityTaNameDisplay");
                 c && (c.textContent = i.name);
                 var l = document.getElementById("icityTaHandleDisplay");
@@ -13378,7 +13378,7 @@ document.addEventListener("DOMContentLoaded", function () {
         (n && (n.value = e.name),
           i && (i.value = e.handle),
           a && (a.value = e.bio),
-          window.fillPreview("icityEditTaAvatarPreview", e.avatar || window.__AKINI_DEF_TA));
+          window.fillPreview("icityEditTaAvatarPreview", e.avatar || "🐰"));
         var o = document.getElementById("icityEditTaBgPreview");
         D("akini_icity_ta_bg_" + t, function (t) {
           o && t
@@ -13413,7 +13413,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 "icityEditMyAvatarPreview",
                 localStorage.getItem("akini_my_avatar") ||
                   localStorage.getItem("akini_icity_my_avatar") ||
-                  window.__AKINI_DEF_MY,
+                  "🐱",
               ));
             var c = document.getElementById("icityEditMyBgPreview");
             (D("akini_icity_my_bg", function (t) {
@@ -13450,7 +13450,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   "icityEditMyAvatarPreview",
                   localStorage.getItem("akini_my_avatar") ||
                     localStorage.getItem("akini_icity_my_avatar") ||
-                    window.__AKINI_DEF_MY,
+                    "🐱",
                 ));
               var r = document.getElementById("icityEditMyBgPreview");
               D("akini_icity_my_bg", function (t) {
@@ -13793,14 +13793,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   // 信件详情：我寄/回显示我的头像，联系人寄/回显示联系人的头像；姓名始终显示联系人
                   var senderAvatar;
                   if ("sent" === e) {
-                    senderAvatar = localStorage.getItem("akini_my_avatar") || window.__AKINI_DEF_MY;
+                    senderAvatar = localStorage.getItem("akini_my_avatar") || "🐱";
                   } else {
-                    senderAvatar = otherContact ? (otherContact.avatar || window.__AKINI_DEF_TA) : (localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA);
+                    senderAvatar = otherContact ? (otherContact.avatar || "🐰") : (localStorage.getItem("akini_ta_avatar") || "🐰");
                   }
                   if (avatarEl) {
                     avatarEl.innerHTML = "";
                     avatarEl.innerHTML = nt(senderAvatar, 44);
-                    if (!avatarEl.innerHTML.trim()) avatarEl.innerHTML = window.__AKINI_DEF_TA;
+                    if (!avatarEl.innerHTML.trim()) avatarEl.innerHTML = "🐰";
                   }
                   if (nameEl) {
                     nameEl.textContent = a;
@@ -14135,7 +14135,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   !__myAv.trim() ||
                   "null" === __myAv.trim() ||
                   "undefined" === __myAv.trim() ||
-                  window.__AKINI_DEF_MY === __myAv.trim()) &&
+                  "🐱" === __myAv.trim()) &&
                 !window.__akiniAvatarRestoreTried
               ) {
                 window.__akiniAvatarRestoreTried = !0;
@@ -14147,7 +14147,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   "function" == typeof et && et();
                 } catch (e2) {}
               }
-              const n = it(__myAv, window.__AKINI_DEF_MY);
+              const n = it(__myAv, "🐱");
               var i = null;
               window.akiniContacts &&
                 (i = window.akiniContacts.getChatTarget(
@@ -14158,7 +14158,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   : localStorage.getItem("akini_ta_name") || "哥哥",
                 o = it(
                   i ? i.avatar : localStorage.getItem("akini_ta_avatar"),
-                  window.__AKINI_DEF_TA,
+                  "🐰",
                 ),
                 /* “我”的头像永远以 localStorage/缓存为准（左位固定是我），禁止被联系人头像覆盖 */
                 r = { name: e, avatar: n },
@@ -14166,7 +14166,7 @@ document.addEventListener("DOMContentLoaded", function () {
               if (window.akiniContacts) {
                 var l = window.akiniContacts.getHomeAvatars(),
                   d = window.akiniContacts.getChatTarget(l.right);
-                d && (c = { name: d.name, avatar: it(d.avatar, window.__AKINI_DEF_TA) });
+                d && (c = { name: d.name, avatar: it(d.avatar, "🐰") });
               }
               var u = r,
                 ta = c;
@@ -14826,15 +14826,15 @@ document.addEventListener("DOMContentLoaded", function () {
             if (ava) {
               var nameInitial = "";
               try {
-                nameInitial = ((i.name || "").trim() || window.__AKINI_DEF_TA).charAt(0);
+                nameInitial = ((i.name || "").trim() || "🐰").charAt(0);
               } catch (e) {
-                nameInitial = window.__AKINI_DEF_TA;
+                nameInitial = "🐰";
               }
               var ic = (i.avatar || i.appIcon || nameInitial) + "";
               if (!ic || ic === "null" || ic === "undefined") {
-                ic = nameInitial || window.__AKINI_DEF_TA;
+                ic = nameInitial || "🐰";
               }
-              if (!ic || ic === window.__AKINI_DEF_TA) {
+              if (!ic || ic === "🐰") {
                 try {
                   var _ct = i.chatId;
                   if (_ct && window.akiniContacts) {
@@ -14847,7 +14847,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       String(_targ.avatar).trim() !== "undefined"
                     )
                       ic = String(_targ.avatar).trim();
-                    else ic = window.__AKINI_DEF_TA;
+                    else ic = "🐰";
                   }
                 } catch (e) {}
               }
@@ -14866,7 +14866,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     _img.style.display = "none";
                     ava.innerHTML =
                       '<span style="font-size:20px;display:flex;align-items:center;justify-content:center;width:100%;height:100%;">' +
-                      (nameInitial || window.__AKINI_DEF_TA) +
+                      (nameInitial || "🐰") +
                       "</span>";
                   };
                 }
@@ -15883,7 +15883,7 @@ document.addEventListener("DOMContentLoaded", function () {
               o = window.akiniContacts.getChatTarget(a.left),
               r = window.akiniContacts.getChatTarget(a.right);
             // 左侧固定为“我”
-            t && (t.innerHTML = nt(window.getMyAvatar ? window.getMyAvatar() : window.__AKINI_DEF_MY, 56));
+            t && (t.innerHTML = nt(window.getMyAvatar ? window.getMyAvatar() : "🐱", 56));
             r && e && (e.innerHTML = nt(r.avatar, 56));
             n && (n.textContent = "我");
             r && i && (i.textContent = r.name);
@@ -16172,7 +16172,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return {
           id: e.id,
           name: (n && n.name) || e.name || "对方",
-          avatar: (n && n.avatar) || e.avatar || window.__AKINI_DEF_TA,
+          avatar: (n && n.avatar) || e.avatar || "🐰",
         };
       }
       function a(t) {
@@ -16233,7 +16233,7 @@ document.addEventListener("DOMContentLoaded", function () {
           avatar:
             localStorage.getItem("akini_icity_ta_avatar") ||
             localStorage.getItem("akini_ta_avatar") ||
-            window.__AKINI_DEF_TA,
+            "🐰",
         };
       }
       function c(n) {
@@ -16848,7 +16848,7 @@ document.addEventListener("DOMContentLoaded", function () {
               {
                 id: "ta",
                 name: localStorage.getItem("akini_ta_name") || "TA",
-                avatar: localStorage.getItem("akini_ta_avatar") || window.__AKINI_DEF_TA,
+                avatar: localStorage.getItem("akini_ta_avatar") || "🐰",
                 isDefault: !0,
               },
             ];
@@ -16858,7 +16858,7 @@ document.addEventListener("DOMContentLoaded", function () {
               {
                 id: "ta",
                 name: p ? p() : "对方",
-                avatar: y ? y() : window.__AKINI_DEF_TA,
+                avatar: y ? y() : "🐰",
                 isDefault: !0,
               },
             ]),
@@ -16966,7 +16966,7 @@ document.addEventListener("DOMContentLoaded", function () {
             r = $(),
             c = "function" == typeof isSwapped && isSwapped(),
             l = "对方",
-            s = window.__AKINI_DEF_TA;
+            s = "🐰";
           if ("triple" === r && T.length >= 2)
             if (n) a = e.chatCenter;
             else {
@@ -19702,7 +19702,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function setAvatar(el, avatar) {
       if (!el) return;
       if (!avatar) {
-        el.textContent = window.__AKINI_DEF_TA;
+        el.textContent = "🐰";
         return;
       }
       if (
@@ -19728,7 +19728,7 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("[MusicInvite] no contacts");
         return;
       }
-      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : window.__AKINI_DEF_MY;
+      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : "🐱";
       var fromAvatarEl = document.getElementById("musicInviteFromAvatar");
       var myAvatarEl = document.getElementById("musicInviteMyAvatar");
       var fromNameEl = document.getElementById("musicInviteFromName");
@@ -19745,8 +19745,8 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     window._showMusicInviteWaiting = function (contact) {
-      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : window.__AKINI_DEF_MY;
-      var otherAvatar = contact && contact.avatar ? contact.avatar : window.__AKINI_DEF_TA;
+      var myAvatar = window.getMyAvatar ? window.getMyAvatar() : "🐱";
+      var otherAvatar = contact && contact.avatar ? contact.avatar : "🐰";
       var myEl = document.getElementById("musicInviteWaitingMyAvatar");
       var otherEl = document.getElementById("musicInviteWaitingOtherAvatar");
       setAvatar(myEl, myAvatar);
