@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>页面跳转中…</title>
+<script>
+// GitHub Pages 404 兜底：自动跳回首页
+var base = location.origin + location.pathname.replace(/[^/]*$/, '');
+location.replace(base || (location.origin + '/'));
+</script>
+</head>
+<body style="font-family:-apple-system,sans-serif;text-align:center;padding:60px 20px;color:#333">
+<p>页面跳转中…</p>
+<p><a href="/" style="color:#07c160">如果没有自动跳转，点这里回首页</a></p>
+</body>
+</html>

@@ -6071,3 +6071,116 @@ body.dark-mode .wb-bottom .btn-close {
   background: #2c2c2e;
   color: #c8c8c8;
 }
+
+/* ============ 字卡库 v20260908g 布局结构改编（功能逻辑不变） ============ */
+/* 头部：左关闭圆钮 + 标题 + 右侧黑色新增按钮，底部操作条隐藏 */
+.wb-header {
+  position: static;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px 6px;
+  background: transparent;
+  border-bottom: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.wb-header .icon-title { font-size: 19px; }
+.wb-head-close {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: none; background: #fff; color: #555;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.08); flex-shrink: 0;
+}
+.wb-head-close:active { transform: scale(.92); background: #f0ede8; }
+.wb-head-add {
+  margin-left: auto;
+  display: flex; align-items: center; gap: 5px;
+  height: 34px; padding: 0 14px;
+  border: none; border-radius: 18px;
+  background: #1a1a1a; color: #fff;
+  font-size: 13px; font-weight: 600; font-family: inherit;
+  cursor: pointer; box-shadow: 0 3px 10px rgba(0,0,0,.18); flex-shrink: 0;
+}
+.wb-head-add:active { transform: scale(.95); opacity: .88; }
+#wbSelectActions, #wbBlockActions { margin-left: 0 !important; }
+/* Tab：iOS 分段控件（灰槽 + 白色激活块） */
+.wb-tabs {
+  margin: 4px 16px 6px;
+  padding: 3px;
+  gap: 0;
+  background: rgba(0,0,0,.07);
+  border-radius: 14px;
+}
+.wb-tabs .tab {
+  background: transparent;
+  border: none; border-radius: 11px;
+  padding: 8px 0;
+  font-size: 13px; color: #777;
+  box-shadow: none;
+}
+.wb-tabs .tab.active {
+  background: #fff; color: #1a1a1a; font-weight: 600;
+  border: none;
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
+}
+/* 工具条：4 列功能网格，图标在上文字在下 */
+.wb-toolbar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 6px 16px 12px;
+  overflow-x: visible;
+  background: transparent;
+  border-bottom: none;
+}
+.wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }
+.wb-toolbar .tool-btn {
+  width: 100%; min-width: 0; height: auto;
+  flex-direction: column; gap: 5px;
+  padding: 10px 0 8px;
+  border-radius: 14px; border: none;
+  background: #fff; color: #444;
+  box-shadow: 0 1px 4px rgba(0,0,0,.06);
+}
+.wb-toolbar .tool-btn .tb-label {
+  font-size: 11px; color: #999; line-height: 1; font-weight: 500;
+}
+/* 内容区与底部 */
+.wb-content { padding: 10px 16px 24px; }
+.wb-bottom { display: none; }
+/* 深色模式适配新结构 */
+body.dark-mode .wb-head-close { background: #2c2c2e; color: #ccc; }
+body.dark-mode .wb-head-add { background: #f0f0f0; color: #1a1a1a; }
+body.dark-mode .wb-tabs { background: rgba(255,255,255,.08); }
+body.dark-mode .wb-tabs .tab { color: #9a9a9e; }
+body.dark-mode .wb-tabs .tab.active { background: #3a3a3c; color: #f0f0f0; box-shadow: none; }
+body.dark-mode .wb-toolbar .tool-btn { background: #242426 !important; border: none !important; }
+body.dark-mode .wb-toolbar .tool-btn .tb-label { color: #777; }
+
+/* ============ 数据管理 v20260908g 视觉升级（与字卡库统一设计语言） ============ */
+.ak-storage-area .settings-card {
+  border: none;
+  border-radius: 18px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.05);
+}
+.ak-stor-total-label { font-size: 13px; color: #999; font-weight: 500; }
+.ak-stor-total-val { font-size: 17px; font-weight: 700; color: #1a1a1a; font-variant-numeric: tabular-nums; }
+.ak-stor-track { height: 6px; background: rgba(0,0,0,.06); border-radius: 3px; }
+.ak-stor-cell { background: rgba(0,0,0,.035); border-radius: 12px; padding: 12px 6px; }
+.ak-stor-cell-val { font-size: 15px; }
+.ak-stor-btn {
+  height: 44px; border-radius: 14px;
+  border: none; background: rgba(0,0,0,.05); color: #333; font-weight: 500;
+}
+.ak-stor-btn.primary { background: #1a1a1a; border-color: #1a1a1a; color: #fff; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.16); }
+.ak-stor-btn.danger { background: rgba(255,59,48,.08); border: none; color: #ff3b30; }
+.ak-badge-blue { background: rgba(0,0,0,.06); color: #555; }
+.ak-badge-purple { background: rgba(0,0,0,.06); color: #555; }
+.ak-badge-gray { background: rgba(0,0,0,.05); color: #999; }
+body.dark-mode .ak-storage-area .settings-card { background: #242426; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
+body.dark-mode .ak-stor-total-val { color: #f0f0f0; }
+body.dark-mode .ak-stor-track { background: rgba(255,255,255,.1); }
+body.dark-mode .ak-stor-cell { background: rgba(255,255,255,.06); }
+body.dark-mode .ak-stor-btn { background: rgba(255,255,255,.08); color: #ddd; }
+body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0; color: #1a1a1a; }
+body.dark-mode .ak-badge-blue, body.dark-mode .ak-badge-purple { background: rgba(255,255,255,.1); color: #aaa; }
