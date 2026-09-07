@@ -495,7 +495,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   /* 预览气泡永不换行：任何字数、任何屏幕都单行显示，超出截断 */
   white-space: nowrap !important;
   overflow: hidden !important;
-  text-overflow: ellipsis;
+  text-overflow: clip; /* 超出直接截断，绝不显示省略号 */
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   outline: 0;
   -webkit-user-modify: read-write;
@@ -508,7 +508,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .preview-bubble.no-wrap {
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: clip; /* 超出直接截断，绝不显示省略号 */
 }
 .preview-bubble:focus {
   background: rgba(255, 255, 255, 0.75);
