@@ -2124,8 +2124,7 @@ body:not(.bubble-css-on)
   justify-content: flex-start;
   margin-top: 2px;
   font-size: 11px;
-  color: #666;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+  color: #999;
   gap: 4px;
   line-height: 1.2;
 }
@@ -5481,8 +5480,7 @@ button.back-btn[type="button"] {
   text-align: center !important;
   white-space: nowrap;
   font-size: 10px;
-  color: #666;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+  color: #aaa;
   line-height: 1.2;
   flex: none !important;
 }
@@ -5559,40 +5557,27 @@ button.back-btn[type="button"] {
 .chat-body .msg-row .msg-content-line > .bubble-wrap > div[style*="flex-basis:100%"] {
   flex-basis: auto !important;
 }
-/* me 行 row 级已读回执：绝对定位挂在行尾下方，不占行高（与对方连发间距保持一致） */
+/* me 行 row 级已读回执：引用块保持原始整行样式，已读固定在其下一行、与引用右缘对齐 */
 .chat-body .msg-row.me > .msg-rr {
-  position: absolute;
-  right: 50px;
-  bottom: -13px;
   display: block;
-  width: auto;
+  width: 100%;
   box-sizing: border-box;
   text-align: right;
-  padding: 0;
-  margin: 0;
+  padding: 0 47px 0 0;
+  margin: 1px 0 0 0;
   font-size: 10px;
-  color: #666;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55);
+  color: #aaa;
   line-height: 1.2;
   white-space: nowrap;
-  pointer-events: none;
 }
-/* 已读回执：固定聊天气泡（及引用块）正下方，绝对定位不撑高气泡列（连发间距与对方一致），右缘对齐气泡右缘再往左 6px */
-.chat-body .msg-row.me .msg-content-line > .bubble-wrap {
-  position: relative;
-}
+/* 已读回执：固定聊天气泡（及引用块）正下方 2px，右缘对齐气泡右缘再往左 3px */
 .chat-body .msg-row.me .msg-content-line > .bubble-wrap > .msg-rr {
-  position: absolute !important;
-  right: 6px !important;
-  bottom: -13px !important;
-  margin: 0 !important;
+  margin: 2px 3px 0 0 !important;
   padding: 0 !important;
   font-size: 10px !important;
-  color: #666 !important;
-  text-shadow: 0 0 3px rgba(255, 255, 255, 0.55) !important;
+  color: #aaa !important;
   line-height: 1.2 !important;
   white-space: nowrap;
-  pointer-events: none;
 }
 .chat-body .msg-row.me {
   padding-bottom: 0;

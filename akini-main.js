@@ -1000,16 +1000,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     delayMs = freshDelay;
                   }
                 } else {
-                  // 朋友圈/iCity/互动等周期任务过期不补发，直接按新间隔重排（避免上线秒发）
-                  if (
-                    name === "friendsPost" ||
-                    name === "icityPost" ||
-                    name === "friendsInteract"
-                  ) {
-                    delayMs = freshDelay;
-                  } else {
-                    delayMs = 5000 + Math.floor(Math.random() * 10000);
-                  }
+                  delayMs = 5000 + Math.floor(Math.random() * 10000);
                 }
               }
             }
@@ -2858,13 +2849,8 @@ document.addEventListener("DOMContentLoaded", function () {
           k = null,
           _ = o.quoteText || "",
           b = o.quoteName || "";
-        if (
-          !_ &&
-          !s &&
-          window.__akiniToggleOn("quoteReplyToggle", false) &&
-          Math.random() < window.AKR.getProb("quote")
-        ) {
-          var I = getMyLatestMessageText(t);
+        if (!_ && l && !s && Math.random() < window.AKR.getProb("quote")) {
+          var I = getMyLatestMessageText();
           I && ((_ = I), (b = g() || "我"));
         }
         var B = "";
@@ -2970,8 +2956,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         if (0 === msgArr.length) return;
         var $ = "";
-        // 引用文本已在上方按概率选定，此处不再二次掷骰（修复双重概率导致几乎不触发）
-        if (_) {
+        if (_ && Math.random() < window.AKR.getProb("quote")) {
           var W = b || "我",
             J = _.slice(0, 40) + (_.length > 40 ? "…" : "");
           $ =
@@ -3800,9 +3785,8 @@ document.addEventListener("DOMContentLoaded", function () {
             return it.text;
           });
         } catch (err) {}
-        // 无自定义 emoji 字卡时使用内置常用表情兜底，确保开关开启后功能可见
-        if (!emojis.length)
-          emojis = ["🥺", "😭", "🥰", "😤", "🙄", "😳", "🫶", "💢", "✨", "🫠"];
+        // 无自定义 emoji 时不混入（联系人只能用字卡库内容，无兜底）
+        if (!emojis.length) return text;
         var emoji = emojis[Math.floor(Math.random() * emojis.length)];
         return Math.random() < 0.5 ? emoji + " " + text : text + " " + emoji;
       }
@@ -15963,54 +15947,17 @@ document.addEventListener("DOMContentLoaded", function () {
       (window.getContactStickersSync = function (t) {
         var e = "akini_stickers_" + t;
         if (window.__csCache && window.__csCache[e]) return window.__csCache[e];
-        var n = null;
-        try {
-          if (window.akiniStore && window.akiniStore.memoryGet) {
-            var _mv = window.akiniStore.memoryGet(e);
-            if (_mv != null && _mv !== "") n = _mv;
-          }
-        } catch (e0) {}
-        if (n == null) n = localStorage.getItem(e);
-        var p = [];
+        var n = localStorage.getItem(e);
         if (n)
           try {
-            p = JSON.parse(n) || [];
+            var p = JSON.parse(n);
+            ((window.__csCache = window.__csCache || {}),
+              (window.__csCache[e] = p));
+            return p;
           } catch (t) {
-            p = [];
+            return [];
           }
-        // 该联系人无专属表情包时，聚合全库所有表情包兜底（否则表情包回复永远不触发）
-        if (!p.length) {
-          try {
-            var _keys = [];
-            for (var i = 0; i < localStorage.length; i++) {
-              var k0 = localStorage.key(i);
-              if (k0) _keys.push(k0);
-            }
-            if (window.akiniStore && window.akiniStore.memoryKeys)
-              _keys = _keys.concat(window.akiniStore.memoryKeys());
-            var _seen = {};
-            for (var j = 0; j < _keys.length; j++) {
-              var k = _keys[j];
-              if (!k || _seen[k]) continue;
-              _seen[k] = 1;
-              if (/^akini_stickers_.+/.test(k) && k.slice(-7) !== "_backup" && k !== "akini_stickers_idx") {
-                var _raw = null;
-                try {
-                  if (window.akiniStore && window.akiniStore.memoryGet) {
-                    var _mv2 = window.akiniStore.memoryGet(k);
-                    if (_mv2 != null && _mv2 !== "") _raw = _mv2;
-                  }
-                } catch (e1) {}
-                if (_raw == null) _raw = localStorage.getItem(k);
-                var arr = JSON.parse(_raw || "[]");
-                if (arr && arr.length) p = p.concat(arr);
-              }
-            }
-          } catch (t) {}
-        }
-        ((window.__csCache = window.__csCache || {}),
-          (window.__csCache[e] = p));
-        return p;
+        return [];
       }));
     !(function __amt(isFirst) {
       const e = parseFloat(
