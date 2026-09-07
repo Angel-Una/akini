@@ -56,6 +56,22 @@
   function memSet(k, v) { memoryCache[k] = v; }
   function memRemove(k) { delete memoryCache[k]; }
 
+  // ---- mochi 同款①：大键（>200KB，图片/壁纸 dataURL）不进 localStorage ----
+  // 手机 LS 配额仅 ~5MB，几张图片就撑爆；撑爆后【所有】后续 setItem 全部静默失败，
+  // 这就是数据"随机消失"的头号根因。大键只进 内存缓存 + IndexedDB（配额大得多）。
+  var LS_BIG_LIMIT = 200 * 1024;
+  function isBigVal(v) { return typeof v === 'string' && v.length > LS_BIG_LIMIT; }
+
+  // ---- mochi 同款②：LS 写失败脏键集合——对账时这些键信 IDB，不信 LS 残留旧值 ----
+  var _lsDirty = {};
+  try {
+    var _d = JSON.parse(sessionStorage.getItem('akini_ls_dirty') || '[]');
+    if (Array.isArray(_d)) _d.forEach(function (k) { if (k) _lsDirty[k] = 1; });
+  } catch (e) {}
+  function lsDirtySave() { try { sessionStorage.setItem('akini_ls_dirty', JSON.stringify(Object.keys(_lsDirty))); } catch (e) {} }
+  function markDirty(k) { if (!_lsDirty[k]) { _lsDirty[k] = 1; lsDirtySave(); } }
+  function clearDirty(k) { if (_lsDirty[k]) { delete _lsDirty[k]; lsDirtySave(); } }
+
   function getIDB() { return window._idbStore; }
   function idbGet(k, cb) {
     var IDB = getIDB();
@@ -108,7 +124,14 @@
   function akiniSet(k, v, cb) {
     if (typeof v !== 'string') v = String(v);
     memSet(k, v);
-    var lsOk = lsSet(k, v);
+    var lsOk = true;
+    if (isBigVal(v)) {
+      // 大键：跳过 localStorage，并清掉 LS 里的旧残留，防止旧值遮蔽新值
+      lsRemoveRaw(k);
+    } else {
+      lsOk = lsSet(k, v);
+      if (lsOk) clearDirty(k); else markDirty(k);
+    }
     if (isCriticalKey(k)) queueIdbWrite(k, v);
     // localStorage 写失败（配额满等）时立即落盘 IDB，不等 500ms 防抖，防退出丢数据
     if (!lsOk) flushIdbQueue();
@@ -125,45 +148,73 @@
   function akiniGetJson(k, cb, fb) { akiniGet(k, function (v) { cb(safeParse(v, fb)); }); }
   function akiniSetJson(k, v, cb) { var s = safeStringify(v); if (s == null) { if (cb) cb(false); return; } akiniSet(k, s, cb); }
 
-  // ---- 启动全量对账恢复：IDB 有的全部回填到 内存 + localStorage ----
+  // ---- 启动全量对账恢复（mochi 同款 OOM 防线）：分批流式 + 大键驻留预算 ----
+  // 背景：几十 MB 的图片/字卡键一次性全量读入内存会把 JS 堆推到渲染进程上限直接崩溃
+  //（Chrome "喔唷崩溃啦"），低端安卓机尤其明显。防两条：
+  //  ① 分批恢复：每批 4 键、批间隔 25ms，瞬时内存峰值不再叠加；
+  //  ② 大键驻留预算：>200KB 的键驻留总量 ≤4GB 设备 12MB / 其他 24MB，超预算的键
+  //     不驻留内存（记入 __akiniDeferredKeys），读取时按需从 IDB 异步水合。
   var _restored = false;
+  var BIG_MEM_BUDGET = ((typeof navigator !== 'undefined' && navigator.deviceMemory) || 4) <= 4 ? 12 * 1024 * 1024 : 24 * 1024 * 1024;
+  var _bigMemUsed = 0;
+  if (!window.__akiniDeferredKeys) window.__akiniDeferredKeys = {};
   function restoreAll() {
     var IDB = getIDB();
     if (!IDB || !IDB.keys) return;
     try {
       IDB.keys(function (keys) {
         if (!Array.isArray(keys)) return;
-        var done = 0, total = 0;
         var targets = keys.filter(function (k) {
           return k && String(k).indexOf('akini_') === 0 && String(k).indexOf('_backup') < 0 && !HIGH_FREQ_RE.test(String(k));
         });
-        total = targets.length;
-        function fin() {
-          done++;
-          if (done >= total) {
-            _restored = true;
-            try { if (typeof window.__akiniOnCriticalRestored === 'function') window.__akiniOnCriticalRestored(); } catch (e) {}
-            console.log('[存储] 启动恢复完成，共同步', total, '个键');
-          }
-        }
-        if (!total) { fin(); return; }
-        targets.forEach(function (k) {
-          idbGet(k, function (v) {
-            if (v != null && v !== '') {
-              // 对账策略：localStorage 是同步权威层，有值一律以 LS 为准并回写 IDB；
-              // 仅当 LS 丢失（被浏览器清理等）时才用 IDB 镜像回填，避免旧数据回滚覆盖新操作
-              var ls = lsGet(k);
-              if (ls != null && ls !== '') {
-                memSet(k, ls);
-                if (ls !== v) queueIdbWrite(k, ls);
-              } else {
-                memSet(k, v);
-                lsSet(k, v);
-              }
+        var i = 0;
+        (function nextBatch() {
+          if (i >= targets.length) {
+            if (!_restored) {
+              _restored = true;
+              try { if (typeof window.__akiniOnCriticalRestored === 'function') window.__akiniOnCriticalRestored(); } catch (e) {}
+              console.log('[存储] 启动恢复完成，共同步', targets.length, '个键，大键驻留', Math.round(_bigMemUsed / 1024), 'KB');
             }
-            fin();
+            return;
+          }
+          var batch = targets.slice(i, i + 4);
+          i += 4;
+          var pending = batch.length;
+          batch.forEach(function (k) {
+            idbGet(k, function (v) {
+              try {
+                if (v != null && v !== '') {
+                  // 对账策略（mochi 同款）：localStorage 有值且【不在脏键集合】→ 以 LS 为准并回写 IDB；
+                  // LS 丢失 / LS 是脏键（上次写失败残留旧值）→ 一律信 IDB 镜像回填，杜绝旧数据回滚
+                  var ls = lsGet(k);
+                  var big = isBigVal(v);
+                  if (ls != null && ls !== '' && !_lsDirty[k]) {
+                    if (big && _bigMemUsed + ls.length > BIG_MEM_BUDGET) {
+                      window.__akiniDeferredKeys[k] = 1; // 超预算：不驻留，按需水合
+                    } else {
+                      memSet(k, ls);
+                      if (big) _bigMemUsed += ls.length;
+                    }
+                    if (ls !== v) queueIdbWrite(k, ls);
+                  } else if (big) {
+                    // 大键不回填 LS（防回填又撑爆配额）；预算内驻留内存，超预算按需水合
+                    if (_bigMemUsed + v.length > BIG_MEM_BUDGET) {
+                      window.__akiniDeferredKeys[k] = 1;
+                    } else {
+                      memSet(k, v);
+                      _bigMemUsed += v.length;
+                    }
+                    lsRemoveRaw(k);
+                  } else {
+                    memSet(k, v);
+                    if (lsSet(k, v)) clearDirty(k); else markDirty(k);
+                  }
+                }
+              } catch (e) {}
+              if (--pending <= 0) setTimeout(nextBatch, 25);
+            });
           });
-        });
+        })();
       });
     } catch (e) {}
   }
@@ -184,25 +235,47 @@
     restoreChatHistoryFromIdb: restoreChatHistoryFromIdb,
     memoryGet: memGet,
     memorySet: memSet,
-    memoryRemove: memRemove
+    memoryRemove: memRemove,
+    memoryKeys: function () { return Object.keys(memoryCache); }
   };
 
   // ---- 拦截 localStorage 写入：先原始写入（绝不被中断），再镜像内存+IDB ----
   try {
     var lsProto = Object.getPrototypeOf(rawLS);
     if (lsProto && rawLS) {
-      var self = { memSet: memSet, memRemove: memRemove, queueIdbWrite: queueIdbWrite, isCritical: isCriticalKey, origSet: origSet, origRemove: origRemove };
+      var self = { memGet: memGet, memSet: memSet, memRemove: memRemove, queueIdbWrite: queueIdbWrite, isCritical: isCriticalKey, origSet: origSet, origGet: origGet, origRemove: origRemove, isBigVal: isBigVal, markDirty: markDirty, clearDirty: clearDirty };
+      // mochi 同款③：读取拦截——内存缓存优先（大键只存在内存/IDB，直接读 LS 会拿到空）
+      lsProto.getItem = function (k) {
+        try {
+          if (self.isCritical(k)) {
+            var m = self.memGet(k);
+            if (m !== null) return m;
+            // 超预算大键未驻留内存：触发异步水合，本次先返回 LS 值，水合完成后下次读取即得
+            if (window.__akiniDeferredKeys && window.__akiniDeferredKeys[k]) {
+              delete window.__akiniDeferredKeys[k];
+              idbGet(k, function (v) { if (v != null && v !== '') memSet(k, v); });
+            }
+          }
+          return self.origGet ? self.origGet.call(this, k) : null;
+        } catch (e) { return null; }
+      };
       lsProto.setItem = function (k, v) {
-        // 1) 原始写入永远先执行，任何异常都不影响它
+        var sv = String(v);
+        var big = self.isCritical(k) && self.isBigVal(sv);
         var ok = true;
-        try { self.origSet.call(this, k, v); } catch (e) { ok = false; }
+        // 1) 原始写入永远先执行（大键跳过 LS 并清残留，防撑爆配额）；任何异常都不影响镜像
+        if (big) {
+          try { self.origRemove.call(this, k); } catch (e) {}
+        } else {
+          try { self.origSet.call(this, k, v); } catch (e) { ok = false; }
+        }
         // 2) 镜像层失败无所谓，绝不影响数据本体
         try {
           if (self.isCritical(k)) {
-            self.memSet(k, String(v));
-            self.queueIdbWrite(k, String(v));
-            // 原始写入失败时立即落盘 IDB，不等防抖
-            if (!ok) flushIdbQueue();
+            self.memSet(k, sv);
+            self.queueIdbWrite(k, sv);
+            if (ok || big) { self.clearDirty(k); }
+            else { self.markDirty(k); flushIdbQueue(); }
           }
         } catch (e) {}
       };

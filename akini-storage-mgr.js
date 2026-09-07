@@ -138,33 +138,19 @@
       ? '<div class="ak-warn">存储空间已超 80%！建议导出备份后清理，否则最旧的聊天消息可能被自动修剪</div>'
       : "";
 
+    // 简洁版：只保留 导出 / 导入 / 清空 三个操作（数据安全页）
     body.innerHTML =
-      '<div class="settings-card ak-stor-hero">' +
-        '<div class="ak-stor-total-row"><span class="ak-stor-total-label">存储总用量</span>' +
-        '<span class="ak-stor-total-val">' + fmtBytes(st.total) + " / ~5 MB</span></div>" +
-        '<div class="ak-stor-track"><div class="ak-stor-fill" style="width:' + pct.toFixed(1) + "%;background:" + barColor + '"></div></div>' +
-        warn +
-        '<div class="ak-stor-grid">' +
-          ["chat", "friends", "icity", "media", "other"].map(function (c) {
-            var meta = CAT_META[c];
-            return '<div class="ak-stor-cell"><div class="ak-stor-cell-val" style="color:' + meta.color + '">' +
-              fmtBytes(st[c]) + '</div><div class="ak-stor-cell-key">' + meta.label + "</div></div>";
-          }).join("") +
-        "</div>" +
-        '<div class="ak-hint" style="margin-top:8px">含图片/贴纸的消息以高清原图存储，比纯文字（仅几B）大很多属正常；可用下方「危险区」一键清空重开</div>' +
-      "</div>" +
-
-      '<div class="settings-card"><div class="card-title">备份与恢复</div>' +
-        '<div class="ak-hint">数据每次变更已自动备份到浏览器本地库；换设备/清理浏览器前请先导出备份文件</div>' +
+      '<div class="settings-card"><div class="card-title">数据备份</div>' +
+        '<div class="ak-hint">数据已自动备份到浏览器本地库和云端；换设备或清理浏览器前，请先导出备份文件</div>' +
         '<div class="ak-btn-col">' +
-          '<button class="ak-stor-btn primary" id="akStorExport" type="button">导出全部备份</button>' +
-          '<button class="ak-stor-btn" id="akStorImport" type="button">从备份文件恢复</button>' +
+          '<button class="ak-stor-btn primary" id="akStorExport" type="button">导出数据</button>' +
+          '<button class="ak-stor-btn" id="akStorImport" type="button">导入数据</button>' +
           '<input type="file" id="akStorImportFile" accept=".zip,.json" style="display:none">' +
         "</div>" +
       "</div>" +
 
-      '<div class="settings-card"><div class="card-title">危险区</div>' +
-        '<div class="ak-hint">清空后聊天记录、联系人、朋友圈、iCity、贴纸、设置全部删除（含浏览器本地库），不可恢复</div>' +
+      '<div class="settings-card"><div class="card-title">清空数据</div>' +
+        '<div class="ak-hint">清空后聊天记录、联系人、朋友圈、iCity、贴纸、设置全部删除，不可恢复，请谨慎操作</div>' +
         '<div class="ak-btn-col">' +
           '<button class="ak-stor-btn" id="akStorWipe" type="button" style="color:#fa5151;border-color:#fa5151">清空全部数据</button>' +
         "</div>" +
