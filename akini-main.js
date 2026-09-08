@@ -2729,7 +2729,9 @@ document.addEventListener("DOMContentLoaded", function () {
         rr = document.createElement("span");
         rr.className = "msg-rr";
         rr.textContent = "已读";
-        row.appendChild(rr);
+        rr.style.visibility = "visible";
+        var wrapT = line.querySelector(":scope > .bubble-wrap");
+        if (wrapT) wrapT.appendChild(rr); else row.appendChild(rr);
       }
     }
     function __akiniInsertTimestampSeparators() {
@@ -2783,20 +2785,20 @@ document.addEventListener("DOMContentLoaded", function () {
         chatBody.__akiniMetaInterval = setInterval(function () {
           if (document.hidden) return;
           var cb = document.getElementById("chatBody");
-          if (cb && cb.offsetParent === null) return;
+          if (cb && cb.getClientRects().length === 0) return; // fixed 布局 offsetParent 恒 null，用渲染框判断可见性
           if (cb) {
             // 性能：只处理尚未构建元数据的消息行（单次上限40条），不再每3秒全量扫描整个聊天DOM
             var __rows = cb.querySelectorAll(".msg-row:not([data-meta-v])");
             var __lim = Math.min(__rows.length, 40);
             for (var __mi = 0; __mi < __lim; __mi++) __akiniProcessMsgMeta(__rows[__mi]);
-            // 已读回执终兜底：我方消息回执存在但仍隐藏的，直接点亮（不再等调度）
+            // 已读回执终兜底：我方所有消息（普通/转账/问卷/引用/表情包/图片）——无回执补建、藏着点亮
             if (__akiniToggleOn("readReceiptToggle")) {
-              var __hid = cb.querySelectorAll(".msg-row.me .msg-rr");
-              for (var __hi = 0; __hi < __hid.length; __hi++) {
-                var __rrEl = __hid[__hi];
-                if (__rrEl.style && __rrEl.style.visibility === "hidden") {
-                  var __rrRow = __rrEl.closest ? __rrEl.closest(".msg-row") : null;
-                  if (__rrRow) { try { __akiniShowReadReceipt(__rrRow); } catch (e) {} }
+              var __meRows = cb.querySelectorAll(".msg-row.me:not(.timestamp-row)");
+              for (var __hi = 0; __hi < __meRows.length; __hi++) {
+                var __mr = __meRows[__hi];
+                var __rrEl = __mr.querySelector(".msg-rr");
+                if (!__rrEl || (__rrEl.style && __rrEl.style.visibility === "hidden")) {
+                  try { __akiniShowReadReceipt(__mr); } catch (e) {}
                 }
               }
             }
