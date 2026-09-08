@@ -72,7 +72,9 @@
       var doReload = function () {
         if (reloaded) return;
         reloaded = true;
-        try { location.reload(true); } catch (e) { location.reload(); }
+        // milk 式：换 URL 整页加载（?reset= 时间戳），bfcache 对 URL 变化不适用，旧页面无法从内存复活
+        try { location.href = location.pathname + "?reset=" + Date.now(); }
+        catch (e) { try { location.reload(true); } catch (e2) { location.reload(); } }
       };
       var clearLocal = function () {
         try { localStorage.clear(); } catch (e) {}
@@ -95,21 +97,10 @@
         setTimeout(doReload, 400);
       };
       var deleteAllIdb = function () {
-        // 枚举并删除本站点全部 IndexedDB 数据库（不留任何残留）
-        try {
-          if (indexedDB.databases) {
-            indexedDB.databases().then(function (dbs) {
-              (dbs || []).forEach(function (d) { if (d && d.name) { try { indexedDB.deleteDatabase(d.name); } catch (e) {} } });
-              finish();
-            }).catch(function () {
-              ["akini_img_db", "AkiniApp", "localforage"].forEach(function (n) { try { indexedDB.deleteDatabase(n); } catch (e) {} });
-              finish();
-            });
-          } else {
-            ["akini_img_db", "AkiniApp", "localforage"].forEach(function (n) { try { indexedDB.deleteDatabase(n); } catch (e) {} });
-            finish();
-          }
-        } catch (e) { finish(); }
+        // milk 式：主库已被 _idbStore.clearAll()（= localforage.clear()，同连接清空）处理；
+        // 这里只删除无活动连接的 legacy 旧库，避免 deleteDatabase 被打开的连接 blocked 挂起
+        try { indexedDB.deleteDatabase("akini_img_db"); } catch (e) {}
+        finish();
       };
       // 等待主库真正清空后再删库，最后刷新
       try {

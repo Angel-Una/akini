@@ -2554,13 +2554,16 @@ document.addEventListener("DOMContentLoaded", function () {
       // v6：时间戳在头像正下方；已读回执包在 bubble-wrap 内固定于聊天气泡/引用正下方
       if (row.getAttribute("data-meta-v") === "10") {
         var _missTs = __akiniToggleOn("timestampToggle") && !row.querySelector(":scope > .msg-ts");
-        var _missRr = row.classList.contains("me") && __akiniToggleOn("readReceiptToggle") && !row.querySelector(":scope > .msg-rr");
-        if (!_missTs && !_missRr) {
+        var _missRr = row.classList.contains("me") && __akiniToggleOn("readReceiptToggle") && !row.querySelector(":scope .msg-rr") && !row.querySelector(":scope .msg-content-line .msg-rr");
+        // 引用块仍在 row 级（旧结构）→ 继续走重组包进 wrap
+        var _strayQ = row.querySelector(":scope > div[style*='flex-basis:100%']") || row.querySelector(":scope > .quote-bubble") || row.querySelector(":scope > .msg-content-line > div[style*='flex-basis:100%']");
+        if (_strayQ) { row.removeAttribute("data-meta-v"); }
+        else if (!_missTs && !_missRr) {
           // 兜底：已读元素存在但从未显示过（页面刷新后定时器丢失）→ 重新安排延迟显示
           if (isMe && __akiniToggleOn("readReceiptToggle") && row.getAttribute("data-had-read-receipt") !== "1") {
-            var _rr0 = row.querySelector(":scope > .msg-rr");
-            if (_rr0 && _rr0.style.visibility !== "visible" && !row.getAttribute("data-rr-scheduled")) {
-              row.setAttribute("data-rr-scheduled", "1");
+            var _rr0 = row.querySelector(":scope .msg-rr");
+            if (_rr0 && _rr0.style.visibility !== "visible" && !row.__rrScheduled) {
+              row.__rrScheduled = 1; // JS 属性不随 HTML 序列化，刷新后可重新安排
               setTimeout(function () {
                 try { __akiniShowReadReceipt(row); } catch (e) {}
               }, 600 + Math.random() * 1200);
@@ -2580,7 +2583,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var oldTs = row.querySelector(".msg-ts");
       if (oldTs) oldTs.remove();
       // 清掉游离的旧已读回执（v10 重建：含 row 级，防重复渲染叠加）
-      var oldRrFrees = row.querySelectorAll(":scope > .msg-rr, :scope > .msg-content-line > .msg-rr, :scope > .msg-content-line > .bubble-wrap > .msg-rr");
+      var oldRrFrees = row.querySelectorAll(".msg-rr");
       for (var rfi = 0; rfi < oldRrFrees.length; rfi++) {
         if (oldRrFrees[rfi].style.visibility === "visible") hadRead = true;
         oldRrFrees[rfi].remove();
@@ -2629,36 +2632,26 @@ document.addEventListener("DOMContentLoaded", function () {
           wrap0.appendChild(bub0);
         }
         if (wrap0) {
-          if (isMe) {
-            // me 行：引用块保持 row 级原位（整行宽、右对齐，原始样式不变）；
-            // 若之前版本把它包进了窄 wrap，这里挪回 row 末尾恢复原样
-            var qInWrap = wrap0.querySelector(":scope > div[style*='flex-basis:100%']") ||
-                          wrap0.querySelector(":scope > .quote-bubble");
-            if (qInWrap) row.appendChild(qInWrap);
-          } else {
-            // other 行：引用块包入 wrap（该行无已读回执，仅为结构统一）
-            var quote0 = lineEl.querySelector(":scope > div[style*='flex-basis:100%']") ||
-                         row.querySelector(":scope > div[style*='flex-basis:100%']");
-            if (quote0 && quote0.querySelector(".quote-bubble")) wrap0.appendChild(quote0);
-            if (wrap0 && !wrap0.querySelector(".quote-bubble")) {
-              var bareQ = lineEl.querySelector(":scope > .quote-bubble") ||
-                          row.querySelector(":scope > .quote-bubble");
-              if (bareQ) wrap0.appendChild(bareQ);
-            }
+          // 引用块统一包入 wrap（气泡正下方、与气泡同侧对齐，me/other 一致）
+          var quote0 = lineEl.querySelector(":scope > div[style*='flex-basis:100%']") ||
+                       row.querySelector(":scope > div[style*='flex-basis:100%']");
+          if (quote0 && quote0.querySelector(".quote-bubble")) wrap0.appendChild(quote0);
+          if (wrap0 && !wrap0.querySelector(".quote-bubble")) {
+            var bareQ = lineEl.querySelector(":scope > .quote-bubble") ||
+                        row.querySelector(":scope > .quote-bubble");
+            if (bareQ) wrap0.appendChild(bareQ);
           }
         }
       }
       if (showRr && lineEl) {
         var wrapEl = lineEl.querySelector(":scope > .bubble-wrap");
-        if (wrapEl && !row.querySelector(":scope > .msg-rr")) {
+        if (wrapEl && !row.querySelector(":scope .msg-rr")) {
           var rrEl = document.createElement("span");
           rrEl.className = "msg-rr";
           rrEl.textContent = "已读";
           if (!hadRead) rrEl.style.visibility = "hidden";
-          // me 行有引用块（row 级，wrap 外）时放 row 末尾；无引用时放 wrap 内紧贴气泡下方
-          var _hasQuote = isMe && (row.querySelector(":scope > div[style*='flex-basis:100%']") || row.querySelector(":scope > .quote-bubble"));
-          if (isMe && _hasQuote) row.appendChild(rrEl);
-          else wrapEl.appendChild(rrEl);
+          // 已读回执固定在 wrap 内末尾：气泡/引用正下方，右缘对齐
+          wrapEl.appendChild(rrEl);
           // 已读回执：发出去不立即显示，延迟 1.5~4s
           if (!hadRead) {
             row.setAttribute("data-read-pending", "1");
@@ -2685,7 +2678,7 @@ document.addEventListener("DOMContentLoaded", function () {
         row.removeAttribute("data-meta-v");
         __akiniProcessMsgMeta(row);
       }
-      var rr = row.querySelector(":scope > .msg-rr") ||
+      var rr = row.querySelector(":scope .msg-rr") ||
                row.querySelector(":scope > .msg-content-line .msg-rr");
       if (rr) {
         rr.style.visibility = "visible";
@@ -4243,6 +4236,9 @@ document.addEventListener("DOMContentLoaded", function () {
         );
       } catch (e) {}
       U.scrollTop = U.scrollHeight;
+      [120, 400, 900].forEach(function (_ms) {
+        setTimeout(function () { try { U.scrollTop = U.scrollHeight; } catch (e) {} }, _ms);
+      });
       __akiniSetupChatMetaObserver();
     }
     function __akiniLoadMoreHistory(chatId) {

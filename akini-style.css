@@ -6326,3 +6326,20 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 }
 /* 问卷卡：删掉 inner 与 footer 之间的渐变 divider 线（只保留 footer 顶部细线） */
 .survey-bubble-divider { display: none !important; }
+
+/* ===== v20260909l 引用/已读紧凑对齐 + 气泡防溢出 ===== */
+.chat-body .msg-row.me .msg-content-line > .bubble-wrap > div[style*="flex-basis:100%"],
+.chat-body .msg-row.other .msg-content-line > .bubble-wrap > div[style*="flex-basis:100%"] {
+  width: auto !important;
+  max-width: 100% !important;
+  padding-left: 0 !important;
+  margin-top: 2px !important;
+  box-sizing: border-box !important;
+}
+.chat-body .msg-row .msg-content-line > .bubble-wrap > .msg-rr {
+  align-self: flex-end;
+  width: auto !important;
+  text-align: right;
+}
+.chat-body .msg-row.other .msg-content-line > .bubble-wrap > .msg-rr { align-self: flex-start; }
+.chat-body .msg-row .bubble > * { max-width: 100%; box-sizing: border-box; }
