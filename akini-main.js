@@ -5988,33 +5988,43 @@ document.addEventListener("DOMContentLoaded", function () {
         '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
       );
     };
-    /* 全局 emoji 头像兜底：扫描所有叶子容器，凡只含兔子/猫 emoji 且不在气泡内容区的，统一替换为线条头像。
-       不用 class 选择器——很多头像容器是纯 inline-style 无类名，类名方案会漏。 */
+    /* 全局 emoji 头像兜底：新增节点在绘制前即时替换（无闪烁），低频全量兜底防漏。
+       不用类名选择器——很多头像容器是纯 inline-style 无类名。 */
     (function () {
       var EMOJI_RE = /^[\u{1F430}\u{1F431}]\uFE0F?$/u;
-      function sweep() {
+      function isBad(el) {
+        return el && el.nodeType === 1 && el.childElementCount === 0 &&
+          EMOJI_RE.test((el.textContent || "").trim()) &&
+          !el.closest(".bubble,.preview-bubble,.msg-content-line,input,textarea,[contenteditable]");
+      }
+      function fixTree(root) {
         try {
+          if (!root || root.nodeType !== 1) return;
           if (typeof window.__akiniLineAvatarImg !== "function") return;
-          var list = document.querySelectorAll("div,span");
+          if (isBad(root)) { root.innerHTML = window.__akiniLineAvatarImg(); return; }
+          if (!root.querySelectorAll) return;
+          var list = root.querySelectorAll("div,span");
           for (var i = 0; i < list.length; i++) {
-            var el = list[i];
-            if (el.childElementCount !== 0) continue;
-            var t = el.textContent;
-            if (!t || t.length > 3) continue;
-            if (!EMOJI_RE.test(t.trim())) continue;
-            /* 排除消息/输入内容语境：用户真发的 emoji 不换 */
-            if (el.closest(".bubble,.preview-bubble,.msg-content-line,input,textarea,[contenteditable]")) continue;
-            el.innerHTML = window.__akiniLineAvatarImg();
+            if (isBad(list[i])) list[i].innerHTML = window.__akiniLineAvatarImg();
           }
         } catch (e) {}
       }
+      function sweep() { fixTree(document.body); }
       var timer = null;
       function schedule() {
         if (timer) return;
-        timer = setTimeout(function () { timer = null; sweep(); }, 600);
+        timer = setTimeout(function () { timer = null; sweep(); }, 1500);
       }
       function arm() {
-        try { new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true }); } catch (e) {}
+        try {
+          new MutationObserver(function (muts) {
+            for (var i = 0; i < muts.length; i++) {
+              var an = muts[i].addedNodes;
+              for (var k = 0; k < an.length; k++) fixTree(an[k]);
+            }
+            schedule();
+          }).observe(document.body, { childList: true, subtree: true });
+        } catch (e) {}
       }
       if (document.body) arm();
       else document.addEventListener("DOMContentLoaded", arm);
@@ -12128,7 +12138,7 @@ document.addEventListener("DOMContentLoaded", function () {
             n
               ? ((t.innerHTML = n), (t.style.display = "flex"))
               : ((t.innerHTML =
-                  '<div class="icity-contact-card" data-contact-id="" onclick="console.log(&#39;[icity] 点击兜底联系人入口&#39;); if(window.showIcityTaProfile){window.showIcityTaProfile();}else{alert(&#39;暂无联系人&#39;);}" style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);display:flex;align-items:center;gap:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;pointer-events:auto;"><div style="width:48px;height:48px;border-radius:50%;background:#e8e8e8;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;pointer-events:none;">🐰</div><div style="flex:1;min-width:0;pointer-events:none;"><div style="font-size:15px;font-weight:600;color:#222;margin-bottom:2px;">对方</div><div style="font-size:13px;color:#999;">查看 TA 的主页 →</div></div></div>'),
+                  '<div class="icity-contact-card" data-contact-id="" onclick="console.log(&#39;[icity] 点击兜底联系人入口&#39;); if(window.showIcityTaProfile){window.showIcityTaProfile();}else{alert(&#39;暂无联系人&#39;);}" style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);display:flex;align-items:center;gap:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;pointer-events:auto;"><div style="width:48px;height:48px;border-radius:50%;background:#e8e8e8;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;pointer-events:none;">' + (window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : "") + '</div><div style="flex:1;min-width:0;pointer-events:none;"><div style="font-size:15px;font-weight:600;color:#222;margin-bottom:2px;">对方</div><div style="font-size:13px;color:#999;">查看 TA 的主页 →</div></div></div>'),
                 (t.style.display = "flex")),
             t.querySelectorAll(".icity-contact-card").forEach(function (t) {
               t.addEventListener("click", function (e) {
@@ -13579,7 +13589,10 @@ document.addEventListener("DOMContentLoaded", function () {
                         '<img src="' +
                         i.avatar +
                         '" style="width:100%;height:100%;object-fit:cover;">')
-                    : (r.textContent = i.avatar || "🐰"));
+                    : window.__akiniIsDefaultAvatarToken &&
+                        window.__akiniIsDefaultAvatarToken(i.avatar)
+                      ? (r.innerHTML = window.__akiniLineAvatarImg())
+                      : (r.textContent = i.avatar));
                 var c = document.getElementById("icityTaNameDisplay");
                 c && (c.textContent = i.name);
                 var l = document.getElementById("icityTaHandleDisplay");
@@ -20192,7 +20205,10 @@ document.addEventListener("DOMContentLoaded", function () {
   function partnerAvatarHtml(av) {
     var t = av && String(av).trim();
     if (t && /^(https?:|data:|blob:)/.test(t)) return '<img src="' + t + '" alt="" style="width:100%;height:100%;object-fit:cover"/>';
-    return esc(t || "\ud83d\udc30");
+    if (!t || (window.__akiniIsDefaultAvatarToken && window.__akiniIsDefaultAvatarToken(t))) {
+      return window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : esc(t || "\ud83d\udc30");
+    }
+    return esc(t);
   }
   // 观影互动：只从字卡库取（与微信聊天完全同一数据源 akini_wordbank + 主分组过滤 + 联系人过滤）；
   // 字卡库为空时返回空串——绝不使用任何内置语料
