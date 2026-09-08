@@ -1357,7 +1357,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   align-items: center;
   margin-top: 12px;
   padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid #f0f0f0;
 }
 .shop-card-bubble-status {
   font-size: 12px;
@@ -1889,12 +1889,12 @@ body:not(.bubble-css-on)
   width: 46px;
   height: 46px;
   border-radius: 13px;
-  background: #f0f0f0;
+  background: #1a1a1a;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
 .survey-bubble-icon svg {
   display: block;
@@ -2194,11 +2194,11 @@ body:not(.x) .chat-body .msg-row.ta .bubble.transfer-bubble.ta-tr,
 body:not(.x) .chat-body .msg-row.me .msg-content-line .bubble.transfer-bubble.me-tr,
 body:not(.x) .chat-body .msg-row.other .msg-content-line .bubble.transfer-bubble.ta-tr,
 body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta-tr {
-  background: linear-gradient(160deg, #ffffff 0%, #f3f6fd 100%) !important;
+  background: #ffffff !important;
   color: #1a1a1a !important;
-  border: 1px solid rgba(79, 124, 255, 0.16) !important;
+  border: 1px solid #e8e8e8 !important;
   border-radius: 16px !important;
-  box-shadow: 0 6px 18px rgba(79, 124, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07) !important;
   padding: 13px 14px !important;
   width: auto !important;
   min-width: 200px !important;
@@ -5480,7 +5480,8 @@ button.back-btn[type="button"] {
   left: 50% !important;
   transform: translateX(-50%) !important;
   margin-top: 3px;
-  width: 38px !important;
+  width: auto !important;
+  min-width: 38px;
   text-align: center !important;
   white-space: nowrap;
   font-size: 10px;
@@ -5488,12 +5489,26 @@ button.back-btn[type="button"] {
   line-height: 1.2;
   flex: none !important;
 }
+/* 右侧（我）时间戳右缘对齐，左侧（对方）左缘对齐，避免溢出屏幕被裁 */
+.chat-body .msg-row.me .avatar-col .msg-ts {
+  left: auto !important;
+  right: -2px !important;
+  transform: none !important;
+  text-align: right !important;
+}
+.chat-body .msg-row.other .avatar-col .msg-ts,
+.chat-body .msg-row.ta .avatar-col .msg-ts,
+.chat-body .msg-row.group .avatar-col .msg-ts {
+  left: -2px !important;
+  transform: none !important;
+  text-align: left !important;
+}
 
 /* ===== 转账卡完成态（已收款/已退回）：浅色灰白，不再深灰椭圆 ===== */
 .chat-body .msg-row .bubble.transfer-bubble.tr-finished {
-  background: linear-gradient(160deg, #f8f9fb 0%, #eef0f5 100%) !important;
+  background: #fafafa !important;
   color: #8a8a8e !important;
-  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border: 1px solid #ececec !important;
   border-radius: 16px !important;
   padding: 13px 14px !important;
   width: auto !important;
@@ -6228,4 +6243,26 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 .survey-bubble-title, .shop-card-bubble-title {
   font-weight: 600;
   color: #111 !important;
+}
+
+/* ===== 黑白主题卡片深度美化（v20260909f） ===== */
+.chat-body .msg-row .bubble.survey-bubble,
+.chat-body .msg-row .bubble.shop-card-bubble {
+  border-radius: 16px !important;
+  border: 1px solid #e8e8e8 !important;
+}
+.survey-bubble-title, .shop-card-bubble-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: #111 !important;
+  letter-spacing: -0.1px;
+}
+.survey-bubble-desc, .shop-card-bubble-name {
+  color: #888 !important;
+}
+.survey-bubble-footer, .shop-card-bubble-footer {
+  border-top: 1px solid #f0f0f0 !important;
+}
+.survey-bubble-count {
+  color: #999 !important;
 }

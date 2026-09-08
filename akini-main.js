@@ -4021,8 +4021,13 @@ document.addEventListener("DOMContentLoaded", function () {
       setTimeout(function () {
         var cb = document.getElementById("chatBody");
         if (!cb) return;
-        cb.querySelectorAll(".msg-row.me[data-read-pending]").forEach(function (row) {
-          try { __akiniShowReadReceipt(row); } catch (err) {}
+        // 卡片消息（转账/商店/问卷）也要补已读：凡未显示过已读的"我"的消息统一补回执
+        cb.querySelectorAll(".msg-row.me").forEach(function (row) {
+          if (row.getAttribute("data-had-read-receipt") === "1") return;
+          try {
+            row.setAttribute("data-read-pending", "1");
+            __akiniShowReadReceipt(row);
+          } catch (err) {}
         });
       }, __readDelay);
       setTimeout(function () {
