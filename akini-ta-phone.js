@@ -67,6 +67,9 @@
   function avatarHtml(c, size) {
     size = size || 48;
     var av = (c && c.avatar) || '👤';
+    if (window.__akiniIsDefAv && window.__akiniIsDefAv(av) && window.__akiniLineAvatarImg) {
+      return '<div style="' + style + '">' + window.__akiniLineAvatarImg() + '</div>';
+    }
     var style = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f0f0f0;';
     if (typeof av === 'string' && av.indexOf('data:') === 0) {
       return '<div style="' + style + '"><img src="' + av + '" style="width:100%;height:100%;object-fit:cover;" alt="头像"/></div>';

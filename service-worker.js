@@ -1,6 +1,6 @@
-const CACHE_NAME = 'akini-cache-v20260908l';
+const CACHE_NAME = 'akini-cache-v20260908m';
 const PRECACHE_ASSETS = [
-  './index.html',
+  './akini.html',
   './akini-style.css',
   './akini-main.js',
   './favicon.png',
@@ -104,9 +104,9 @@ self.addEventListener('notificationclick', function(event) {
           return;
         }
       }
-      self.clients.openWindow('./index.html');
+      self.clients.openWindow('./akini.html');
     }).catch(function() {
-      self.clients.openWindow('./index.html');
+      self.clients.openWindow('./akini.html');
     })
   );
 });

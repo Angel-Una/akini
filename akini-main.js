@@ -7235,45 +7235,7 @@ document.addEventListener("DOMContentLoaded", function () {
           } else t.style.display = "none";
         }
       })());
-    (function () {
-      if (U && K) {
-        var lastTap = 0;
-        function triggerGroupAvatarPat(a) {
-          var o = a.target.closest ? a.target.closest(".msg-avatar") : null;
-          if (!o) return;
-          var r = o.closest(".msg-row");
-          if (!r || !r.classList.contains("group")) return;
-          var c = window.akiniContacts
-            ? window.akiniContacts.getChatTarget(
-                window.akiniContacts.getActiveChatId(),
-              )
-            : null;
-          if (!c || "group" !== c.type) return;
-          var t = o.getAttribute("data-sender-name") || "";
-          if (!t) {
-            var e = o.closest(".msg-content-line");
-            if (e) {
-              var n = e.querySelector(".msg-sender-name");
-              n && (t = n.textContent || "");
-            }
-          }
-          if (!t) return;
-          a.preventDefault && a.preventDefault();
-          var activeId = window.akiniContacts.getActiveChatId();
-          window.taPokeWithText && window.taPokeWithText(activeId, "拍了拍你", t);
-        }
-        U.addEventListener("dblclick", triggerGroupAvatarPat);
-        U.addEventListener("touchend", function (a) {
-          var now = Date.now();
-          if (now - lastTap < 350) {
-            triggerGroupAvatarPat(a);
-            lastTap = 0;
-          } else {
-            lastTap = now;
-          }
-        }, { passive: !1 });
-      }
-    })();
+    
     document.getElementById("imageSendBtn");
     const Rt =
       document.getElementById("fileInputImageSend") ||
@@ -7583,6 +7545,8 @@ document.addEventListener("DOMContentLoaded", function () {
           } else if ("image" === n) {
             var ib = document.getElementById("fileInputImageSend");
             ib && ib.click();
+          } else if ("poke" === n) {
+            window.__akiniSendPoke && window.__akiniSendPoke();
           } else if ("survey" === n) {
             if (window._openSurveyList) {
               window._openSurveyList();
@@ -10154,9 +10118,11 @@ document.addEventListener("DOMContentLoaded", function () {
         ? (he && (he.innerText = "呼叫中..."),
           p && (p.innerText = "呼叫中..."),
           ye && (ye.style.display = "none"),
-          v && (v.style.display = "none"),
+          v && (v.style.display = ""),
+          v && v.parentElement && (v.parentElement.style.display = ""),
           ve && (ve.style.display = "none"),
           h && (h.style.display = "none"),
+          h && h.parentElement && (h.parentElement.style.display = "none"),
           pe && (pe.style.display = "block"),
           w && (w.style.display = "block"),
           we.isGroupCall
@@ -10250,8 +10216,10 @@ document.addEventListener("DOMContentLoaded", function () {
           p && (p.innerText = "来电中..."),
           ye && (ye.style.display = "none"),
           v && (v.style.display = "none"),
+          v && v.parentElement && (v.parentElement.style.display = "none"),
           ve && (ve.style.display = "block"),
-          h && (h.style.display = "block"),
+          h && (h.style.display = ""),
+          h && h.parentElement && (h.parentElement.style.display = ""),
           pe && (pe.style.display = "block"),
           w && (w.style.display = "block"),
           Be(!0),
@@ -10352,9 +10320,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       const e = document.getElementById("callAnswerBtnFull");
-      (e && (e.style.display = "none"), ve && (ve.style.display = "none"));
+      (e && (e.style.display = "none"),
+        e && e.parentElement && (e.parentElement.style.display = "none"),
+        ve && (ve.style.display = "none"));
       const n = document.getElementById("callMinimizeBtnFull");
-      (n && (n.style.display = "block"), ye && (ye.style.display = "block"));
+      (n && (n.style.display = ""),
+        n && n.parentElement && (n.parentElement.style.display = ""),
+        ye && (ye.style.display = "block"));
       const i = document.getElementById("callHangupBtnFull");
       (i && (i.style.display = "block"), pe && (pe.style.display = "block"));
       const a = document.getElementById("callTimeDisplayFull");
@@ -14592,44 +14564,7 @@ document.addEventListener("DOMContentLoaded", function () {
     (Mn,
       Ln,
       Tn(),
-      (function () {
-        let t = 0,
-          e = !1;
-        function n(n) {
-          const i = Date.now();
-          if (i - t < 350) {
-            if ((n.preventDefault(), e)) return;
-            ((e = !0),
-              setTimeout(function () {
-                e = !1;
-              }, 600));
-            (!(function (t, e) {
-              const n = document.createElement("div");
-              ((n.className = "msg-row system"),
-                (n.innerHTML = `<div class="bubble">${e}拍了拍${t}</div>`),
-                U && (U.appendChild(n), (U.scrollTop = U.scrollHeight), S()),
-                (function () {
-                  try {
-                    var _pc = window.akiniContacts && window.akiniContacts.getActiveChatId();
-                    var _pt = _pc && window.akiniContacts.getChatTarget(_pc);
-                    if (_pc && _pt && window.I) window.I(_pc, _pt, null, true);
-                    else b();
-                  } catch (e) { b(); }
-                })());
-            })(
-              (document.getElementById("chatTaName") || {}).innerText || "对方",
-              localStorage.getItem("akini_my_name") || "我",
-            ),
-              (t = 0));
-          } else t = i;
-        }
-        ["chatTaAvatar", "chatTaName"].forEach(function (t) {
-          const e = document.getElementById(t);
-          e &&
-            (e.addEventListener("touchend", n, { passive: !1 }),
-            e.addEventListener("dblclick", n));
-        });
-      })(),
+      
       (window.taPokeWithText = function (t, e, memberName) {
         if (!window.akiniContacts) return;
         t = t || window.akiniContacts.getActiveChatId();
@@ -14680,6 +14615,37 @@ document.addEventListener("DOMContentLoaded", function () {
             window.showInAppNotif(u));
         }
         b(t);
+      }),
+      (window.__akiniSendPoke = function () {
+        if (!window.akiniContacts) return;
+        var chatId = window.akiniContacts.getActiveChatId();
+        var target = window.akiniContacts.getChatTarget(chatId);
+        if (!target) return;
+        var myName = localStorage.getItem("akini_my_name") || "我";
+        var taName = target.name || "对方";
+        var def = "";
+        try { def = localStorage.getItem("akini_poke_suffix") || ""; } catch (e) {}
+        var suffix = window.prompt(
+          "自定义拍一拍内容（可留空）\n例如：的肩膀 / 的钱包\n\n将发送：" + myName + " 拍了拍 " + taName + "＋你填的内容",
+          def,
+        );
+        if (null === suffix) return;
+        suffix = String(suffix).trim();
+        try { localStorage.setItem("akini_poke_suffix", suffix); } catch (e) {}
+        var esc = function (x) {
+          return String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        };
+        var text = myName + " 拍了拍 " + taName + suffix;
+        var rowHtml =
+          '<div class="msg-row system"><div class="bubble">' + esc(text) + "</div></div>";
+        __akiniAppendMessageHTML(chatId, rowHtml, {
+          lastMsg: text,
+          lastSenderAvatar: window.getMyAvatar ? "" : "",
+          lastSenderName: myName,
+        });
+        S();
+        V();
+        b(chatId);
       }),
       (window.taPoke = function (t) {
         if (!window.akiniContacts) return;
