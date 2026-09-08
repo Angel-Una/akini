@@ -66,15 +66,21 @@
       if (!confirm("最后确认：真的要全部删除吗？建议先点「导出备份」留底。")) return;
       wipeBtn.disabled = true;
       wipeBtn.textContent = "正在清除…";
+      // 全局清除标记：阻断一切 localStorage 写回与 IDB 备份，防止清除后数据复活
+      try { window.__akiniWiping = true; } catch (e) {}
       var reloaded = false;
       var doReload = function () {
         if (reloaded) return;
         reloaded = true;
         try { location.reload(true); } catch (e) { location.reload(); }
       };
-      try { localStorage.clear(); } catch (e) {}
-      try { sessionStorage.clear(); } catch (e) {}
+      var clearLocal = function () {
+        try { localStorage.clear(); } catch (e) {}
+        try { sessionStorage.clear(); } catch (e) {}
+      };
       var finish = function () {
+        // 所有 IDB 已删，最后清 localStorage 并立即刷新（顺序不能反，否则快照机制会在间隙写回）
+        clearLocal();
         // 注销 Service Worker + 清 Cache Storage，避免旧缓存恢复页面
         try {
           if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
@@ -86,7 +92,7 @@
         try {
           if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); });
         } catch (e) {}
-        setTimeout(doReload, 800);
+        setTimeout(doReload, 400);
       };
       var deleteAllIdb = function () {
         // 枚举并删除本站点全部 IndexedDB 数据库（不留任何残留）

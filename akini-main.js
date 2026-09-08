@@ -593,6 +593,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       return {
         set: function (k, v, cb) {
+          if (window.__akiniWiping) { if (typeof cb === "function") cb(); return; }
           var done = function () { if (typeof cb === "function") cb(); };
           ready(function (inst) {
             if (!inst) { lsSet(k, v); done(); return; }
@@ -609,6 +610,7 @@ document.addEventListener("DOMContentLoaded", function () {
           });
         },
         backupAll: function (force, cb) {
+          if (window.__akiniWiping) { if (typeof cb === "function") cb(); return; }
           if (typeof force === "function") { cb = force; force = false; }
           var done = function () { if (typeof cb === "function") cb(); };
           /* v20261024 节流：30s 内重复调用直接跳过，避免高频全库遍历比对导致卡顿/发烫 */
@@ -917,6 +919,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         window.__akiniEmergencyTrim = __akiniEmergencyTrim;
         localStorage.setItem = function (k, v) {
+          if (window.__akiniWiping) return; // 清除数据期间禁止任何写回，防止数据复活
           var r;
           try {
             r = origSetItem.apply(this, arguments);
@@ -2496,6 +2499,7 @@ document.addEventListener("DOMContentLoaded", function () {
         mm = String(e.getMinutes()).padStart(2, "0");
       var fmt = localStorage.getItem("akini_timeFormat") || "24";
       var time = hh + ":" + mm;
+      if (fmt === "24s") return time + ":" + String(e.getSeconds()).padStart(2, "0");
       if (fmt === "12PM") return time + "PM";
       if (fmt === "12AM") return time + "AM";
       return time;
@@ -3226,7 +3230,20 @@ document.addEventListener("DOMContentLoaded", function () {
           __akiniShowReadReceipt(row);
         });
       }
-      setTimeout(__showReadNow, __readDelay);
+      setTimeout(function () {
+        __showReadNow();
+        // 兜底：卡片类消息（转账/商店/问卷）未打 pending 标记的也一并补已读
+        try {
+          var cb2 = document.getElementById("chatBody");
+          if (cb2) cb2.querySelectorAll(".msg-row.me").forEach(function (row) {
+            if (row.getAttribute("data-had-read-receipt") === "1") return;
+            try {
+              row.setAttribute("data-read-pending", "1");
+              __akiniShowReadReceipt(row);
+            } catch (err) {}
+          });
+        } catch (err) {}
+      }, __readDelay);
       setTimeout(function () {
         if (l) l.style.display = "block";
         showTypingBubble(r, __sendMemberId);
@@ -8994,9 +9011,14 @@ document.addEventListener("DOMContentLoaded", function () {
           // 搜索框：固定在第一张字卡上面，输入即过滤列表
           const _exclSearch = document.createElement("input");
           /* 搜索框阻止触摸冒泡到 WEL fast-tap 容器：否则 touchend 被 preventDefault，输入框无法聚焦 */
-          ["touchstart", "touchend", "click"].forEach(function (evn) {
-            _exclSearch.addEventListener(evn, function (ev) { ev.stopPropagation(); }, { passive: true });
-          });
+          _exclSearch.addEventListener("touchstart", function (ev) { ev.stopPropagation(); }, { passive: true });
+          _exclSearch.addEventListener("click", function (ev) { ev.stopPropagation(); });
+          /* 关键：touchend 必须 preventDefault + 手动 focus（父容器 fast-tap 会拦截默认点击行为，导致键盘弹不出） */
+          _exclSearch.addEventListener("touchend", function (ev) {
+            ev.stopPropagation();
+            ev.preventDefault();
+            try { _exclSearch.focus(); } catch (e) {}
+          }, { passive: false });
           ((_exclSearch.type = "search"),
             (_exclSearch.placeholder = "搜索字卡内容…"),
             (_exclSearch.style.cssText = "width:100%;box-sizing:border-box;margin:10px 0 2px;padding:9px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:16px;outline:0;background:#fff"),
@@ -16132,7 +16154,8 @@ document.addEventListener("DOMContentLoaded", function () {
           var btns = {
             "24": document.getElementById("timeFmt24"),
             "12PM": document.getElementById("timeFmt12PM"),
-            "12AM": document.getElementById("timeFmt12AM")
+            "12AM": document.getElementById("timeFmt12AM"),
+            "24s": document.getElementById("timeFmt24S")
           };
           function syncFmt(){
             try {

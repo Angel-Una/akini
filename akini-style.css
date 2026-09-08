@@ -1752,7 +1752,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body .msg-row {
   display: flex;
   flex-direction: column;
-  margin-bottom: 14px;
+  margin-bottom: 20px;
   width: 100%;
   position: relative;
 }
@@ -1889,12 +1889,13 @@ body:not(.bubble-css-on)
   width: 46px;
   height: 46px;
   border-radius: 13px;
-  background: #1a1a1a;
+  background: #ffffff;
+  border: 1px solid #ececec;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 .survey-bubble-icon svg {
   display: block;
