@@ -20145,20 +20145,23 @@ document.addEventListener("DOMContentLoaded", function () {
     if (t && /^(https?:|data:|blob:)/.test(t)) return '<img src="' + t + '" alt="" style="width:100%;height:100%;object-fit:cover"/>';
     return esc(t || "\ud83d\udc30");
   }
-  // 观影互动语料：优先字卡库主分组短句，为空时用内置观影语句
-  function pickWatchLine() {
-    var pool = [];
+  // 观影互动：只从字卡库取（与微信聊天完全同一数据源 akini_wordbank + 主分组过滤 + 联系人过滤）；
+  // 字卡库为空时返回空串——绝不使用任何内置语料
+  function pickWatchLine(contactId) {
     try {
-      var groups = window.__wbRead ? window.__wbRead("akini_wb_groups_main", []) : [];
-      (groups || []).forEach(function (g) {
-        (g && g.items || []).forEach(function (t) {
-          var x = String(t || "").trim();
-          if (x && x.length <= 30) pool.push(x);
-        });
+      var wb = window.__wbRead
+        ? window.__wbRead("akini_wordbank", [])
+        : JSON.parse(localStorage.getItem("akini_wordbank") || "[]");
+      var pool = (wb || []).filter(function (t) { return !t.tab || "main" === t.tab; });
+      if (window.__wbFilter) pool = window.__wbFilter(pool, contactId) || [];
+      var texts = [];
+      pool.forEach(function (e) {
+        var x = String((e && (e.text || e.content)) || "").trim();
+        if (x && x.length <= 60) texts.push(x);
       });
-    } catch (e) {}
-    if (!pool.length) pool = ["哈哈哈这段太好笑了", "呜呜呜好感人", "宝宝快看这里！", "这个镜头绝了", "前方高能！", "再看一遍再看一遍", "太甜了吧", "我哭了你呢"];
-    return pool[Math.floor(Math.random() * pool.length)];
+      if (!texts.length) return "";
+      return texts[Math.floor(Math.random() * texts.length)];
+    } catch (e) { return ""; }
   }
   // 联系人消息：与聊天页相同的 msg-row other 结构，自动套用自定义CSS/时间戳
   function appendPartnerMsg(c, text) {
@@ -20188,7 +20191,8 @@ document.addEventListener("DOMContentLoaded", function () {
       var wa = $("watchArea");
       if (!wa || wa.style.display === "none") return;
       var c = watchPartners[Math.floor(Math.random() * watchPartners.length)];
-      appendPartnerMsg(c, pickWatchLine());
+      var line = pickWatchLine(c && c.id);
+      if (line) appendPartnerMsg(c, line); // 字卡库为空则不回复
     }, delayMs);
   }
   function appendWatchSysMsg(text) {
@@ -20293,22 +20297,16 @@ document.addEventListener("DOMContentLoaded", function () {
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
+  var pseudoFs = false; // iPhone Safari 不支持元素全屏时的伪全屏状态
   function isFullscreen() {
-    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    return pseudoFs || !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
   function showPlayer(kind) {
-    var v = $("watchVideo"), f = $("watchFrame"), em = $("watchEmpty"), ct = $("watchControls"), dg = $("watchDyGuide");
+    var v = $("watchVideo"), f = $("watchFrame"), em = $("watchEmpty"), ct = $("watchControls");
     if (em) em.style.display = "none";
     if (v) v.style.display = kind === "video" ? "block" : "none";
     if (f) f.style.display = kind === "iframe" ? "block" : "none";
     if (ct) ct.style.display = kind === "video" ? "flex" : "none";
-    if (dg) dg.style.display = kind === "douyin" ? "flex" : "none";
-  }
-  // 抖音引导卡片：官方已全面封禁第三方嵌入，改为引导新标签页打开
-  function showDouyinGuide(url) {
-    showPlayer("douyin");
-    var btn = $("watchDyOpenBtn");
-    if (btn) btn.onclick = function () { window.open(url, "_blank"); };
   }
   function fmtTime(s) {
     s = Math.max(0, Math.floor(s || 0));
@@ -20322,7 +20320,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (pa) pa.style.display = playing ? "block" : "none";
   }
   function importVideo() {
-    var raw = window.prompt("粘贴视频链接：\n· 哔哩哔哩：含 BV 号的视频页链接（站内直接播放）\n· mp4/m3u8 视频直链（站内直接播放）\n· 抖音：分享口令或链接（站内无法播放，将在新标签页打开）\n\n链接仅本次有效，不会保存");
+    var raw = window.prompt("粘贴视频链接：\n· 哔哩哔哩：含 BV 号的视频页链接（站内直接播放）\n· mp4/m3u8 视频直链（站内直接播放）\n\n链接仅本次有效，不会保存");
     if (raw === null) return;
     raw = String(raw).trim();
     if (!raw) return;
@@ -20343,11 +20341,9 @@ document.addEventListener("DOMContentLoaded", function () {
       alert("哔哩哔哩短链无法直接解析，请打开视频页复制含 BV 号的完整链接");
       return;
     }
-    // 抖音（视频页/短链/口令）：官方已彻底封禁第三方 iframe 嵌入（X-Frame-Options:DENY + CSP 白名单），
-    // 公共解析接口实测全部失效（页面仅返回 JS 空壳，无播放地址），站内播放必然黑屏。
-    // 统一改为引导卡片：一键在浏览器新标签页打开抖音观看。
+    // 抖音已彻底封禁第三方嵌入，站内不再支持抖音链接
     if (/douyin\.com\//.test(url)) {
-      showDouyinGuide(url);
+      alert("抖音链接暂不支持导入");
       return;
     }
     // 直链视频
@@ -20431,18 +20427,33 @@ document.addEventListener("DOMContentLoaded", function () {
   function toggleFullscreen() {
     var box = $("watchVideoBox");
     if (!box) return;
+    // 伪全屏中：再点一次退出
+    if (pseudoFs) {
+      pseudoFs = false;
+      box.classList.remove("watch-pseudo-fs");
+      document.body.style.overflow = "";
+      applyFullscreenUI();
+      return;
+    }
     if (isFullscreen()) {
       (document.exitFullscreen || document.webkitExitFullscreen).call(document);
       try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch (e) {}
-    } else {
-      var req = box.requestFullscreen || box.webkitRequestFullscreen;
-      if (req) {
-        try { var p = req.call(box); if (p && p.catch) p.catch(function () {}); } catch (e) {}
-      }
+      return;
+    }
+    var req = box.requestFullscreen || box.webkitRequestFullscreen;
+    var nativeOk = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) && !!req;
+    if (nativeOk) {
+      try { var p = req.call(box); if (p && p.catch) p.catch(function () {}); } catch (e) {}
       try {
         if (screen.orientation && screen.orientation.lock)
           screen.orientation.lock("landscape").catch(function () {});
       } catch (e) {}
+    } else {
+      // iPhone Safari 等不支持元素全屏的环境：CSS 伪全屏（固定铺满整个屏幕）
+      pseudoFs = true;
+      box.classList.add("watch-pseudo-fs");
+      document.body.style.overflow = "hidden";
+      applyFullscreenUI();
     }
   }
   function initWatch() {

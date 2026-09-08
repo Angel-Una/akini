@@ -6161,3 +6161,18 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 .akini-ta-phone-item { content-visibility: auto; contain-intrinsic-size: auto 90px; }
 /* 减少重绘：滚动容器开启硬件加速提示 */
 .wb-content, .chat-messages, .akini-ta-phone-list { transform: translateZ(0); }
+
+/* 观影伪全屏（iPhone Safari 无元素全屏 API 的兜底）：固定铺满全屏 */
+.watch-pseudo-fs {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483000 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  background: #000 !important;
+}
+.watch-pseudo-fs video,
+.watch-pseudo-fs iframe {
+  width: 100% !important;
+  height: 100% !important;
+}
