@@ -6365,3 +6365,13 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
   vertical-align: top !important;
 }
 .chat-body .msg-row.other .msg-content-line > .bubble-wrap { align-items: flex-start; }
+
+/* v20260909r 文字溢出终防线：钳制任何来源（自定义CSS/颜色预设）的椭圆超大圆角，强制安全内边距与断行 */
+.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+.chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  border-radius: 18px !important;
+  padding: 10px 14px !important;
+  overflow-wrap: break-word !important;
+  word-break: break-word !important;
+}

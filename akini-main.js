@@ -2562,14 +2562,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (_strayQ) { row.removeAttribute("data-meta-v"); }
         else if (!_missTs && !_missRr) {
           // 兜底：已读元素存在但从未显示过（页面刷新后定时器丢失）→ 重新安排延迟显示
-          if (isMe && __akiniToggleOn("readReceiptToggle") && row.getAttribute("data-had-read-receipt") !== "1") {
+          if (isMe && __akiniToggleOn("readReceiptToggle")) {
             var _rr0 = row.querySelector(":scope .msg-rr");
-            if (_rr0 && _rr0.style.visibility !== "visible" && !row.__rrScheduled) {
-              row.__rrScheduled = 1; // JS 属性不随 HTML 序列化，刷新后可重新安排
-              setTimeout(function () {
-                try { __akiniShowReadReceipt(row); } catch (e) {}
-              }, 600 + Math.random() * 1200);
-            }
+            if (_rr0 && _rr0.style.visibility !== "visible") _rr0.style.visibility = "visible";
           }
           return;
         }
@@ -2664,29 +2659,14 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         // rr 已存在但仍隐藏且从未显示过（刷新后定时器丢失）→ 重新调度显示
         var _existRr = row.querySelector(":scope .msg-rr");
-        if (_existRr && !hadRead && _existRr.style.visibility !== "visible" && !row.__rrScheduled) {
-          row.__rrScheduled = 1;
-          (function(__r) {
-            setTimeout(function() { try { __akiniShowReadReceipt(__r); } catch (e) {} }, 800 + Math.random() * 1500);
-          })(row);
-        }
+        if (_existRr && _existRr.style.visibility !== "visible") _existRr.style.visibility = "visible";
         if (wrapEl && !row.querySelector(":scope .msg-rr")) {
           var rrEl = document.createElement("span");
           rrEl.className = "msg-rr";
           rrEl.textContent = "已读";
-          if (!hadRead) rrEl.style.visibility = "hidden";
-          // 已读回执固定在 wrap 内末尾：气泡/引用正下方，右缘对齐
+          // 已读回执固定在 wrap 内末尾：气泡/引用正下方，右缘对齐；创建即显示并随持久化保存可见态
           wrapEl.appendChild(rrEl);
-          // 已读回执：发出去不立即显示，延迟 1.5~4s
-          if (!hadRead) {
-            row.setAttribute("data-read-pending", "1");
-            (function(__r) {
-              var readDelay = 1500 + Math.random() * 2500;
-              setTimeout(function() {
-                __akiniShowReadReceipt(__r);
-              }, readDelay);
-            })(row);
-          }
+          row.setAttribute("data-had-read-receipt", "1");
         }
       }
       row.setAttribute("data-meta-v", "10");
