@@ -5974,12 +5974,13 @@ document.addEventListener("DOMContentLoaded", function () {
       );
     };
     window.__akiniIsDefaultAvatarToken = function (t) {
-      // 判定是否为「默认占位」：空、👤、🐰、🐱、单个字符（名字首字兜底）
+      // 判定是否为「默认占位」：空、emoji（含 VS16 变体）均转为线条头像；汉字/字母/数字昵称首字保留
       if (!t || "string" != typeof t) return !0;
-      var s = String(t).trim();
+      var s = String(t).trim().replace(/️/g, "");
       if (!s) return !0;
       if ("👤" === s || "🐰" === s || "🐱" === s) return !0;
-      return !1;
+      var a = Array.from(s);
+      return a.length <= 2 && !/^[a-zA-Z0-9一-鿿]+$/.test(s);
     };
     function nt(t, e) {
       if (
@@ -20275,6 +20276,11 @@ document.addEventListener("DOMContentLoaded", function () {
     renderWatchPicker();
     var pk = $("watchContactPicker");
     if (pk) pk.style.display = "flex";
+    else {
+      // 兼容旧页面结构/缓存混搭：无选人界面时直接打开观影区，保证入口永远可用
+      var wa0 = $("watchArea");
+      if (wa0) wa0.style.display = "flex";
+    }
   }
   var danmakuTimer = null;
   function $(id) { return document.getElementById(id); }
@@ -20536,7 +20542,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
   window.__akiniOpenWatch = function () {
-    initWatch();
-    openWatchPicker(); // 先选择一起观影的联系人（支持多选），确认后进入观影页
+    try {
+      initWatch();
+      openWatchPicker(); // 先选择一起观影的联系人（支持多选），确认后进入观影页
+    } catch (e) {
+      // 任何异常都不能让观影打不开：兜底直接显示观影区
+      var wa = $("watchArea");
+      if (wa) wa.style.display = "flex";
+    }
   };
 })();
