@@ -5988,24 +5988,30 @@ document.addEventListener("DOMContentLoaded", function () {
         '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
       );
     };
-    /* 全局 emoji 头像兜底：任何只含兔子/猫 emoji 的头像容器统一替换为线条头像（覆盖字卡/日记/观影等散点渲染） */
+    /* 全局 emoji 头像兜底：扫描所有叶子容器，凡只含兔子/猫 emoji 且不在气泡内容区的，统一替换为线条头像。
+       不用 class 选择器——很多头像容器是纯 inline-style 无类名，类名方案会漏。 */
     (function () {
       var EMOJI_RE = /^[\u{1F430}\u{1F431}]\uFE0F?$/u;
       function sweep() {
         try {
-          var list = document.querySelectorAll('[class*="avatar" i],[id*="avatar" i]');
+          if (typeof window.__akiniLineAvatarImg !== "function") return;
+          var list = document.querySelectorAll("div,span");
           for (var i = 0; i < list.length; i++) {
             var el = list[i];
-            if (el.children.length === 0 && EMOJI_RE.test((el.textContent || "").trim())) {
-              el.innerHTML = window.__akiniLineAvatarImg();
-            }
+            if (el.childElementCount !== 0) continue;
+            var t = el.textContent;
+            if (!t || t.length > 3) continue;
+            if (!EMOJI_RE.test(t.trim())) continue;
+            /* 排除消息/输入内容语境：用户真发的 emoji 不换 */
+            if (el.closest(".bubble,.preview-bubble,.msg-content-line,input,textarea,[contenteditable]")) continue;
+            el.innerHTML = window.__akiniLineAvatarImg();
           }
         } catch (e) {}
       }
       var timer = null;
       function schedule() {
         if (timer) return;
-        timer = setTimeout(function () { timer = null; sweep(); }, 800);
+        timer = setTimeout(function () { timer = null; sweep(); }, 600);
       }
       function arm() {
         try { new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true }); } catch (e) {}
@@ -6013,7 +6019,8 @@ document.addEventListener("DOMContentLoaded", function () {
       if (document.body) arm();
       else document.addEventListener("DOMContentLoaded", arm);
       sweep();
-      setTimeout(sweep, 3000);
+      setTimeout(sweep, 1500);
+      setTimeout(sweep, 4000);
     })();
     window.__akiniIsDefaultAvatarToken = function (t) {
       // 判定是否为「默认占位」：空、emoji（含 VS16 变体）均转为线条头像；汉字/字母/数字昵称首字保留

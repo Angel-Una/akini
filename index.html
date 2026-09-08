@@ -12,8 +12,13 @@
   function go() {
     if (jumped) return;
     jumped = true;
-    location.replace("akini.html?v=20260908w");
+    location.replace("akini.html?v=20260908z");
   }
+  /* 旧版遗留 SW/缓存只在首次进新入口时清一次；之后直接跳转，避免每次进入都注销 SW 导致开屏闪两次 */
+  var cleaned = false;
+  try { cleaned = localStorage.getItem("__akini_entry_cleaned_v1") === "1"; } catch (e) {}
+  if (cleaned) { go(); return; }
+  try { localStorage.setItem("__akini_entry_cleaned_v1", "1"); } catch (e) {}
   try {
     var jobs = [];
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
