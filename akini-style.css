@@ -4488,9 +4488,7 @@ body {
   margin: 0 auto;
 }
 .call-fullscreen {
-  background: rgba(255, 255, 255, 0.35) !important;
-  backdrop-filter: blur(28px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(1.8) !important;
+  /* v20260908h: 删除旧的半透明白底+毛玻璃覆盖（会把深色通话背景变成透明） */
   max-width: none;
   left: 50% !important;
   transform: translateX(-50%) !important;
@@ -5600,38 +5598,8 @@ button.back-btn[type="button"] {
 
 /* ===== 储存数据页（v20261001） ===== */
 .ak-storage-area { z-index: 999998; }
-.ak-stor-hero { padding: 14px; }
-.ak-stor-total-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-.ak-stor-total-label { font-size: 14px; font-weight: 600; color: #1a1a1a; }
-.ak-stor-total-val { font-size: 13px; color: #888; }
-.ak-stor-track { height: 8px; background: #f0f0f0; border-radius: 4px; overflow: hidden; }
-.ak-stor-fill { height: 100%; border-radius: 4px; transition: width .4s ease; }
-.ak-warn { margin-top: 8px; font-size: 12px; color: #ff3b30; line-height: 1.5; }
-.ak-stor-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
-.ak-stor-cell { background: #f8f8f8; border-radius: 10px; padding: 10px 6px; text-align: center; }
-.ak-stor-cell-val { font-size: 14px; font-weight: 700; }
-.ak-stor-cell-key { font-size: 11px; color: #999; margin-top: 3px; }
-.ak-task-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
-.ak-task-row:last-of-type { border-bottom: none; }
-.ak-task-name { font-size: 14px; color: #1a1a1a; font-weight: 500; }
-.ak-task-info { font-size: 12px; color: #888; text-align: right; line-height: 1.6; }
-.ak-task-time { color: #bbb; margin-left: 4px; }
 .ak-hint { font-size: 11px; color: #bbb; margin-top: 8px; line-height: 1.5; }
-.ak-log-list { max-height: 240px; overflow-y: auto; }
-.ak-log-row { display: flex; align-items: center; gap: 6px; padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
-.ak-log-row:last-child { border-bottom: none; }
-.ak-badge { flex-shrink: 0; font-size: 10px; padding: 2px 6px; border-radius: 6px; font-weight: 600; }
-.ak-badge-blue { background: #e8f1fd; color: #4a90e2; }
-.ak-badge-purple { background: #f2ebfb; color: #9c6fd4; }
-.ak-badge-gray { background: #f0f0f0; color: #888; }
-.ak-log-msg { flex: 1; min-width: 0; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ak-log-time { flex-shrink: 0; color: #bbb; font-size: 11px; }
 .ak-empty { font-size: 12px; color: #bbb; padding: 10px 0; text-align: center; }
-.ak-key-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f5f5f5; font-size: 12px; }
-.ak-key-row:last-child { border-bottom: none; }
-.ak-key-dot { flex-shrink: 0; width: 8px; height: 8px; border-radius: 50%; }
-.ak-key-name { flex: 1; min-width: 0; color: #555; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ak-key-size { flex-shrink: 0; color: #999; font-variant-numeric: tabular-nums; }
 .ak-btn-col { display: flex; flex-direction: column; gap: 8px; }
 .ak-stor-btn { width: 100%; height: 42px; border-radius: 12px; border: 1px solid #e8e8e8; background: #f8f8f8; color: #333; font-size: 14px; cursor: pointer; }
 .ak-stor-btn.primary { background: #07c160; border-color: #07c160; color: #fff; font-weight: 600; }
@@ -5805,12 +5773,7 @@ html, body {
   -webkit-tap-highlight-color: transparent;
 }
 .wb-excl-card-row .t { flex: 1; min-width: 0; font-size: 14px; color: #333; line-height: 1.5; word-break: break-all; }
-@media (prefers-color-scheme: dark) {
-  .wb-excl-seg button { background: #3a3a3e; color: #f0f0f2; }
-  .wb-excl-seg button.on { background: #000; color: #fff; }
-  .wb-excl-card-row { background: #232327; }
-  .wb-excl-card-row .t { color: #ddd; }
-}
+/* v20260908i: 移除系统深色媒体查询对专属字卡面板的覆盖，统一浅色样式 */
 
 /* 预览气泡：空内容时显示为可点击输入的占位虚线框（不是空白消息条） */
 .preview-bubble.is-empty {
@@ -6142,9 +6105,6 @@ body.dark-mode .wb-bottom .btn-close {
   background: #fff; color: #444;
   box-shadow: 0 1px 4px rgba(0,0,0,.06);
 }
-.wb-toolbar .tool-btn .tb-label {
-  font-size: 11px; color: #999; line-height: 1; font-weight: 500;
-}
 /* 内容区与底部 */
 .wb-content { padding: 10px 16px 24px; }
 .wb-bottom { display: none; }
@@ -6155,7 +6115,6 @@ body.dark-mode .wb-tabs { background: rgba(255,255,255,.08); }
 body.dark-mode .wb-tabs .tab { color: #9a9a9e; }
 body.dark-mode .wb-tabs .tab.active { background: #3a3a3c; color: #f0f0f0; box-shadow: none; }
 body.dark-mode .wb-toolbar .tool-btn { background: #242426 !important; border: none !important; }
-body.dark-mode .wb-toolbar .tool-btn .tb-label { color: #777; }
 
 /* ============ 数据管理 v20260908g 视觉升级（与字卡库统一设计语言） ============ */
 .ak-storage-area .settings-card {
@@ -6163,24 +6122,41 @@ body.dark-mode .wb-toolbar .tool-btn .tb-label { color: #777; }
   border-radius: 18px;
   box-shadow: 0 2px 10px rgba(0,0,0,.05);
 }
-.ak-stor-total-label { font-size: 13px; color: #999; font-weight: 500; }
-.ak-stor-total-val { font-size: 17px; font-weight: 700; color: #1a1a1a; font-variant-numeric: tabular-nums; }
-.ak-stor-track { height: 6px; background: rgba(0,0,0,.06); border-radius: 3px; }
-.ak-stor-cell { background: rgba(0,0,0,.035); border-radius: 12px; padding: 12px 6px; }
-.ak-stor-cell-val { font-size: 15px; }
 .ak-stor-btn {
   height: 44px; border-radius: 14px;
   border: none; background: rgba(0,0,0,.05); color: #333; font-weight: 500;
 }
 .ak-stor-btn.primary { background: #1a1a1a; border-color: #1a1a1a; color: #fff; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,.16); }
 .ak-stor-btn.danger { background: rgba(255,59,48,.08); border: none; color: #ff3b30; }
-.ak-badge-blue { background: rgba(0,0,0,.06); color: #555; }
-.ak-badge-purple { background: rgba(0,0,0,.06); color: #555; }
-.ak-badge-gray { background: rgba(0,0,0,.05); color: #999; }
 body.dark-mode .ak-storage-area .settings-card { background: #242426; box-shadow: 0 2px 8px rgba(0,0,0,.3); }
-body.dark-mode .ak-stor-total-val { color: #f0f0f0; }
-body.dark-mode .ak-stor-track { background: rgba(255,255,255,.1); }
-body.dark-mode .ak-stor-cell { background: rgba(255,255,255,.06); }
 body.dark-mode .ak-stor-btn { background: rgba(255,255,255,.08); color: #ddd; }
 body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0; color: #1a1a1a; }
-body.dark-mode .ak-badge-blue, body.dark-mode .ak-badge-purple { background: rgba(255,255,255,.1); color: #aaa; }
+
+/* ============ 字卡库 v20260908h 白底回归（保留新布局结构） ============ */
+.wordbank-overlay { background: #fff; }
+.add-modal { background: #fff; }
+.wb-toolbar .tool-btn { background: #f5f5f5; box-shadow: none; }
+.wb-head-close { background: #f5f5f5; box-shadow: none; }
+.wb-word-item { background: #fff; border: 1px solid #f0f0f0; box-shadow: none; }
+.wb-word-item.selected { background: #f5f5f5; border: 1.5px solid #1a1a1a; box-shadow: none; }
+.wb-word-item.selected .wb-word-check { background: #1a1a1a; border-color: #1a1a1a; }
+.wb-word-item .wb-word-group { color: #555; background: #f0f0f0; }
+.wb-gf-btn { background: #f5f5f5; box-shadow: none; }
+#wbSearchBar { background: #fff !important; }
+.wb-tabs { background: #f0f0f0; }
+
+/* ============ v20260908i ============ */
+/* 专属字卡：分段控件改白底浅色（与字卡库 tabs 同款） */
+.wb-excl-seg { background: #f0f0f0; border-radius: 12px; padding: 3px; gap: 0; }
+.wb-excl-seg button { background: transparent !important; color: #666 !important; border-radius: 9px; padding: 8px 0; font-size: 14px; font-weight: 500; }
+.wb-excl-seg button.on { background: #fff !important; color: #111 !important; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+/* 按字卡行：与按分组行同款白卡 */
+.wb-excl-card-row { background: #fff; border: 1px solid #f0f0f0; padding: 13px 14px; }
+/* 删掉八个功能的文字标签，恢复纯图标 */
+.wb-toolbar .tool-btn { height: 46px; padding: 0; grid-template-rows: none; align-content: center; }
+/* 长列表渲染性能：屏外内容跳过布局绘制 */
+.wb-word-item, .wb-excl-card-row, .wb-excl-group-row { content-visibility: auto; contain-intrinsic-size: auto 56px; }
+.msg-row { content-visibility: auto; contain-intrinsic-size: auto 48px; }
+.akini-ta-phone-item { content-visibility: auto; contain-intrinsic-size: auto 90px; }
+/* 减少重绘：滚动容器开启硬件加速提示 */
+.wb-content, .chat-messages, .akini-ta-phone-list { transform: translateZ(0); }

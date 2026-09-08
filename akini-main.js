@@ -3959,7 +3959,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
     }
-    var AKINI_CHAT_BATCH_SIZE = 100;
+    var AKINI_CHAT_BATCH_SIZE = 200;
     function __akiniStripTypingRows(html) {
       if (!html || "string" != typeof html) return html || "";
       var hasTyping =
@@ -4128,20 +4128,26 @@ document.addEventListener("DOMContentLoaded", function () {
         lastTime: Date.now()
       }, meta || {}));
       C(chatId, fullHTML);
-      // 若当前正在看该聊天，把新消息追加到 DOM（同时保持虚拟滚动）
+      // 若当前正在看该聊天，把新消息追加到 DOM（新消息刚生成、必然不在已渲染批次中，直接追加安全）
       if (U && window.akiniContacts.getActiveChatId() === chatId) {
-        var total = __akiniCountMsgRows(fullHTML);
-        // 如果当前 DOM 里已经展示了全部消息，直接追加；否则只追加到末尾（用户仍在底部时可见）
-        var visibleRows = U.querySelectorAll('.msg-row').length;
-        if (total - visibleRows <= 1) {
-          var temp = document.createElement('div'); temp.innerHTML = cleanNew;
-          while (temp.firstChild) {
-            U.appendChild(temp.firstChild);
-          }
-          // 仅当用户本就停留在底部附近时才跟随滚动，上滑翻阅历史时不拽回
-          var __nbA = U.scrollHeight - U.scrollTop - U.clientHeight < 150;
-          if (__nbA) U.scrollTop = U.scrollHeight;
+        var temp = document.createElement('div'); temp.innerHTML = cleanNew;
+        while (temp.firstChild) {
+          U.appendChild(temp.firstChild);
         }
+        // 最多只保留最近 200 条在界面上：超出后从顶部裁剪，并启用下拉加载回看更早记录
+        var excess = U.querySelectorAll('.msg-row').length - AKINI_CHAT_BATCH_SIZE;
+        if (excess > 0) {
+          var removed = 0;
+          while (U.firstChild && removed < excess) {
+            var node = U.firstChild;
+            U.removeChild(node);
+            if (node.nodeType === 1 && node.classList && node.classList.contains('msg-row')) removed++;
+          }
+          __akiniBindPullLoad(chatId);
+        }
+        // 仅当用户本就停留在底部附近时才跟随滚动，上滑翻阅历史时不拽回
+        var __nbA = U.scrollHeight - U.scrollTop - U.clientHeight < 150;
+        if (__nbA) U.scrollTop = U.scrollHeight;
       }
     }
     function C(t, e) {
@@ -7824,7 +7830,7 @@ document.addEventListener("DOMContentLoaded", function () {
           ((ug.className =
             "wb-gf-btn" + ("__ungrouped__" === n ? " active" : "")),
             (ug.dataset.gid = "__ungrouped__"),
-            (ug.textContent = "未分组"),
+            (ug.textContent = "未分组(" + l().filter(function(x){ return !x.gid && (x.tab || "main") === t; }).length + ")"),
             e.appendChild(ug),
             i.forEach((i) => {
               const a = document.createElement("button");
@@ -8066,7 +8072,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     o = document.createElement("div");
                   ((o.style.cssText =
                     "display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8f8f8;border-radius:10px;margin-bottom:8px;"),
-                    (o.innerHTML = `\n                        <div style="display:flex;align-items:center;gap:8px;">\n                            <span style="width:10px;height:10px;border-radius:50%;background:${e.color || "#a0a0a0"};display:inline-block;flex-shrink:0;"></span>\n                            <span style="font-size:14px;color:#333;font-weight:500;">${e.name}</span>\n                            <span style="font-size:12px;color:#aaa;">${a}条</span>\n                        </div>\n                        <button type="button" data-gi="${i}" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:0;" class="del-group-btn">✕</button>\n                    `),
+                    (o.innerHTML = `\n                        <div style="display:flex;align-items:center;gap:8px;">\n                            <span style="width:10px;height:10px;border-radius:50%;background:${e.color || "#a0a0a0"};display:inline-block;flex-shrink:0;"></span>\n                            <span style="font-size:14px;color:#333;font-weight:500;">${e.name}</span>\n                            <span style="font-size:12px;color:#aaa;">${a}条</span>\n                        </div>\n                        <button type="button" data-gi="${i}" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;" class="del-group-btn">✕</button>\n                    `),
                     n.appendChild(o));
                 })),
             P());
@@ -8209,8 +8215,8 @@ document.addEventListener("DOMContentLoaded", function () {
           var ov = document.createElement("div");
           ov.style.cssText = "position:fixed;inset:0;z-index:1000002;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center";
           var rowsHtml = modules.map(function (mod) {
-            return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1.5px solid #e8e8e8;background:#fff;cursor:pointer;margin-bottom:8px">' +
-              '<input type="checkbox" data-key="' + mod.key + '" checked style="width:16px;height:16px;accent-color:#07c160;flex-shrink:0"/>' +
+            return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1px solid #f0f0f0;background:#f8f8f8;cursor:pointer;margin-bottom:8px">' +
+              '<input type="checkbox" data-key="' + mod.key + '" checked style="width:16px;height:16px;accent-color:#1a1a1a;flex-shrink:0"/>' +
               '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#222">' + mod.label + '</div>' +
               '<div style="font-size:11px;color:#999;margin-top:2px">' + mod.count + ' 条</div></div></label>';
           }).join("");
@@ -8223,7 +8229,7 @@ document.addEventListener("DOMContentLoaded", function () {
             '<label style="font-size:12px;color:#333;display:flex;align-items:center;gap:4px"><input type="radio" name="__wb_io_mode" value="merge" checked/>追加</label>' +
             '<label style="font-size:12px;color:#333;display:flex;align-items:center;gap:4px"><input type="radio" name="__wb_io_mode" value="overwrite"/>覆盖</label></div>' +
             '<div style="display:flex;gap:10px"><button type="button" data-act="cancel" style="flex:1;padding:12px;border:1.5px solid #e5e5e5;border-radius:13px;background:none;color:#888;font-size:13px;cursor:pointer">取消</button>' +
-            '<button type="button" data-act="ok" style="flex:2;padding:12px;border:none;border-radius:13px;background:#07c160;color:#fff;font-size:14px;font-weight:700;cursor:pointer">导入</button></div></div>';
+            '<button type="button" data-act="ok" style="flex:2;padding:12px;border:none;border-radius:13px;background:#1a1a1a;color:#fff;font-size:14px;font-weight:700;cursor:pointer">导入</button></div></div>';
           ov.addEventListener("click", function (ev) {
             if (ev.target === ov) { ov.remove(); return; }
             var btn = ev.target && ev.target.closest ? ev.target.closest("button[data-act]") : null;
@@ -8603,7 +8609,7 @@ document.addEventListener("DOMContentLoaded", function () {
             ((r = !r),
               c.clear(),
               r && bm && exitBlockMode(),
-              (A.style.background = r ? "#a0a0a0" : ""),
+              (A.style.background = r ? "#1a1a1a" : ""),
               (A.style.color = r ? "#fff" : ""),
               f());
           });
@@ -8701,7 +8707,7 @@ document.addEventListener("DOMContentLoaded", function () {
               const sb = document.getElementById("selectBtn");
               sb && ((sb.style.background = ""), (sb.style.color = ""));
             }
-            ((WB.style.background = bm ? "#a0a0a0" : ""),
+            ((WB.style.background = bm ? "#1a1a1a" : ""),
               (WB.style.color = bm ? "#fff" : ""),
               f());
           });
@@ -9056,8 +9062,8 @@ document.addEventListener("DOMContentLoaded", function () {
           ov.style.cssText = "position:fixed;inset:0;z-index:1000002;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center";
           var rowsHtml = gs.map(function (g) {
             var cnt = all.filter(function (t) { return String(t.gid || "") === String(g.id); }).length;
-            return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1.5px solid #e8e8e8;background:#fff;cursor:pointer;margin-bottom:8px">' +
-              '<input type="checkbox" data-gid="' + g.id + '" checked style="width:16px;height:16px;accent-color:#07c160;flex-shrink:0"/>' +
+            return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1px solid #f0f0f0;background:#f8f8f8;cursor:pointer;margin-bottom:8px">' +
+              '<input type="checkbox" data-gid="' + g.id + '" checked style="width:16px;height:16px;accent-color:#1a1a1a;flex-shrink:0"/>' +
               '<span style="width:10px;height:10px;border-radius:50%;background:' + (g.color || "#74C0FC") + ';flex-shrink:0"></span>' +
               '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#222">' + String(g.name).replace(/</g, "&lt;") + '</div>' +
               '<div style="font-size:11px;color:#999;margin-top:2px">' + cnt + ' 条字卡</div></div></label>';
@@ -9100,8 +9106,8 @@ document.addEventListener("DOMContentLoaded", function () {
             var ov = document.createElement("div");
             ov.style.cssText = "position:fixed;inset:0;z-index:1000002;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center";
             var modRow = function (key, label, count) {
-              return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1.5px solid #e8e8e8;background:#fff;cursor:pointer;margin-bottom:8px">' +
-                '<input type="checkbox" data-key="' + key + '" checked style="width:16px;height:16px;accent-color:#07c160;flex-shrink:0"/>' +
+              return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1px solid #f0f0f0;background:#f8f8f8;cursor:pointer;margin-bottom:8px">' +
+                '<input type="checkbox" data-key="' + key + '" checked style="width:16px;height:16px;accent-color:#1a1a1a;flex-shrink:0"/>' +
                 '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#222">' + label + '</div>' +
                 '<div style="font-size:11px;color:#999;margin-top:2px">' + count + ' 条</div></div></label>';
             };
@@ -9633,7 +9639,7 @@ document.addEventListener("DOMContentLoaded", function () {
           try {
             if (window.akiniTaPhoneCollectMoment) {
               var _cid = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null;
-              window.akiniTaPhoneCollectMoment(_cid, e, o.ts);
+              window.akiniTaPhoneCollectMoment(_cid, e, o.ts, o.img ? [o.img] : null);
             }
           } catch (e2) {}
           // syy 风格：发布后延迟随机时间，多联系人按概率自动评论 + 自动点赞
@@ -13316,7 +13322,7 @@ document.addEventListener("DOMContentLoaded", function () {
               });
           (n.push(i),
             j(n),
-            (function(){ try { if (window.akiniTaPhoneCollectIcity) { var _icid = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null; window.akiniTaPhoneCollectIcity(_icid, e, i.ts); } } catch (_e) {} })(),
+            (function(){ try { if (window.akiniTaPhoneCollectIcity) { var _icid = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null; window.akiniTaPhoneCollectIcity(_icid, e, i.ts, i.img ? [i.img] : null); } } catch (_e) {} })(),
             window.scheduleTaLikeSoon && window.scheduleTaLikeSoon(i.id),
             // 联系人主动评论用户发布的日记（replyToMyComment 仅回复用户已有评论，发布新日记时无评论故改用主动评论）
             window.scheduleTaCommentSoon && window.scheduleTaCommentSoon(i.id),

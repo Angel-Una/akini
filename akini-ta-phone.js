@@ -77,7 +77,9 @@
   /* ============ 收藏存储（按联系人维度） ============ */
   function storageKey(contactId) { return 'akini_ta_phone_' + contactId; }
 
+  var _colCache = {};
   function loadCollections(contactId) {
+    if (_colCache[contactId]) return _colCache[contactId];
     try {
       // 统一走 akiniStore（内存缓存+IDB+localStorage），与朋友圈数据持久化逻辑一致
       var saved = window.akiniStore && window.akiniStore.getSync
@@ -85,15 +87,17 @@
         : localStorage.getItem(storageKey(contactId));
       if (saved && typeof saved === 'string') {
         var parsed = JSON.parse(saved);
-        return {
+        _colCache[contactId] = {
           chat: Array.isArray(parsed.chat) ? parsed.chat : [],
           moments: Array.isArray(parsed.moments) ? parsed.moments : [],
           icity: Array.isArray(parsed.icity) ? parsed.icity : [],
           music: Array.isArray(parsed.music) ? parsed.music : []
         };
+        return _colCache[contactId];
       }
     } catch (e) {}
-    return { chat: [], moments: [], icity: [], music: [] };
+    _colCache[contactId] = _colCache[contactId] || { chat: [], moments: [], icity: [], music: [] };
+    return _colCache[contactId];
   }
 
   function saveCollections(contactId, data) {
@@ -118,7 +122,7 @@
     } catch (e) { return ''; }
   }
 
-  function addCollection(contactId, type, content, originalTime) {
+  function addCollection(contactId, type, content, originalTime, images) {
     if (!content || !content.trim()) return false;
     /* 严格归属到传入的联系人：微信消息只收藏对应窗口的，朋友圈/iCity/网易云各自独立收藏 */
     var targetId = contactId;
@@ -129,13 +133,15 @@
       if (data[type][i].content === content.trim() && data[type][i].originalTime === originalTime) { dup = true; break; }
     }
     if (dup) return false;
-    data[type].unshift({
+    var item = {
       id: Date.now() + Math.random(),
       content: content.trim(),
       remark: pickWordcardRemark(),
       originalTime: originalTime || Date.now(),
       collectedTime: Date.now()
-    });
+    };
+    if (images && images.length) item.images = images.slice(0, 9);
+    data[type].unshift(item);
     saveCollections(targetId, data);
     return true;
   }
@@ -145,14 +151,14 @@
     if (Math.random() < CHAT_CHANCE) addCollection(contactId, 'chat', text.trim(), timestamp || Date.now());
   };
 
-  window.akiniTaPhoneCollectMoment = function (contactId, text, timestamp) {
-    if (!contactId || !text || !text.trim()) return;
-    if (Math.random() < MOMENTS_CHANCE) addCollection(contactId, 'moments', text.trim(), timestamp || Date.now());
+  window.akiniTaPhoneCollectMoment = function (contactId, text, timestamp, images) {
+    if (!contactId || !text || !String(text).trim()) return;
+    if (Math.random() < MOMENTS_CHANCE) addCollection(contactId, 'moments', String(text).trim(), timestamp || Date.now(), images);
   };
 
-  window.akiniTaPhoneCollectIcity = function (contactId, text, timestamp) {
-    if (!contactId || !text || !text.trim()) return;
-    if (Math.random() < ICITY_CHANCE) addCollection(contactId, 'icity', text.trim(), timestamp || Date.now());
+  window.akiniTaPhoneCollectIcity = function (contactId, text, timestamp, images) {
+    if (!contactId || !text || !String(text).trim()) return;
+    if (Math.random() < ICITY_CHANCE) addCollection(contactId, 'icity', String(text).trim(), timestamp || Date.now(), images);
   };
 
   // 联系人收藏用户添加的歌曲：track = {title, artist, cover, ...}
@@ -398,6 +404,11 @@
         '<button class="akini-ta-phone-item-delete" onclick="window.AkiniTaPhone.deleteCollection(\'' + currentContactId + '\',\'' + currentTab + '\',' + item.id + ')" title="删除">×</button>' +
         '<div class="akini-ta-phone-item-time">' + formatTime(item.originalTime) + '</div>' +
         '<div class="akini-ta-phone-item-text">' + escapeHtml(item.content) + '</div>' +
+        (item.images && item.images.length
+          ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">' + item.images.map(function (im) {
+              return '<img src="' + String(im).replace(/"/g, '&quot;') + '" style="width:72px;height:72px;object-fit:cover;border-radius:8px;background:#eee" alt=""/>';
+            }).join('') + '</div>'
+          : '') +
         (item.remark ? '<div class="akini-ta-phone-item-remark">备注：' + escapeHtml(item.remark) + '</div>' : '') +
       '</div>';
     }).join('');
