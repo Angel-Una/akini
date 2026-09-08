@@ -3018,7 +3018,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 M +
                 '</div><div style="font-size:12px;opacity:0.8;margin-top:2px;">' +
                 L +
-                '</div><div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div><div style="display:flex;justify-content:flex-end;"><span class="tr-status" id="' +
+                '</div><div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:#999;letter-spacing:.5px">转账</span><span class="tr-status" id="' +
                 z +
                 '_status">待收款</span></div></div>' +
                 H +
@@ -3702,7 +3702,7 @@ document.addEventListener("DOMContentLoaded", function () {
               tM +
               '</div><div style="font-size:12px;opacity:0.8;margin-top:2px;">' +
               tL +
-              '</div><div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div><div style="display:flex;justify-content:flex-end;"><span class="tr-status" id="' +
+              '</div><div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div><div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:#999;letter-spacing:.5px">转账</span><span class="tr-status" id="' +
               tz +
               '_status">待收款</span></div></div></div></div>' +
               "",
@@ -4013,7 +4013,30 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!e) return;
       var n = _();
       if (!n || "none" === n.type) return;
-      window.I(t, e, n);
+      // 统一走发消息同款回复流程：先已读 → 弹"对方正在输入"动态 → 再发回复消息
+      var isActive = (t === window.akiniContacts.getActiveChatId());
+      var __readDelay = 600 + Math.random() * 600;
+      var __typingDelay = __readDelay + 400;
+      var __replyDelay = __typingDelay + 1200 + Math.random() * 1800;
+      setTimeout(function () {
+        var cb = document.getElementById("chatBody");
+        if (!cb) return;
+        cb.querySelectorAll(".msg-row.me[data-read-pending]").forEach(function (row) {
+          try { __akiniShowReadReceipt(row); } catch (err) {}
+        });
+      }, __readDelay);
+      setTimeout(function () {
+        if (!isActive) return;
+        var l = document.getElementById("typingIndicator");
+        if (l) l.style.display = "block";
+        try { showTypingBubble(t, "group" === e.type ? (e.memberIds || [])[0] : null); } catch (err) {}
+      }, __typingDelay);
+      setTimeout(function () {
+        var l = document.getElementById("typingIndicator");
+        if (l) l.style.display = "none";
+        try { hideTypingBubble(t); } catch (err) {}
+        window.I(t, e, n, true);
+      }, __replyDelay);
     }
     window.akiniTriggerReply = akiniTriggerReply;
     var x = null,
@@ -11391,7 +11414,7 @@ document.addEventListener("DOMContentLoaded", function () {
           c && m
             ? `<div class="tr-claim-tip" style="font-size:11px;opacity:0.75;margin-top:2px;">仅 ${rt(x)} 可领取</div>`
             : "",
-        A = `<div class="bubble transfer-bubble ${"me" === t ? "me-tr" : "ta-tr"}" id="${k}"\n            data-tr-uid="${v}" data-tr-who="${t}" data-tr-amount="${e}" data-tr-note="${_}" data-tr-status="${w}" data-tr-recipient="${rt(m || "")}"\n            onclick="(function(el){ if(typeof window._openTransferDetailFromBubble===&#39;function&#39;) window._openTransferDetailFromBubble(el.dataset.trUid); })(this)">\n            <div class="tr-amount" style="font-size:20px;font-weight:700;color:#1a1a1a;">¥${parseFloat(e).toFixed(2)}</div>\n            <div class="tr-note" id="${v}_note">${n || ""}</div>\n            ${E}\n            <div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div>\n            <div style="display:flex;justify-content:flex-end;">\n                <span class="tr-status" id="${w}">待收款</span>\n            </div>\n        </div>`;
+        A = `<div class="bubble transfer-bubble ${"me" === t ? "me-tr" : "ta-tr"}" id="${k}"\n            data-tr-uid="${v}" data-tr-who="${t}" data-tr-amount="${e}" data-tr-note="${_}" data-tr-status="${w}" data-tr-recipient="${rt(m || "")}"\n            onclick="(function(el){ if(typeof window._openTransferDetailFromBubble===&#39;function&#39;) window._openTransferDetailFromBubble(el.dataset.trUid); })(this)">\n            <div class="tr-amount" style="font-size:20px;font-weight:700;color:#1a1a1a;">¥${parseFloat(e).toFixed(2)}</div>\n            <div class="tr-note" id="${v}_note">${n || ""}</div>\n            ${E}\n            <div style="height:1px;background:rgba(255,255,255,0.25);margin:6px 0 4px;"></div>\n            <div style="display:flex;justify-content:space-between;align-items:center;">\n                <span style="font-size:11px;color:#999;letter-spacing:.5px">转账</span>\n                <span class="tr-status" id="${w}">待收款</span>\n            </div>\n        </div>`;
       if (
         ((p.innerHTML =
           c && s
@@ -11530,7 +11553,11 @@ document.addEventListener("DOMContentLoaded", function () {
             (a.textContent = e.note || "（无备注）"),
             (o.textContent = e.time || __akiniFormatDateTime(new Date())),
             (r.textContent = "待收款" === e.status ? "待收款" : e.status),
-            (c.style.display = "block"),
+            (function () {
+              var hint = document.getElementById("tdStateHint");
+              if (hint) hint.textContent = "待收款" === e.status ? ("me" === e.who ? "等待对方收款" : "待你收款") : e.status;
+            })(),
+            (c.style.display = "none"),
             l && (l.style.display = "none"));
           const d = e.recipientId || "",
             u =
@@ -11544,41 +11571,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 (window.akiniContacts.getChatTarget(e.targetId) || {}).type
             ),
             f = "me" !== e.who && (!d || "me" === d);
-          ("me" === e.who
-            ? m && d && "me" !== d
-              ? ((c.textContent =
-                  "待收款" === e.status ? "待" + u + "领取" : e.status),
-                (c.onclick = function () {
-                  n.style.display = "none";
-                }))
-              : ((c.textContent = e.status),
-                (c.onclick = function () {
-                  n.style.display = "none";
-                }))
-            : "待收款" === e.status && f
-              ? ((c.textContent = "收款"),
-                (c.onclick = function () {
-                  (confirmCollect(t), (n.style.display = "none"));
-                }),
-                l &&
-                  ((l.style.display = "block"),
-                  (l.onclick = function () {
-                    (refundTransfer(t), (n.style.display = "none"));
-                  })))
-              : "待收款" === e.status
-                ? ((c.textContent = "仅" + u + "可领取"),
-                  (c.onclick = function () {
-                    n.style.display = "none";
-                  }))
-                : "已退回" === e.status
-                  ? ((c.textContent = "已退回"),
-                    (c.onclick = function () {
-                      n.style.display = "none";
-                    }))
-                  : ((c.textContent = e.status),
-                    (c.onclick = function () {
-                      n.style.display = "none";
-                    })),
+          ("待收款" === e.status && "me" !== e.who && f
+            ? ((c.style.display = "block"),
+              (c.textContent = "确认收款"),
+              (c.onclick = function () {
+                (confirmCollect(t), (n.style.display = "none"));
+              }),
+              l &&
+                ((l.style.display = "block"),
+                (l.onclick = function () {
+                  (refundTransfer(t), (n.style.display = "none"));
+                })))
+            : ((c.style.display = "none"), l && (l.style.display = "none")),
             s &&
               (s.onclick = function () {
                 n.style.display = "none";
