@@ -6343,3 +6343,25 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 }
 .chat-body .msg-row.other .msg-content-line > .bubble-wrap > .msg-rr { align-self: flex-start; }
 .chat-body .msg-row .bubble > * { max-width: 100%; box-sizing: border-box; }
+
+
+/* ===== v20260909n-quote 引用胶囊：气泡正下方、同侧边缘对齐、过长省略号 ===== */
+.chat-body .msg-row .quote-bubble {
+  display: inline-block !important;
+  background: #fff !important;
+  color: #333 !important;
+  border: none !important;
+  border-radius: 10px !important;
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.1) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  margin-top: 2px !important;
+  vertical-align: top !important;
+}
+.chat-body .msg-row.other .msg-content-line > .bubble-wrap { align-items: flex-start; }

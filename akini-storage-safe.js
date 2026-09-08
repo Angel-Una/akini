@@ -9,6 +9,22 @@
   if (window.__akiniStorageSafeReady) return;
   window.__akiniStorageSafeReady = true;
 
+  // wipe 保险丝：上一轮清除若在刷新前来不及清完 IDB，本轮启动第一时间清空（cookie 不受 localStorage.clear 影响）
+  try {
+    if (/(?:^|;\s*)akini_wipe_pending=1/.test(document.cookie || "")) {
+      try { document.cookie = "akini_wipe_pending=;path=/;max-age=0"; } catch (e) {}
+      try { localStorage.clear(); } catch (e) {}
+      try { sessionStorage.clear(); } catch (e) {}
+      try {
+        if (typeof localforage !== "undefined") {
+          var _wlf = localforage.createInstance({ name: "AkiniApp", storeName: "akini_data" });
+          _wlf.clear().catch(function () {});
+        }
+      } catch (e) {}
+      try { indexedDB.deleteDatabase("akini_img_db"); } catch (e) {}
+    }
+  } catch (e) {}
+
   var HIGH_FREQ_RE = /^akini_(next_|last_)/; // 高频调度键不镜像，避免事务堆积
   function isCriticalKey(k) {
     if (!k) return false;

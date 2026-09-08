@@ -535,6 +535,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       function migrateLegacy(done) {
         // 把旧自研 IDB（akini_img_db）里的数据搬进 localforage；旧库保留不删，双保险
+        if (window.__akiniWiping) { done(); return; } // 清除数据期间禁止迁移，避免阻塞清空回调
         try {
           if (typeof indexedDB === "undefined") { done(); return; }
           var req = indexedDB.open(LEGACY_DB, 1);
@@ -2553,10 +2554,11 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!isMe && !isOther) return;
       // v6：时间戳在头像正下方；已读回执包在 bubble-wrap 内固定于聊天气泡/引用正下方
       if (row.getAttribute("data-meta-v") === "10") {
-        var _missTs = __akiniToggleOn("timestampToggle") && !row.querySelector(":scope > .msg-ts");
+        var _missTs = __akiniToggleOn("timestampToggle") && !row.querySelector(":scope .msg-ts");
         var _missRr = row.classList.contains("me") && __akiniToggleOn("readReceiptToggle") && !row.querySelector(":scope .msg-rr") && !row.querySelector(":scope .msg-content-line .msg-rr");
         // 引用块仍在 row 级（旧结构）→ 继续走重组包进 wrap
-        var _strayQ = row.querySelector(":scope > div[style*='flex-basis:100%']") || row.querySelector(":scope > .quote-bubble") || row.querySelector(":scope > .msg-content-line > div[style*='flex-basis:100%']");
+        var _strayQ = row.querySelector(":scope > div[style*='flex-basis:100%']") || row.querySelector(":scope > .quote-bubble") || row.querySelector(":scope > .msg-content-line > div[style*='flex-basis:100%']") ||
+                      row.querySelector(":scope .bubble > .quote-bubble");
         if (_strayQ) { row.removeAttribute("data-meta-v"); }
         else if (!_missTs && !_missRr) {
           // 兜底：已读元素存在但从未显示过（页面刷新后定时器丢失）→ 重新安排延迟显示
@@ -2631,20 +2633,43 @@ document.addEventListener("DOMContentLoaded", function () {
           lineEl.insertBefore(wrap0, bub0);
           wrap0.appendChild(bub0);
         }
-        if (wrap0) {
-          // 引用块统一包入 wrap（气泡正下方、与气泡同侧对齐，me/other 一致）
-          var quote0 = lineEl.querySelector(":scope > div[style*='flex-basis:100%']") ||
-                       row.querySelector(":scope > div[style*='flex-basis:100%']");
-          if (quote0 && quote0.querySelector(".quote-bubble")) wrap0.appendChild(quote0);
-          if (wrap0 && !wrap0.querySelector(".quote-bubble")) {
-            var bareQ = lineEl.querySelector(":scope > .quote-bubble") ||
-                        row.querySelector(":scope > .quote-bubble");
-            if (bareQ) wrap0.appendChild(bareQ);
+        // 引用块：白底胶囊，放 wrap 内气泡正下方，与气泡同侧边缘对齐，过长省略号
+        if (wrap0 && !wrap0.querySelector(":scope > .quote-bubble") &&
+            !(wrap0.querySelector(":scope > div[style*='flex-basis:100%']") || {}).length) {
+          var _bubEl = wrap0.querySelector(":scope > .bubble");
+          var qWrap = lineEl.querySelector(":scope > div[style*='flex-basis:100%']") ||
+                      row.querySelector(":scope > div[style*='flex-basis:100%']");
+          var qEl = (qWrap && qWrap.querySelector(".quote-bubble")) ||
+                    lineEl.querySelector(":scope > .quote-bubble") ||
+                    row.querySelector(":scope > .quote-bubble") ||
+                    (_bubEl && _bubEl.querySelector(":scope > .quote-bubble"));
+          if (qEl) {
+            qEl.removeAttribute("style"); // 清内联，样式统一走 CSS（胶囊+对齐+省略号）
+            wrap0.appendChild(qEl);
+            if (qWrap && !qWrap.querySelector(".quote-bubble") && !qWrap.innerHTML.trim()) qWrap.remove();
           }
         }
       }
       if (showRr && lineEl) {
         var wrapEl = lineEl.querySelector(":scope > .bubble-wrap");
+        // 兜底：气泡不在 content-line 直接子级（卡片/特殊结构）时宽松查找并补建 wrap
+        if (!wrapEl) {
+          var anyBub = lineEl.querySelector(".bubble");
+          if (anyBub) {
+            wrapEl = document.createElement("div");
+            wrapEl.className = "bubble-wrap";
+            anyBub.parentNode.insertBefore(wrapEl, anyBub);
+            wrapEl.appendChild(anyBub);
+          }
+        }
+        // rr 已存在但仍隐藏且从未显示过（刷新后定时器丢失）→ 重新调度显示
+        var _existRr = row.querySelector(":scope .msg-rr");
+        if (_existRr && !hadRead && _existRr.style.visibility !== "visible" && !row.__rrScheduled) {
+          row.__rrScheduled = 1;
+          (function(__r) {
+            setTimeout(function() { try { __akiniShowReadReceipt(__r); } catch (e) {} }, 800 + Math.random() * 1500);
+          })(row);
+        }
         if (wrapEl && !row.querySelector(":scope .msg-rr")) {
           var rrEl = document.createElement("span");
           rrEl.className = "msg-rr";
@@ -2682,6 +2707,16 @@ document.addEventListener("DOMContentLoaded", function () {
                row.querySelector(":scope > .msg-content-line .msg-rr");
       if (rr) {
         rr.style.visibility = "visible";
+        // 显示后立即持久化整个聊天记录 HTML，刷新后直接可见，不再依赖兜底调度
+        try {
+          var _cid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
+          var _cb = document.getElementById("chatBody");
+          if (_cid && _cb && window.akiniContacts.updateSession) {
+            var _html = _cb.innerHTML;
+            window.akiniContacts.updateSession(_cid, { messagesHTML: _html });
+            if (typeof C === "function") C(_cid, _html);
+          }
+        } catch (e) {}
         return;
       }
       var line = row.querySelector(":scope > .msg-content-line");

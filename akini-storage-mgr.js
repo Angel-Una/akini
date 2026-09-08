@@ -68,6 +68,8 @@
       wipeBtn.textContent = "正在清除…";
       // 全局清除标记：阻断一切 localStorage 写回与 IDB 备份，防止清除后数据复活
       try { window.__akiniWiping = true; } catch (e) {}
+      // 保险丝 cookie：即使本次刷新前 IDB 没清完，下次启动会再清一轮
+      try { document.cookie = "akini_wipe_pending=1;path=/;max-age=600"; } catch (e) {}
       var reloaded = false;
       var doReload = function () {
         if (reloaded) return;
@@ -94,6 +96,7 @@
         try {
           if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); });
         } catch (e) {}
+        try { document.cookie = "akini_wipe_pending=;path=/;max-age=0"; } catch (e) {}
         setTimeout(doReload, 400);
       };
       var deleteAllIdb = function () {
@@ -107,8 +110,12 @@
         if (window._idbStore && window._idbStore.clearAll) window._idbStore.clearAll(function () { deleteAllIdb(); });
         else deleteAllIdb();
       } catch (e) { deleteAllIdb(); }
-      // 终极兜底：3 秒内无论如何强制清本地并刷新（防止 IDB 回调挂起导致数据残留）
-      setTimeout(function () { try { clearLocal(); } catch (e) {} doReload(); }, 3000);
+      // 终极兜底：6 秒仍未完成则再补一轮清空后强制刷新
+      setTimeout(function () {
+        try { if (window._idbStore && window._idbStore.clearAll) window._idbStore.clearAll(function () {}); } catch (e) {}
+        try { clearLocal(); } catch (e) {}
+        setTimeout(doReload, 300);
+      }, 6000);
     };
   }
 
