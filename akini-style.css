@@ -1,3 +1,7 @@
+/* 全局提升按键响应：禁用双击缩放判定延迟（保留双指缩放与滚动） */
+body, button, a, input, textarea, select, label, [role="button"] {
+  touch-action: manipulation;
+}
 * {
   margin: 0;
   padding: 0;
@@ -442,7 +446,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   gap: 10px;
   position: relative;
-  left: -44px;
+  left: -47px;
   margin-left: 0;
   top: -3px;
 }
@@ -3763,9 +3767,9 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   position: fixed;
   width: 300px;
   height: 440px;
-  background: rgba(246, 247, 250, 0.72) !important;
-  backdrop-filter: blur(30px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(1.8) !important;
+  background: rgba(246, 247, 250, 0.92) !important;
+  backdrop-filter: blur(40px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
   border-radius: 28px;
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.12);
   z-index: 999999990 !important;
@@ -3867,9 +3871,9 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   height: 48px !important;
   min-width: 110px !important;
   padding: 4px 14px 4px 6px !important;
-  background: rgba(246, 247, 250, 0.78) !important;
-  backdrop-filter: blur(30px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(30px) saturate(1.8) !important;
+  background: rgba(246, 247, 250, 0.92) !important;
+  backdrop-filter: blur(40px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
   border-radius: 999px !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
   border: 1px solid rgba(0, 0, 0, 0.06) !important;

@@ -5961,9 +5961,9 @@ document.addEventListener("DOMContentLoaded", function () {
       "data:image/svg+xml;charset=utf-8," +
       encodeURIComponent(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">' +
-          '<rect width="80" height="80" fill="#e8eaee"/>' +
-          '<circle cx="40" cy="30" r="13" fill="none" stroke="#a6adb6" stroke-width="3.5"/>' +
-          '<path d="M14 76c4-17 14-26 26-26s22 9 26 26" fill="none" stroke="#a6adb6" stroke-width="3.5" stroke-linecap="round"/>' +
+          '<rect width="80" height="80" fill="#f7f8fa"/>' +
+          '<circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/>' +
+          '<path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/>' +
           "</svg>",
       );
     window.__akiniLineAvatarImg = function () {
@@ -20498,12 +20498,20 @@ document.addEventListener("DOMContentLoaded", function () {
     $("watchBackBtn").addEventListener("click", function () {
       if (isFullscreen()) toggleFullscreen();
       var v = $("watchVideo");
-      try { v && v.pause(); } catch (e) {}
+      try {
+        if (v) {
+          v.pause();
+          if (v.__hls) { try { v.__hls.destroy(); } catch (e) {} v.__hls = null; }
+          v.removeAttribute("src");
+          v.load && v.load();
+        }
+      } catch (e) {}
+      var dk = $("watchDanmakuLayer");
+      if (dk) dk.innerHTML = "";
       if (partnerReplyTimer) { clearTimeout(partnerReplyTimer); partnerReplyTimer = null; }
       $("watchArea").style.display = "none";
     });
     $("watchImportBtn").addEventListener("click", importVideo);
-    $("watchFullBtn").addEventListener("click", toggleFullscreen);
     $("watchSendBtn").addEventListener("click", function () { sendMsg(false); });
     $("watchSendBtnFs").addEventListener("click", function () { sendMsg(true); });
     $("watchMsgInput").addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(false); });
@@ -20555,12 +20563,16 @@ document.addEventListener("DOMContentLoaded", function () {
       applyWatchWallpaper();
       var names = watchPartners.map(function (p2) { return p2.name || "联系人"; }).join("\u3001");
       appendWatchSysMsg(names + " 加入了一起观影");
-      schedulePartnerReply();
+      // 不再主动发消息：只有你说话时对方才按回复延迟回应
     });
   }
   window.__akiniOpenWatch = function () {
     try {
       initWatch();
+      try {
+        if (typeof window.applyBubbleCss === "function")
+          window.applyBubbleCss(localStorage.getItem("akini_bubble_css") || "");
+      } catch (e) {}
       openWatchPicker(); // 先选择一起观影的联系人（支持多选），确认后进入观影页
     } catch (e) {
       // 任何异常都不能让观影打不开：兜底直接显示观影区
