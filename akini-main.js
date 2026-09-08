@@ -14647,6 +14647,18 @@ document.addEventListener("DOMContentLoaded", function () {
         S();
         V();
         b(chatId);
+        // 拍一拍对方后触发联系人回复（延迟与消息回复设置一致）
+        try {
+          var _pdMin = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2") || 2,
+              _pdMax = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5") || 5;
+          var _pokeDelay = (_pdMin + Math.random() * Math.max(0, _pdMax - _pdMin)) * 1000;
+          var _pokeReply = function () {
+            try { I(chatId, target, { type: "text", extra: {} }, false); } catch (e) {}
+          };
+          if (window._akiniTimer && window._akiniTimer.schedule)
+            window._akiniTimer.schedule("pokeReply", _pokeReply, _pokeDelay);
+          else setTimeout(_pokeReply, _pokeDelay);
+        } catch (e) {}
       }),
       (window.taPoke = function (t) {
         if (!window.akiniContacts) return;
@@ -20086,7 +20098,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (pa) pa.style.display = playing ? "block" : "none";
   }
   function importVideo() {
-    var raw = window.prompt("粘贴视频链接：\n· 哔哩哔哩：含 BV 号的视频页链接\n· 抖音：视频页链接（www.douyin.com/video/…）\n· 或 mp4/m3u8 直链\n\n链接仅本次有效，不会保存");
+    var raw = window.prompt("粘贴视频链接：\n· 抖音：分享口令或短链（v.douyin.com/…）、视频页链接均可\n· 哔哩哔哩：含 BV 号的视频页链接\n· 或 mp4/m3u8 直链\n\n链接仅本次有效，不会保存");
     if (raw === null) return;
     raw = String(raw).trim();
     if (!raw) return;
@@ -20115,7 +20127,22 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
     if (/v\.douyin\.com\//.test(url)) {
-      alert("抖音短链无法直接解析，请在抖音里打开该视频后复制视频页链接（www.douyin.com/video/…），或粘贴 mp4 直链");
+      // 抖音分享短链/口令：经公共代理跟随重定向解析真实视频页，再嵌入官方分享播放器
+      showPlayer("iframe");
+      var _dyApi = "https://api.allorigins.win/get?url=" + encodeURIComponent(url);
+      fetch(_dyApi).then(function (r) { return r.json(); }).then(function (d) {
+        var finalUrl = (d && d.status && d.status.url) || "";
+        var mm = finalUrl.match(/video\/(\d+)/) ||
+          (d && d.contents ? String(d.contents).match(/video\/(\d+)/) : null) ||
+          finalUrl.match(/modal_id=(\d+)/);
+        if (mm) {
+          f.src = "https://www.iesdouyin.com/share/video/" + mm[1] + "/";
+        } else {
+          alert("抖音链接解析失败，请打开视频后复制完整链接（www.douyin.com/video/…）重试");
+        }
+      }).catch(function () {
+        alert("抖音短链解析失败，请检查网络后重试，或粘贴视频页完整链接");
+      });
       return;
     }
     // 直链视频
