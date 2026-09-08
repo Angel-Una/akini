@@ -446,7 +446,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   gap: 10px;
   position: relative;
-  left: -47px;
+  left: -50px;
   margin-left: 0;
   top: -3px;
 }

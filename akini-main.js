@@ -162,9 +162,20 @@ window.__akiniBootStep = "start";
   try {
     ["readReceiptToggle", "timestampToggle"].forEach(function (key) {
       if (localStorage.getItem("akini_toggle_" + key) === null) {
-        localStorage.setItem("akini_toggle_" + key, "0");
+        localStorage.setItem("akini_toggle_" + key, "1");
       }
     });
+    /* 一次性迁移：旧版默认误写"0"导致开关看似无效；仅迁移一次，尊重之后的手动关闭 */
+    try {
+      if (!localStorage.getItem("akini_mig_tsrr_v1")) {
+        localStorage.setItem("akini_mig_tsrr_v1", "1");
+        ["readReceiptToggle", "timestampToggle"].forEach(function (key) {
+          if (localStorage.getItem("akini_toggle_" + key) === "0") {
+            localStorage.setItem("akini_toggle_" + key, "1");
+          }
+        });
+      }
+    } catch (e) {}
   } catch (e) {}
 })();
 /* ====== AKR（Akini 随机内核）：随机行为/概率/时间范围控制 ====== */
@@ -2537,7 +2548,11 @@ document.addEventListener("DOMContentLoaded", function () {
       if (isSystem) return; // 系统消息不显示时间戳和已读回执
       if (!isMe && !isOther) return;
       // v6：时间戳在头像正下方；已读回执包在 bubble-wrap 内固定于聊天气泡/引用正下方
-      if (row.getAttribute("data-meta-v") === "10") return; // 已是 v7 结构
+      if (row.getAttribute("data-meta-v") === "10") {
+        var _missTs = __akiniToggleOn("timestampToggle") && !row.querySelector(":scope > .msg-ts");
+        var _missRr = row.classList.contains("me") && __akiniToggleOn("readReceiptToggle") && !row.querySelector(":scope > .msg-rr");
+        if (!_missTs && !_missRr) return;
+      } // 已是 v7 结构
       var hadRead = row.getAttribute("data-had-read-receipt") === "1";
       var existing = row.querySelector(".msg-meta");
       if (existing) {
@@ -2619,7 +2634,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (showRr && lineEl) {
         var wrapEl = lineEl.querySelector(":scope > .bubble-wrap");
-        if (wrapEl) {
+        if (wrapEl && !row.querySelector(":scope > .msg-rr")) {
           var rrEl = document.createElement("span");
           rrEl.className = "msg-rr";
           rrEl.textContent = "已读";
@@ -5973,6 +5988,33 @@ document.addEventListener("DOMContentLoaded", function () {
         '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
       );
     };
+    /* 全局 emoji 头像兜底：任何只含兔子/猫 emoji 的头像容器统一替换为线条头像（覆盖字卡/日记/观影等散点渲染） */
+    (function () {
+      var EMOJI_RE = /^[\u{1F430}\u{1F431}]\uFE0F?$/u;
+      function sweep() {
+        try {
+          var list = document.querySelectorAll('[class*="avatar" i],[id*="avatar" i]');
+          for (var i = 0; i < list.length; i++) {
+            var el = list[i];
+            if (el.children.length === 0 && EMOJI_RE.test((el.textContent || "").trim())) {
+              el.innerHTML = window.__akiniLineAvatarImg();
+            }
+          }
+        } catch (e) {}
+      }
+      var timer = null;
+      function schedule() {
+        if (timer) return;
+        timer = setTimeout(function () { timer = null; sweep(); }, 800);
+      }
+      function arm() {
+        try { new MutationObserver(schedule).observe(document.body, { childList: true, subtree: true }); } catch (e) {}
+      }
+      if (document.body) arm();
+      else document.addEventListener("DOMContentLoaded", arm);
+      sweep();
+      setTimeout(sweep, 3000);
+    })();
     window.__akiniIsDefaultAvatarToken = function (t) {
       // 判定是否为「默认占位」：空、emoji（含 VS16 变体）均转为线条头像；汉字/字母/数字昵称首字保留
       if (!t || "string" != typeof t) return !0;
