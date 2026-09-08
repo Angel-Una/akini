@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Akini</title>
+<script>
+/* 入口页：清掉旧版内嵌应用遗留的 Service Worker 与缓存，然后进入最新 akini.html */
+(function () {
+  var jumped = false;
+  function go() {
+    if (jumped) return;
+    jumped = true;
+    location.replace("akini.html?v=20260908u");
+  }
+  try {
+    var jobs = [];
+    if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
+      jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+        return Promise.all(rs.map(function (r) { return r.unregister(); }));
+      }));
+    }
+    if (window.caches && caches.keys) {
+      jobs.push(caches.keys().then(function (ks) {
+        return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+      }));
+    }
+    if (jobs.length) {
+      Promise.all(jobs).then(go).catch(go);
+      setTimeout(go, 1500);
+    } else {
+      go();
+    }
+  } catch (e) { go(); }
+})();
+</script>
+</head>
+<body></body>
+</html>
