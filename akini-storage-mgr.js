@@ -116,8 +116,8 @@
         if (window._idbStore && window._idbStore.clearAll) window._idbStore.clearAll(function () { deleteAllIdb(); });
         else deleteAllIdb();
       } catch (e) { deleteAllIdb(); }
-      // 终极兜底：8 秒内无论如何强制刷新
-      setTimeout(doReload, 8000);
+      // 终极兜底：3 秒内无论如何强制清本地并刷新（防止 IDB 回调挂起导致数据残留）
+      setTimeout(function () { try { clearLocal(); } catch (e) {} doReload(); }, 3000);
     };
   }
 

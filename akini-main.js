@@ -2555,7 +2555,19 @@ document.addEventListener("DOMContentLoaded", function () {
       if (row.getAttribute("data-meta-v") === "10") {
         var _missTs = __akiniToggleOn("timestampToggle") && !row.querySelector(":scope > .msg-ts");
         var _missRr = row.classList.contains("me") && __akiniToggleOn("readReceiptToggle") && !row.querySelector(":scope > .msg-rr");
-        if (!_missTs && !_missRr) return;
+        if (!_missTs && !_missRr) {
+          // 兜底：已读元素存在但从未显示过（页面刷新后定时器丢失）→ 重新安排延迟显示
+          if (isMe && __akiniToggleOn("readReceiptToggle") && row.getAttribute("data-had-read-receipt") !== "1") {
+            var _rr0 = row.querySelector(":scope > .msg-rr");
+            if (_rr0 && _rr0.style.visibility !== "visible" && !row.getAttribute("data-rr-scheduled")) {
+              row.setAttribute("data-rr-scheduled", "1");
+              setTimeout(function () {
+                try { __akiniShowReadReceipt(row); } catch (e) {}
+              }, 600 + Math.random() * 1200);
+            }
+          }
+          return;
+        }
       } // 已是 v7 结构
       var hadRead = row.getAttribute("data-had-read-receipt") === "1";
       var existing = row.querySelector(".msg-meta");
@@ -9008,28 +9020,9 @@ document.addEventListener("DOMContentLoaded", function () {
           // 设置页：隐藏左上角「‹」（用户要求删除），退出走右上角「返回/关闭」
           (function(){var bh=document.getElementById("wbExclBackHome");bh&&(bh.style.display="none");var c=document.getElementById("wbExclClose");c&&(c.style.display="");})();
           ((WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)));
-          // 搜索框：固定在第一张字卡上面，输入即过滤列表
-          const _exclSearch = document.createElement("input");
-          /* 搜索框阻止触摸冒泡到 WEL fast-tap 容器：否则 touchend 被 preventDefault，输入框无法聚焦 */
-          _exclSearch.addEventListener("touchstart", function (ev) { ev.stopPropagation(); }, { passive: true });
-          _exclSearch.addEventListener("click", function (ev) { ev.stopPropagation(); });
-          /* 关键：touchend 必须 preventDefault + 手动 focus（父容器 fast-tap 会拦截默认点击行为，导致键盘弹不出） */
-          _exclSearch.addEventListener("touchend", function (ev) {
-            ev.stopPropagation();
-            ev.preventDefault();
-            try { _exclSearch.focus(); } catch (e) {}
-          }, { passive: false });
-          ((_exclSearch.type = "search"),
-            (_exclSearch.placeholder = "搜索字卡内容…"),
-            (_exclSearch.style.cssText = "width:100%;box-sizing:border-box;margin:10px 0 2px;padding:9px 12px;border:1px solid #e0e0e0;border-radius:10px;font-size:16px;outline:0;background:#fff"),
-            _exclSearch.addEventListener("input", function () {
-              const q = _exclSearch.value.trim();
-              WEL.querySelectorAll(".wb-excl-card-row").forEach(function (r) {
-                const t = r.querySelector(".t");
-                r.style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
-              });
-            }),
-            WEL.appendChild(_exclSearch));
+          // 搜索框：常驻 overlay 头部（wbExclSearch），此处仅重置取值；事件在模块初始化时绑定一次
+          const _exclSearch = document.getElementById("wbExclSearch");
+          if (_exclSearch) { _exclSearch.value = ""; _exclSearch.style.display = ""; }
           const all = window.__wbRead("akini_wordbank", []) || [],
             tabs = [["main", "主字卡"], ["emoji", "Emoji"], ["pat", "拍一拍"]];
           let any = !1;
@@ -9060,9 +9053,27 @@ document.addEventListener("DOMContentLoaded", function () {
             any ||
               (WEL.innerHTML += '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0">还没有字卡</div>'));
         }
+        // 专属字卡搜索：常驻输入框一次性绑定（不经过 fast-tap 链，避免触摸被吞/死机）
+        (function () {
+          var si = document.getElementById("wbExclSearch");
+          if (!si || si.__bound) return;
+          si.__bound = 1;
+          si.addEventListener("input", function () {
+            var q = si.value.trim();
+            var list = document.getElementById("wbExclList");
+            if (!list) return;
+            var rows = list.querySelectorAll(".wb-excl-card-row");
+            for (var i = 0; i < rows.length; i++) {
+              var t = rows[i].querySelector(".t");
+              rows[i].style.display = !q || (t && t.textContent.indexOf(q) >= 0) ? "" : "none";
+            }
+          });
+        })();
         function renderExclGroups(cid) {
           if (!WEL) return;
           exclCid = cid;
+          var _si = document.getElementById("wbExclSearch");
+          if (_si) { _si.value = ""; _si.style.display = "none"; } // 分组模式隐藏搜索框
           const cname = wbContactName(cid);
           ((WET.textContent = cname),
             (WEBack.style.display = ""),
@@ -9145,7 +9156,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (sel.main) {
             data.customReplies = all
               .filter(function (t) { return ((t && t.tab) || "main") === "main" && txt(t); })
-              .filter(function (t) { return !hasGroupFilter ? !t.gid : !!inGroup[String(t.gid)]; })
+              // 全量导出必须包含全部主字卡（含已分组）：milk 端只从 customReplies 读主字卡，分组 items 不会自动并入
+              .filter(function (t) { return !hasGroupFilter ? true : !!inGroup[String(t.gid)]; })
               .map(txt);
             if (data.customReplies.length) {
               data.items = data.customReplies.slice();

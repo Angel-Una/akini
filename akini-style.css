@@ -6267,3 +6267,44 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 .survey-bubble-count {
   color: #999 !important;
 }
+
+/* ===== v20260909i 已读/时间戳防遮挡 ===== */
+.chat-body .msg-row .avatar-col .msg-ts { z-index: 6; }
+.chat-body .msg-row.me > .msg-rr { z-index: 6 !important; }
+.chat-body .msg-row .msg-content-line > .bubble-wrap > .msg-rr { z-index: 6 !important; }
+
+/* ===== v20260909j 时间戳/已读根治：全部改文档流，永不裁切 ===== */
+.chat-body .msg-row .avatar-col {
+  height: auto !important;
+  min-height: 38px;
+  overflow: visible !important;
+}
+.chat-body .msg-row .avatar-col .msg-ts {
+  position: static !important;
+  transform: none !important;
+  margin-top: 4px;
+  width: 100% !important;
+  min-width: 0 !important;
+  display: block;
+}
+.chat-body .msg-row.me .avatar-col .msg-ts { right: auto !important; left: auto !important; text-align: right !important; }
+.chat-body .msg-row.other .avatar-col .msg-ts,
+.chat-body .msg-row.ta .avatar-col .msg-ts,
+.chat-body .msg-row.group .avatar-col .msg-ts { left: auto !important; text-align: left !important; }
+.chat-body .msg-row.me > .msg-rr,
+.chat-body .msg-row .msg-content-line > .bubble-wrap > .msg-rr {
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  display: block;
+  width: 100%;
+  text-align: right;
+  margin-top: 3px;
+}
+/* 问卷卡 footer 横线与转账/商店卡统一：细灰线 + 上间距 */
+.survey-bubble-footer {
+  margin-top: 12px !important;
+  padding: 10px 12px 8px !important;
+  border-top: 1px solid #f0f0f0 !important;
+}
