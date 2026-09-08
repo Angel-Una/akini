@@ -3866,9 +3866,9 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   height: 48px !important;
   min-width: 110px !important;
   padding: 4px 14px 4px 6px !important;
-  background: rgba(255, 255, 255, 0.35) !important;
-  backdrop-filter: blur(28px) saturate(1.8) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(1.8) !important;
+  background: rgba(246, 247, 250, 0.78) !important;
+  backdrop-filter: blur(30px) saturate(1.8) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.8) !important;
   border-radius: 999px !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12) !important;
   border: 1px solid rgba(0, 0, 0, 0.06) !important;

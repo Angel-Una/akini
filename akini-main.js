@@ -14626,16 +14626,17 @@ document.addEventListener("DOMContentLoaded", function () {
         var def = "";
         try { def = localStorage.getItem("akini_poke_suffix") || ""; } catch (e) {}
         var suffix = window.prompt(
-          "自定义拍一拍内容（可留空）\n例如：的肩膀 / 的钱包\n\n将发送：" + myName + " 拍了拍 " + taName + "＋你填的内容",
+          "自定义拍一拍内容\n例如：拍了拍" + taName + "的肩膀\n\n将发送：" + myName + " ＋你填的内容",
           def,
         );
         if (null === suffix) return;
         suffix = String(suffix).trim();
+        if (!suffix) suffix = "拍了拍 " + taName;
         try { localStorage.setItem("akini_poke_suffix", suffix); } catch (e) {}
         var esc = function (x) {
           return String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         };
-        var text = myName + " 拍了拍 " + taName + suffix;
+        var text = myName + " " + suffix;
         var rowHtml =
           '<div class="msg-row system"><div class="bubble">' + esc(text) + "</div></div>";
         __akiniAppendMessageHTML(chatId, rowHtml, {
@@ -17483,6 +17484,17 @@ document.addEventListener("DOMContentLoaded", function () {
         var __akiniManualPlay = !1;
         window.syncAvatars = function (t) {
           var n = t || f();
+          // 清洗残留：已删除/失效的联系人从选中列表剔除，避免误判三人模式、渲染空头像
+          if (window.akiniContacts && T.length) {
+            var _valid = T.filter(function (t) {
+              return !!(t && t.id && window.akiniContacts.getContactById(t.id));
+            });
+            if (_valid.length !== T.length) {
+              T.length = 0;
+              _valid.forEach(function (v) { T.push(v); });
+              try { saveMusicContacts(); } catch (e) {}
+            }
+          }
           window.akiniContacts &&
             T.forEach(function (t) {
               var e = window.akiniContacts.getContactById(t.id);
@@ -20042,4 +20054,218 @@ document.addEventListener("DOMContentLoaded", function () {
       if (mm.contains(t)) ev.preventDefault();
     } catch (e) {}
   }, { passive: false });
+})();
+
+/* ===== 观影（一起看视频）：视频链接仅内存保存，重进即清空；竖屏消息进聊天区，全屏横屏变弹幕 ===== */
+(function () {
+  var inited = false;
+  var danmakuTimer = null;
+  function $(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function isFullscreen() {
+    return !!(document.fullscreenElement || document.webkitFullscreenElement);
+  }
+  function showPlayer(kind) {
+    var v = $("watchVideo"), f = $("watchFrame"), em = $("watchEmpty"), ct = $("watchControls");
+    if (em) em.style.display = "none";
+    if (v) v.style.display = kind === "video" ? "block" : "none";
+    if (f) f.style.display = kind === "iframe" ? "block" : "none";
+    if (ct) ct.style.display = kind === "video" ? "flex" : "none";
+  }
+  function fmtTime(s) {
+    s = Math.max(0, Math.floor(s || 0));
+    return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2);
+  }
+  function syncPlayIcon() {
+    var v = $("watchVideo");
+    var playing = v && !v.paused && !v.ended;
+    var pi = $("watchPlayIcon"), pa = $("watchPauseIcon");
+    if (pi) pi.style.display = playing ? "none" : "block";
+    if (pa) pa.style.display = playing ? "block" : "none";
+  }
+  function importVideo() {
+    var raw = window.prompt("粘贴视频链接：\n· 哔哩哔哩：含 BV 号的视频页链接\n· 抖音：视频页链接（www.douyin.com/video/…）\n· 或 mp4/m3u8 直链\n\n链接仅本次有效，不会保存");
+    if (raw === null) return;
+    raw = String(raw).trim();
+    if (!raw) return;
+    var urlMatch = raw.match(/https?:\/\/[^\s"'<>]+/);
+    if (!urlMatch) { alert("没有识别到链接，请检查粘贴内容"); return; }
+    var url = urlMatch[0].replace(/[，。；、]+$/, "");
+    var v = $("watchVideo"), f = $("watchFrame");
+    try { if (v) { v.pause(); v.removeAttribute("src"); v.load && v.load(); } } catch (e) {}
+    if (f) f.src = "about:blank";
+    // B站：提取 BV 号走官方嵌入播放器
+    var bv = url.match(/BV[0-9A-Za-z]{10}/);
+    if (bv) {
+      showPlayer("iframe");
+      f.src = "https://player.bilibili.com/player.html?bvid=" + bv[0] + "&autoplay=1&high_quality=1";
+      return;
+    }
+    if (/b23\.tv\//.test(url)) {
+      alert("哔哩哔哩短链无法直接解析，请打开视频页复制含 BV 号的完整链接");
+      return;
+    }
+    // 抖音视频页：尝试嵌入分享页
+    var dy = url.match(/douyin\.com\/video\/(\d+)/);
+    if (dy) {
+      showPlayer("iframe");
+      f.src = "https://www.iesdouyin.com/share/video/" + dy[1] + "/";
+      return;
+    }
+    if (/v\.douyin\.com\//.test(url)) {
+      alert("抖音短链无法直接解析，请在抖音里打开该视频后复制视频页链接（www.douyin.com/video/…），或粘贴 mp4 直链");
+      return;
+    }
+    // 直链视频
+    if (/\.(mp4|webm|ogg|mov|m3u8)(\?|$)/i.test(url) || /^https?:\/\//.test(url)) {
+      showPlayer("video");
+      var isHls = /\.m3u8(\?|$)/i.test(url);
+      if (isHls && window.Hls && window.Hls.isSupported()) {
+        try {
+          if (v.__hls) { v.__hls.destroy(); }
+          var hls = new window.Hls();
+          v.__hls = hls;
+          hls.loadSource(url);
+          hls.attachMedia(v);
+        } catch (e) { v.src = url; }
+      } else {
+        v.src = url;
+      }
+      v.play && v.play().catch(function () {});
+      return;
+    }
+  }
+  function appendChatMsg(text) {
+    var body = $("watchChatBody");
+    if (!body) return;
+    var name = localStorage.getItem("akini_my_name") || "我";
+    var row = document.createElement("div");
+    row.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:10px;gap:8px;align-items:flex-start";
+    row.innerHTML =
+      '<div style="max-width:75%;background:#95ec69;border-radius:8px;padding:8px 10px;font-size:15px;color:#111;word-break:break-all;line-height:1.5">' +
+      esc(text) + '</div>' +
+      '<div style="width:34px;height:34px;border-radius:6px;overflow:hidden;flex-shrink:0;background:#e8eaee;display:flex;align-items:center;justify-content:center;font-size:11px;color:#999">' +
+      (window.getMyAvatar ? (function(){var a="";try{a=window.getMyAvatar()||"";}catch(e){} return a;})() : esc(name[0] || "我")) + '</div>';
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+  }
+  function fireDanmaku(text) {
+    var layer = $("watchDanmakuLayer");
+    if (!layer) return;
+    var d = document.createElement("div");
+    d.textContent = text;
+    var top = 8 + Math.random() * 62;
+    d.style.cssText =
+      "position:absolute;left:100%;top:" + top + "%;white-space:nowrap;font-size:16px;color:#fff;" +
+      "text-shadow:0 1px 3px rgba(0,0,0,.6);pointer-events:none;will-change:transform;transition:transform 7s linear";
+    layer.appendChild(d);
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        var w = layer.clientWidth + d.offsetWidth + 40;
+        d.style.transform = "translateX(-" + w + "px)";
+      });
+    });
+    setTimeout(function () { d.remove(); }, 7300);
+  }
+  function sendMsg(fsMode) {
+    var input = fsMode ? $("watchMsgInputFs") : $("watchMsgInput");
+    if (!input) return;
+    var t = input.value.trim();
+    if (!t) return;
+    input.value = "";
+    appendChatMsg(t);
+    if (isFullscreen()) fireDanmaku(t);
+  }
+  function applyFullscreenUI() {
+    var fs = isFullscreen();
+    var layer = $("watchDanmakuLayer"), bar = $("watchFloatInputBar");
+    var v = $("watchVideo"), f = $("watchFrame"), em = $("watchEmpty");
+    if (layer) layer.style.display = fs ? "block" : "none";
+    if (bar) bar.style.display = fs ? "flex" : "none";
+    var wct = $("watchControls");
+    if (wct) wct.style.bottom = fs ? "52px" : "0";
+    [v, f, em].forEach(function (el) {
+      if (!el) return;
+      if (fs) { el.style.aspectRatio = "auto"; el.style.height = "100%"; el.style.width = "100%"; }
+      else { el.style.height = ""; el.style.aspectRatio = "16/9"; }
+    });
+  }
+  function toggleFullscreen() {
+    var box = $("watchVideoBox");
+    if (!box) return;
+    if (isFullscreen()) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      try { screen.orientation && screen.orientation.unlock && screen.orientation.unlock(); } catch (e) {}
+    } else {
+      var req = box.requestFullscreen || box.webkitRequestFullscreen;
+      if (req) {
+        try { var p = req.call(box); if (p && p.catch) p.catch(function () {}); } catch (e) {}
+      }
+      try {
+        if (screen.orientation && screen.orientation.lock)
+          screen.orientation.lock("landscape").catch(function () {});
+      } catch (e) {}
+    }
+  }
+  function initWatch() {
+    if (inited) return;
+    inited = true;
+    var wv = $("watchVideo");
+    $("watchPlayPause").addEventListener("click", function () {
+      if (!wv) return;
+      if (wv.paused || wv.ended) { wv.play && wv.play().catch(function () {}); }
+      else wv.pause();
+    });
+    $("watchBack10").addEventListener("click", function () {
+      if (wv && isFinite(wv.duration)) wv.currentTime = Math.max(0, wv.currentTime - 10);
+    });
+    $("watchFwd10").addEventListener("click", function () {
+      if (wv && isFinite(wv.duration)) wv.currentTime = Math.min(wv.duration, wv.currentTime + 10);
+    });
+    var seek = $("watchSeek");
+    var seeking = false;
+    seek.addEventListener("input", function () {
+      seeking = true;
+      if (wv && isFinite(wv.duration) && wv.duration > 0)
+        wv.currentTime = (parseFloat(seek.value) / 1000) * wv.duration;
+    });
+    seek.addEventListener("change", function () { seeking = false; });
+    wv.addEventListener("timeupdate", function () {
+      if (!seeking && isFinite(wv.duration) && wv.duration > 0)
+        seek.value = String(Math.round((wv.currentTime / wv.duration) * 1000));
+      var ct = $("watchCurTime"); if (ct) ct.textContent = fmtTime(wv.currentTime);
+    });
+    wv.addEventListener("loadedmetadata", function () {
+      var dt = $("watchDurTime"); if (dt) dt.textContent = fmtTime(wv.duration);
+    });
+    wv.addEventListener("play", syncPlayIcon);
+    wv.addEventListener("pause", syncPlayIcon);
+    wv.addEventListener("ended", syncPlayIcon);
+    // 点画面切换播放/暂停
+    wv.addEventListener("click", function () {
+      if (wv.paused || wv.ended) { wv.play && wv.play().catch(function () {}); }
+      else wv.pause();
+    });
+    $("watchBackBtn").addEventListener("click", function () {
+      if (isFullscreen()) toggleFullscreen();
+      var v = $("watchVideo");
+      try { v && v.pause(); } catch (e) {}
+      $("watchArea").style.display = "none";
+    });
+    $("watchImportBtn").addEventListener("click", importVideo);
+    $("watchFullBtn").addEventListener("click", toggleFullscreen);
+    $("watchSendBtn").addEventListener("click", function () { sendMsg(false); });
+    $("watchSendBtnFs").addEventListener("click", function () { sendMsg(true); });
+    $("watchMsgInput").addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(false); });
+    $("watchMsgInputFs").addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(true); });
+    document.addEventListener("fullscreenchange", applyFullscreenUI);
+    document.addEventListener("webkitfullscreenchange", applyFullscreenUI);
+  }
+  window.__akiniOpenWatch = function () {
+    initWatch();
+    var a = $("watchArea");
+    if (a) a.style.display = "flex";
+  };
 })();
