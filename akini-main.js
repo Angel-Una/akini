@@ -2707,15 +2707,20 @@ document.addEventListener("DOMContentLoaded", function () {
                row.querySelector(":scope > .msg-content-line .msg-rr");
       if (rr) {
         rr.style.visibility = "visible";
-        // 显示后立即持久化整个聊天记录 HTML，刷新后直接可见，不再依赖兜底调度
+        // 显示后持久化（600ms 防抖合并，批量点亮时只存一次，避免卡顿）
         try {
-          var _cid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
-          var _cb = document.getElementById("chatBody");
-          if (_cid && _cb && window.akiniContacts.updateSession) {
-            var _html = _cb.innerHTML;
-            window.akiniContacts.updateSession(_cid, { messagesHTML: _html });
-            if (typeof C === "function") C(_cid, _html);
-          }
+          if (window.__akiniRrSaveTimer) clearTimeout(window.__akiniRrSaveTimer);
+          window.__akiniRrSaveTimer = setTimeout(function () {
+            try {
+              var _cid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
+              var _cb = document.getElementById("chatBody");
+              if (_cid && _cb && window.akiniContacts.updateSession) {
+                var _html = _cb.innerHTML;
+                window.akiniContacts.updateSession(_cid, { messagesHTML: _html });
+                if (typeof C === "function") C(_cid, _html);
+              }
+            } catch (e) {}
+          }, 600);
         } catch (e) {}
         return;
       }
@@ -2784,6 +2789,17 @@ document.addEventListener("DOMContentLoaded", function () {
             var __rows = cb.querySelectorAll(".msg-row:not([data-meta-v])");
             var __lim = Math.min(__rows.length, 40);
             for (var __mi = 0; __mi < __lim; __mi++) __akiniProcessMsgMeta(__rows[__mi]);
+            // 已读回执终兜底：我方消息回执存在但仍隐藏的，直接点亮（不再等调度）
+            if (__akiniToggleOn("readReceiptToggle")) {
+              var __hid = cb.querySelectorAll(".msg-row.me .msg-rr");
+              for (var __hi = 0; __hi < __hid.length; __hi++) {
+                var __rrEl = __hid[__hi];
+                if (__rrEl.style && __rrEl.style.visibility === "hidden") {
+                  var __rrRow = __rrEl.closest ? __rrEl.closest(".msg-row") : null;
+                  if (__rrRow) { try { __akiniShowReadReceipt(__rrRow); } catch (e) {} }
+                }
+              }
+            }
             __akiniUpgradeSurveyIcons(cb);
             __akiniSyncCardStatus(cb);
           }
@@ -8764,13 +8780,17 @@ document.addEventListener("DOMContentLoaded", function () {
                     if (Array.isArray(gr[f2])) grpCardCnt += gr[f2].length;
                   });
                 });
-                var mainCnt = (Array.isArray(x) ? x.length : 0) + (x && Array.isArray(x.customReplies) ? x.customReplies.length : 0) + grpCardCnt;
+                var _hasCR = !!(x && !Array.isArray(x) && Array.isArray(x.customReplies));
+                // customReplies 已含全部分组字卡（milk 导出口径），有它就不再累加分组 items，否则数量翻倍
+                var mainCnt = (Array.isArray(x) ? x.length : 0) + (_hasCR ? x.customReplies.length : 0) + (_hasCR ? 0 : grpCardCnt);
                 if (mainCnt > 0) mods.push({ key: "main", label: "主字卡", count: mainCnt });
                 if (x && Array.isArray(x.customPokes) && x.customPokes.length) mods.push({ key: "pat", label: "拍一拍", count: x.customPokes.length });
                 if (x && Array.isArray(x.customEmojis) && x.customEmojis.length) mods.push({ key: "emoji", label: "Emoji", count: x.customEmojis.length });
                 if (grpArr.length) mods.push({ key: "groups", label: "字卡分组", count: grpArr.length });
                 var otherCnt = 0;
                 ["items", "replies", "words", "list", "data", "wordbank", "cards", "main"].forEach(function (k3) {
+                  // items 是 customReplies 的冗余副本，已有 customReplies 时跳过避免重复计数
+                  if (k3 === "items" && _hasCR) return;
                   if (x && !Array.isArray(x) && Array.isArray(x[k3])) otherCnt += x[k3].length;
                 });
                 if (otherCnt > 0 || (x && (x.ls || x.idb || x.text))) mods.push({ key: "other", label: "其他字卡", count: otherCnt > 0 ? otherCnt : "若干" });
@@ -9201,7 +9221,6 @@ document.addEventListener("DOMContentLoaded", function () {
               .filter(function (t) { return !hasGroupFilter ? true : !!inGroup[String(t.gid)]; })
               .map(txt);
             if (data.customReplies.length) {
-              data.items = data.customReplies.slice();
               data.modules.push("main");
             }
           }
