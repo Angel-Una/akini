@@ -2719,9 +2719,9 @@ document.addEventListener("DOMContentLoaded", function () {
           mutations.forEach(function (m) {
             Array.from(m.addedNodes).forEach(function (node) {
               if (node.nodeType === 1 && node.classList && node.classList.contains("msg-row") && !node.classList.contains("timestamp-row")) {
-                __akiniProcessMsgMeta(node);
-                __akiniInsertTimestampSeparators();
-                __akiniUpgradeSurveyIcons(node);
+                try { __akiniProcessMsgMeta(node); } catch (e) {}
+                try { __akiniInsertTimestampSeparators(); } catch (e) {}
+                try { __akiniUpgradeSurveyIcons(node); } catch (e) {}
               }
             });
           });
@@ -2750,17 +2750,23 @@ document.addEventListener("DOMContentLoaded", function () {
       __akiniSetupChatMetaObserver();
     }
     window.__akiniRefreshChatMeta = function () {
-      var chatBody = document.getElementById("chatBody");
-      if (!chatBody) return;
-      chatBody.querySelectorAll(".msg-meta, .msg-ts").forEach(function (meta) {
-        meta.remove();
+      ["chatBody", "watchChatBody"].forEach(function (bodyId) {
+        try {
+          var chatBody = document.getElementById(bodyId);
+          if (!chatBody) return;
+          chatBody.querySelectorAll(".msg-meta, .msg-ts").forEach(function (meta) {
+            meta.remove();
+          });
+          chatBody.querySelectorAll(".timestamp-row").forEach(function (row) {
+            row.remove();
+          });
+          Array.from(chatBody.children).forEach(function (row) {
+            try { __akiniProcessMsgMeta(row); } catch (e) {}
+          });
+        } catch (e) {}
       });
-      chatBody.querySelectorAll(".timestamp-row").forEach(function (row) {
-        row.remove();
-      });
-      Array.from(chatBody.children).forEach(__akiniProcessMsgMeta);
-      __akiniInsertTimestampSeparators();
-      __akiniSetupChatMetaObserver();
+      try { __akiniInsertTimestampSeparators(); } catch (e) {}
+      try { __akiniSetupChatMetaObserver(); } catch (e) {}
     };
     function u(t, e) {
       e &&
@@ -8161,7 +8167,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     o = document.createElement("div");
                   ((o.style.cssText =
                     "display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8f8f8;border-radius:10px;margin-bottom:8px;"),
-                    (o.innerHTML = `\n                        <div style="display:flex;align-items:center;gap:8px;">\n                            <span style="width:10px;height:10px;border-radius:50%;background:${e.color || "#a0a0a0"};display:inline-block;flex-shrink:0;"></span>\n                            <span style="font-size:14px;color:#333;font-weight:500;">${e.name}</span>\n                            <span style="font-size:12px;color:#aaa;">${a}条</span>\n                        </div>\n                        <button type="button" data-gi="${i}" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;" class="del-group-btn">✕</button>\n                    `),
+                    (o.innerHTML = `\n                        <div style="display:flex;align-items:center;gap:8px;">\n                            <span style="font-size:14px;color:#333;font-weight:500;">${e.name}</span>\n                            <span style="font-size:12px;color:#aaa;">${a}条</span>\n                        </div>\n                        <button type="button" data-gi="${i}" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;" class="del-group-btn">✕</button>\n                    `),
                     n.appendChild(o));
                 })),
             P());
@@ -8753,7 +8759,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     (e.dataset.gid = t.id),
                     (e.style.cssText =
                       "padding:10px 14px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;"),
-                    (e.innerHTML = `<span style="width:10px;height:10px;border-radius:50%;background:${t.color || "#a0a0a0"};display:inline-block;"></span>${t.name}`),
+                    (e.innerHTML = `${t.name}`),
                     L.appendChild(e));
                 }),
                 M &&
@@ -9091,7 +9097,10 @@ document.addEventListener("DOMContentLoaded", function () {
               .filter(function (t) { return ((t && t.tab) || "main") === "main" && txt(t); })
               .filter(function (t) { return !hasGroupFilter ? !t.gid : !!inGroup[String(t.gid)]; })
               .map(txt);
-            if (data.customReplies.length) data.modules.push("replies");
+            if (data.customReplies.length) {
+              data.items = data.customReplies.slice();
+              data.modules.push("main");
+            }
           }
           if (sel.emoji && !hasGroupFilter) {
             data.customEmojis = all
@@ -9153,7 +9162,6 @@ document.addEventListener("DOMContentLoaded", function () {
             var cnt = all.filter(function (t) { return String(t.gid || "") === String(g.id); }).length;
             return '<label style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:13px;border:1px solid #f0f0f0;background:#f8f8f8;cursor:pointer;margin-bottom:8px">' +
               '<input type="checkbox" data-gid="' + g.id + '" checked style="width:16px;height:16px;accent-color:#1a1a1a;flex-shrink:0"/>' +
-              '<span style="width:10px;height:10px;border-radius:50%;background:' + (g.color || "#74C0FC") + ';flex-shrink:0"></span>' +
               '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:#222">' + String(g.name).replace(/</g, "&lt;") + '</div>' +
               '<div style="font-size:11px;color:#999;margin-top:2px">' + cnt + ' 条字卡</div></div></label>';
           }).join("");
@@ -9162,7 +9170,7 @@ document.addEventListener("DOMContentLoaded", function () {
             '<div style="font-size:12px;color:#999;margin-bottom:14px">勾选要导出的分组，仅导出这些分组的字卡</div>' +
             rowsHtml +
             '<div style="display:flex;gap:10px"><button type="button" data-act="cancel" style="flex:1;padding:12px;border:1.5px solid #e5e5e5;border-radius:13px;background:none;color:#888;font-size:13px;cursor:pointer">取消</button>' +
-            '<button type="button" data-act="ok" style="flex:2;padding:12px;border:none;border-radius:13px;background:#07c160;color:#fff;font-size:14px;font-weight:700;cursor:pointer">导出</button></div></div>';
+            '<button type="button" data-act="ok" style="flex:2;padding:12px;border:none;border-radius:13px;background:#1a1a1a;color:#fff;font-size:14px;font-weight:700;cursor:pointer">导出</button></div></div>';
           ov.addEventListener("click", function (ev) {
             if (ev.target === ov) { ov.remove(); return; }
             var btn = ev.target && ev.target.closest ? ev.target.closest("button[data-act]") : null;
@@ -9209,7 +9217,7 @@ document.addEventListener("DOMContentLoaded", function () {
               (gs.length ? modRow("groups", "字卡分组（含组内字卡）", gs.length) : "") +
               (gs.length ? '<button type="button" data-act="bygroup" style="width:100%;padding:12px;margin:2px 0 12px;border:1.5px dashed #e0e0e0;border-radius:13px;background:#fafafa;color:#555;font-size:13px;cursor:pointer">按分组导出 ›</button>' : "") +
               '<div style="display:flex;gap:10px"><button type="button" data-act="cancel" style="flex:1;padding:12px;border:1.5px solid #e5e5e5;border-radius:13px;background:none;color:#888;font-size:13px;cursor:pointer">取消</button>' +
-              '<button type="button" data-act="ok" style="flex:2;padding:12px;border:none;border-radius:13px;background:#07c160;color:#fff;font-size:14px;font-weight:700;cursor:pointer">导出</button></div></div>';
+              '<button type="button" data-act="ok" style="flex:2;padding:12px;border:none;border-radius:13px;background:#1a1a1a;color:#fff;font-size:14px;font-weight:700;cursor:pointer">导出</button></div></div>';
             ov.addEventListener("click", function (ev) {
               if (ev.target === ov) { ov.remove(); return; }
               var btn = ev.target && ev.target.closest ? ev.target.closest("button[data-act]") : null;
@@ -11107,6 +11115,7 @@ document.addEventListener("DOMContentLoaded", function () {
             : (we.isMyCalling
                 ? (cstatus && (cstatus.innerText = "正在呼叫..."),
                   abtn && (abtn.style.display = "none"),
+                  abtn && abtn.parentElement && (abtn.parentElement.style.display = "none"),
                   mbtn && (mbtn.style.display = "none"),
                   hbtn && (hbtn.style.display = "block"),
                   pe && (pe.style.display = "block"),
@@ -11115,6 +11124,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   he && (he.innerText = "呼叫中..."))
                 : (cstatus && (cstatus.innerText = "来电中..."),
                   abtn && (abtn.style.display = "block"),
+                  abtn && abtn.parentElement && (abtn.parentElement.style.display = ""),
                   mbtn && (mbtn.style.display = "none"),
                   hbtn && (hbtn.style.display = "block"),
                   pe && (pe.style.display = "block"),
@@ -17249,19 +17259,19 @@ document.addEventListener("DOMContentLoaded", function () {
                 a = document.createElement("div");
               ((a.className = "music-contact-item"),
                 (a.style.cssText =
-                  "display:flex;flex-direction:column;justify-content:flex-start;align-items:center;gap:8px;padding:14px;background:transparent;border-radius:16px;cursor:pointer;position:relative;min-width:0;box-sizing:border-box;"),
+                  "display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid #f5f5f5;cursor:pointer;-webkit-tap-highlight-color:transparent;min-width:0;box-sizing:border-box;"),
                 a.setAttribute("data-cid", t.id),
                 a.setAttribute("data-index", n),
                 (a.innerHTML =
-                  '<div style="position:absolute;top:10px;right:10px;width:22px;height:22px;border-radius:50%;border:2px solid ' +
-                  (i ? "#4f7cff" : "rgba(255,255,255,0.25)") +
-                  ';display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.25);">' +
-                  (i
-                    ? '<div style="width:10px;height:10px;border-radius:50%;background:#4f7cff;"></div>'
-                    : "") +
-                  '</div><div style="width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,0.1);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:28px;">' +
-                  nt(t.avatar, 56) +
-                  '</div><div style="font-size:13px;font-weight:600;color:#fff;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%;">' +
+                  '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' +
+                  (i ? "#1a1a1a" : "#ddd") +
+                  ";background:" +
+                  (i ? "#1a1a1a" : "#fff") +
+                  ';color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
+                  (i ? "✓" : "") +
+                  '</div><div style="width:42px;height:42px;border-radius:50%;overflow:hidden;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">' +
+                  (window.partnerAvatarHtml ? window.partnerAvatarHtml(t.avatar) : nt(t.avatar, 42)) +
+                  '</div><div style="flex:1;min-width:0;font-size:16px;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
                   J(t.name || "对方") +
                   "</div>"),
                 a.addEventListener("click", function () {
@@ -17289,12 +17299,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 }),
                 e.contactList.appendChild(a));
             }),
-            (e.contactList.style.display = "grid"),
-            (e.contactList.style.gridTemplateColumns = "repeat(4, 1fr)"),
-            (e.contactList.style.alignItems = "start"),
-            (e.contactList.style.justifyItems = "center"),
-            (e.contactList.style.gap = "10px"),
-            (e.contactList.style.padding = "0 20px 20px"));
+            (e.contactList.style.display = "block"),
+            (e.contactList.style.padding = "12px 16px"));
         }
       }
       function Ot() {
@@ -20626,6 +20632,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var a = $("watchArea");
       if (a) a.style.display = "flex";
       applyWatchWallpaper();
+      try { if (typeof window.__akiniRefreshChatMeta === "function") window.__akiniRefreshChatMeta(); } catch (e) {}
       var names = watchPartners.map(function (p2) { return p2.name || "联系人"; }).join("\u3001");
       appendWatchSysMsg(names + " 加入了一起观影");
       // 不再主动发消息：只有你说话时对方才按回复延迟回应

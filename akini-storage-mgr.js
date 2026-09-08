@@ -64,15 +64,54 @@
     if (wipeBtn) wipeBtn.onclick = function () {
       if (!confirm("确定要清空全部数据吗？\n聊天记录、联系人、朋友圈、iCity、贴纸、设置都会被删除，且无法恢复！")) return;
       if (!confirm("最后确认：真的要全部删除吗？建议先点「导出备份」留底。")) return;
+      wipeBtn.disabled = true;
+      wipeBtn.textContent = "正在清除…";
+      var reloaded = false;
+      var doReload = function () {
+        if (reloaded) return;
+        reloaded = true;
+        try { location.reload(true); } catch (e) { location.reload(); }
+      };
       try { localStorage.clear(); } catch (e) {}
       try { sessionStorage.clear(); } catch (e) {}
-      try { window._idbStore && window._idbStore.clearAll && window._idbStore.clearAll(); } catch (e) {}
-      try { indexedDB.deleteDatabase("akini_img_db"); } catch (e) {}
-      try { indexedDB.deleteDatabase("AkiniApp"); } catch (e) {}
+      var finish = function () {
+        // 注销 Service Worker + 清 Cache Storage，避免旧缓存恢复页面
+        try {
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            navigator.serviceWorker.getRegistrations().then(function (rs) {
+              rs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
+            });
+          }
+        } catch (e) {}
+        try {
+          if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); });
+        } catch (e) {}
+        setTimeout(doReload, 800);
+      };
+      var deleteAllIdb = function () {
+        // 枚举并删除本站点全部 IndexedDB 数据库（不留任何残留）
+        try {
+          if (indexedDB.databases) {
+            indexedDB.databases().then(function (dbs) {
+              (dbs || []).forEach(function (d) { if (d && d.name) { try { indexedDB.deleteDatabase(d.name); } catch (e) {} } });
+              finish();
+            }).catch(function () {
+              ["akini_img_db", "AkiniApp", "localforage"].forEach(function (n) { try { indexedDB.deleteDatabase(n); } catch (e) {} });
+              finish();
+            });
+          } else {
+            ["akini_img_db", "AkiniApp", "localforage"].forEach(function (n) { try { indexedDB.deleteDatabase(n); } catch (e) {} });
+            finish();
+          }
+        } catch (e) { finish(); }
+      };
+      // 等待主库真正清空后再删库，最后刷新
       try {
-        if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); });
-      } catch (e) {}
-      setTimeout(function () { location.reload(); }, 400);
+        if (window._idbStore && window._idbStore.clearAll) window._idbStore.clearAll(function () { deleteAllIdb(); });
+        else deleteAllIdb();
+      } catch (e) { deleteAllIdb(); }
+      // 终极兜底：8 秒内无论如何强制刷新
+      setTimeout(doReload, 8000);
     };
   }
 

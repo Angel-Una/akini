@@ -446,7 +446,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   gap: 10px;
   position: relative;
-  left: -50px;
+  left: -55px;
   margin-left: 0;
   top: -3px;
 }
@@ -1291,9 +1291,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   max-width: 258px;
   width: fit-content !important;
   padding: 13px !important;
-  background: linear-gradient(160deg, #ffffff 0%, #f3f6fd 100%) !important;
-  border: 1px solid rgba(79, 124, 255, 0.16);
-  box-shadow: 0 6px 18px rgba(79, 124, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.05);
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
   color: #1a1a1a !important;
   border-radius: 16px !important;
   cursor: pointer;
@@ -1361,11 +1361,11 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .shop-card-bubble-status {
   font-size: 12px;
-  color: #4f7cff !important;
+  color: #1a1a1a !important;
   font-weight: 500;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(79, 124, 255, 0.12) !important;
+  background: rgba(0, 0, 0, 0.06) !important;
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -1865,9 +1865,9 @@ body:not(.bubble-css-on)
   max-width: 250px;
   padding: 0 !important;
   border-radius: 16px !important;
-  background: linear-gradient(160deg, #ffffff 0%, #f3f6fd 100%) !important;
-  border: 1px solid rgba(79, 124, 255, 0.16) !important;
-  box-shadow: 0 6px 18px rgba(79, 124, 255, 0.07), 0 2px 8px rgba(0, 0, 0, 0.05) !important;
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06) !important;
   color: #1a1a1a !important;
   overflow: hidden;
   cursor: pointer;
@@ -1889,12 +1889,12 @@ body:not(.bubble-css-on)
   width: 46px;
   height: 46px;
   border-radius: 13px;
-  background: rgba(79, 124, 255, 0.1);
+  background: #f0f0f0;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 4px 10px rgba(79, 124, 255, 0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 .survey-bubble-icon svg {
   display: block;
@@ -1936,11 +1936,11 @@ body:not(.bubble-css-on)
 }
 .survey-bubble-status {
   font-size: 12px;
-  color: #4f7cff;
+  color: #1a1a1a;
   font-weight: 500;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(79, 124, 255, 0.12);
+  background: rgba(0, 0, 0, 0.06);
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -1993,15 +1993,16 @@ body.bubble-gray:not(.bubble-css-on)
   color: #111 !important;
 }
 .chat-body .msg-row .bubble.transfer-bubble {
-  background: #222 !important;
-  color: #fff !important;
+  background: #fff !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e8e8e8 !important;
 }
 .chat-body .msg-row.me .bubble.transfer-bubble {
-  background: #222 !important;
+  background: #fff !important;
 }
 .chat-body .msg-row.other .bubble.transfer-bubble,
 .chat-body .msg-row.ta .bubble.transfer-bubble {
-  background: #222 !important;
+  background: #fff !important;
 }
 body:not(.bubble-css-on)
   .chat-body
@@ -2214,11 +2215,11 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .transfer-bubble .tr-status {
   font-size: 12px;
-  color: #4f7cff !important;
+  color: #1a1a1a !important;
   font-weight: 500;
   padding: 3px 12px;
   border-radius: 999px;
-  background: rgba(79, 124, 255, 0.12) !important;
+  background: rgba(0, 0, 0, 0.06) !important;
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -3580,7 +3581,7 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   color: #333;
 }
 .add-modal .actions .confirm {
-  background: #a0a0a0;
+  background: #1a1a1a;
   color: #fff;
 }
 .music-player {
