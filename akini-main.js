@@ -410,16 +410,16 @@ document.addEventListener("DOMContentLoaded", function () {
       var titleText = title || "提示";
       var iconHtml = "";
       if (!opts.noIcon) {
-        var iconColor = "#007aff";
+        var iconColor = "#1a1a1a";
         var iconPath = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z";
         if (titleText.indexOf("成功") >= 0) {
-          iconColor = "#07c160";
+          iconColor = "#1a1a1a";
           iconPath = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z";
         } else if (titleText.indexOf("失败") >= 0 || titleText.indexOf("错误") >= 0) {
-          iconColor = "#ff4d4f";
+          iconColor = "#1a1a1a";
           iconPath = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z";
         } else if (titleText.indexOf("确认") >= 0 || titleText.indexOf("提醒") >= 0) {
-          iconColor = "#faad14";
+          iconColor = "#1a1a1a";
           iconPath = "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm0-3h-2V7h2v7z";
         }
         iconHtml = '<svg viewBox="0 0 24 24" width="36" height="36" style="color:' + iconColor + ';fill:currentColor;"><path d="' + iconPath + '"/></svg>';
@@ -455,7 +455,7 @@ document.addEventListener("DOMContentLoaded", function () {
         ok.className = "akini-modal-btn akini-modal-btn-ok";
         ok.textContent = opts.okText || "确定";
         ok.style.cssText =
-          "flex:1;height:44px;border:none;border-radius:14px;background:#07c160;color:#fff;font-size:15px;font-weight:600;cursor:pointer;";
+          "flex:1;height:44px;border:none;border-radius:14px;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer;";
         cancel.addEventListener("click", function () {
           close(false);
         });
@@ -471,7 +471,7 @@ document.addEventListener("DOMContentLoaded", function () {
         btn.className = "akini-modal-btn akini-modal-btn-ok";
         btn.textContent = opts.okText || "确定";
         btn.style.cssText =
-          "margin-top:4px;height:44px;border:none;border-radius:14px;background:#07c160;color:#fff;font-size:15px;font-weight:600;padding:0 32px;cursor:pointer;align-self:center;min-width:120px;";
+          "margin-top:4px;height:44px;border:none;border-radius:14px;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;padding:0 32px;cursor:pointer;align-self:center;min-width:120px;";
         btn.addEventListener("click", function () {
           close();
         });
@@ -480,6 +480,23 @@ document.addEventListener("DOMContentLoaded", function () {
       overlay.appendChild(panel);
       document.body.appendChild(overlay);
     };
+    // 全局兜底：所有残留原生 alert 统一走 akini 黑白简约弹窗（prompt/confirm 保留原生，因依赖返回值）
+    (function () {
+      var __origAlert = window.alert && window.alert.bind(window);
+      window.alert = function (msg) {
+        try {
+          var s = String(msg === null || msg === undefined ? "" : msg);
+          var lines = s.split(/\n+/).map(function (x) { return x.trim(); }).filter(Boolean);
+          var first = lines[0] || "提示";
+          // 首行较短且像标题时作为标题，其余作为正文
+          if (first.length <= 14 && lines.length > 1) {
+            window.__akiniCenterModal(first, lines.slice(1).join("\n"));
+          } else {
+            window.__akiniCenterModal("提示", s);
+          }
+        } catch (e) { if (__origAlert) __origAlert(msg); }
+      };
+    })();
     window._idbStore = (function () {
       // 存储逻辑对齐 milk/syy：localforage（IndexedDB→WebSQL→localStorage 自动降级）为唯一主存储；
       // localStorage 仅作小键热备与同步读取缓存。旧自研库 akini_img_db 的数据首次启动自动迁入。
@@ -558,7 +575,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
       }
       function isSnapKey(k) {
-        return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
+        return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup" || k === "akini_idb_full_snapshot";
       }
       // milk 逻辑：大数据只留 IDB + 内存缓存，不回写 localStorage（5MB 配额只装小键）
       var LS_HOT_LIMIT = 153600;
@@ -580,11 +597,12 @@ document.addEventListener("DOMContentLoaded", function () {
             }, function () { cb(localStorage.getItem(k)); });
           });
         },
-        backupAll: function (cb) {
+        backupAll: function (force, cb) {
+          if (typeof force === "function") { cb = force; force = false; }
           var done = function () { if (typeof cb === "function") cb(); };
           /* v20261024 节流：30s 内重复调用直接跳过，避免高频全库遍历比对导致卡顿/发烫 */
           var _now = Date.now();
-          if (this._lastBA && _now - this._lastBA < 30000) { done(); return; }
+          if (!force && this._lastBA && _now - this._lastBA < 30000) { done(); return; }
           this._lastBA = _now;
           // 收集 localStorage 中需要备份的键值，写入 IDB 前逐个比对长度，
           // 防止用可能已过期/被系统清空的 localStorage 数据覆盖 IDB 主存储。
@@ -599,13 +617,23 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!inst) { done(); return; }
             var idx = 0;
             (function next() {
-              if (idx >= lsItems.length) { done(); return; }
+              if (idx >= lsItems.length) {
+                // 额外写一份全量快照单键（IDB 容量大），作为最终兜底恢复源
+                try {
+                  var snap = {};
+                  for (var si = 0; si < lsItems.length; si++) snap[lsItems[si].k] = lsItems[si].v;
+                  snap.__ts = _now;
+                  inst.setItem("akini_idb_full_snapshot", JSON.stringify(snap)).then(done, done);
+                } catch (e0) { done(); }
+                return;
+              }
               var item = lsItems[idx++];
               inst.getItem(item.k).then(function (idbVal) {
-                var idbLen = (idbVal === null || idbVal === undefined) ? 0 : String(idbVal).length;
-                // 只在新于 IDB 时才覆盖：聊天记录由 C() 直接维护，通常 IDB >= localStorage；
-                // 设置类只在 localStorage 更新且更长时才同步到 IDB，避免过期快照覆盖最新数据。
-                if (idbLen < String(item.v).length) {
+                // 值不同即同步：localStorage 为运行期权威（启动时 IDB 已先回填空 LS），
+                // 空占位值（[]/{}）不覆盖 IDB，防止异常状态清掉真实数据。
+                var isPlaceholder = item.v === "[]" || item.v === "{}" || item.v === "null";
+                var same = (idbVal === null || idbVal === undefined) ? false : String(idbVal) === String(item.v);
+                if (!isPlaceholder && !same) {
                   inst.setItem(item.k, item.v).then(next, next);
                 } else next();
               }, next);
@@ -629,7 +657,28 @@ document.addEventListener("DOMContentLoaded", function () {
                   try { localStorage.setItem(k, v); } catch (x) {}
                 }
               }
-            }).then(done, done);
+            }).then(function () {
+              // 兜底：全量快照回填空键（覆盖逐键恢复之外的缺失场景，如 IDB 键被单独清理）
+              inst.getItem("akini_idb_full_snapshot").then(function (snapRaw) {
+                try {
+                  var snap = snapRaw ? JSON.parse(snapRaw) : null;
+                  if (snap && typeof snap === "object") {
+                    for (var sk in snap) {
+                      if (!snap.hasOwnProperty(sk) || sk === "__ts") continue;
+                      if (sk.indexOf("akini_") !== 0 || sk.indexOf("akini_app_icon_") === 0) continue;
+                      if (isEmpty(snap[sk])) continue;
+                      var cur2 = null;
+                      try { cur2 = localStorage.getItem(sk); } catch (e1) {}
+                      if (isEmpty(cur2)) {
+                        if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(sk, snap[sk]);
+                        if (String(snap[sk]).length <= LS_HOT_LIMIT) { try { localStorage.setItem(sk, snap[sk]); } catch (e2) {} }
+                      }
+                    }
+                  }
+                } catch (e3) {}
+                done();
+              }, done);
+            }, done);
           });
         },
         getAll: function (cb) {
@@ -663,7 +712,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 确保启动瞬间 localStorage 已有数据，避免读到空默认值后再写回覆盖（参照 milk 的紧急备份思路）
     (function () {
       function isSnapKey(k) {
-        return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup";
+        return k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup" || k === "akini_idb_full_snapshot";
       }
       function isEmpty(v) {
         return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
@@ -817,6 +866,18 @@ document.addEventListener("DOMContentLoaded", function () {
             try { localStorage.removeItem("akini_localstorage_snapshot_backup"); } catch (e4) {}
           } catch (e) {}
         }
+        // 页面隐藏/关闭前立即强制全量备份（绕过 30s 节流），防系统回收页面时丢失最后改动
+        window.addEventListener("pagehide", function () {
+          if (!window._akiniDataRestored) return;
+          try { snapshotLs(); } catch (e) {}
+          try { window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll(true); } catch (e) {}
+          try { window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll(); } catch (e) {}
+        });
+        window.addEventListener("beforeunload", function () {
+          if (!window._akiniDataRestored) return;
+          try { snapshotLs(); } catch (e) {}
+          try { window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll(true); } catch (e) {}
+        });
         function doBackup() {
           if (backupTimer) return;
           // 启动恢复完成前不触发备份，避免用可能不完整的 localStorage 覆盖 IDB/Cache 里的完整数据
@@ -2438,6 +2499,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function __akiniToggleOn(id) {
       return localStorage.getItem("akini_toggle_" + id) === "1";
     }
+    window.__akiniProcessMsgMeta = __akiniProcessMsgMeta; // 导出：观影聊天区复用同一套气泡元数据（时间戳/已读回执/自定义CSS）
     // 已读回执按气泡实际底部定位（短气泡时 content-line 被头像列撑高，不能用 top:100%）
     function __akiniPlaceReadReceipt(line, rr) {
       try {
@@ -2658,7 +2720,10 @@ document.addEventListener("DOMContentLoaded", function () {
           var cb = document.getElementById("chatBody");
           if (cb && cb.offsetParent === null) return;
           if (cb) {
-            Array.from(cb.children).forEach(__akiniProcessMsgMeta);
+            // 性能：只处理尚未构建元数据的消息行（单次上限40条），不再每3秒全量扫描整个聊天DOM
+            var __rows = cb.querySelectorAll(".msg-row:not([data-meta-v])");
+            var __lim = Math.min(__rows.length, 40);
+            for (var __mi = 0; __mi < __lim; __mi++) __akiniProcessMsgMeta(__rows[__mi]);
             __akiniUpgradeSurveyIcons(cb);
             __akiniSyncCardStatus(cb);
           }
@@ -3486,7 +3551,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
-      }, 3000);
+      }, 8000);
       /* 后台/低功耗设备可能丢定时器，周期性 catch-up 确保任务不遗漏 */
       setInterval(function () {
         try {
@@ -20071,6 +20136,146 @@ document.addEventListener("DOMContentLoaded", function () {
 /* ===== 观影（一起看视频）：视频链接仅内存保存，重进即清空；竖屏消息进聊天区，全屏横屏变弹幕 ===== */
 (function () {
   var inited = false;
+  var watchPartners = [];      // 本次一起观影的联系人 [{id,name,avatar}]
+  var partnerReplyTimer = null;
+  var watchObjUrl = null;      // 本地视频 objectURL，换源时释放
+  function partnerAvatarHtml(av) {
+    var t = av && String(av).trim();
+    if (t && /^(https?:|data:|blob:)/.test(t)) return '<img src="' + t + '" alt="" style="width:100%;height:100%;object-fit:cover"/>';
+    return esc(t || "\ud83d\udc30");
+  }
+  // 观影互动语料：优先字卡库主分组短句，为空时用内置观影语句
+  function pickWatchLine() {
+    var pool = [];
+    try {
+      var groups = window.__wbRead ? window.__wbRead("akini_wb_groups_main", []) : [];
+      (groups || []).forEach(function (g) {
+        (g && g.items || []).forEach(function (t) {
+          var x = String(t || "").trim();
+          if (x && x.length <= 30) pool.push(x);
+        });
+      });
+    } catch (e) {}
+    if (!pool.length) pool = ["哈哈哈这段太好笑了", "呜呜呜好感人", "宝宝快看这里！", "这个镜头绝了", "前方高能！", "再看一遍再看一遍", "太甜了吧", "我哭了你呢"];
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  // 联系人消息：与聊天页相同的 msg-row other 结构，自动套用自定义CSS/时间戳
+  function appendPartnerMsg(c, text) {
+    var body = $("watchChatBody");
+    if (!body) return;
+    var row = document.createElement("div");
+    row.className = "msg-row other";
+    row.setAttribute("data-ts", String(Date.now()));
+    row.innerHTML =
+      '<div class="msg-content-line"><div class="msg-avatar">' + partnerAvatarHtml(c.avatar) + '</div>' +
+      '<div class="bubble">' + esc(text) + '</div></div>';
+    body.appendChild(row);
+    try { if (typeof window.__akiniProcessMsgMeta === "function") window.__akiniProcessMsgMeta(row); } catch (e) {}
+    body.scrollTop = body.scrollHeight;
+    if (isFullscreen()) fireDanmaku((c.name ? c.name + "：" : "") + text);
+  }
+  function schedulePartnerReply() {
+    if (!watchPartners.length || partnerReplyTimer) return; // 一次只排一条，防堆积
+    partnerReplyTimer = setTimeout(function () {
+      partnerReplyTimer = null;
+      var wa = $("watchArea");
+      if (!wa || wa.style.display === "none") return;
+      var c = watchPartners[Math.floor(Math.random() * watchPartners.length)];
+      appendPartnerMsg(c, pickWatchLine());
+    }, 2000 + Math.random() * 4000);
+  }
+  function appendWatchSysMsg(text) {
+    var body = $("watchChatBody");
+    if (!body) return;
+    var row = document.createElement("div");
+    row.className = "msg-row system";
+    row.style.cssText = "text-align:center;margin:8px 0";
+    row.innerHTML = '<span style="display:inline-block;font-size:12px;color:#999;background:rgba(0,0,0,.05);border-radius:10px;padding:3px 10px">' + esc(text) + '</span>';
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+  }
+  // 观影聊天独立壁纸（akini_watch_wallpaper），不再跟随微信聊天页
+  function applyWatchWallpaper() {
+    var wb = $("watchChatBody");
+    if (!wb) return;
+    var wp = null;
+    try { wp = localStorage.getItem("akini_watch_wallpaper"); } catch (e) {}
+    if (wp) {
+      wb.style.backgroundImage = "url(" + wp + ")";
+      wb.style.backgroundSize = "cover";
+      wb.style.backgroundPosition = "center";
+    } else {
+      wb.style.backgroundImage = "none";
+    }
+    wb.style.backgroundColor = "#f5f5f5";
+  }
+  function compressImage(file, cb) {
+    var rd = new FileReader();
+    rd.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        try {
+          var max = 1280, w = img.width, h = img.height;
+          if (w > max || h > max) { var r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); }
+          var cv = document.createElement("canvas");
+          cv.width = w; cv.height = h;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h);
+          cb(cv.toDataURL("image/jpeg", 0.8));
+        } catch (e) { cb(rd.result); }
+      };
+      img.onerror = function () { cb(rd.result); };
+      img.src = rd.result;
+    };
+    rd.readAsDataURL(file);
+  }
+  function importLocalVideo(file) {
+    if (!file) return;
+    var v = $("watchVideo"), f = $("watchFrame");
+    try { if (watchObjUrl) { URL.revokeObjectURL(watchObjUrl); watchObjUrl = null; } } catch (e) {}
+    try { if (v) { v.pause(); v.removeAttribute("src"); v.load && v.load(); } } catch (e) {}
+    if (f) f.src = "about:blank";
+    watchObjUrl = URL.createObjectURL(file);
+    showPlayer("video");
+    if (v) { v.src = watchObjUrl; v.play && v.play().catch(function () {}); }
+    appendWatchSysMsg("已导入本地视频：" + (file.name || "视频"));
+  }
+  function renderWatchPicker() {
+    var list = $("watchPickerList");
+    if (!list) return;
+    var contacts = [];
+    try {
+      var all = window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+      contacts = (all || []).filter(function (c) { return c && c.id && c.type !== "group"; });
+    } catch (e) {}
+    list.innerHTML = "";
+    if (!contacts.length) {
+      list.innerHTML = '<div style="text-align:center;color:#bbb;padding:60px 0;font-size:14px">还没有联系人，先去微信里添加吧</div>';
+    }
+    contacts.forEach(function (c) {
+      var sel = watchPartners.some(function (p) { return p.id === c.id; });
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid #f5f5f5;cursor:pointer;-webkit-tap-highlight-color:transparent";
+      row.innerHTML =
+        '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (sel ? "#1a1a1a" : "#ddd") + ';background:' + (sel ? "#1a1a1a" : "#fff") + ';color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (sel ? "\u2713" : "") + '</div>' +
+        '<div style="width:42px;height:42px;border-radius:50%;overflow:hidden;background:#e8e8e8;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">' + partnerAvatarHtml(c.avatar) + '</div>' +
+        '<div style="flex:1;min-width:0;font-size:16px;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(c.name || "联系人") + '</div>';
+      row.addEventListener("click", function () {
+        var idx = -1;
+        watchPartners.forEach(function (p, i2) { if (p.id === c.id) idx = i2; });
+        if (idx >= 0) watchPartners.splice(idx, 1);
+        else watchPartners.push({ id: c.id, name: c.name, avatar: c.avatar });
+        renderWatchPicker();
+      });
+      list.appendChild(row);
+    });
+    var btn = $("watchPickerConfirm");
+    if (btn) btn.textContent = watchPartners.length ? "开始观影（" + watchPartners.length + "）" : "开始观影";
+  }
+  function openWatchPicker() {
+    renderWatchPicker();
+    var pk = $("watchContactPicker");
+    if (pk) pk.style.display = "flex";
+  }
   var danmakuTimer = null;
   function $(id) { return document.getElementById(id); }
   function esc(s) {
@@ -20080,11 +20285,18 @@ document.addEventListener("DOMContentLoaded", function () {
     return !!(document.fullscreenElement || document.webkitFullscreenElement);
   }
   function showPlayer(kind) {
-    var v = $("watchVideo"), f = $("watchFrame"), em = $("watchEmpty"), ct = $("watchControls");
+    var v = $("watchVideo"), f = $("watchFrame"), em = $("watchEmpty"), ct = $("watchControls"), dg = $("watchDyGuide");
     if (em) em.style.display = "none";
     if (v) v.style.display = kind === "video" ? "block" : "none";
     if (f) f.style.display = kind === "iframe" ? "block" : "none";
     if (ct) ct.style.display = kind === "video" ? "flex" : "none";
+    if (dg) dg.style.display = kind === "douyin" ? "flex" : "none";
+  }
+  // 抖音引导卡片：官方已全面封禁第三方嵌入，改为引导新标签页打开
+  function showDouyinGuide(url) {
+    showPlayer("douyin");
+    var btn = $("watchDyOpenBtn");
+    if (btn) btn.onclick = function () { window.open(url, "_blank"); };
   }
   function fmtTime(s) {
     s = Math.max(0, Math.floor(s || 0));
@@ -20098,7 +20310,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (pa) pa.style.display = playing ? "block" : "none";
   }
   function importVideo() {
-    var raw = window.prompt("粘贴视频链接：\n· 抖音：分享口令或短链（v.douyin.com/…）、视频页链接均可\n· 哔哩哔哩：含 BV 号的视频页链接\n· 或 mp4/m3u8 直链\n\n链接仅本次有效，不会保存");
+    var raw = window.prompt("粘贴视频链接：\n· 哔哩哔哩：含 BV 号的视频页链接（站内直接播放）\n· mp4/m3u8 视频直链（站内直接播放）\n· 抖音：分享口令或链接（站内无法播放，将在新标签页打开）\n\n链接仅本次有效，不会保存");
     if (raw === null) return;
     raw = String(raw).trim();
     if (!raw) return;
@@ -20119,30 +20331,11 @@ document.addEventListener("DOMContentLoaded", function () {
       alert("哔哩哔哩短链无法直接解析，请打开视频页复制含 BV 号的完整链接");
       return;
     }
-    // 抖音视频页：尝试嵌入分享页
-    var dy = url.match(/douyin\.com\/video\/(\d+)/);
-    if (dy) {
-      showPlayer("iframe");
-      f.src = "https://www.iesdouyin.com/share/video/" + dy[1] + "/";
-      return;
-    }
-    if (/v\.douyin\.com\//.test(url)) {
-      // 抖音分享短链/口令：经公共代理跟随重定向解析真实视频页，再嵌入官方分享播放器
-      showPlayer("iframe");
-      var _dyApi = "https://api.allorigins.win/get?url=" + encodeURIComponent(url);
-      fetch(_dyApi).then(function (r) { return r.json(); }).then(function (d) {
-        var finalUrl = (d && d.status && d.status.url) || "";
-        var mm = finalUrl.match(/video\/(\d+)/) ||
-          (d && d.contents ? String(d.contents).match(/video\/(\d+)/) : null) ||
-          finalUrl.match(/modal_id=(\d+)/);
-        if (mm) {
-          f.src = "https://www.iesdouyin.com/share/video/" + mm[1] + "/";
-        } else {
-          alert("抖音链接解析失败，请打开视频后复制完整链接（www.douyin.com/video/…）重试");
-        }
-      }).catch(function () {
-        alert("抖音短链解析失败，请检查网络后重试，或粘贴视频页完整链接");
-      });
+    // 抖音（视频页/短链/口令）：官方已彻底封禁第三方 iframe 嵌入（X-Frame-Options:DENY + CSP 白名单），
+    // 公共解析接口实测全部失效（页面仅返回 JS 空壳，无播放地址），站内播放必然黑屏。
+    // 统一改为引导卡片：一键在浏览器新标签页打开抖音观看。
+    if (/douyin\.com\//.test(url)) {
+      showDouyinGuide(url);
       return;
     }
     // 直链视频
@@ -20164,18 +20357,21 @@ document.addEventListener("DOMContentLoaded", function () {
       return;
     }
   }
+  // 观影消息复刻微信聊天界面：与聊天页完全相同的 msg-row 结构，
+  // 走 __akiniProcessMsgMeta 自动套用自定义美化CSS、时间戳与已读回执（遵循美化面板开关）
   function appendChatMsg(text) {
     var body = $("watchChatBody");
     if (!body) return;
-    var name = localStorage.getItem("akini_my_name") || "我";
+    var av = "";
+    try { av = (typeof window.getMyAvatar === "function" ? window.getMyAvatar() : "") || ""; } catch (e) {}
     var row = document.createElement("div");
-    row.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:10px;gap:8px;align-items:flex-start";
+    row.className = "msg-row me";
+    row.setAttribute("data-ts", String(Date.now()));
     row.innerHTML =
-      '<div style="max-width:75%;background:#95ec69;border-radius:8px;padding:8px 10px;font-size:15px;color:#111;word-break:break-all;line-height:1.5">' +
-      esc(text) + '</div>' +
-      '<div style="width:34px;height:34px;border-radius:6px;overflow:hidden;flex-shrink:0;background:#e8eaee;display:flex;align-items:center;justify-content:center;font-size:11px;color:#999">' +
-      (window.getMyAvatar ? (function(){var a="";try{a=window.getMyAvatar()||"";}catch(e){} return a;})() : esc(name[0] || "我")) + '</div>';
+      '<div class="msg-content-line"><div class="bubble">' + esc(text) + '</div>' +
+      '<div class="msg-avatar">' + av + '</div></div>';
     body.appendChild(row);
+    try { if (typeof window.__akiniProcessMsgMeta === "function") window.__akiniProcessMsgMeta(row); } catch (e) {}
     body.scrollTop = body.scrollHeight;
   }
   function fireDanmaku(text) {
@@ -20204,6 +20400,7 @@ document.addEventListener("DOMContentLoaded", function () {
     input.value = "";
     appendChatMsg(t);
     if (isFullscreen()) fireDanmaku(t);
+    schedulePartnerReply();
   }
   function applyFullscreenUI() {
     var fs = isFullscreen();
@@ -20279,6 +20476,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (isFullscreen()) toggleFullscreen();
       var v = $("watchVideo");
       try { v && v.pause(); } catch (e) {}
+      if (partnerReplyTimer) { clearTimeout(partnerReplyTimer); partnerReplyTimer = null; }
       $("watchArea").style.display = "none";
     });
     $("watchImportBtn").addEventListener("click", importVideo);
@@ -20289,10 +20487,56 @@ document.addEventListener("DOMContentLoaded", function () {
     $("watchMsgInputFs").addEventListener("keydown", function (e) { if (e.key === "Enter") sendMsg(true); });
     document.addEventListener("fullscreenchange", applyFullscreenUI);
     document.addEventListener("webkitfullscreenchange", applyFullscreenUI);
+    // 右上角 ⋯ 菜单：导入本地视频 / 更换观影独立聊天壁纸
+    var menuOv = $("watchMenuOverlay");
+    function closeWatchMenu() { if (menuOv) menuOv.style.display = "none"; }
+    var menuBtn = $("watchMenuBtn");
+    if (menuBtn) menuBtn.addEventListener("click", function (e) { e.stopPropagation(); if (menuOv) menuOv.style.display = "flex"; });
+    if (menuOv) menuOv.addEventListener("click", function (e) { if (e.target === menuOv) closeWatchMenu(); });
+    var mc = $("watchMenuCancel");
+    if (mc) mc.addEventListener("click", closeWatchMenu);
+    var ml = $("watchMenuLocal");
+    if (ml) ml.addEventListener("click", function () { closeWatchMenu(); var fi = $("watchLocalFileInput"); if (fi) fi.click(); });
+    var lfi = $("watchLocalFileInput");
+    if (lfi) lfi.addEventListener("change", function () { var f0 = this.files && this.files[0]; if (f0) importLocalVideo(f0); this.value = ""; });
+    var mw = $("watchMenuWallpaper");
+    if (mw) mw.addEventListener("click", function () { closeWatchMenu(); var wi = $("watchWallpaperInput"); if (wi) wi.click(); });
+    var wfi = $("watchWallpaperInput");
+    if (wfi) wfi.addEventListener("change", function () {
+      var f0 = this.files && this.files[0];
+      this.value = "";
+      if (!f0) return;
+      compressImage(f0, function (dataUrl) {
+        try { localStorage.setItem("akini_watch_wallpaper", dataUrl); }
+        catch (e) { window.__akiniCenterModal("提示", "壁纸图片过大，保存失败，请换一张试试"); return; }
+        applyWatchWallpaper();
+        window.__akiniCenterModal("更换成功", "观影聊天壁纸已更新");
+      });
+    });
+    var mwc = $("watchMenuWallpaperClear");
+    if (mwc) mwc.addEventListener("click", function () {
+      closeWatchMenu();
+      try { localStorage.removeItem("akini_watch_wallpaper"); } catch (e) {}
+      applyWatchWallpaper();
+    });
+    // 联系人选择器
+    var pb = $("watchPickerBackBtn");
+    if (pb) pb.addEventListener("click", function () { var pk = $("watchContactPicker"); if (pk) pk.style.display = "none"; });
+    var pc = $("watchPickerConfirm");
+    if (pc) pc.addEventListener("click", function () {
+      if (!watchPartners.length) { window.__akiniCenterModal("提示", "先选择至少 1 位想一起看的人"); return; }
+      var pk = $("watchContactPicker");
+      if (pk) pk.style.display = "none";
+      var a = $("watchArea");
+      if (a) a.style.display = "flex";
+      applyWatchWallpaper();
+      var names = watchPartners.map(function (p2) { return p2.name || "联系人"; }).join("\u3001");
+      appendWatchSysMsg(names + " 加入了一起观影");
+      schedulePartnerReply();
+    });
   }
   window.__akiniOpenWatch = function () {
     initWatch();
-    var a = $("watchArea");
-    if (a) a.style.display = "flex";
+    openWatchPicker(); // 先选择一起观影的联系人（支持多选），确认后进入观影页
   };
 })();
