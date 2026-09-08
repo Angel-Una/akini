@@ -2655,8 +2655,9 @@ document.addEventListener("DOMContentLoaded", function () {
           rrEl.className = "msg-rr";
           rrEl.textContent = "已读";
           if (!hadRead) rrEl.style.visibility = "hidden";
-          // me 行引用块在 row 级（wrap 外），已读回执必须放 row 末尾才能位于引用之下
-          if (isMe) row.appendChild(rrEl);
+          // me 行有引用块（row 级，wrap 外）时放 row 末尾；无引用时放 wrap 内紧贴气泡下方
+          var _hasQuote = isMe && (row.querySelector(":scope > div[style*='flex-basis:100%']") || row.querySelector(":scope > .quote-bubble"));
+          if (isMe && _hasQuote) row.appendChild(rrEl);
           else wrapEl.appendChild(rrEl);
           // 已读回执：发出去不立即显示，延迟 1.5~4s
           if (!hadRead) {
@@ -8952,6 +8953,7 @@ document.addEventListener("DOMContentLoaded", function () {
               const cid = cmap[k];
               ((byCC[cid] = byCC[cid] || []).push(k));
             }),
+            (function(){ var si=__wbExclSearchHome(); if(si){ si.value=""; si.style.display="none"; } })(),
             (WEL.innerHTML = ""),
             cs.forEach((c) => {
               const gids = byC[c.id] || [],
@@ -9006,6 +9008,12 @@ document.addEventListener("DOMContentLoaded", function () {
           });
           return seg;
         }
+        // 搜索框归位：列表渲染会 innerHTML="" 清空 WEL，须先把常驻 input 移回 WEL 之前的安全位
+        function __wbExclSearchHome() {
+          var si = document.getElementById("wbExclSearch");
+          if (si && si.parentNode !== WEL.parentNode) WEL.parentNode.insertBefore(si, WEL);
+          return si;
+        }
         function renderExclDetail(cid) {
           exclMode === "card" ? renderExclCards(cid) : renderExclGroups(cid);
         }
@@ -9019,7 +9027,9 @@ document.addEventListener("DOMContentLoaded", function () {
           const cmap = window.__wbRead("akini_wb_exclusive_cards", {});
           // 设置页：隐藏左上角「‹」（用户要求删除），退出走右上角「返回/关闭」
           (function(){var bh=document.getElementById("wbExclBackHome");bh&&(bh.style.display="none");var c=document.getElementById("wbExclClose");c&&(c.style.display="");})();
-          ((WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)));
+          ((function(){ var si=__wbExclSearchHome(); if(si){ si.value=""; si.style.display=""; } })(),
+            (WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)),
+            (function(){ var si=document.getElementById("wbExclSearch"); if(si) WEL.appendChild(si); })());
           // 搜索框：常驻 overlay 头部（wbExclSearch），此处仅重置取值；事件在模块初始化时绑定一次
           const _exclSearch = document.getElementById("wbExclSearch");
           if (_exclSearch) { _exclSearch.value = ""; _exclSearch.style.display = ""; }
@@ -9072,7 +9082,7 @@ document.addEventListener("DOMContentLoaded", function () {
         function renderExclGroups(cid) {
           if (!WEL) return;
           exclCid = cid;
-          var _si = document.getElementById("wbExclSearch");
+          var _si = __wbExclSearchHome();
           if (_si) { _si.value = ""; _si.style.display = "none"; } // 分组模式隐藏搜索框
           const cname = wbContactName(cid);
           ((WET.textContent = cname),

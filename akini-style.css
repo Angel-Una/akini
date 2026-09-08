@@ -6308,3 +6308,21 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
   padding: 10px 12px 8px !important;
   border-top: 1px solid #f0f0f0 !important;
 }
+
+/* ===== v20260909k 时间戳照抄 mochi：列宽自适应内容，永不裁切 ===== */
+.chat-body .msg-row .avatar-col {
+  width: auto !important;
+  min-width: 38px;
+  align-items: center !important;
+}
+.chat-body .msg-row .avatar-col .msg-avatar { flex-shrink: 0; }
+.chat-body .msg-row .avatar-col .msg-ts {
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  line-height: 1.2;
+}
+/* 问卷卡：删掉 inner 与 footer 之间的渐变 divider 线（只保留 footer 顶部细线） */
+.survey-bubble-divider { display: none !important; }
