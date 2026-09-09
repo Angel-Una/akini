@@ -4025,6 +4025,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function mixEmojiToText(text) {
         if (!ex.emojiMix || !text) return text;
+        /* 对齐 milk（core.js）：emoji 融入按 20% 概率触发，不是每条消息都夹带 */
+        if (Math.random() >= 0.2) return text;
         var emojis = [];
         try {
           var wb = i("akini_wordbank", []);
@@ -9189,9 +9191,10 @@ document.addEventListener("DOMContentLoaded", function () {
           const cmap = window.__wbRead("akini_wb_exclusive_cards", {});
           // 设置页：隐藏左上角「‹」（用户要求删除），退出走右上角「返回/关闭」
           (function(){var bh=document.getElementById("wbExclBackHome");bh&&(bh.style.display="none");var c=document.getElementById("wbExclClose");c&&(c.style.display="");})();
+          /* 搜索框固定在 overlay 内、滚动列表 WEL 之外：WEL 整体被 fast-tap 包装，
+             输入框放进 WEL 会被 preventDefault 吞掉 touchend，iOS 永远聚焦不了（点了没反应） */
           ((function(){ var si=__wbExclSearchHome(); if(si){ si.value=""; si.style.display=""; } })(),
-            (WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)),
-            (function(){ var si=document.getElementById("wbExclSearch"); if(si) WEL.appendChild(si); })());
+            (WEL.innerHTML = ""), WEL.appendChild(renderExclSeg(cid)));
           // 搜索框：常驻 overlay 头部（wbExclSearch），此处仅重置取值；事件在模块初始化时绑定一次
           const _exclSearch = document.getElementById("wbExclSearch");
           if (_exclSearch) { _exclSearch.value = ""; _exclSearch.style.display = ""; }
@@ -9230,6 +9233,14 @@ document.addEventListener("DOMContentLoaded", function () {
           var si = document.getElementById("wbExclSearch");
           if (!si || si.__bound) return;
           si.__bound = 1;
+          si.style.flexShrink = "0";
+          /* iOS 保险：触摸事件不冒泡到任何 fast-tap 容器，并显式聚焦 */
+          ["touchstart", "touchend", "touchmove"].forEach(function (evn) {
+            si.addEventListener(evn, function (ev) { ev.stopPropagation(); }, { passive: true });
+          });
+          si.addEventListener("touchend", function () {
+            try { si.focus(); } catch (e) {}
+          });
           si.addEventListener("input", function () {
             var q = si.value.trim();
             var list = document.getElementById("wbExclList");
@@ -9295,7 +9306,8 @@ document.addEventListener("DOMContentLoaded", function () {
               }));
           }),
             any ||
-              (WEL.innerHTML +=
+              WEL.insertAdjacentHTML(
+                "beforeend",
                 '<div class="empty-text" style="text-align:center;color:#bbb;padding:40px 0">还没有分组<br>请先在字卡库「分组」中创建分组</div>'));
         }
         /* 专属字卡打开：挂到 window 供内联 onclick 直接调用（最可靠的触发路径） */
