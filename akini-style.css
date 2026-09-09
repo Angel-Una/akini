@@ -1799,6 +1799,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   white-space: pre-wrap;
   writing-mode: horizontal-tb;
   line-height: 1.5;
+  /* v20260909za 关键修复：气泡必须是定位容器（与 milk 的 .message 一致），
+     否则美化 CSS 的 ::before/::after 翅膀/弧带装饰会锚定到外层 .msg-row（整行宽），
+     错位后盖在气泡上下边缘，看起来就像被割断/缺一块 */
+  position: relative !important;
 }
 /* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带阴影停用 */
 body:not(.bubble-css-on)
