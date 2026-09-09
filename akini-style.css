@@ -1458,7 +1458,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body {
   flex: 1;
   overflow-y: auto;
-  padding: calc(64px + env(safe-area-inset-top, 0px)) 14px 16px;
+  padding: calc(64px + env(safe-area-inset-top, 0px)) 14px 34px;
   transition: background 0.3s;
   background-size: cover;
   background-position: center;
@@ -5585,17 +5585,18 @@ button.back-btn[type="button"] {
   position: relative;
 }
 .chat-body .msg-row.me .msg-content-line > .bubble-wrap > .msg-rr {
-  position: absolute !important;
-  top: 100% !important;
-  right: 6px !important;
-  left: auto !important;
-  margin: 2px 0 0 0 !important;
-  padding: 0 !important;
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  text-align: right !important;
+  box-sizing: border-box !important;
+  margin: 3px 0 0 0 !important;
+  padding: 0 6px 0 0 !important;
   font-size: 10px !important;
   color: #777 !important;
   line-height: 1.2 !important;
   white-space: nowrap;
-  z-index: 1;
+  overflow: visible !important;
 }
 /* row 级已读回执（含引用块场景）同样绝对定位，不占行高；
    right = 头像列38px + 间距8px + 气泡右缘左移6px = 52px，与气泡右缘精确对齐 */
@@ -6367,13 +6368,17 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 }
 .chat-body .msg-row.other .msg-content-line > .bubble-wrap { align-items: flex-start; }
 
-/* v20260909r 文字溢出终防线：钳制任何来源（自定义CSS/颜色预设）的椭圆超大圆角，强制安全内边距与断行 */
-.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-.chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+/* v20260909u 文字溢出终防线：特异性封顶(html body前缀)，任何来源气泡强制安全圆角/内边距/断行/宽度自适应，文字永不越界 */
+html body .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   border-radius: 18px !important;
   padding: 11px 14px !important;
   min-width: 0 !important;
+  width: auto !important;
+  max-width: 100% !important;
+  height: auto !important;
   overflow-wrap: break-word !important;
   word-break: break-word !important;
+  white-space: pre-wrap !important;
 }

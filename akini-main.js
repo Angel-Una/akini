@@ -2791,6 +2791,21 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           });
           __akiniScheduleRrGroups();
+          /* 任何发送路径产生的待读回执统一调度点亮（不依赖具体发送函数） */
+          try {
+            if (__akiniToggleOn("readReceiptToggle")) {
+              var __pendRows = chatBody.querySelectorAll(".msg-row.me[data-read-pending]");
+              for (var __pi = 0; __pi < __pendRows.length; __pi++) {
+                (function (__row) {
+                  if (__row.__rrFlushT) return;
+                  __row.__rrFlushT = setTimeout(function () {
+                    __row.__rrFlushT = null;
+                    try { __akiniShowReadReceipt(__row); } catch (e) {}
+                  }, 1500 + Math.random() * 2500);
+                })(__pendRows[__pi]);
+              }
+            }
+          } catch (e) {}
         });
         obs.observe(chatBody, { childList: true });
         chatBody.__akiniMetaObserver = obs;
@@ -2811,7 +2826,7 @@ document.addEventListener("DOMContentLoaded", function () {
               for (var __hi = 0; __hi < __meRows.length; __hi++) {
                 var __mr = __meRows[__hi];
                 var __rrEl = __mr.querySelector(".msg-rr");
-                if (!__rrEl) { try { __akiniShowReadReceipt(__mr); } catch (e) {} }
+                if (!__rrEl || __mr.hasAttribute("data-read-pending")) { try { __akiniShowReadReceipt(__mr); } catch (e) {} }
               }
             }
             __akiniRefreshRrGroups(cb);
