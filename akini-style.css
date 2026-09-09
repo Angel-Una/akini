@@ -1807,6 +1807,12 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
      装饰会穿透到聊天背景图下面而消失（看起来不完整）；isolate 保证负层装饰
      只垫在气泡底色之下、页面背景之上，任何美化 CSS 的装饰都完整可见 */
   isolation: isolate !important;
+  /* v20260909zf 核心修复（对齐 milk .message 的 overflow:hidden）：
+     弧带/翅膀类美化装饰是按"被气泡边缘裁掉"设计的——milk 默认 overflow:hidden 把
+     inset:0 的弧带裁成胶囊形；我们之前气泡没有 overflow 基线（默认 visible），
+     弧带原样溢出气泡上下边缘 → 看起来就是被割断。这里给低优先级默认 hidden：
+     美化 CSS 自己写了 overflow:visible !important（如外贴翅膀）仍可正常覆盖。 */
+  overflow: hidden;
 }
 /* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带阴影停用 */
 body:not(.bubble-css-on)
