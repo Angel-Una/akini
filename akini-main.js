@@ -2564,7 +2564,7 @@ document.addEventListener("DOMContentLoaded", function () {
           // 兜底：已读元素存在但从未显示过（页面刷新后定时器丢失）→ 重新安排延迟显示
           if (isMe && __akiniToggleOn("readReceiptToggle")) {
             var _rr0 = row.querySelector(":scope .msg-rr");
-            if (_rr0 && _rr0.style.visibility !== "visible") _rr0.style.visibility = "visible";
+            if (_rr0 && _rr0.style.visibility !== "visible") row.setAttribute("data-read-pending", "1");
           }
           return;
         }
@@ -2659,14 +2659,17 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         // rr 已存在但仍隐藏且从未显示过（刷新后定时器丢失）→ 重新调度显示
         var _existRr = row.querySelector(":scope .msg-rr");
-        if (_existRr && _existRr.style.visibility !== "visible") _existRr.style.visibility = "visible";
+        if (_existRr && _existRr.style.visibility !== "visible" && !hadRead) row.setAttribute("data-read-pending", "1");
         if (wrapEl && !row.querySelector(":scope .msg-rr")) {
           var rrEl = document.createElement("span");
           rrEl.className = "msg-rr";
           rrEl.textContent = "已读";
-          // 已读回执固定在 wrap 内末尾：气泡/引用正下方，右缘对齐；创建即显示并随持久化保存可见态
+          // 已读回执固定在 wrap 内末尾：气泡/引用正下方，右缘对齐；创建时隐藏，由已读时序统一点亮
+          if (!hadRead) {
+            rrEl.style.visibility = "hidden";
+            row.setAttribute("data-read-pending", "1");
+          }
           wrapEl.appendChild(rrEl);
-          row.setAttribute("data-had-read-receipt", "1");
         }
       }
       row.setAttribute("data-meta-v", "10");
@@ -2738,10 +2741,40 @@ document.addEventListener("DOMContentLoaded", function () {
         if (el.getAttribute("data-state") !== st) el.setAttribute("data-state", st);
       });
     }
+    /* milk 式已读回执：同发送方连续消息组只保留最后一条的"已读" */
+    var __akiniRrGrpT = null;
+    function __akiniRefreshRrGroups(cb) {
+      try {
+        cb = cb || document.getElementById("chatBody");
+        if (!cb) return;
+        var meRows = cb.querySelectorAll(":scope > .msg-row.me");
+        for (var i = 0; i < meRows.length; i++) {
+          var rr = meRows[i].querySelector(".msg-rr");
+          if (!rr) continue;
+          var n = meRows[i].nextElementSibling;
+          while (n && !(n.classList && n.classList.contains("msg-row") && !n.classList.contains("timestamp-row") && !n.classList.contains("system"))) n = n.nextElementSibling;
+          rr.style.display = "";
+        }
+      } catch (e) {}
+    }
+    function __akiniScheduleRrGroups() {
+      clearTimeout(__akiniRrGrpT);
+      __akiniRrGrpT = setTimeout(function () { __akiniRefreshRrGroups(); }, 250);
+    }
     function __akiniSetupChatMetaObserver() {
       var chatBody = document.getElementById("chatBody");
       if (!chatBody) return;
       Array.from(chatBody.children).forEach(__akiniProcessMsgMeta);
+      __akiniScheduleRrGroups();
+      /* 刷新后：将历史遗留的待读回执按 milk 时序延迟点亮一次 */
+      setTimeout(function () {
+        try {
+          if (!__akiniToggleOn("readReceiptToggle")) return;
+          chatBody.querySelectorAll(".msg-row.me[data-read-pending]").forEach(function (row) {
+            setTimeout(function () { try { __akiniShowReadReceipt(row); } catch (e) {} }, 1200 + Math.random() * 1800);
+          });
+        } catch (e) {}
+      }, 400);
       __akiniCleanFinishedTransferInline(chatBody);
       __akiniInsertTimestampSeparators();
       __akiniUpgradeSurveyIcons(chatBody);
@@ -2757,6 +2790,7 @@ document.addEventListener("DOMContentLoaded", function () {
               }
             });
           });
+          __akiniScheduleRrGroups();
         });
         obs.observe(chatBody, { childList: true });
         chatBody.__akiniMetaObserver = obs;
@@ -2777,11 +2811,10 @@ document.addEventListener("DOMContentLoaded", function () {
               for (var __hi = 0; __hi < __meRows.length; __hi++) {
                 var __mr = __meRows[__hi];
                 var __rrEl = __mr.querySelector(".msg-rr");
-                if (!__rrEl || (__rrEl.style && __rrEl.style.visibility === "hidden")) {
-                  try { __akiniShowReadReceipt(__mr); } catch (e) {}
-                }
+                if (!__rrEl) { try { __akiniShowReadReceipt(__mr); } catch (e) {} }
               }
             }
+            __akiniRefreshRrGroups(cb);
             __akiniUpgradeSurveyIcons(cb);
             __akiniSyncCardStatus(cb);
           }
@@ -3258,8 +3291,8 @@ document.addEventListener("DOMContentLoaded", function () {
         "group" === (__sendTarget && __sendTarget.type)
           ? (__sendTarget.memberIds || [])[0]
           : null;
-      var __readDelay = 600 + Math.random() * 600; // 0.6~1.2s 显示已读
-      var __typingDelay = __readDelay + 400; // 已读后再显示输入动态
+      var __readDelay = 1500 + Math.random() * 2500; // milk 式：1.5~4s 后显示已读
+      var __typingDelay = __readDelay + 400 + Math.random() * 500; // 已读后再弹输入动态
       function __showReadNow() {
         var cb = document.getElementById("chatBody");
         if (!cb) return;

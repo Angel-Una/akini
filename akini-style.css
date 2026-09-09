@@ -1789,9 +1789,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   object-fit: cover !important;
 }
 .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  padding: 9px 14px;
-  border-radius: 14px !important;
+  padding: 11px 14px;
+  border-radius: 18px !important;
   max-width: 65%;
+  min-width: 0;
   font-size: 14px;
   word-break: break-word;
   overflow-wrap: anywhere;
@@ -6371,7 +6372,8 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   border-radius: 18px !important;
-  padding: 10px 14px !important;
+  padding: 11px 14px !important;
+  min-width: 0 !important;
   overflow-wrap: break-word !important;
   word-break: break-word !important;
 }
