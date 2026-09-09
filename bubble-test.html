@@ -20,8 +20,8 @@
 </head>
 <body class="bubble-css-on">
 <div class="bt-head">
-  <div class="bt-title">气泡对照测试（v20260909zg）</div>
-  <div class="bt-sub">同一份 CSS：A 区走 milk 原版管线，B 区走 Akini 管线。<br>1. 点「应用美化 CSS」<br>2. 等 10 秒（装饰图要加载）<br>3. 截图整个页面发我</div>
+  <div class="bt-title">气泡对照测试（v20260909zh）</div>
+  <div class="bt-sub">同一份 CSS：A 区走 milk 原版管线，B 区走 Akini 管线。<br>1. 点「应用美化 CSS」<br>2. 等 10 秒（装饰图要加载）<br>3. 往下滑，把 A/B/C 三个区都截图发我</div>
   <textarea id="btCss">.message {
 border-radius: 15px !important;
 padding: 4px 12px !important;
@@ -98,5 +98,13 @@ background-color: #f2fafd !important;
   <div class="msg-row me"><div class="msg-content-line"><div class="bubble-wrap"><div class="bubble">今天去了那家新开的蛋糕店超级好吃</div><span class="msg-rr" style="visibility:hidden">已读</span></div><div class="avatar-col"><div class="msg-avatar"></div><span class="msg-ts">00:31</span></div></div></div>
   <div class="msg-row other"><div class="msg-content-line"><div class="avatar-col"><div class="msg-avatar"></div><span class="msg-ts">00:32</span></div><div class="bubble-wrap"><div class="bubble">坏脾气很正常，你不对我发才不正常</div></div></div></div>
 </div>
+
+<div class="zone-label">C 区 · Akini 管线（去掉 isolate 层叠隔离）</div>
+<div id="akini-zone-c" class="chat-body zone-c">
+  <div class="msg-row other"><div class="msg-content-line"><div class="avatar-col"><div class="msg-avatar"></div><span class="msg-ts">00:30</span></div><div class="bubble-wrap"><div class="bubble">在干嘛呢，想你了呀</div></div></div></div>
+  <div class="msg-row me"><div class="msg-content-line"><div class="bubble-wrap"><div class="bubble">今天去了那家新开的蛋糕店超级好吃</div><span class="msg-rr" style="visibility:hidden">已读</span></div><div class="avatar-col"><div class="msg-avatar"></div><span class="msg-ts">00:31</span></div></div></div>
+  <div class="msg-row other"><div class="msg-content-line"><div class="avatar-col"><div class="msg-avatar"></div><span class="msg-ts">00:32</span></div><div class="bubble-wrap"><div class="bubble">坏脾气很正常，你不对我发才不正常</div></div></div></div>
+</div>
+<style>.zone-c .bubble { isolation: auto !important; }</style>
 <script src="bubble-test-engine.js"></script>
 </body></html>
