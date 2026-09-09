@@ -1803,6 +1803,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
      否则美化 CSS 的 ::before/::after 翅膀/弧带装饰会锚定到外层 .msg-row（整行宽），
      错位后盖在气泡上下边缘，看起来就像被割断/缺一块 */
   position: relative !important;
+  /* v20260909zd 通用兜底：气泡自成层叠上下文。美化 CSS 若用 z-index:-1 画底层装饰，
+     装饰会穿透到聊天背景图下面而消失（看起来不完整）；isolate 保证负层装饰
+     只垫在气泡底色之下、页面背景之上，任何美化 CSS 的装饰都完整可见 */
+  isolation: isolate !important;
 }
 /* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带阴影停用 */
 body:not(.bubble-css-on)
