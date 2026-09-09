@@ -6412,7 +6412,6 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   height: auto !important;
 }
 
-/* v20260909z: 美化气泡伪元素/阴影不被圆角裁切，上下装饰完整显示，避免被截成隔断 */
-html body .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  overflow: visible !important;
-}
+/* v20260909zb: 不再强制 bubble overflow（milk 的 .message 是 overflow:hidden，
+   美化设计靠它把内部弧带装饰裁剪成胶囊形；强制 visible 会让装饰溢出上下边缘形成隔断）。
+   裁不裁完全交给美化 CSS 自己决定；祖先容器保持 overflow:visible 防止外部裁切。 */
