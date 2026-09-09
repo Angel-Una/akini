@@ -5012,44 +5012,19 @@ button.back-btn[type="button"] {
 
 /* ===== 黑胶唱片化：首页播放器（与一起听同款：无同心圆纹，封面大黑胶窄） ===== */
 .music-player-disc {
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 42%), #0c0c0e;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 42%), #0c0c0e;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 2px #000;
   position: relative;
 }
 .music-player-cover {
   width: 62px;
   height: 62px;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 0 0 3px rgba(255, 255, 255, 0.08);
 }
-.music-player-disc::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #f2f2f2;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.7);
-  pointer-events: none;
-}
+.music-player-disc::after { content: none; }
 
-/* ===== 黑胶唱片化：一起听大唱片中轴孔 ===== */
-#musicDisc::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #f2f2f2;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 2.5px rgba(0, 0, 0, 0.7);
-  pointer-events: none;
-  z-index: 3;
-}
+/* ===== 黑胶唱片化：一起听大唱片中轴孔（v20260910zc 应要求移除白色圆点） ===== */
+#musicDisc::after { content: none; }
 .music-player-info {
   flex: 1;
   min-width: 0;
