@@ -3843,24 +3843,62 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function doSticker() {
         h();
-        var o = getContactStickersSync(r) || [];
-        if (!o.length) {
-          try {
+        var o = [];
+        try {
+          // 优先同步缓存（akini_stickers_<id>），联系人专属表情包
+          var key = "akini_stickers_" + (r || "");
+          var cache = (window.__csCache && window.__csCache[key]) || null;
+          if (Array.isArray(cache) && cache.length) o = cache;
+          // 缓存无数据则尝试同步 localStorage（因写入时会迁移到 idb，这里做兜底）
+          if (!o.length) {
+            var raw = localStorage.getItem(key);
+            if (raw) { try { var arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) o = arr; } catch(e){} }
+          }
+          // 仍无则回退全局表情包 akini_stickers
+          if (!o.length) {
+            var g = (window.__csCache && window.__csCache["akini_stickers"]) || null;
+            if (Array.isArray(g) && g.length) o = g;
+            else {
+              var rawg = localStorage.getItem("akini_stickers");
+              if (rawg) { try { var arr2 = JSON.parse(rawg); if (Array.isArray(arr2) && arr2.length) o = arr2; } catch(e){} }
+            }
+          }
+          // 最后回退字卡库 sticker 分类
+          if (!o.length) {
             var wb = i("akini_wordbank", []);
-            var sc = wb.filter(function (it) {
+            o = wb.filter(function (it) {
               var tab = (it.tab || "").toLowerCase();
               return (tab === "sticker" || tab === "stickers" || tab === "表情" || tab === "表情包") && (it.img || it.url || it.text);
-            });
-            o = sc.map(function(it){ return it.img || it.url || it.text; }).filter(Boolean);
-          } catch(e) {}
-        }
+            }).map(function(it){ return it.img || it.url || it.text; }).filter(Boolean);
+          }
+        } catch(e) { console.warn('doSticker load stickers fail', e); }
         if (!o.length) {
+          // 终极兜底：刷新后 LS 已迁移清空、__csCache 未恢复时，从 IndexedDB 异步读取并立即发送
           try {
-            var rawStickers = JSON.parse(localStorage.getItem("akini_stickers") || "[]");
-            if (Array.isArray(rawStickers) && rawStickers.length) o = rawStickers;
-          } catch(e) {}
+            if (window._idbStore && window._idbStore.get) {
+              var __sk = ["akini_stickers_" + (r || ""), "akini_stickers_" + (r || "") + "_backup", "akini_stickers", "akini_stickers_backup"];
+              var __si = 0;
+              var __tryNext = function () {
+                if (__si >= __sk.length) return;
+                var _k = __sk[__si++];
+                window._idbStore.get(_k, function (v) {
+                  var arr = null;
+                  if (v) { try { arr = JSON.parse(v); } catch (e) {} }
+                  if (Array.isArray(arr) && arr.length) {
+                    try { window.__csCache = window.__csCache || {}; window.__csCache[__sk[0]] = arr; } catch (e) {}
+                    __doStickerSend(arr);
+                  } else __tryNext();
+                });
+              };
+              __tryNext();
+            }
+          } catch (e) {}
+          return;
         }
-        if (!o.length) return;
+        __doStickerSend(o);
+      }
+      function __doStickerSend(o) {
+        if (!o || !o.length) return;
         const n =
           '<div class="msg-row other"><div class="msg-content-line"><div class="msg-avatar">' +
           i +
@@ -4023,6 +4061,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         let f = messages[idx];
         f = mixEmojiToText(f);
+        // v20260909w: 引用回复附加到第一条消息
+        var quoteHtml = "";
+        if (idx === 0 && window.__pendingQuote) {
+          var pq = window.__pendingQuote;
+          window.__pendingQuote = null;
+          quoteHtml = '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;max-width:70%!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-block!important;">' + pq.name + '：' + pq.text + '</div>';
+        }
         const p =
           '<div class="msg-row other"><div class="msg-content-line"><div class="msg-avatar">' +
           i +
@@ -4133,10 +4178,26 @@ document.addEventListener("DOMContentLoaded", function () {
       var e = window.akiniContacts.getChatTarget(t);
       if (!e) return;
       var n = _();
-      if (!n || "none" === n.type) return;
+      // milk 已读不回逻辑：命中 none 时消息照常延迟点亮已读（1.5~4秒），只是不回复
+      if (n && "none" === n.type) {
+        var __nrDelay = 1500 + Math.random() * 2500;
+        setTimeout(function () {
+          try {
+            var cb0 = document.getElementById("chatBody");
+            if (!cb0) return;
+            cb0.querySelectorAll(".msg-row.me").forEach(function (row) {
+              if (row.getAttribute("data-had-read-receipt") === "1") return;
+              row.setAttribute("data-read-pending", "1");
+              try { __akiniShowReadReceipt(row); } catch (e1) {}
+            });
+          } catch (e2) {}
+        }, __nrDelay);
+        return;
+      }
+      if (!n) return;
       // 统一走发消息同款回复流程：先已读 → 弹"对方正在输入"动态 → 再发回复消息
       var isActive = (t === window.akiniContacts.getActiveChatId());
-      var __readDelay = 600 + Math.random() * 600;
+      var __readDelay = 1500 + Math.random() * 2500;
       var __typingDelay = __readDelay + 400;
       var __replyDelay = __typingDelay + 1200 + Math.random() * 1800;
       setTimeout(function () {
@@ -7910,7 +7971,10 @@ document.addEventListener("DOMContentLoaded", function () {
         if (cid) {
           var bgKey = "akini_chat_bg_" + cid;
           try { localStorage.removeItem(bgKey); } catch (e) {}
-          try { if (window._idbStore && window._idbStore.set) window._idbStore.set(bgKey, ""); } catch (e) {}
+          try { localStorage.removeItem(bgKey + "_backup"); } catch (e) {}
+          try { if (window.akiniStore && window.akiniStore.remove) { window.akiniStore.remove(bgKey); window.akiniStore.remove(bgKey + "_backup"); } } catch (e) {}
+          try { if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(bgKey, ""); } catch (e) {}
+          try { if (window._idbStore && window._idbStore.set) { window._idbStore.set(bgKey, ""); window._idbStore.set(bgKey + "_backup", ""); } } catch (e) {}
         }
         if (cb2) {
           cb2.style.backgroundImage = "";

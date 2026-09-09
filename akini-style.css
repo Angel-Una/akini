@@ -6372,12 +6372,8 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 html body .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  border-radius: 18px !important;
-  padding: 11px 14px !important;
   min-width: 0 !important;
-  width: auto !important;
   max-width: 100% !important;
-  height: auto !important;
   overflow-wrap: break-word !important;
   word-break: break-word !important;
   white-space: pre-wrap !important;
@@ -6391,21 +6387,23 @@ html body .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubb
   contain: none !important;
 }
 .chat-body .msg-row .bubble {
-  overflow: visible !important;
   box-sizing: border-box !important;
 }
-/* 默认胶囊气泡终极防线：文字必须框在气泡内，强断行，padding 留足，不溢出 */
+/* v20260909w 文字防溢出防线：只防文字溢出，不干预气泡外观（padding/圆角/overflow 全部交还基础样式与美化CSS，修复美化气泡上下隔断） */
 html body .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   box-sizing: border-box !important;
-  display: inline-block !important;
   max-width: 100% !important;
-  width: auto !important;
-  height: auto !important;
-  min-height: auto !important;
+  min-width: 0 !important;
   word-break: break-word !important;
   overflow-wrap: anywhere !important;
   white-space: pre-wrap !important;
-  line-height: 1.55 !important;
+}
+/* 默认胶囊气泡（未启用美化CSS时）基础包裹：仅默认主题生效，美化气泡完全按用户CSS渲染 */
+html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   padding: 11px 15px !important;
   border-radius: 18px !important;
+  line-height: 1.55 !important;
+  display: inline-block !important;
+  width: auto !important;
+  height: auto !important;
 }
