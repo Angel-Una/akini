@@ -242,14 +242,16 @@ window.AKR = (function () {
     try {
       readNoReply = localStorage.getItem("akini_toggle_readNoReplyToggle") === "1";
     } catch (e) {}
-    if (readNoReply) {
-      if (Math.random() < getProb("noReply"))
-        return { type: "none", extra: {} };
+    if (readNoReply && Math.random() < getProb("noReply")) {
+      return { type: "none", extra: {} };
     }
-    var extra = {};
-    if (Math.random() < getProb("poke")) extra.poke = true;
-    if (localStorage.getItem("akini_toggle_emojiMixToggle") === "1")
-      extra.emojiMix = true;
+    var extra = {
+      poke: Math.random() < getProb("poke"),
+      quote: Math.random() < getProb("quote"),
+      sticker: Math.random() < (getProb("emoji") || 0.15),
+      transfer: Math.random() < getProb("taTransfer"),
+      emojiMix: localStorage.getItem("akini_toggle_emojiMixToggle") === "1"
+    };
     return {
       type: "text",
       extra: extra,
@@ -3841,8 +3843,24 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function doSticker() {
         h();
-        const o = getContactStickersSync(r);
-        if (0 === o.length) return;
+        var o = getContactStickersSync(r) || [];
+        if (!o.length) {
+          try {
+            var wb = i("akini_wordbank", []);
+            var sc = wb.filter(function (it) {
+              var tab = (it.tab || "").toLowerCase();
+              return (tab === "sticker" || tab === "stickers" || tab === "表情" || tab === "表情包") && (it.img || it.url || it.text);
+            });
+            o = sc.map(function(it){ return it.img || it.url || it.text; }).filter(Boolean);
+          } catch(e) {}
+        }
+        if (!o.length) {
+          try {
+            var rawStickers = JSON.parse(localStorage.getItem("akini_stickers") || "[]");
+            if (Array.isArray(rawStickers) && rawStickers.length) o = rawStickers;
+          } catch(e) {}
+        }
+        if (!o.length) return;
         const n =
           '<div class="msg-row other"><div class="msg-content-line"><div class="msg-avatar">' +
           i +
@@ -3969,7 +3987,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function mixEmojiToText(text) {
         if (!ex.emojiMix || !text) return text;
-        if (Math.random() >= 0.2) return text;
         var emojis = [];
         try {
           var wb = i("akini_wordbank", []);
@@ -4080,7 +4097,7 @@ document.addEventListener("DOMContentLoaded", function () {
       function runExtras() {
         var list = [];
         if (ex.transfer && window.__akiniToggleOn("contactTransferToggle", false)) list.push(doTransfer);
-        if (ex.sticker && window.__akiniToggleOn("contactEmojiToggle", false)) list.push(doSticker);
+        if (ex.sticker) list.push(doSticker);
         if (ex.poke && "group" !== e.type) list.push(doPoke);
         if (ex.call && window.__akiniToggleOn("contactActiveMsgToggle", false)) list.push(doCall);
         if (0 === list.length) return;

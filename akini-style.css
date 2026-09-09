@@ -6382,3 +6382,30 @@ html body .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubb
   word-break: break-word !important;
   white-space: pre-wrap !important;
 }
+
+/* v20260909v: 气泡防切割 + 默认胶囊气泡文字严密包裹 */
+.chat-body .msg-row,
+.chat-body .msg-row .msg-content-line,
+.chat-body .msg-row .msg-content-line > .bubble-wrap {
+  overflow: visible !important;
+  contain: none !important;
+}
+.chat-body .msg-row .bubble {
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+/* 默认胶囊气泡终极防线：文字必须框在气泡内，强断行，padding 留足，不溢出 */
+html body .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  box-sizing: border-box !important;
+  display: inline-block !important;
+  max-width: 100% !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: auto !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  white-space: pre-wrap !important;
+  line-height: 1.55 !important;
+  padding: 11px 15px !important;
+  border-radius: 18px !important;
+}
