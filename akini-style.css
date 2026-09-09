@@ -4989,16 +4989,11 @@ button.back-btn[type="button"] {
   height: 96px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: repeating-radial-gradient(
-    #111 0,
-    #111 3px,
-    #222 4px,
-    #222 5px
-  );
+  background: #0c0c0e;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 8px #1a1a1a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 2px #000;
   animation: disc-spin 10s linear infinite;
   animation-play-state: paused;
 }
@@ -5015,16 +5010,15 @@ button.back-btn[type="button"] {
   object-fit: cover;
 }
 
-/* ===== 黑胶唱片化：首页播放器 ===== */
+/* ===== 黑胶唱片化：首页播放器（与一起听同款：无同心圆纹，封面大黑胶窄） ===== */
 .music-player-disc {
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 42%),
-    repeating-radial-gradient(circle at 50% 50%, #1b1b1e 0 1px, #0a0a0c 1px 3px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 3px #000;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0) 42%), #0c0c0e;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 2px #000;
   position: relative;
 }
 .music-player-cover {
-  width: 54px;
-  height: 54px;
+  width: 62px;
+  height: 62px;
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), 0 0 0 3px rgba(255, 255, 255, 0.12);
 }
 .music-player-disc::after {
@@ -5126,7 +5120,7 @@ button.back-btn[type="button"] {
 .music-player-disc {
   width: 68px !important;
   height: 68px !important;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 0 0 6px #1a1a1a !important;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 0 0 2px #000 !important;
 }
 .music-player-cover {
   width: 44px !important;
@@ -5243,11 +5237,11 @@ button.back-btn[type="button"] {
 .music-player-disc {
   width: 84px !important;
   height: 84px !important;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 0 0 6px #1a1a1a !important;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 0 0 2px #000 !important;
 }
 .music-player-cover {
-  width: 60px !important;
-  height: 60px !important;
+  width: 54px !important;
+  height: 54px !important;
 }
 .music-player-right {
   min-width: 100px !important;
