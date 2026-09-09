@@ -3665,7 +3665,10 @@ document.addEventListener("DOMContentLoaded", function () {
       };
       document.addEventListener("visibilitychange", function () {
         if (!document.hidden && window._akiniTimer) {
-          window._akiniTimer.catchUp(actions);
+          // 切回前台先让页面稳定 3 秒再补跑到期任务，避免恢复瞬间任务与渲染抢占导致卡顿
+          setTimeout(function () {
+            try { !document.hidden && window._akiniTimer && window._akiniTimer.catchUp(actions); } catch (e) {}
+          }, 3000);
         }
       });
       window.addEventListener("pageshow", function (e) {
@@ -3693,8 +3696,34 @@ document.addEventListener("DOMContentLoaded", function () {
         var _fc = window.akiniContacts && window.akiniContacts.getActiveChatId();
         var _ft = _fc && window.akiniContacts.getChatTarget(_fc);
         if (_fc && _ft && window.I) {
-          // 用户主动点"继续说"：直接回复，绕开 pending 幽灵闸与 45 秒节流
-          window.I(_fc, _ft, null, true);
+          if (!__akiniToggleOn("contactReplyToggle", true)) return; // 回复开关关：与正常流程一致不回复
+          // 「继续说」与联系人正常回消息完全同一节奏：已读 → 输入动态 → 打字延迟 → 才回消息，绝不秒发
+          if (window.__akiniForceReplyInFlight) return; // 一轮进行中，防连点堆积
+          window.__akiniForceReplyInFlight = true;
+          var _fRead = 1500 + Math.random() * 2500;                 // 1.5~4s 后显示已读
+          var _fType = _fRead + 400 + Math.random() * 500;          // 已读后再弹输入动态
+          var _fm = parseFloat(localStorage.getItem("akini_num_typingDelayMin") || "3"),
+              _fx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5");
+          if (!(_fm > 0)) _fm = 3;
+          if (!(_fx >= _fm)) _fx = Math.max(_fm, 5);
+          var _fReply = _fType + 1e3 * (_fm + Math.random() * (_fx - _fm)); // 输入动态持续打字延迟后才回
+          var _fMember = "group" === _ft.type ? (_ft.memberIds || [])[0] : null;
+          setTimeout(function () {
+            try {
+              var cb = document.getElementById("chatBody");
+              if (cb) cb.querySelectorAll(".msg-row.me").forEach(function (row) {
+                if (row.getAttribute("data-had-read-receipt") === "1") return;
+                try { row.setAttribute("data-read-pending", "1"); __akiniShowReadReceipt(row); } catch (err) {}
+              });
+            } catch (err) {}
+          }, _fRead);
+          setTimeout(function () {
+            try { showTypingBubble(_fc, _fMember); } catch (err) {}
+          }, _fType);
+          setTimeout(function () {
+            window.__akiniForceReplyInFlight = false;
+            try { window.I(_fc, _ft, null, true); } catch (e0) {}
+          }, _fReply);
           return;
         }
         if (typeof b === "function") {
@@ -6488,7 +6517,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }),
       window.addEventListener("pageshow", function (t) {
-        if (t.persisted) {
+        if (t.persisted && !window.__akiniBooted) {
           window._akiniCacheStore &&
             window._akiniCacheStore.restoreAll &&
             window._akiniCacheStore.restoreAll(function () {
@@ -10710,6 +10739,17 @@ document.addEventListener("DOMContentLoaded", function () {
       const a = document.getElementById("callTimeDisplayFull");
       (a && (a.style.display = "block"), Be(!1));
     }
+    // 兜底守卫：通话未接通且非我主叫时，强制隐藏「最小化」（该位置应为「接通」，接通后才切换为最小化）
+    setInterval(function () {
+      try {
+        if (!we.active || we.answered || we.isMyCalling) return;
+        var v = document.getElementById("callMinimizeBtnFull");
+        if (v && v.parentElement && v.parentElement.style.display !== "none") {
+          v.style.display = "none";
+          v.parentElement.style.display = "none";
+        }
+      } catch (e) {}
+    }, 1000);
     window.startCall = function (t, e) {
       Te(t, !0, { callerAvatar: e });
     };
@@ -20436,6 +20476,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var inited = false;
   var watchPartners = [];      // 本次一起观影的联系人 [{id,name,avatar}]
   var partnerReplyTimer = null;
+  var watchPendingCount = 0;   // 连发合并计数：与微信聊天一致，多条消息统一一轮回复结清
   var watchObjUrl = null;      // 本地视频 objectURL，换源时释放
   function partnerAvatarHtml(av) {
     var t = av && String(av).trim();
@@ -20479,7 +20520,9 @@ document.addEventListener("DOMContentLoaded", function () {
     if (isFullscreen()) fireDanmaku((c.name ? c.name + "：" : "") + text);
   }
   function schedulePartnerReply() {
-    if (!watchPartners.length || partnerReplyTimer) return; // 一次只排一条，防堆积
+    if (!watchPartners.length) return;
+    watchPendingCount++;
+    if (partnerReplyTimer) return; // 已有待回复的一轮：连发只累加计数，统一一轮回复（同微信聊天）
     // 与微信聊天回复完全同节奏：读取设置页"回复延迟范围"（默认 2~5 秒），延迟到点才发，绝不秒发
     var dMin = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
         dMax = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
@@ -20488,11 +20531,20 @@ document.addEventListener("DOMContentLoaded", function () {
     var delayMs = 1e3 * (dMin + Math.random() * (dMax - dMin));
     partnerReplyTimer = setTimeout(function () {
       partnerReplyTimer = null;
+      watchPendingCount = 0;
       var wa = $("watchArea");
       if (!wa || wa.style.display === "none") return;
-      var c = watchPartners[Math.floor(Math.random() * watchPartners.length)];
-      var line = pickWatchLine(c && c.id);
-      if (line) appendPartnerMsg(c, line); // 字卡库为空则不回复
+      // 与微信聊天一致：一轮回复 1~3 条（75%/20%/5% 同 AKR.getReplyCount），逐条间隔发出
+      var r = Math.random();
+      var replyCount = r < 0.75 ? 1 : r < 0.95 ? 2 : 3;
+      var sendNext = function (left) {
+        if (left <= 0) return;
+        var c = watchPartners[Math.floor(Math.random() * watchPartners.length)];
+        var line = pickWatchLine(c && c.id);
+        if (line) appendPartnerMsg(c, line); // 字卡库为空则不回复
+        if (left > 1) setTimeout(function () { sendNext(left - 1); }, 900 + Math.random() * 900);
+      };
+      sendNext(replyCount);
     }, delayMs);
   }
   function appendWatchSysMsg(text) {
@@ -20709,6 +20761,33 @@ document.addEventListener("DOMContentLoaded", function () {
     appendChatMsg(t);
     if (isFullscreen()) fireDanmaku(t);
     schedulePartnerReply();
+    // 已读回执：与微信聊天一致，开关开启时发送后 1.5~4 秒点亮「已读」
+    try {
+      if (window.__akiniToggleOn && window.__akiniToggleOn("readReceiptToggle")) {
+        var __rrDelay = 1500 + Math.random() * 2500;
+        setTimeout(function () {
+          try {
+            var body = $("watchChatBody");
+            if (!body) return;
+            body.querySelectorAll(".msg-row.me").forEach(function (row) {
+              if (row.getAttribute("data-had-read-receipt") === "1") return;
+              row.setAttribute("data-had-read-receipt", "1");
+              row.removeAttribute("data-read-pending");
+              var rr = row.querySelector(":scope .msg-rr");
+              if (!rr) {
+                rr = document.createElement("span");
+                rr.className = "msg-rr";
+                rr.textContent = "已读";
+                var line = row.querySelector(":scope > .msg-content-line");
+                var wrapT = line && line.querySelector(":scope > .bubble-wrap");
+                if (wrapT) wrapT.appendChild(rr); else (line || row).appendChild(rr);
+              }
+              rr.style.visibility = "visible";
+            });
+          } catch (e) {}
+        }, __rrDelay);
+      }
+    } catch (e) {}
   }
   function applyFullscreenUI() {
     var fs = isFullscreen();
@@ -20809,6 +20888,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var dk = $("watchDanmakuLayer");
       if (dk) dk.innerHTML = "";
       if (partnerReplyTimer) { clearTimeout(partnerReplyTimer); partnerReplyTimer = null; }
+      watchPendingCount = 0;
       $("watchArea").style.display = "none";
     });
     $("watchImportBtn").addEventListener("click", importVideo);

@@ -5012,7 +5012,7 @@ button.back-btn[type="button"] {
 
 /* ===== 黑胶唱片化：首页播放器（与一起听同款：无同心圆纹，封面大黑胶窄） ===== */
 .music-player-disc {
-  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 42%), #0c0c0e;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0) 42%), repeating-radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 4px), #0c0c0e;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4), inset 0 0 0 2px #000;
   position: relative;
 }
@@ -6238,7 +6238,7 @@ body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-
 
 /* 通话界面操作按钮：强制图标在上、文字在下竖排居中（与挂断/接听一致） */
 .call-actions > div {
-  display: flex !important;
+  display: flex;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: flex-end !important;
