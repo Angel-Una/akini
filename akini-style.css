@@ -6194,7 +6194,11 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 .wb-toolbar .tool-btn { height: 46px; padding: 0; grid-template-rows: none; align-content: center; }
 /* 长列表渲染性能：屏外内容跳过布局绘制 */
 .wb-word-item, .wb-excl-card-row, .wb-excl-group-row { content-visibility: auto; contain-intrinsic-size: auto 56px; }
-.msg-row { content-visibility: auto; contain-intrinsic-size: auto 48px; }
+/* v20260909zi 关键修复：content-visibility:auto 附带 paint containment（绘制裁剪），
+   iOS Safari 会严格执行——探出气泡上边缘的美化装饰(::before 等)被行盒子水平裁掉，
+   表现为"装饰缺失/被割断"（milk 无此规则故永远完整）。开启美化 CSS 时必须停用，
+   仅在默认气泡下保留该滚动性能优化 */
+body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-size: auto 48px; }
 .akini-ta-phone-item { content-visibility: auto; contain-intrinsic-size: auto 90px; }
 /* 减少重绘：滚动容器开启硬件加速提示 */
 .wb-content, .chat-messages, .akini-ta-phone-list { transform: translateZ(0); }
@@ -6399,6 +6403,8 @@ html body .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubb
 .chat-body .msg-row .msg-content-line > .bubble-wrap {
   overflow: visible !important;
   contain: none !important;
+  /* v20260909zi：双保险，彻底关掉绘制裁剪，保证任何美化装饰探出边界都不被裁 */
+  content-visibility: visible !important;
 }
 .chat-body .msg-row .bubble {
   box-sizing: border-box !important;
