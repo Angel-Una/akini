@@ -6407,3 +6407,8 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   width: auto !important;
   height: auto !important;
 }
+
+/* v20260909z: 美化气泡伪元素/阴影不被圆角裁切，上下装饰完整显示，避免被截成隔断 */
+html body .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  overflow: visible !important;
+}

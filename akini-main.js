@@ -11326,7 +11326,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }, 1e3)))
               : (we.isMyCalling
                   ? (he && (he.innerText = "呼叫中..."),
-                    ye && (ye.style.display = "none"),
+                    ye && (ye.style.display = "block"),
                     ve && (ve.style.display = "none"),
                     pe && (pe.style.display = "block"))
                   : (he && (he.innerText = "来电中..."),
@@ -11349,16 +11349,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? (cstatus && (cstatus.innerText = "正在呼叫..."),
                   abtn && (abtn.style.display = "none"),
                   abtn && abtn.parentElement && (abtn.parentElement.style.display = "none"),
-                  mbtn && (mbtn.style.display = "none"),
+                  mbtn && (mbtn.style.display = "block"),
+                  mbtn && mbtn.parentElement && (mbtn.parentElement.style.display = ""),
                   hbtn && (hbtn.style.display = "block"),
                   pe && (pe.style.display = "block"),
-                  ye && (ye.style.display = "none"),
+                  ye && (ye.style.display = "block"),
                   ve && (ve.style.display = "none"),
                   he && (he.innerText = "呼叫中..."))
                 : (cstatus && (cstatus.innerText = "来电中..."),
                   abtn && (abtn.style.display = "block"),
                   abtn && abtn.parentElement && (abtn.parentElement.style.display = ""),
                   mbtn && (mbtn.style.display = "none"),
+                  mbtn && mbtn.parentElement && (mbtn.parentElement.style.display = "none"),
                   hbtn && (hbtn.style.display = "block"),
                   pe && (pe.style.display = "block"),
                   ye && (ye.style.display = "none"),
