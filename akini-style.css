@@ -264,13 +264,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .middle-row {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 0 16px 12px;
   flex: none;
   width: 100%;
   box-sizing: border-box;
   align-items: flex-start;
-  /* 删掉首页中间位置独立滑动，全部平铺显示 */
+  /* 首页是一个统一整体：彻底禁止局部单独滑动，全部平铺显示 */
   overflow: visible !important;
   gap: 16px;
   /* 图二圈起内容上移 3px */
@@ -282,16 +282,11 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   gap: 10px;
   flex-shrink: 0;
   margin-top: 2px;
-  margin-left: 0;
+  margin-left: 17px;
   width: 204px;
   align-self: stretch;
   overflow: visible;
   padding-bottom: 0;
-}
-  min-height: 0;
-  /* 由 .middle-row 统一滚动，避免嵌套滚动器 */
-  overflow: visible;
-  padding-bottom: 12px;
 }
 .left-apps-row {
   display: flex;
