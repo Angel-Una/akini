@@ -85,6 +85,13 @@
       var finish = function () {
         // 所有 IDB 已删，最后清 localStorage 并立即刷新（顺序不能反，否则快照机制会在间隙写回）
         clearLocal();
+        // milk 式全量归0：清空所有可访问 cookie（含残留的标记/会话 cookie）
+        try {
+          document.cookie.split(";").forEach(function (c) {
+            var n = String(c).split("=")[0].trim();
+            if (n) document.cookie = n + "=;path=/;max-age=0";
+          });
+        } catch (e) {}
         // 注销 Service Worker + 清 Cache Storage，避免旧缓存恢复页面
         try {
           if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
@@ -100,8 +107,18 @@
         setTimeout(doReload, 400);
       };
       var deleteAllIdb = function () {
-        // milk 式：主库已被 _idbStore.clearAll()（= localforage.clear()，同连接清空）处理；
-        // 这里只删除无活动连接的 legacy 旧库，避免 deleteDatabase 被打开的连接 blocked 挂起
+        // milk 式：主库已被 _idbStore.clearAll()（= localforage.clear()，同连接清空）处理
+        // 全量归0：枚举删除所有 IDB 库；主库虽有活动连接导致删除被 blocked，但数据已被 clearAll 归零，
+        // 删除请求随页面卸载消亡，配合保险丝 cookie 下次启动再清一轮，保证无任何残留
+        try {
+          if (indexedDB.databases) {
+            indexedDB.databases().then(function (dbs) {
+              (dbs || []).forEach(function (d) {
+                if (d && d.name) { try { indexedDB.deleteDatabase(d.name); } catch (e) {} }
+              });
+            }).catch(function () {});
+          }
+        } catch (e) {}
         try { indexedDB.deleteDatabase("akini_img_db"); } catch (e) {}
         finish();
       };
