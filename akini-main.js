@@ -908,6 +908,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (backupTimer) return;
           // 启动恢复完成前不触发备份，避免用可能不完整的 localStorage 覆盖 IDB/Cache 里的完整数据
           if (!window._akiniDataRestored) return;
+          // 性能：200ms 防抖改为 3s 节流——连续写入合并为一次全量快照，杜绝"每次 setItem 都全量序列化"的卡顿源
+          // 数据安全不降：pagehide/beforeunload/切后台仍有绕过节流的强制即时备份兜底
           backupTimer = setTimeout(function () {
             backupTimer = null;
             snapshotLs();
@@ -917,7 +919,7 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
               window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
             } catch (e) {}
-          }, 200);
+          }, 3000);
         }
         function __akiniEmergencyTrim(html, n) {
           if (!html) return html;
@@ -5880,8 +5882,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(99, p));
         if (p >= 100) window.__akiniSplashProgress = 100;
+        // milk 式简化：进度条由 CSS 动画平滑驱动（3s 走满），JS 不再逐帧改写 width，杜绝回退/跳变
         var bar = document.getElementById("akiniSplashBar");
-        if (bar) bar.style.width = window.__akiniSplashProgress + "%";
+        if (bar && window.__akiniSplashProgress >= 100) { bar.style.animation = "none"; bar.style.width = "100%"; }
         var st = document.getElementById("akiniSplashStatus");
         if (st) {
           if (window.__akiniSplashProgress >= 100) st.textContent = "已准备好";
@@ -6508,10 +6511,10 @@ document.addEventListener("DOMContentLoaded", function () {
       // 定期备份到 IndexedDB：移动端 beforeunload/pagehide 不可靠，靠定时器保证数据落盘
       setInterval(function () {
         try {
-          if (window._restoringData || window._restoringChatHistory) return;
+          if (document.hidden || window._restoringData || window._restoringChatHistory) return;
           V();
         } catch (t) {}
-      }, 15000),
+      }, 60000),
       (window._restoringChatHistory = !0),
       U && (U.innerHTML = ""),
       setTimeout(function () {
@@ -6550,7 +6553,7 @@ document.addEventListener("DOMContentLoaded", function () {
             window.akiniContacts.updateSession(e, { messagesHTML: t });
           });
         } catch (e) {}
-      }, 30000),
+      }, 120000),
       (window.renderAvatarHtml = nt),
       (window.renderAvatarFill = it));
     var at = null;
@@ -16418,14 +16421,30 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
               } else alert("此浏览器不支持通知功能");
           }));
-      // ===== 静音循环音频保活（与 milk 同方案）=====
+      // ===== 静音循环音频保活（milk 音频源 + mochi 指数退避补播）=====
       // iOS/微信里 WakeLock 在后台基本无效，只有"正在播放音频"的页面系统才不会冻结回收
       var _kaAudio = null;
+      var _kaUserStopped = false;  // 用户主动关闭后不补播
+      var _kaRetryTimer = null;    // 退避补播定时器
+      var _kaDelay = 0;            // 下次补播间隔；0=不在退避轨道
+      var _kaLastPlayAt = 0;       // 最近一次成功开播时间（稳定 30s 后清零退避）
       function _kaAudioEnabled() {
         try { return "1" === localStorage.getItem("akini_toggle_keepAliveToggle"); } catch (e) { return false; }
       }
+      function _kaScheduleRetry() {
+        // mochi 式指数退避：5s→10s→20s→40s→60s 封顶，避免与系统/其他 App 抢音频焦点拉锯
+        if (!_kaAudioEnabled() || _kaUserStopped || !_kaAudio) return;
+        _kaDelay = _kaDelay ? Math.min(_kaDelay * 2, 60000) : 5000;
+        clearTimeout(_kaRetryTimer);
+        _kaRetryTimer = setTimeout(function () {
+          if (!_kaAudioEnabled() || _kaUserStopped || !_kaAudio) return;
+          var p = _kaAudio.play();
+          if (p && p.catch) p.catch(function () { _kaScheduleRetry(); });
+        }, _kaDelay);
+      }
       function _kaAudioStart() {
         try {
+          _kaUserStopped = false;
           if (!_kaAudio) {
             // 与 milk 完全同款：远程 m4a 静音循环流——iOS/微信对「正在播放远程音频」的页面不冻结回收，
             // 本地超短 wav 循环会被系统判为无实际输出而杀页（挂后台重进的根因）。加载失败回退本地 wav。
@@ -16442,8 +16461,19 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
               } catch (e) {}
             });
+            // mochi 方案：被系统/其他 App 暂停时退避补播（后台保活失效的另一半原因）
+            _kaAudio.addEventListener("pause", function () {
+              try {
+                if (!_kaAudioEnabled() || _kaUserStopped) return;
+                // 稳定播放满 30s 后被打断 → 退避轨道清零重算
+                if (_kaLastPlayAt && Date.now() - _kaLastPlayAt > 30000) _kaDelay = 0;
+                _kaScheduleRetry();
+              } catch (e) {}
+            });
+            _kaAudio.addEventListener("playing", function () { _kaLastPlayAt = Date.now(); });
           }
           var p = _kaAudio.play();
+          if (p && p.then) p.then(function () { _kaLastPlayAt = Date.now(); _kaDelay = 0; });
           if (p && p.catch) p.catch(function () {
             // 自动播放被拦截：等下一次触摸/点击解锁后再播
             var unlock = function () { if (_kaAudioEnabled() && _kaAudio) _kaAudio.play().catch(function () {}); };
@@ -16453,6 +16483,8 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
       }
       function _kaAudioStop() {
+        _kaUserStopped = true;
+        clearTimeout(_kaRetryTimer);
         if (_kaAudio) { try { _kaAudio.pause(); _kaAudio.currentTime = 0; } catch (e) {} }
       }
       (window._akiniKeepAliveAudioStart = _kaAudioStart,
@@ -16460,6 +16492,7 @@ document.addEventListener("DOMContentLoaded", function () {
         // 切回前台时若保活开着但音频被系统暂停，自动续播
         document.addEventListener("visibilitychange", function () {
           if (_kaAudioEnabled() && "visible" === document.visibilityState && _kaAudio && _kaAudio.paused) {
+            _kaDelay = 0;
             _kaAudio.play().catch(function () {});
           }
         }),
@@ -18286,7 +18319,7 @@ document.addEventListener("DOMContentLoaded", function () {
           setInterval(function () {
             if (document.hidden) return;
             (rt(),
-              ot() && !d && V(),
+              
               d &&
                 (Q(),
                 Y(),
@@ -18298,7 +18331,7 @@ document.addEventListener("DOMContentLoaded", function () {
                       u.currentTime > 0 &&
                       u.currentTime >= u.duration - 0.3)) &&
                   ((u._ending = !0), yt())));
-          }, 5e3));
+          }, 10000));
         var N = null,
           P = null,
           H = [];
