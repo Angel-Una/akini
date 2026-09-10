@@ -150,6 +150,86 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-shrink: 0;
 }
 
+/* ===== 首页新排布：纪念日横条 / 4×2图标网格 / 气泡行 ===== */
+.anniv-bar {
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  background-size: cover !important;
+  background-position: center !important;
+  padding: 14px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.anniv-bar .anniv-left {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.anniv-bar .label {
+  font-size: 15px;
+  color: #555;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+.anniv-bar .unit {
+  font-size: 12px;
+  color: #999;
+}
+.anniv-bar .number {
+  font-size: 36px;
+  font-weight: 700;
+  color: #333;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px 6px;
+  padding: 2px 14px;
+  box-sizing: border-box;
+  width: 100%;
+}
+.apps-grid .app-item {
+  width: auto !important;
+  margin: 0;
+  flex-shrink: 0;
+}
+/* 图标放大 32→40，更显大 */
+.app-item .icon-wrap {
+  width: 40px;
+  height: 40px;
+}
+.chat-preview {
+  display: flex;
+  flex-direction: row !important;
+  align-items: flex-end;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 2px;
+  margin: 0;
+}
+.chat-preview .preview-row {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin: 0 !important;
+}
+.chat-preview .preview-row:nth-child(2) {
+  justify-content: flex-end;
+}
+.chat-preview .preview-bubble {
+  max-width: calc(100% - 44px);
+  font-size: 12px;
+}
+
 .top-card {
   margin: 0;
   background: #ffffff;
@@ -261,42 +341,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   text-shadow: 0 1px 4px rgba(255, 255, 255, 0.6);
   flex-shrink: 0;
 }
-.middle-row {
-  display: flex;
-  justify-content: flex-start;
-  padding: 0 16px 2px;
-  flex: none;
-  width: 100%;
-  box-sizing: border-box;
-  align-items: flex-start;
-  /* 首页是一个统一整体：彻底禁止局部单独滑动，全部平铺显示 */
-  overflow: visible !important;
-  gap: 16px;
-  /* 圈起区域整体左移（用户要求） */
-  margin: 0 0 0 -20px;
-}
-.left-apps-container {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  flex-shrink: 0;
-  margin-top: 2px;
-  margin-left: 12px;
-  width: 204px;
-  align-self: stretch;
-  overflow: visible;
-  padding-bottom: 0;
-}
-.left-apps-row {
-  display: flex;
-  gap: 12px;
-}
-.left-apps-row.bottom-row .app-item,
-.left-apps-row.top-row .app-item,
-.left-apps-row.ta-phone-row .app-item {
-  width: 60px;
-  flex-shrink: 0;
-}
+
+
+
+
 #appBtnMail {
   pointer-events: auto !important;
   touch-action: manipulation !important;
@@ -371,19 +419,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #666;
   font-weight: 500;
 }
-.right-column {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  align-items: flex-start;
-  margin-left: 0;
-  margin-right: 0;
-  transform: translateX(0);
-  align-self: stretch;
-  min-height: 0;
-  /* 由 .middle-row 统一滚动，避免嵌套滚动器 */
-  overflow: visible;
-}
+
 .right-card {
   background: #ffffff;
   border-radius: 18px;
