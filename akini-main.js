@@ -6018,6 +6018,16 @@ document.addEventListener("DOMContentLoaded", function () {
           try { if ("function" == typeof window._renderIcity) window._renderIcity(); } catch (e) {}
           try { if ("function" == typeof window.renderHomeAvatarPreviews) window.renderHomeAvatarPreviews(); } catch (e) {}
           try { if ("function" == typeof window.renderHomeAvatarContacts) window.renderHomeAvatarContacts(); } catch (e) {}
+          /* 信箱：boot 完成后清缓存重渲染，修复 boot 前打开信箱导致的空列表 */
+          try {
+            if ("function" == typeof window.__renderMail) {
+              var _ma = document.getElementById("mailArea");
+              if (_ma && _ma.style.display !== "none") {
+                if (window.__renderMail.__resetCache) window.__renderMail.__resetCache();
+                window.__renderMail();
+              }
+            }
+          } catch (e) {}
         }
         setTimeout(_bootRefresh, 500);
         setTimeout(_bootRefresh, 1500);
@@ -14566,12 +14576,35 @@ document.addEventListener("DOMContentLoaded", function () {
       hn = document.getElementById("mailRecipientPickerModal"),
       wn = document.getElementById("mailRecipientPickerClose");
     let kn = "sent";
+    /* 信箱双 tab 内存缓存：切换时先用缓存同步渲染（零延迟），后台再异步刷新 */
+    var _mailRawCache = { sent: null, received: null };
     window.__renderMail = function () {
       _n(kn);
     };
     window.__renderMail();
+    window.__renderMail.__resetCache = function () {
+      _mailRawCache.sent = null;
+      _mailRawCache.received = null;
+    };
     function _n(t) {
       if (!dn) return;
+      /* 数据门：boot 恢复未完成时最多等 3 秒，杜绝"信件消失需重进" */
+      if (!window._akiniDataRestored) {
+        if (!_n._waitTimer) {
+          var waited = 0;
+          _n._waitTimer = setInterval(function () {
+            waited += 200;
+            if (window._akiniDataRestored || waited >= 3000) {
+              clearInterval(_n._waitTimer);
+              _n._waitTimer = null;
+              _mailRawCache.sent = null;
+              _mailRawCache.received = null;
+              _n(kn);
+            }
+          }, 200);
+        }
+        return;
+      }
       const e = "sent" === t ? "akini_mail_sent" : "akini_mail_received";
       function loadRaw(v) {
         try {
@@ -14582,8 +14615,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         return true;
       }
+      /* 缓存命中：立即同步渲染，切换秒开 */
+      if (_mailRawCache[t] != null) {
+        _renderMailList(t, _mailRawCache[t]);
+      }
       D(e, function (v) {
         if (v && loadRaw(v)) {
+          _mailRawCache[t] = v;
           _renderMailList(t, v);
         } else {
           D(e + "_backup", function (vb) {
@@ -14591,9 +14629,10 @@ document.addEventListener("DOMContentLoaded", function () {
               try {
                 localStorage.setItem(e, vb);
               } catch (e) {}
+              _mailRawCache[t] = vb;
               _renderMailList(t, vb);
             } else {
-              _renderMailList(t, "[]");
+              if (_mailRawCache[t] == null) _renderMailList(t, "[]");
             }
           });
         }
@@ -14894,6 +14933,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function saveMailSent(t) {
       var e = JSON.stringify(t || []);
+      _mailRawCache.sent = e;
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_mail_sent", e);
       } else {
@@ -14905,6 +14945,7 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function saveMailReceived(t) {
       var e = JSON.stringify(t || []);
+      _mailRawCache.received = e;
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_mail_received", e);
       } else {
