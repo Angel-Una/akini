@@ -157,34 +157,56 @@ window.__akiniBootStep = "start";
     }
   } catch (e) {}
 })();
-/* 默认开启：已读回执、时间戳（仅在用户从未设置时写入） */
+/* 默认开启项：时间戳（仅在用户从未设置时写入；联系人相关功能一律默认关闭，需用户显式手动开启） */
 (function () {
   try {
-    ["readReceiptToggle", "timestampToggle"].forEach(function (key) {
-      if (localStorage.getItem("akini_toggle_" + key) === null) {
-        localStorage.setItem("akini_toggle_" + key, "1");
-      }
-    });
-    /* 一次性迁移：旧版默认误写"0"导致开关看似无效；仅迁移一次，尊重之后的手动关闭 */
-    try {
-      if (!localStorage.getItem("akini_mig_tsrr_v1")) {
-        localStorage.setItem("akini_mig_tsrr_v1", "1");
-        ["readReceiptToggle", "timestampToggle"].forEach(function (key) {
-          if (localStorage.getItem("akini_toggle_" + key) === "0") {
-            localStorage.setItem("akini_toggle_" + key, "1");
-          }
-        });
-      }
-    } catch (e) {}
+    if (localStorage.getItem("akini_toggle_timestampToggle") === null) {
+      localStorage.setItem("akini_toggle_timestampToggle", "1");
+    }
   } catch (e) {}
 })();
 /* ====== AKR（Akini 随机内核）：随机行为/概率/时间范围控制 ====== */
+window.__akiniHasActiveContact = function () {
+  try {
+    if (!window.akiniContacts) return false;
+    var contacts = window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+    if (Array.isArray(contacts) && contacts.length > 0) return true;
+    var actId = window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : window.akiniContacts.getActiveChatId();
+    if (actId) {
+      var target = window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(actId) : null;
+      if (target && target.id) return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+};
+
 window.__akiniToggleOn = function (key, defaultOn) {
   try {
+    // 凡是设置里需要手动开关的联系人行为功能，未开联系人一律禁止使用
+    var contactSpecificKeys = [
+      "readReceiptToggle",
+      "quoteReplyToggle",
+      "emojiMixToggle",
+      "readNoReplyToggle",
+      "contactEmojiToggle",
+      "contactPokeToggle",
+      "contactTransferToggle",
+      "contactActiveMsgToggle",
+      "contactFriendsToggle",
+      "contactIcityToggle",
+      "contactMailToggle",
+      "contactReplyToggle"
+    ];
+    if (contactSpecificKeys.indexOf(key) !== -1) {
+      if (!window.__akiniHasActiveContact()) return false;
+    }
+
     var v = localStorage.getItem("akini_toggle_" + key);
-    if (v === null || v === undefined) return defaultOn !== false;
+    if (v === null || v === undefined) return defaultOn === true;
     return v === "1";
-  } catch (e) { return defaultOn !== false; }
+  } catch (e) { return defaultOn === true; }
 };
 window.AKR = (function () {
   /* 概率默认值（可用 localStorage 覆盖：akini_prob_<name>，范围 0-100） */
@@ -236,8 +258,36 @@ window.AKR = (function () {
     var r = Math.random();
     return r < 0.75 ? 1 : r < 0.95 ? 2 : 3;
   }
-  /* 回复行为：未开“已读不回”时必回；开启后才按概率已读不回；3% 概率触发拍一拍 */
+  /* 回复行为：无联系人或未开启联系人时全面禁止主动功能；
+     引用回复/emoji融入消息/已读不回必须在显式手动开启且存在有效联系人时才触发 */
   function pickReplyBehavior() {
+    var hasContact = false;
+    try {
+      if (window.akiniContacts) {
+        var cid = window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : window.akiniContacts.getActiveChatId();
+        if (cid) {
+          var target = window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(cid) : null;
+          if (target && target.id) hasContact = true;
+        }
+      }
+    } catch (e) {
+      hasContact = false;
+    }
+
+    // 没有开联系人/无有效激活联系人，一律禁止任何主动功能
+    if (!hasContact) {
+      return {
+        type: "text",
+        extra: {
+          poke: false,
+          quote: false,
+          sticker: false,
+          transfer: false,
+          emojiMix: false
+        }
+      };
+    }
+
     var readNoReply = false;
     try {
       readNoReply = localStorage.getItem("akini_toggle_readNoReplyToggle") === "1";
@@ -245,12 +295,38 @@ window.AKR = (function () {
     if (readNoReply && Math.random() < getProb("noReply")) {
       return { type: "none", extra: {} };
     }
+
+    var quoteOn = false;
+    try {
+      quoteOn = localStorage.getItem("akini_toggle_quoteReplyToggle") === "1";
+    } catch (e) {}
+
+    var pokeOn = false;
+    try {
+      pokeOn = localStorage.getItem("akini_toggle_contactPokeToggle") === "1";
+    } catch (e) {}
+
+    var stickerOn = false;
+    try {
+      stickerOn = localStorage.getItem("akini_toggle_contactEmojiToggle") === "1";
+    } catch (e) {}
+
+    var transferOn = false;
+    try {
+      transferOn = localStorage.getItem("akini_toggle_contactTransferToggle") === "1";
+    } catch (e) {}
+
+    var emojiMixOn = false;
+    try {
+      emojiMixOn = localStorage.getItem("akini_toggle_emojiMixToggle") === "1";
+    } catch (e) {}
+
     var extra = {
-      poke: Math.random() < getProb("poke"),
-      quote: Math.random() < getProb("quote"),
-      sticker: Math.random() < (getProb("emoji") || 0.15),
-      transfer: Math.random() < getProb("taTransfer"),
-      emojiMix: localStorage.getItem("akini_toggle_emojiMixToggle") === "1"
+      poke: pokeOn && Math.random() < getProb("poke"),
+      quote: quoteOn && Math.random() < getProb("quote"),
+      sticker: stickerOn && Math.random() < getProb("emoji"),
+      transfer: transferOn && Math.random() < getProb("taTransfer"),
+      emojiMix: emojiMixOn
     };
     return {
       type: "text",
@@ -2527,7 +2603,7 @@ document.addEventListener("DOMContentLoaded", function () {
       return hh + ":" + mm;
     };
     function __akiniToggleOn(id) {
-      return localStorage.getItem("akini_toggle_" + id) === "1";
+      return window.__akiniToggleOn ? window.__akiniToggleOn(id, false) : localStorage.getItem("akini_toggle_" + id) === "1";
     }
     window.__akiniProcessMsgMeta = __akiniProcessMsgMeta; // 导出：观影聊天区复用同一套气泡元数据（时间戳/已读回执/自定义CSS）
     // 已读回执按气泡实际底部定位（短气泡时 content-line 被头像列撑高，不能用 top:100%）
@@ -4140,8 +4216,8 @@ document.addEventListener("DOMContentLoaded", function () {
       function runExtras() {
         var list = [];
         if (ex.transfer && window.__akiniToggleOn("contactTransferToggle", false)) list.push(doTransfer);
-        if (ex.sticker) list.push(doSticker);
-        if (ex.poke && "group" !== e.type) list.push(doPoke);
+        if (ex.sticker && window.__akiniToggleOn("contactEmojiToggle", false)) list.push(doSticker);
+        if (ex.poke && "group" !== e.type && window.__akiniToggleOn("contactPokeToggle", false)) list.push(doPoke);
         if (ex.call && window.__akiniToggleOn("contactActiveMsgToggle", false)) list.push(doCall);
         if (0 === list.length) return;
         var k = 0;
@@ -4763,34 +4839,29 @@ document.addEventListener("DOMContentLoaded", function () {
     function N(t, e) {
       if (t) {
         var n = "akini_stickers_" + t,
-          i = "akini_stickers_" + t + "_backup",
-          a = localStorage.getItem(n);
-        if (a)
+          i = "akini_stickers_" + t + "_backup";
+        var a = null;
+        try { a = localStorage.getItem(n); } catch (err) {}
+        if (a) {
           try {
             var o = JSON.parse(a);
-            ((window.__csCache = window.__csCache || {}),
-              (window.__csCache[n] = o));
-            return (
-              _idbStore.set(n, a),
-              _idbStore.set(i, a, function () {
-                try {
-                  (localStorage.removeItem(n),
-                    localStorage.removeItem(n + "_idx"));
-                } catch (t) {}
-              }),
-              void e(o)
-            );
-          } catch (t) {}
-        _idbStore.get(n, function (t) {
-          var n = [];
+            window.__csCache = window.__csCache || {};
+            window.__csCache[n] = o;
+            return void e(o);
+          } catch (err) {}
+        }
+        if (window.__csCache && Array.isArray(window.__csCache[n]) && window.__csCache[n].length > 0) {
+          return void e(window.__csCache[n]);
+        }
+        _idbStore.get(n, function (val) {
+          var nList = [];
           try {
-            n = JSON.parse(t || "[]");
-          } catch (t) {}
-          ((window.__csCache = window.__csCache || {}),
-            (window.__csCache[
-              "akini_stickers_" + (typeof t === "undefined" ? "" : t)
-            ] = n),
-            e(n));
+            nList = JSON.parse(val || "[]");
+          } catch (err) {}
+          window.__csCache = window.__csCache || {};
+          window.__csCache[n] = nList;
+          try { localStorage.setItem(n, JSON.stringify(nList)); } catch (err) {}
+          e(nList);
         });
       } else H(e);
     }
@@ -4799,18 +4870,13 @@ document.addEventListener("DOMContentLoaded", function () {
         var i = "akini_stickers_" + t,
           a = "akini_stickers_" + t + "_backup",
           o = JSON.stringify(e || []);
-        ((window.__csCache = window.__csCache || {}),
-          (window.__csCache[i] = e || []),
-          _idbStore.set(a, o),
-          _idbStore.set(i, o, function () {
-            try {
-              (localStorage.removeItem(i), localStorage.removeItem(i + "_idx"));
-            } catch (t) {}
-          }),
-          n &&
-            setTimeout(function () {
-              n();
-            }, 0));
+        window.__csCache = window.__csCache || {};
+        window.__csCache[i] = e || [];
+        try { localStorage.setItem(i, o); } catch (err) {}
+        _idbStore.set(a, o);
+        _idbStore.set(i, o, function () {
+          n && setTimeout(n, 0);
+        });
       } else W(e, n);
     }
     function H(t) {
@@ -5666,7 +5732,8 @@ document.addEventListener("DOMContentLoaded", function () {
       var t = window.akiniContacts.getActiveChatId();
       if (!t) return null;
       var e = window.akiniContacts.getChatTarget(t);
-      return e && "contact" === e.type ? e.id : null;
+      if (!e) return t;
+      return ("group" !== e.type) ? (e.id || t) : null;
     }
     // 图片读取：依赖全局 FileReader 拦截做统一高质量压缩（1024px / JPEG 0.85），
     // 此处不再二次压缩，避免把头像/图片压到 360px 0.4 导致模糊（参考 milk 头像保留策略）
@@ -5908,8 +5975,14 @@ document.addEventListener("DOMContentLoaded", function () {
       try {
         var el = document.getElementById("akiniSplash");
         if (el) {
+          el.style.pointerEvents = "none";
           el.classList.add("hidden");
-          setTimeout(function () { try { if (el && el.parentNode) el.parentNode.removeChild(el); } catch (e) {} }, 520);
+          setTimeout(function () {
+            try {
+              el.style.display = "none";
+              if (el && el.parentNode) el.parentNode.removeChild(el);
+            } catch (e) {}
+          }, 300);
         }
       } catch (e) {}
       window.__akiniSplashDone = !0;
@@ -7984,46 +8057,76 @@ document.addEventListener("DOMContentLoaded", function () {
       if (t) {
         var e = J();
         N(e, function (n) {
-          ((t.innerHTML = ""),
-            0 === n.length &&
-              (t.innerHTML =
-                '<div style="width:100%; text-align:center; color:#999; font-size:13px; padding:20px;">暂无表情包，点击添加</div>'),
-            n.forEach(function (n, i) {
-              const a = document.createElement("div");
-              a.style.cssText = "position:relative;width:64px;height:64px;";
-              const o = document.createElement("img");
-              ((o.src = n),
-                (o.style.cssText =
-                  "width:64px;height:64px;object-fit:cover;border-radius:8px;"));
-              const r = document.createElement("button");
-              ((r.textContent = "✕"),
-                (r.style.cssText =
-                  "position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ff3b30;color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;"),
-                r.addEventListener("click", function () {
-                  N(e, function (t) {
-                    (t.splice(i, 1),
-                      P(e, t, function () {
-                        (ae(), me());
-                      }));
+          t.innerHTML = "";
+          if (!n || 0 === n.length) {
+            t.innerHTML = '<div style="width:100%; text-align:center; color:#999; font-size:13px; padding:20px;">暂无表情包，点击添加</div>';
+            return;
+          }
+          n.forEach(function (stickerSrc, i) {
+            const a = document.createElement("div");
+            a.style.cssText = "position:relative;width:64px;height:64px;flex-shrink:0;";
+            const o = document.createElement("img");
+            o.src = stickerSrc;
+            o.style.cssText = "width:64px;height:64px;object-fit:cover;border-radius:8px;pointer-events:none;display:block;";
+            const r = document.createElement("button");
+            r.type = "button";
+            r.className = "delete-sticker-btn";
+            r.setAttribute("aria-label", "删除表情包");
+            r.textContent = "✕";
+
+            var deleteLock = false;
+            function triggerDelete(ev) {
+              if (ev) {
+                try { ev.stopPropagation(); } catch (err) {}
+                try { ev.preventDefault(); } catch (err) {}
+              }
+              if (deleteLock) return;
+              deleteLock = true;
+              r.style.opacity = "0.5";
+              N(e, function (list) {
+                var arr = Array.isArray(list) ? list.slice() : [];
+                var targetIdx = i;
+                if (targetIdx < 0 || targetIdx >= arr.length || arr[targetIdx] !== stickerSrc) {
+                  targetIdx = arr.indexOf(stickerSrc);
+                }
+                if (targetIdx >= 0) {
+                  arr.splice(targetIdx, 1);
+                  P(e, arr, function () {
+                    ae();
+                    me();
                   });
-                }),
-                a.appendChild(o),
-                a.appendChild(r),
-                t.appendChild(a));
-            }));
+                } else {
+                  deleteLock = false;
+                  r.style.opacity = "1";
+                }
+              });
+            }
+
+            r.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); }, { passive: false });
+            r.addEventListener("touchstart", function (ev) { ev.stopPropagation(); }, { passive: false });
+            r.addEventListener("touchend", function (ev) {
+              triggerDelete(ev);
+            }, { passive: false });
+            r.addEventListener("click", function (ev) {
+              triggerDelete(ev);
+            });
+
+            a.appendChild(o);
+            a.appendChild(r);
+            t.appendChild(a);
+          });
         });
       }
     }
-    (ne &&
-      ne.addEventListener("click", function () {
-        const t = document.getElementById("stickerManagerOverlay");
-        t && (t.style.display = "none");
-      }),
-      ie &&
-        ie.addEventListener("click", function () {
-          const t = document.getElementById("stickerManagerOverlay");
-          t && (t.style.display = "none");
-        }));
+    function closeStickerManager() {
+      const t = document.getElementById("stickerManagerOverlay");
+      if (t) {
+        t.style.display = "none";
+        t.classList.remove("show");
+      }
+    }
+    ne && (ne.addEventListener("click", closeStickerManager), ne.addEventListener("touchend", closeStickerManager));
+    ie && (ie.addEventListener("click", closeStickerManager), ie.addEventListener("touchend", closeStickerManager));
     const oe = document.getElementById("emojiToggleBtn"),
       re = document.getElementById("emojiPanel");
     function hideEmojiPanel() {
@@ -8147,12 +8250,24 @@ document.addEventListener("DOMContentLoaded", function () {
           (this.value = ""));
       });
     const se = document.getElementById("deleteStickerBtn");
-    se &&
-      a(se, function () {
-        ((Y.style.display = "none"), (Y.style.pointerEvents = "none"));
-        const t = document.getElementById("stickerManagerOverlay");
-        t && ((t.style.display = "flex"), ae());
+    function openStickerManager() {
+      if (Y) {
+        Y.style.display = "none";
+        Y.style.pointerEvents = "none";
+      }
+      const t = document.getElementById("stickerManagerOverlay");
+      if (t) {
+        t.style.display = "flex";
+        t.classList.add("show");
+        ae();
+      }
+    }
+    if (se) {
+      a(se, openStickerManager);
+      se.addEventListener("click", function (ev) {
+        openStickerManager();
       });
+    }
     /* 清除聊天壁纸：恢复默认背景 */
     var clearWpBtn = document.getElementById("clearChatWallpaperBtn");
     clearWpBtn &&
@@ -15247,42 +15362,50 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!target) return;
         var myName = localStorage.getItem("akini_my_name") || "我";
         var taName = target.name || "对方";
-        var def = "";
-        try { def = localStorage.getItem("akini_poke_suffix") || ""; } catch (e) {}
-        var suffix = window.prompt(
-          "自定义拍一拍内容\n例如：拍了拍" + taName + "的肩膀\n\n将发送：" + myName + " ＋你填的内容",
-          def,
-        );
-        if (null === suffix) return;
-        suffix = String(suffix).trim();
-        if (!suffix) suffix = "拍了拍 " + taName;
-        try { localStorage.setItem("akini_poke_suffix", suffix); } catch (e) {}
-        var esc = function (x) {
-          return String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        var modal = document.getElementById("pokeSendModal");
+        var input = document.getElementById("pokeSendInput");
+        var preview = document.getElementById("pokeSendPreview");
+        if (!modal || !input) return;
+        // 打开弹窗：预填上次内容，实时预览「我 + 内容」（milk 式交互，akini 底部卡片风格）
+        var last = "";
+        try { last = localStorage.getItem("akini_poke_suffix") || ""; } catch (e) {}
+        input.value = last;
+        var updatePreview = function () {
+          var v = (input.value || "").trim() || "拍了拍 " + taName;
+          if (preview) preview.textContent = "将发送：" + myName + " " + v;
         };
-        var text = myName + " " + suffix;
-        var rowHtml =
-          '<div class="msg-row system"><div class="bubble">' + esc(text) + "</div></div>";
-        __akiniAppendMessageHTML(chatId, rowHtml, {
-          lastMsg: text,
-          lastSenderAvatar: window.getMyAvatar ? "" : "",
-          lastSenderName: myName,
-        });
-        S();
-        V();
-        b(chatId);
-        // 拍一拍对方后触发联系人回复（延迟与消息回复设置一致）
-        try {
-          var _pdMin = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2") || 2,
-              _pdMax = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5") || 5;
-          var _pokeDelay = (_pdMin + Math.random() * Math.max(0, _pdMax - _pdMin)) * 1000;
-          var _pokeReply = function () {
-            try { I(chatId, target, { type: "text", extra: {} }, false); } catch (e) {}
+        updatePreview();
+        input.oninput = updatePreview;
+        modal.style.display = "flex";
+        setTimeout(function () { try { input.focus(); } catch (e) {} }, 120);
+        var close = function () { modal.style.display = "none"; };
+        var cancelBtn = document.getElementById("pokeSendCancel");
+        var goBtn = document.getElementById("pokeSendGo");
+        if (cancelBtn) cancelBtn.onclick = close;
+        modal.onclick = function (e) { if (e.target === modal) close(); };
+        if (goBtn)
+          goBtn.onclick = function () {
+            var suffix = (input.value || "").trim();
+            if (!suffix) suffix = "拍了拍 " + taName;
+            try { localStorage.setItem("akini_poke_suffix", suffix); } catch (e) {}
+            close();
+            var esc = function (x) {
+              return String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            };
+            var text = myName + " " + suffix;
+            var rowHtml =
+              '<div class="msg-row system"><div class="bubble">' + esc(text) + "</div></div>";
+            __akiniAppendMessageHTML(chatId, rowHtml, {
+              lastMsg: text,
+              lastSenderAvatar: "",
+              lastSenderName: myName,
+            });
+            S();
+            V();
+            b(chatId);
+            // milk 核心：拍一拍后走完整回复时间线（已读→输入动态→打字→回复），与发消息一致
+            try { __akiniScheduleReply(chatId, null); } catch (e) {}
           };
-          if (window._akiniTimer && window._akiniTimer.schedule)
-            window._akiniTimer.schedule("pokeReply", _pokeReply, _pokeDelay);
-          else setTimeout(_pokeReply, _pokeDelay);
-        } catch (e) {}
       }),
       (window.taPoke = function (t) {
         if (!window.akiniContacts) return;
@@ -16275,7 +16398,8 @@ document.addEventListener("DOMContentLoaded", function () {
           if (ver !== "20261016") {
             localStorage.setItem("akini_app_version", "20261016");
             // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
-            localStorage.setItem("akini_toggle_contactPokeToggle", "1");
+            // 联系人拍一拍：默认关闭，需用户显式手动开启
+            localStorage.setItem("akini_toggle_contactPokeToggle", "0");
             // 联系人主动发朋友圈/发iCity：默认关闭，需用户手动开启才生效
             localStorage.setItem("akini_toggle_contactFriendsToggle", "0");
             localStorage.setItem("akini_toggle_contactIcityToggle", "0");
@@ -16657,7 +16781,7 @@ document.addEventListener("DOMContentLoaded", function () {
         t("readNoReplyToggle", !1),
         t("emojiMixToggle", !1),
         t("contactEmojiToggle", !1),
-        t("contactPokeToggle", !0),
+        t("contactPokeToggle", !1),
         t("contactTransferToggle", !1),
         (function(){
           try {

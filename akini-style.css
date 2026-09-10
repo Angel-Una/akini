@@ -135,13 +135,18 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: relative;
   flex: 1;
   width: 100%;
+  max-width: 414px;
+  margin: 0 auto;
+  box-sizing: border-box;
   min-height: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  /* 整体由 .middle-row 负责滚动，避免多层嵌套滚动器互相抢占 */
-  overflow: hidden;
-  overflow-x: hidden;
+  align-items: stretch;
+  /* 删掉首页中间位置独立滑动，整体平铺统一滚动 */
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
 .top-card {
@@ -259,17 +264,14 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .middle-row {
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   padding: 0 16px 12px;
-  flex: 1;
-  min-height: 0;
+  flex: none;
+  width: 100%;
+  box-sizing: border-box;
   align-items: flex-start;
-  overflow-x: hidden;
-  /* 应用/纪念日/聊天预览区统一滚动 */
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
+  /* 删掉首页中间位置独立滑动，全部平铺显示 */
+  overflow: visible !important;
   gap: 16px;
   /* 图二圈起内容上移 3px */
   margin-top: -3px;
@@ -280,9 +282,12 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   gap: 10px;
   flex-shrink: 0;
   margin-top: 2px;
-  margin-left: 17px;
+  margin-left: 0;
   width: 204px;
   align-self: stretch;
+  overflow: visible;
+  padding-bottom: 0;
+}
   min-height: 0;
   /* 由 .middle-row 统一滚动，避免嵌套滚动器 */
   overflow: visible;
@@ -2101,13 +2106,13 @@ body:not(.bubble-css-on)
 #msgContextMenu {
   position: fixed;
   z-index: 9000;
-  background: rgba(30, 30, 32, 0.94);
+  background: rgba(255, 255, 255, 0.97);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 20px;
   padding: 3px 5px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
@@ -2141,7 +2146,7 @@ body:not(.bubble-css-on)
   min-width: 36px;
   padding: 0;
   font-size: 0;
-  color: #f5f5f7;
+  color: #1a1a1a;
   cursor: pointer;
   border-radius: 18px;
   border: none;
@@ -2155,14 +2160,14 @@ body:not(.bubble-css-on)
   pointer-events: none;
 }
 #msgContextMenu .ctx-item:active {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.07);
   transform: scale(0.92);
 }
 #msgContextMenu .ctx-item.danger {
-  color: #ff5252;
+  color: #e5484d;
 }
 #msgContextMenu .ctx-item.danger:active {
-  background: rgba(255, 82, 82, 0.22);
+  background: rgba(229, 72, 77, 0.12);
 }
 #msgContextMenu .ctx-sep {
   display: none;
@@ -3229,6 +3234,34 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   width: 18px;
   height: 18px;
   accent-color: #2b2b2b;
+}
+.delete-sticker-btn {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #ff3b30;
+  color: #fff;
+  border: 2px solid #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  z-index: 10;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+.delete-sticker-btn::before {
+  content: "";
+  position: absolute;
+  inset: -10px;
 }
 .sticker-manager-overlay .manage-panel .manage-item.selected img {
   border-color: #2b2b2b;
@@ -5368,11 +5401,11 @@ button.back-btn[type="button"] {
   color: #888 !important;
   text-shadow: none !important;
 }
-/* v20260830ay: 首页红色圈起的应用区域可上下滚动（保留横向隐藏） */
+/* 删掉首页中间位置独立滑动：对齐 milk 与 mochi，全部平铺显示 */
 .middle-row {
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
+  overflow: visible !important;
+  -webkit-overflow-scrolling: auto;
+  overscroll-behavior: auto;
 }
 
 /* v20260828v 播放器与首页布局微调 */
