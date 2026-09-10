@@ -68,6 +68,8 @@
       wipeBtn.textContent = "正在清除…";
       // 全局清除标记：阻断一切 localStorage 写回与 IDB 备份，防止清除后数据复活
       try { window.__akiniWiping = true; } catch (e) {}
+      // 放行 AkiniPersist 的删除/清空拦截，否则 localStorage.clear() 会把 akini_ 关键数据全部保留下来，清除失败
+      try { window._akiniAllowRemove = true; } catch (e) {}
       // 保险丝 cookie：即使本次刷新前 IDB 没清完，下次启动会再清一轮
       try { document.cookie = "akini_wipe_pending=1;path=/;max-age=600"; } catch (e) {}
       var reloaded = false;

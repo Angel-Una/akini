@@ -155,6 +155,8 @@
           try {
             var lock = +(localStorage.getItem("akini_cloud_restore_lock") || 0);
             if (Date.now() - lock > 10 * 60 * 1000) {
+              // 用户已进入应用则不再自动刷新（恢复的数据已在内存，界面下次启动自然生效）
+              if (window.__akiniSplashDone) { console.warn("[云备份] 已进入应用，跳过恢复后刷新"); return; }
               localStorage.setItem("akini_cloud_restore_lock", String(Date.now()));
               location.reload();
             }

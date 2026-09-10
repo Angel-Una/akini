@@ -3353,92 +3353,8 @@ document.addEventListener("DOMContentLoaded", function () {
         E = x.some(function (t) {
           return "全体成员" === t || "all" === t;
         });
-      window.__akiniPendingReplyMap = window.__akiniPendingReplyMap || {};
-      var __pending = window.__akiniPendingReplyMap[r];
-      if (!__pending) {
-        __pending = { count: 0, memberId: __sendMemberId };
-        window.__akiniPendingReplyMap[r] = __pending;
-      }
-      __pending.count++;
-      __pending.memberId = __sendMemberId;
-      __pending.ts = Date.now();
-      __akiniPersistPendingReply();
-      // 连发合并：已有待执行的回复 timer 时只累加计数，一轮回复统一结清（防一条消息炸出多轮回复）
-      if (__pending.timer) return;
-      __pending.timer = setTimeout(function () {
-        try {
-          __pending.timer = null;
-          console.log("[sendMsg] setTimeout fired, calling I");
-          var __dbg = null;
-          if (__dbg) {
-            __dbg.style.display = "block";
-            __dbg.textContent = "准备回复…";
-          }
-          r === window.akiniContacts.getActiveChatId() &&
-            (l && (l.style.display = "none"),
-            h());
-          var t = c;
-          if (!t) {
-            if (__dbg) __dbg.textContent = "t 为空，无法回复";
-            __akiniOnReplyComplete(r);
-            return;
-          }
-          if ("group" === t.type) {
-            var e = t.memberIds || [];
-            if (0 === e.length) {
-              __akiniOnReplyComplete(t.id);
-              return;
-            }
-            var n = [];
-            E
-              ? (n = e.slice())
-              : x.length > 0
-                ? (e.forEach(function (t) {
-                    var e = window.akiniContacts.getChatTarget(t);
-                    e && x.indexOf(e.name) >= 0 && n.push(t);
-                  }),
-                  0 === n.length && (n = e.slice()))
-                : (n = e.slice());
-            var i = g() || "我",
-              a = v ? i : "",
-              o = v || k || "";
-            var _groupRepliesRemaining = n.length;
-            n.forEach(function (e, n) {
-              var i = 3e3 * Math.random() + 1500 * n;
-              setTimeout(function () {
-                var _r = w(t.id, e, { quoteText: o, quoteName: a, isGroup: !0 });
-                _groupRepliesRemaining--;
-                if (_groupRepliesRemaining <= 0) {
-                  __akiniOnReplyComplete(t.id);
-                }
-                false && _r &&
-                  _r.mentionSender &&
-                  "me" !== _r.mentionSender &&
-                  setTimeout(
-                    function () {
-                      w(t.id, _r.mentionSender, { isGroup: !0 });
-                    },
-                    1500 + 2e3 * Math.random(),
-                  );
-              }, i);
-            });
-            return;
-          }
-          window.I(t.id, t, __bh, true);
-          // I() 内部会异步逐条发送，真正的完成在 sendMessageAt 末尾调用 __akiniOnReplyComplete
-        } catch (t) {
-          console.error("sendMsg reply error:", t);
-          // 出错也要释放 pending，避免输入动态卡住
-          __akiniOnReplyComplete(r);
-          try {
-            var __dbg = null;
-            if (__dbg) {
-              __dbg.style.display = "block";
-              __dbg.textContent = "回复出错: " + ((t && t.message) || t);
-            }
-          } catch (e) {}
-        }
-      }, __typingDelay + p);
+      // 对齐 milk：每次发送消息清空之前的回复等待 timer 并重新计时（debounce），到点回复一轮
+      __akiniScheduleReply(r, __sendMemberId);
     }
     function _() {
       return window.AKR ? window.AKR.pickReplyBehavior() : { type: "text" };
@@ -3571,13 +3487,69 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) {}
     }
     function __akiniOnReplyComplete(t) {
-      // 一轮回复结清该聊天全部未回：一轮最多 getReplyCount()(1-3) 条，绝不按用户消息数翻倍
+      // 对齐 milk：一轮回复结清该聊天的待回复状态，隐藏输入中动画
       var pending = window.__akiniPendingReplyMap && window.__akiniPendingReplyMap[t];
       if (pending) {
+        if (pending.timer) { clearTimeout(pending.timer); pending.timer = null; }
         delete window.__akiniPendingReplyMap[t];
         __akiniPersistPendingReply();
       }
       hideTypingBubble(t);
+    }
+    // 对齐 milk 的调度器：每次用户发送消息（单发或连发），清除上一次等待的 timer（debounce），重新计时并在到点后回复一轮（1~3句）
+    function __akiniScheduleReply(chatId, memberId, delayOverride) {
+      if (!chatId || !window.akiniContacts) return;
+      if (!window.__akiniToggleOn || !window.__akiniToggleOn("contactReplyToggle", true)) return;
+      var target = window.akiniContacts.getChatTarget(chatId);
+      if (!target) return;
+
+      window.__akiniPendingReplyMap = window.__akiniPendingReplyMap || {};
+      var pending = window.__akiniPendingReplyMap[chatId];
+      if (!pending) {
+        pending = { count: 1, memberId: memberId || null };
+        window.__akiniPendingReplyMap[chatId] = pending;
+      } else {
+        pending.count++;
+        if (memberId) pending.memberId = memberId;
+      }
+      pending.ts = Date.now();
+      __akiniPersistPendingReply();
+
+      // milk 核心：每次发送消息如果之前有正在等待回复的 timer，立即 clearTimeout 重新计时！
+      if (pending.timer) {
+        clearTimeout(pending.timer);
+        pending.timer = null;
+      }
+
+      var o = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
+          r = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
+      if (!(o >= 0)) o = 2;
+      if (!(r >= o)) r = Math.max(o, 5);
+      var randomDelay = 1e3 * o + Math.random() * Math.max(0, 1e3 * (r - o));
+      var finalDelay = typeof delayOverride === "number" ? delayOverride : randomDelay;
+
+      // milk：回复等待期间如果激活当前会话，显示输入动态
+      if (chatId === window.akiniContacts.getActiveChatId()) {
+        showTypingBubble(chatId, "group" === target.type ? (target.memberIds || [])[0] : null);
+      }
+
+      pending.timer = setTimeout(function () {
+        pending.timer = null;
+        try {
+          var currentTarget = window.akiniContacts.getChatTarget(chatId);
+          if (!currentTarget) { __akiniOnReplyComplete(chatId); return; }
+          var n = _();
+          if ("none" === n.type) {
+            // 已读不回
+            __akiniOnReplyComplete(chatId);
+            return;
+          }
+          I(chatId, currentTarget, n, true);
+        } catch (err) {
+          console.error("[Akini] reply error:", err);
+          __akiniOnReplyComplete(chatId);
+        }
+      }, finalDelay);
     }
     function b(t) {
       if (we && we.active) return;
@@ -3591,15 +3563,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try { hideTypingBubble(t); } catch (e) {}
         return;
       }
-      // 45 秒全局节流：同一聊天 45 秒内只允许一轮回复（catchUp 15s 周期/启动恢复/手动触发并发在此拦截）
-      var __lrB = (window.__akiniLastReplyRun = window.__akiniLastReplyRun || {});
-      var __nowB = Date.now();
-      if (__lrB[t] && __nowB - __lrB[t] < 45000) {
-        console.log("[b] 45秒内已有回复轮次，结清 pending 丢弃重复调度", t);
-        try { __akiniOnReplyComplete(t); } catch (e0) {}
-        return;
-      }
-      __lrB[t] = __nowB;
+// 对齐 milk：移除 45 秒节流，只要有待回复正常执行回复
       const e = window.akiniContacts.getChatTarget(t);
       if (!e) return;
       const n = _();
@@ -3775,17 +3739,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
       if ((e || (e = window.akiniContacts.getChatTarget(t)), !e)) return;
-      // 全局节流：同一聊天 45 秒内只允许一轮回复/主动消息，防止定时器堆积集中爆发刷屏
-      if (!isUserReply) {
-        var __lr = (window.__akiniLastReplyRun = window.__akiniLastReplyRun || {});
-        var __nowTs = Date.now();
-        if (__lr[t] && __nowTs - __lr[t] < 45000) {
-          console.log("[I] 距上一轮不足45秒，跳过（防堆积爆发）");
-          try { hideTypingBubble(t); } catch (_e) {}
-          return;
-        }
-        __lr[t] = __nowTs;
-      }
+// 对齐 milk：移除 45 秒节流，只要用户发消息，延时到点正常回复
       const i = (
           window._akiniAv ||
           (window._akiniAv = function (v, s) {
@@ -5898,7 +5852,7 @@ document.addEventListener("DOMContentLoaded", function () {
       Q = document.getElementById("menuBg");
     // ========== 开屏动画：进度条 + 收尾隐藏 ==========
     window.__akiniSplashProgress = 0;
-    window.__akiniSplashDone = !1;
+    if (typeof window.__akiniSplashDone === "undefined") window.__akiniSplashDone = !1; // 重复初始化不得重置，否则已点「进入」会被翻回未进入
     window.__akiniSplashStartAt = Date.now();
     window.__akiniSplashMinMs = 3000; // 固定 3s 引导加载，确保核心数据准备完成
     window.__akiniSetSplashProgress = function (p, statusText) {
@@ -5929,16 +5883,17 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       } catch (e) {}
     };
+    // 防弹版：DOM 移除优先、互不阻塞，任何一步异常都不影响「进入」生效
     window.__akiniHideSplash = function () {
+      try { window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100); } catch (e) {}
       try {
-        if (window.__akiniSplashDone) return;
-        window.__akiniSplashDone = !0;
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
         var el = document.getElementById("akiniSplash");
-        if (!el) return;
-        el.classList.add("hidden");
-        setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 520);
+        if (el) {
+          el.classList.add("hidden");
+          setTimeout(function () { try { if (el && el.parentNode) el.parentNode.removeChild(el); } catch (e) {} }, 520);
+        }
       } catch (e) {}
+      window.__akiniSplashDone = !0;
     };
     // 绑定手动进入按钮：加载完成前不隐藏，点击后才进入主界面
     (function bindSplashEnter() {
@@ -5950,6 +5905,7 @@ document.addEventListener("DOMContentLoaded", function () {
     })();
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
+      try { window.__akiniBootApp = __akiniBootApp; } catch (e) {}
       window.__akiniBooted = !0;
       setTimeout(function () {
         window._restoringData = !1;
@@ -7634,18 +7590,199 @@ document.addEventListener("DOMContentLoaded", function () {
             const e = new FileReader();
             ((e.onload = function (t) {
               h();
-              const e = document.createElement("div");
-              ((e.className = "msg-row me"),
-                (e.innerHTML = `<div class="msg-content-line"><div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;"><img src="${t.target.result}" style="max-width:160px;max-height:200px;border-radius:10px;display:block;"></div><div class="msg-avatar">${f()}</div></div>${d("right")}`),
-                U.appendChild(e),
-                (U.scrollTop = U.scrollHeight),
-                S());
+              window.__akiniSendImageDataUrl &&
+                window.__akiniSendImageDataUrl(t.target.result);
             }),
               e.readAsDataURL(t));
           }),
-          (this.value = ""),
-          b());
+          (this.value = ""));
       }));
+    /* ===== 连发消息与图片发送（完全对齐 milk 交互与回复逻辑） ===== */
+    window.__akiniRenderUserText = function (text) {
+      if (!text || !window.akiniContacts) return;
+      var chatId = window.akiniContacts.getActiveChatId();
+      if (!chatId) return;
+      var o = document.createElement("div");
+      o.className = "msg-row me";
+      o.innerHTML =
+        '<div class="msg-content-line"><div class="bubble">' +
+        rt(text) +
+        '</div><div class="msg-avatar">' +
+        f() +
+        "</div></div>" +
+        d("right");
+      __akiniAppendMessageHTML(chatId, o.outerHTML, {
+        lastMsg: text,
+        lastSenderAvatar: f() || "👤",
+        lastSenderName: g() || "我",
+      });
+      S();
+      V();
+      try { if (window.akiniTaPhoneCollectChat) window.akiniTaPhoneCollectChat(chatId, text, Date.now()); } catch (e) {}
+    };
+
+    window.__akiniSendImageDataUrl = function (dataUrl, skipReply) {
+      if (!dataUrl || !window.akiniContacts) return;
+      var chatId = window.akiniContacts.getActiveChatId();
+      if (!chatId) return;
+      var e = document.createElement("div");
+      e.className = "msg-row me";
+      e.innerHTML =
+        '<div class="msg-content-line"><div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;"><img src="' +
+        dataUrl +
+        '" style="max-width:160px;max-height:200px;border-radius:10px;display:block;"></div><div class="msg-avatar">' +
+        f() +
+        "</div></div>" +
+        d("right");
+      if (U) {
+        U.appendChild(e);
+        U.scrollTop = U.scrollHeight;
+        S();
+        V();
+      }
+      if (!skipReply) {
+        var _tgt = window.akiniContacts.getChatTarget(chatId);
+        var _mid = _tgt && "group" === _tgt.type ? (_tgt.memberIds || [])[0] : null;
+        __akiniScheduleReply(chatId, _mid);
+      }
+    };
+
+    var __batchItems = [];
+    function __batchRender() {
+      var list = document.getElementById("batchSendList");
+      if (!list) return;
+      list.innerHTML = "";
+      if (!__batchItems.length) {
+        list.innerHTML =
+          '<div style="text-align:center;color:#bbb;padding:36px 0;font-size:13px;line-height:1.8">还没有内容<br>点击下方按钮添加文字或图片，按顺序逐条发出</div>';
+      }
+      __batchItems.forEach(function (item, idx) {
+        var row = document.createElement("div");
+        row.style.cssText =
+          "display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;background:#fff;border-radius:12px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.05)";
+        var num = document.createElement("div");
+        num.style.cssText =
+          "flex-shrink:0;width:20px;height:20px;border-radius:50%;background:#1a1a1a;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;margin-top:8px";
+        num.textContent = idx + 1;
+        row.appendChild(num);
+        if (item.type === "image") {
+          var img = document.createElement("img");
+          img.src = item.dataUrl;
+          img.style.cssText =
+            "flex-shrink:1;width:72px;height:72px;object-fit:cover;border-radius:8px;background:#eee";
+          row.appendChild(img);
+        } else {
+          var ta = document.createElement("textarea");
+          ta.value = item.text || "";
+          ta.placeholder = "输入第 " + (idx + 1) + " 条消息…";
+          ta.rows = 1;
+          ta.style.cssText =
+            "flex:1;min-width:0;border:none;outline:0;resize:none;font-size:15px;color:#222;background:transparent;line-height:1.5;padding:6px 0;font-family:inherit";
+          ta.addEventListener("input", function () {
+            item.text = ta.value;
+            ta.style.height = "auto";
+            ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
+            __batchSyncGo();
+          });
+          row.appendChild(ta);
+        }
+        var del = document.createElement("button");
+        del.type = "button";
+        del.textContent = "✕";
+        del.style.cssText =
+          "flex-shrink:0;background:#f0f0f0;border:none;color:#999;width:24px;height:24px;border-radius:50%;font-size:11px;cursor:pointer;margin-top:6px";
+        del.addEventListener("click", function () {
+          __batchItems.splice(idx, 1);
+          __batchRender();
+        });
+        row.appendChild(del);
+        list.appendChild(row);
+      });
+      __batchSyncGo();
+      list.scrollTop = list.scrollHeight;
+    }
+    function __batchSyncGo() {
+      var goBtn = document.getElementById("batchSendGo");
+      if (!goBtn) return;
+      var n = __batchItems.filter(function (it) {
+        return it.type === "image" ? !!it.dataUrl : !!(it.text || "").trim();
+      }).length;
+      goBtn.textContent = n > 0 ? "发送 (" + n + ")" : "发送";
+      goBtn.style.opacity = n > 0 ? "1" : "0.4";
+      goBtn.style.pointerEvents = n > 0 ? "auto" : "none";
+    }
+    window.__akiniOpenBatchSend = function () {
+      var m = document.getElementById("batchSendModal");
+      if (!m) return;
+      if (!__batchItems.length) __batchItems.push({ type: "text", text: "" });
+      __batchRender();
+      m.style.display = "flex";
+    };
+    (function () {
+      var modal = document.getElementById("batchSendModal");
+      if (!modal) return;
+      var cancel = document.getElementById("batchSendCancel");
+      var go = document.getElementById("batchSendGo");
+      var addText = document.getElementById("batchAddText");
+      var imgInput = document.getElementById("batchImageInput");
+      cancel &&
+        cancel.addEventListener("click", function () {
+          modal.style.display = "none";
+        });
+      addText &&
+        addText.addEventListener("click", function () {
+          __batchItems.push({ type: "text", text: "" });
+          __batchRender();
+        });
+      imgInput &&
+        imgInput.addEventListener("change", function () {
+          var files = Array.from(this.files || []);
+          var left = files.length;
+          if (!left) return;
+          files.forEach(function (file) {
+            var rd = new FileReader();
+            rd.onload = function (ev) {
+              __batchItems.push({ type: "image", dataUrl: ev.target.result });
+              if (--left === 0) __batchRender();
+            };
+            rd.readAsDataURL(file);
+          });
+          this.value = "";
+        });
+      go &&
+        go.addEventListener("click", function () {
+          var queue = __batchItems.filter(function (it) {
+            return it.type === "image" ? !!it.dataUrl : !!(it.text || "").trim();
+          });
+          if (!queue.length) return;
+          modal.style.display = "none";
+          __batchItems = [];
+          var chatId = window.akiniContacts && window.akiniContacts.getActiveChatId();
+          if (!chatId) return;
+
+          // milk 核心：连发消息按每条 300ms 间隔依次发出
+          queue.forEach(function (it, idx) {
+            setTimeout(function () {
+              try {
+                if (it.type === "image") {
+                  window.__akiniSendImageDataUrl(it.dataUrl, true);
+                } else {
+                  window.__akiniRenderUserText(it.text.trim());
+                }
+              } catch (e) { console.error("[batchSend]", e); }
+            }, idx * 300);
+          });
+
+          // milk 核心：在所有批量消息全部发出后（queue.length * 300 + randomDelay），触发一轮回复（1~3句）
+          var o = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
+              r = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
+          if (!(o >= 0)) o = 2;
+          if (!(r >= o)) r = Math.max(o, 5);
+          var randomDelay = 1e3 * o + Math.random() * Math.max(0, 1e3 * (r - o));
+          var totalWait = queue.length * 300 + randomDelay;
+          __akiniScheduleReply(chatId, null, totalWait);
+        });
+    })();
     const Ft = document.getElementById("chatMoreBtn"),
       qt = document.getElementById("dismissGroupBtn"),
       jt = document.getElementById("changeGroupAvatarBtn");
@@ -7920,6 +8057,8 @@ document.addEventListener("DOMContentLoaded", function () {
           } else if ("image" === n) {
             var ib = document.getElementById("fileInputImageSend");
             ib && ib.click();
+          } else if ("batch" === n) {
+            window.__akiniOpenBatchSend && window.__akiniOpenBatchSend();
           } else if ("poke" === n) {
             window.__akiniSendPoke && window.__akiniSendPoke();
           } else if ("survey" === n) {
@@ -16317,6 +16456,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         var sanitized = { app: t.app || "Akini", name: title, msg: body, onTap: t.onTap, groupName: t.groupName, avatar: t.avatar || t.appIcon || "", appIcon: t.appIcon || "", chatId: t.chatId || "", ts: t.ts || Date.now(), fullContent: t.fullContent };
         o && o(sanitized);
+        // 通知前强制落盘：保活后台触发的消息若只写内存，iOS 杀页后会出现「通知到了、点进去没内容」
+        try { if (window._flushAllData) window._flushAllData(); } catch (e) {}
         var e = document.getElementById("pushNotifyToggle"),
           n =
             e &&
@@ -16351,10 +16492,28 @@ document.addEventListener("DOMContentLoaded", function () {
               } catch (e) { fallbackNotify(); }
             };
 
+            // SW 通知点击跳转：系统通知经 SW 展示时 onTap 会丢失，由 SW notificationclick 回填
+            try {
+              if (!window.__akiniNotifTapBound && navigator.serviceWorker) {
+                window.__akiniNotifTapBound = true;
+                navigator.serviceWorker.addEventListener("message", function (ev) {
+                  var d = ev && ev.data;
+                  if (!d || d.type !== "AKINI_NOTIF_TAP") return;
+                  try {
+                    if (d.app === "信箱") {
+                      if (window.o) window.o("mail");
+                      if (window.__mailShowTab) window.__mailShowTab("received");
+                    } else if (d.chatId && window.openChat) {
+                      window.openChat(d.chatId);
+                    }
+                  } catch (e) {}
+                });
+              }
+            } catch (e) {}
             window.__akiniSystemNotify(i, {
               body: body,
               icon: "./favicon.png",
-              tag: "akini_" + (sanitized.chatId || "msg") + "_" + (sanitized.ts || Date.now()),
+              tag: "akini_" + (sanitized.app || "消息") + "_" + (sanitized.chatId || "") + "_" + (sanitized.ts || Date.now()),
               renotify: true,
             }, function () { t.onTap && t.onTap(); });
           } catch (t) {}

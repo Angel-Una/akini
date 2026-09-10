@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20260910zk';
+const CACHE_NAME = 'akini-cache-v20260910zd';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -98,26 +98,34 @@ self.addEventListener('push', function(event) {
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
+  // 解析 tag（akini_<app>_<chatId>_<ts>），点击后让页面跳转到对应聊天/信箱
+  var payload = { type: 'AKINI_NOTIF_TAP', app: '', chatId: '', ts: 0 };
+  try {
+    var m = String(event.notification && event.notification.tag || '').match(/^akini_([^_]+)_([^_]*)_(\d+)$/);
+    if (m) { payload.app = m[1]; payload.chatId = m[2]; payload.ts = +m[3] || 0; }
+  } catch(e){}
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
         if (client.url && client.url.indexOf('/akini') > -1) {
-          client.focus();
-          return;
+          try { client.postMessage(payload); } catch(e){}
+          return client.focus();
         }
       }
-      self.clients.openWindow('./akini.html');
+      return self.clients.openWindow('./akini.html');
     }).catch(function() {
-      self.clients.openWindow('./akini.html');
+      return self.clients.openWindow('./akini.html');
     })
   );
 });
 
 self.addEventListener('message', function(event){
   if(event.data && event.data.type === 'GET_CACHE_NAME'){
+    // 页面端通过 navigator.serviceWorker.addEventListener('message') 接收，需回 {type:'CACHE_NAME', name}
+    try { if (event.source && event.source.postMessage) event.source.postMessage({ type: 'CACHE_NAME', name: CACHE_NAME }); } catch(e){}
     if(event.ports && event.ports[0]){
-      event.ports[0].postMessage({cacheName: CACHE_NAME});
+      event.ports[0].postMessage({ type: 'CACHE_NAME', name: CACHE_NAME, cacheName: CACHE_NAME });
     }
   }
 });

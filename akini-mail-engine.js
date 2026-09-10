@@ -23,15 +23,24 @@
     try { return parseInt(localStorage.getItem("akini_mail_last_active") || "0", 10) || 0; } catch (e) { return 0; }
   }
 
+  // akiniStore.getSync 返回的是原始存储值（JSON 字符串或 null），直接 push 会抛 TypeError，
+  // 这正是「主动写信到点永远收不到」的根因——必须统一解析成数组
+  function _asArr(v) {
+    if (!v) return [];
+    if (typeof v === "string") {
+      try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+    }
+    return Array.isArray(v) ? v : [];
+  }
   function getSent() {
-    return window.akiniStore && window.akiniStore.getSync
+    return _asArr(window.akiniStore && window.akiniStore.getSync
       ? window.akiniStore.getSync("akini_mail_sent", [])
-      : [];
+      : []);
   }
   function getReceived() {
-    return window.akiniStore && window.akiniStore.getSync
+    return _asArr(window.akiniStore && window.akiniStore.getSync
       ? window.akiniStore.getSync("akini_mail_received", [])
-      : [];
+      : []);
   }
   function saveSent(arr) {
     var n = JSON.stringify(arr || []);
@@ -165,12 +174,13 @@
       try { localStorage.removeItem("akini_next_mailAutoSend"); } catch (e) {}
       delay = minMs + Math.random() * Math.max(0, maxMs - minMs);
     } else if (lastSent > 0 && now0 - lastSent >= minMs) {
-      delay = 8000 + Math.floor(Math.random() * 15000);
+      // syy 式实体化：离线错过立即补发，进应用 1.5~3.5s 内送达
+      delay = 1500 + Math.floor(Math.random() * 2000);
     } else {
       // 跨重启续跑：已有未到期计划按剩余时间继续；已过期则尽快补发
       var existing = parseFloat(localStorage.getItem("akini_next_mailAutoSend") || "0");
       if (existing) {
-        delay = existing > now0 ? (existing - now0) : (8000 + Math.floor(Math.random() * 15000));
+        delay = existing > now0 ? (existing - now0) : (1500 + Math.floor(Math.random() * 2000));
       } else {
         var target = (lastSent > 0 ? lastSent : now0) + minMs + Math.random() * Math.max(0, maxMs - minMs);
         delay = Math.max(5000, target - now0);
@@ -184,10 +194,13 @@
           manageAutoSendTimer();
           return;
         }
-        // 防连发：距上次来信不足最小间隔的 80% 则顺延
+        // 防连发：距上次来信不足最小间隔的 80% 则顺延到「上次来信+最小间隔」再试
+        // （原来直接 manageAutoSendTimer() 重排会算出秒级补发延迟，定时器空转死循环）
         var _lastRun = parseFloat(localStorage.getItem("akini_mail_last_sent") || "0");
         if (_lastRun > 0 && Date.now() - _lastRun < minMs * 0.8) {
-          manageAutoSendTimer();
+          var _wait = Math.max(60000, _lastRun + minMs - Date.now());
+          try { localStorage.setItem("akini_next_mailAutoSend", String(Date.now() + _wait)); } catch (e) {}
+          autoTimer = setTimeout(function () { manageAutoSendTimer(); }, _wait);
           return;
         }
         var contacts = window.akiniContacts ? window.akiniContacts.getContacts() : [];
