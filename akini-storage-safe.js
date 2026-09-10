@@ -112,6 +112,8 @@
   var _idbFlushTimer = null;
   function flushIdbQueue() {
     _idbFlushTimer = null;
+    // 清除数据期间：丢弃队列，绝不再写 IDB（否则 clearAll 之后队列落盘导致数据复活）
+    if (window.__akiniWiping) { _idbQueue = {}; return; }
     var keys = Object.keys(_idbQueue);
     if (!keys.length) return;
     var IDB = getIDB();
@@ -126,7 +128,10 @@
     });
   }
   function scheduleIdbFlush() { if (!_idbFlushTimer) _idbFlushTimer = setTimeout(flushIdbQueue, 500); }
-  function queueIdbWrite(k, v) { _idbQueue[k] = v == null ? null : String(v); scheduleIdbFlush(); }
+  function queueIdbWrite(k, v) {
+    if (window.__akiniWiping) return; // 清除数据期间禁止入队
+    _idbQueue[k] = v == null ? null : String(v); scheduleIdbFlush();
+  }
   try {
     document.addEventListener('visibilitychange', function () { if (document.hidden) flushIdbQueue(); });
     window.addEventListener('pagehide', flushIdbQueue);
@@ -282,7 +287,17 @@
     memoryGet: memGet,
     memorySet: memSet,
     memoryRemove: memRemove,
-    memoryKeys: function () { return Object.keys(memoryCache); }
+    memoryKeys: function () { return Object.keys(memoryCache); },
+    // 清除数据专用：清空内存镜像 + IDB 待写队列 + 启动前暂存 + 脏键集合，
+    // 防止清除后内存/队列里的旧数据在刷新前的间隙被重新落盘
+    wipeMemory: function () {
+      try { memoryCache = {}; } catch (e) {}
+      try { _idbQueue = {}; } catch (e) {}
+      try { _preRestorePending = {}; } catch (e) {}
+      try { _reconciledKeys = {}; } catch (e) {}
+      try { _lsDirty = {}; lsDirtySave(); } catch (e) {}
+      try { if (_idbFlushTimer) { clearTimeout(_idbFlushTimer); _idbFlushTimer = null; } } catch (e) {}
+    }
   };
 
   // ---- 拦截 localStorage 写入：先原始写入（绝不被中断），再镜像内存+IDB ----
@@ -308,6 +323,8 @@
         } catch (e) { return null; }
       };
       lsProto.setItem = function (k, v) {
+        // 清除数据期间：akini_ 键一律拒写（含原始 LS 层），杜绝清完复活
+        if (window.__akiniWiping && k && String(k).indexOf('akini_') === 0) return;
         var sv = String(v);
         var big = self.isCritical(k) && self.isBigVal(sv);
         var ok = true;

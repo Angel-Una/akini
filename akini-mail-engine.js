@@ -123,10 +123,15 @@
       for (var d = 0; d < delivered.length; d++) {
         var s2 = delivered[d];
         if (window.showInAppNotif) {
+          // 头像实时从联系人取：预约时存的 replyAvatar 可能是换头像前的旧值
+          var _rc = null;
+          try { if (window.akiniContacts && s2.replyFromId) _rc = window.akiniContacts.getChatTarget(s2.replyFromId); } catch (e) {}
+          var _rava = (_rc && _rc.avatar && String(_rc.avatar).trim()) || s2.replyAvatar || "";
           window.showInAppNotif({
             app: "信箱",
             appIcon: "✉️",
-            avatar: window.nt ? window.nt(s2.replyAvatar, 40) : "",
+            avatar: window.nt ? window.nt(_rava, 40) : "",
+            chatId: s2.replyFromId || "",
             name: s2.replyFromName || "对方",
             fullContent: true,
             msg: (s2.replyFromName || "对方") + "回复了你的信件",
@@ -224,6 +229,7 @@
             app: "信箱",
             appIcon: "✉️",
             avatar: window.nt ? window.nt(c.avatar, 40) : "",
+            chatId: c.id || "",
             name: c.name,
             fullContent: true,
             msg: c.name + "给你写了一封信",

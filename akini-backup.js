@@ -182,15 +182,50 @@
     }
   }
 
+  // 派生/快照键：不进入备份文件——它们是运行时自动再生的冗余副本，
+  // 导入旧快照反而会覆盖新数据；真正的 _backup 数据键（如完整聊天记录）不在此列
+  function isDerivedKey(k) {
+    return (
+      /^snap2?_/.test(k) ||
+      k === "akini_localstorage_snapshot" ||
+      k === "akini_localstorage_snapshot_backup" ||
+      k === "akini_idb_full_snapshot" ||
+      k === "akini_ls_dirty"
+    );
+  }
+
   function collectLocalStorageSync() {
     var data = {};
+    // 1) localStorage 全量（拦截层对关键键返回内存权威值）
     try {
       for (var i = 0; i < localStorage.length; i++) {
         var key = localStorage.key(i);
-        if (!key) continue;
+        if (!key || isDerivedKey(key)) continue;
         try {
-          data[key] = localStorage.getItem(key);
+          var v = localStorage.getItem(key);
+          if (v != null) data[key] = v;
         } catch (e) {}
+      }
+    } catch (e) {}
+    // 2) 内存镜像补充：大键（>200KB 图片/完整聊天记录）被配额策略移出 LS，只存在内存/IDB
+    try {
+      if (window.akiniStore && window.akiniStore.memoryKeys && window.akiniStore.memoryGet) {
+        window.akiniStore.memoryKeys().forEach(function (k) {
+          if (!k || isDerivedKey(k)) return;
+          var mv = window.akiniStore.memoryGet(k);
+          if (mv != null && mv !== "") data[k] = mv; // 内存为权威层，覆盖 LS 残留旧值
+        });
+      }
+    } catch (e) {}
+    // 3) sessionStorage 应急副本补缺（仅补缺失，不覆盖）
+    try {
+      for (var j = 0; j < sessionStorage.length; j++) {
+        var sk = sessionStorage.key(j);
+        if (!sk || sk.indexOf("akini_") !== 0 || isDerivedKey(sk)) continue;
+        if (data[sk] == null || data[sk] === "") {
+          var sv = sessionStorage.getItem(sk);
+          if (sv != null && sv !== "") data[sk] = sv;
+        }
       }
     } catch (e) {}
     return data;
@@ -207,7 +242,8 @@
         if (idbData && typeof idbData === "object") {
           for (var k in idbData) {
             if (!Object.prototype.hasOwnProperty.call(idbData, k)) continue;
-            if (/snapshot|_backup|_cache/i.test(k)) continue;
+            // 只剔除派生快照键；_backup/_cache 结尾的真实数据键全量保留（可能存有唯一完整副本）
+            if (isDerivedKey(k)) continue;
             filtered[k] = idbData[k];
           }
         }
@@ -230,6 +266,8 @@
       var idbOut = {};
       for (var k2 in idbData) {
         if (!Object.prototype.hasOwnProperty.call(idbData, k2)) continue;
+        // LS/内存为运行期权威：已覆盖的键跳过 IDB 版本；IDB 独有的键（含 _backup 完整副本）全部收录
+        if (lsData[k2] != null) continue;
         idbOut[k2] = processLocalStorageValueForExport(idbData[k2], state);
       }
       done({
@@ -467,12 +505,17 @@
 
   function applyBackupToStorage(data, done, errCb) {
     window._restoringData = true;
+    // 放行 AkiniPersist 的 clear/removeItem 拦截，确保旧数据被真正清空
+    try { window._akiniAllowRemove = true; } catch (e) {}
+    // 清空内存镜像 + IDB 待写队列：旧内存值会在拦截读取时遮蔽导入的新值
+    try { if (window.akiniStore && window.akiniStore.wipeMemory) window.akiniStore.wipeMemory(); } catch (e) {}
     var lsRaw = (data && data.localStorage) || {};
     var idbRaw = (data && data.indexedDB) || {};
     var mediaStore = (data && data.mediaStore) || {};
     var backupKeyCount = Object.keys(lsRaw).length + Object.keys(idbRaw).length;
     if (backupKeyCount === 0) {
       window._restoringData = false;
+      try { window._akiniAllowRemove = false; } catch (e) {}
       if (errCb) errCb("备份文件为空，未导入任何数据");
       return;
     }
@@ -495,14 +538,22 @@
     function writeAll() {
       var count = 0;
       var pending = 0;
+      var finished = false;
+      function finishOk() {
+        if (finished) return;
+        finished = true;
+        // 写入完成：落盘防抖队列立即冲刷，随后恢复拦截开关并回调（由调用方刷新页面）
+        try { if (window.akiniStore && window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (e) {}
+        try { window._akiniAllowRemove = false; } catch (e) {}
+        if (done) done(count);
+      }
 
       function tryWrite(key, value) {
         if (value === null || value === undefined) return;
-        if (key === "akini_localstorage_snapshot" || key === "akini_localstorage_snapshot_backup")
-          return;
+        if (isDerivedKey(key)) return; // 快照/派生键不导入，运行时自动再生
         count++;
         pending++;
-        // localStorage 兜底
+        // localStorage 兜底（拦截层同步镜像到内存 + IDB 队列）
         try {
           localStorage.setItem(key, value);
         } catch (e) {}
@@ -511,7 +562,7 @@
           if (window._idbStore && window._idbStore.set) {
             window._idbStore.set(key, value, function () {
               pending--;
-              if (pending === 0 && done) done(count);
+              if (pending === 0) finishOk();
             });
           } else {
             pending--;
@@ -519,7 +570,7 @@
         } catch (e) {
           pending--;
         }
-        if (pending === 0 && done) done(count);
+        if (pending === 0) finishOk();
       }
 
       for (var key in lsRaw) {
@@ -532,25 +583,32 @@
         var v2 = processLocalStorageValueForImport(idbRaw[k2], mediaStore);
         tryWrite(k2, v2);
       }
-      if (pending === 0 && done) done(count);
+      if (pending === 0) finishOk();
     }
 
-    // 清空旧数据
+    // 清空旧数据（localStorage + sessionStorage + IndexedDB 三层全清，防止旧数据混入）
     try {
       localStorage.clear();
     } catch (e) {}
+    try {
+      sessionStorage.clear();
+    } catch (e) {}
+    var importFail = function (msg) {
+      restoreRollback();
+      window._restoringData = false;
+      try { window._akiniAllowRemove = false; } catch (e) {}
+      if (errCb) errCb(msg);
+    };
     if (window._idbStore && window._idbStore.clearAll) {
       try {
         window._idbStore.clearAll(function () {
-          try { writeAll(); } catch (e) { restoreRollback(); window._restoringData = false; if (errCb) errCb("导入写入失败：" + e.message); }
+          try { writeAll(); } catch (e) { importFail("导入写入失败：" + e.message); }
         });
       } catch (e) {
-        restoreRollback();
-        window._restoringData = false;
-        if (errCb) errCb("清空旧数据失败：" + e.message);
+        importFail("清空旧数据失败：" + e.message);
       }
     } else {
-      try { writeAll(); } catch (e) { restoreRollback(); window._restoringData = false; if (errCb) errCb("导入写入失败：" + e.message); }
+      try { writeAll(); } catch (e) { importFail("导入写入失败：" + e.message); }
     }
   }
 

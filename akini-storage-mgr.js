@@ -70,7 +70,9 @@
       try { window.__akiniWiping = true; } catch (e) {}
       // 放行 AkiniPersist 的删除/清空拦截，否则 localStorage.clear() 会把 akini_ 关键数据全部保留下来，清除失败
       try { window._akiniAllowRemove = true; } catch (e) {}
-      // 保险丝 cookie：即使本次刷新前 IDB 没清完，下次启动会再清一轮
+      // 立即清空内存镜像 + IDB 待写队列，防止刷新前的间隙旧数据被重新落盘
+      try { if (window.akiniStore && window.akiniStore.wipeMemory) window.akiniStore.wipeMemory(); } catch (e) {}
+      // 保险丝 cookie：即使本次刷新前 IDB 没清完，下次启动会再清一轮（由 akini-storage-safe.js 启动段消费）
       try { document.cookie = "akini_wipe_pending=1;path=/;max-age=600"; } catch (e) {}
       var reloaded = false;
       var doReload = function () {
@@ -83,6 +85,17 @@
       var clearLocal = function () {
         try { localStorage.clear(); } catch (e) {}
         try { sessionStorage.clear(); } catch (e) {}
+        // 兜底：若 clear 被任何拦截层保留/回写，逐键强删所有残留（含非 akini_ 键）
+        try {
+          var rest = [];
+          for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k) rest.push(k); }
+          rest.forEach(function (k) { try { localStorage.removeItem(k); } catch (e) {} });
+        } catch (e) {}
+        try {
+          var srest = [];
+          for (var j = 0; j < sessionStorage.length; j++) { var sk = sessionStorage.key(j); if (sk) srest.push(sk); }
+          srest.forEach(function (k) { try { sessionStorage.removeItem(k); } catch (e) {} });
+        } catch (e) {}
       };
       var finish = function () {
         // 所有 IDB 已删，最后清 localStorage 并立即刷新（顺序不能反，否则快照机制会在间隙写回）
@@ -94,19 +107,28 @@
             if (n) document.cookie = n + "=;path=/;max-age=0";
           });
         } catch (e) {}
-        // 注销 Service Worker + 清 Cache Storage，避免旧缓存恢复页面
+        // 保险丝 cookie 必须保留到下次启动：由 akini-storage-safe.js 启动段再清一轮后自行摘除
+        try { document.cookie = "akini_wipe_pending=1;path=/;max-age=600"; } catch (e) {}
+        // 注销 Service Worker + 清 Cache Storage，避免旧缓存恢复页面；最多等 1.5s 后强制刷新
+        var cleanups = [];
         try {
           if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-            navigator.serviceWorker.getRegistrations().then(function (rs) {
+            cleanups.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
               rs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
-            });
+            }).catch(function () {}));
           }
         } catch (e) {}
         try {
-          if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { try { caches.delete(k); } catch (e) {} }); });
+          if (window.caches && caches.keys) {
+            cleanups.push(caches.keys().then(function (ks) {
+              return Promise.all(ks.map(function (k) { return caches.delete(k).catch(function () {}); }));
+            }).catch(function () {}));
+          }
         } catch (e) {}
-        try { document.cookie = "akini_wipe_pending=;path=/;max-age=0"; } catch (e) {}
-        setTimeout(doReload, 400);
+        Promise.race([
+          Promise.all(cleanups),
+          new Promise(function (res) { setTimeout(res, 1500); })
+        ]).then(function () { setTimeout(doReload, 200); });
       };
       var deleteAllIdb = function () {
         // milk 式：主库已被 _idbStore.clearAll()（= localforage.clear()，同连接清空）处理

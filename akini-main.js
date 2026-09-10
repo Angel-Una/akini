@@ -697,6 +697,16 @@ document.addEventListener("DOMContentLoaded", function () {
             }, done);
           });
         },
+        keys: function (cb) {
+          if (typeof cb !== "function") return;
+          ready(function (inst) {
+            if (!inst) { cb([]); return; }
+            inst.keys().then(
+              function (ks) { cb(ks || []); },
+              function () { cb([]); }
+            );
+          });
+        },
         getAll: function (cb) {
           if (typeof cb !== "function") return;
           ready(function (inst) {
@@ -5851,10 +5861,11 @@ document.addEventListener("DOMContentLoaded", function () {
     var Y = document.getElementById("chatMenuOverlay"),
       Q = document.getElementById("menuBg");
     // ========== 开屏动画：进度条 + 收尾隐藏 ==========
-    window.__akiniSplashProgress = 0;
+    // 重复初始化全部幂等：进度/起点/时长一旦被重置，用户会看到进度条跳回重涨（开屏"闪"的根因之一）
+    if (typeof window.__akiniSplashProgress !== "number") window.__akiniSplashProgress = 0;
     if (typeof window.__akiniSplashDone === "undefined") window.__akiniSplashDone = !1; // 重复初始化不得重置，否则已点「进入」会被翻回未进入
-    window.__akiniSplashStartAt = Date.now();
-    window.__akiniSplashMinMs = 3000; // 固定 3s 引导加载，确保核心数据准备完成
+    if (!window.__akiniSplashStartAt) window.__akiniSplashStartAt = Date.now();
+    if (typeof window.__akiniSplashMinMs === "undefined") window.__akiniSplashMinMs = 3000; // 固定 3s 引导加载，确保核心数据准备完成
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
@@ -6267,6 +6278,8 @@ document.addEventListener("DOMContentLoaded", function () {
               "</span>"
       );
     }
+    // 导出给信箱等独立引擎使用（局内消息弹窗头像渲染依赖它，未导出时只能回落到默认图标）
+    try { window.nt = nt; } catch (e) {}
     function it(t, e) {
       if (((e = e || ""), !t || "string" != typeof t))
         return window.__akiniIsDefaultAvatarToken(e)
@@ -16414,10 +16427,21 @@ document.addEventListener("DOMContentLoaded", function () {
       function _kaAudioStart() {
         try {
           if (!_kaAudio) {
-            _kaAudio = new Audio("silence.wav");
+            // 与 milk 完全同款：远程 m4a 静音循环流——iOS/微信对「正在播放远程音频」的页面不冻结回收，
+            // 本地超短 wav 循环会被系统判为无实际输出而杀页（挂后台重进的根因）。加载失败回退本地 wav。
+            _kaAudio = new Audio("https://img.heliar.top/file/1772885159972_silence.m4a");
             _kaAudio.loop = true;
             _kaAudio.volume = 0.01;
             _kaAudio.preload = "auto";
+            _kaAudio.addEventListener("error", function () {
+              try {
+                if (_kaAudio && _kaAudio.src.indexOf("silence.wav") < 0) {
+                  _kaAudio.src = "silence.wav";
+                  _kaAudio.load();
+                  if (_kaAudioEnabled()) _kaAudio.play().catch(function () {});
+                }
+              } catch (e) {}
+            });
           }
           var p = _kaAudio.play();
           if (p && p.catch) p.catch(function () {
