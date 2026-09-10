@@ -3302,71 +3302,15 @@ document.addEventListener("DOMContentLoaded", function () {
       // TA的手机：按概率自动收藏用户发送的聊天消息
       try { if (window.akiniTaPhoneCollectChat && r) window.akiniTaPhoneCollectChat(r, t, Date.now()); } catch (e) {}
       const __bh = _();
-      if ("none" === __bh.type) return;
-      const l = document.getElementById("typingIndicator");
       const __sendTarget = window.akiniContacts.getChatTarget(r);
-      const s = parseFloat(
-          localStorage.getItem("akini_num_replyDelayMin") || "2",
-        ),
-        u = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5"),
-        m = 1e3 * s,
-        y = 1e3 * u,
-        p = m + Math.random() * Math.max(0, y - m),
-        v = i,
-        k = t,
-        b = v ? v + " " + t : t;
       // 输入状态：先显示已读，再显示输入动态（连发消息只回复一次）
       var __sendMemberId =
         "group" === (__sendTarget && __sendTarget.type)
           ? (__sendTarget.memberIds || [])[0]
           : null;
-      var __readDelay = 1500 + Math.random() * 2500; // milk 式：1.5~4s 后显示已读
-      var __typingDelay = __readDelay + 400 + Math.random() * 500; // 已读后再弹输入动态
-      function __showReadNow() {
-        var cb = document.getElementById("chatBody");
-        if (!cb) return;
-        cb.querySelectorAll(".msg-row.me[data-read-pending]").forEach(function (
-          row,
-        ) {
-          __akiniShowReadReceipt(row);
-        });
-      }
-      setTimeout(function () {
-        __showReadNow();
-        // 兜底：卡片类消息（转账/商店/问卷）未打 pending 标记的也一并补已读
-        try {
-          var cb2 = document.getElementById("chatBody");
-          if (cb2) cb2.querySelectorAll(".msg-row.me").forEach(function (row) {
-            if (row.getAttribute("data-had-read-receipt") === "1") return;
-            try {
-              row.setAttribute("data-read-pending", "1");
-              __akiniShowReadReceipt(row);
-            } catch (err) {}
-          });
-        } catch (err) {}
-      }, __readDelay);
-      setTimeout(function () {
-        if (l) l.style.display = "block";
-        showTypingBubble(r, __sendMemberId);
-      }, __typingDelay);
-      var x =
-          c && "group" === c.type
-            ? (function (t) {
-                for (
-                  var e, n = [], i = /@([^\s@]+(?:\s[^\s@]+)?)/g;
-                  null !== (e = i.exec(t));
-                ) {
-                  var a = e[1].trim();
-                  a && n.push(a);
-                }
-                return n;
-              })(b)
-            : [],
-        E = x.some(function (t) {
-          return "全体成员" === t || "all" === t;
-        });
-      // 对齐 milk：每次发送消息清空之前的回复等待 timer 并重新计时（debounce），到点回复一轮
-      __akiniScheduleReply(r, __sendMemberId);
+      // 对齐 milk：行为在发送时判定一次并贯穿整条时间线（已读 → 输入动态 → 打字 → 回复），
+      // 到点不再二次判定；连发清空上一轮全部定时器重新计时（debounce），到点回复一轮
+      __akiniScheduleReply(r, __sendMemberId, undefined, __bh);
     }
     function _() {
       return window.AKR ? window.AKR.pickReplyBehavior() : { type: "text" };
@@ -3416,8 +3360,11 @@ document.addEventListener("DOMContentLoaded", function () {
       var m = window.__akiniTypingMap[t];
       if (m && m.timer) clearTimeout(m.timer);
       // 只记录状态（头像 + 兜底计时器），悬浮层由 __akiniPaintTypingFloat 统一绘制。
-      // 兜底时长 = 回复延迟上限 + 15 秒（最长 2 分钟）：回复链任何环节断掉都不会让输入状态超过用户设置的时间
-      var __maxS = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
+      // 兜底时长 = 回复/打字延迟上限较大者 + 15 秒（最长 2 分钟）：回复链任何环节断掉都不会让输入状态超过用户设置的时间
+      var __maxS = Math.max(
+        parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5"),
+        parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5")
+      );
       var __watchMs = Math.min(Math.max(__maxS * 1000 + 15000, 20000), 120000);
       window.__akiniTypingMap[t] = {
         avatar: avatar,
@@ -3503,13 +3450,17 @@ document.addEventListener("DOMContentLoaded", function () {
       var pending = window.__akiniPendingReplyMap && window.__akiniPendingReplyMap[t];
       if (pending) {
         if (pending.timer) { clearTimeout(pending.timer); pending.timer = null; }
+        if (pending.readTimer) { clearTimeout(pending.readTimer); pending.readTimer = null; }
+        if (pending.typingTimer) { clearTimeout(pending.typingTimer); pending.typingTimer = null; }
         delete window.__akiniPendingReplyMap[t];
         __akiniPersistPendingReply();
       }
       hideTypingBubble(t);
     }
-    // 对齐 milk 的调度器：每次用户发送消息（单发或连发），清除上一次等待的 timer（debounce），重新计时并在到点后回复一轮（1~3句）
-    function __akiniScheduleReply(chatId, memberId, delayOverride) {
+    // 对齐 milk 的调度器：行为在发送时判定一次（behavior 传入），贯穿整条时间线到点不再二次判定；
+    // 时间线：已读(1.5~4s) → 输入动态(+0.4~0.9s) → 打字时长(typingDelayMin~Max) → 回复到达；
+    // 连发清空上一轮全部定时器重新计时（debounce），已读不回只亮已读、全程无输入动态
+    function __akiniScheduleReply(chatId, memberId, delayOverride, behavior) {
       if (!chatId || !window.akiniContacts) return;
       if (!window.__akiniToggleOn || !window.__akiniToggleOn("contactReplyToggle", true)) return;
       var target = window.akiniContacts.getChatTarget(chatId);
@@ -3525,43 +3476,93 @@ document.addEventListener("DOMContentLoaded", function () {
         if (memberId) pending.memberId = memberId;
       }
       pending.ts = Date.now();
+      // milk 核心：行为只判定一次（以最后一次发送的判定为准），回复到点直接使用，不再二次判定
+      var n = behavior || _();
+      pending.behavior = n;
       __akiniPersistPendingReply();
 
-      // milk 核心：每次发送消息如果之前有正在等待回复的 timer，立即 clearTimeout 重新计时！
-      if (pending.timer) {
-        clearTimeout(pending.timer);
-        pending.timer = null;
+      // milk 核心 debounce：连发时清掉上一轮全部定时器（已读/输入动态/回复），重新排完整时间线
+      if (pending.timer) { clearTimeout(pending.timer); pending.timer = null; }
+      if (pending.readTimer) { clearTimeout(pending.readTimer); pending.readTimer = null; }
+      if (pending.typingTimer) { clearTimeout(pending.typingTimer); pending.typingTimer = null; }
+
+      var baseWait = typeof delayOverride === "number" ? delayOverride : 0;
+      var __readDelay = baseWait + 1500 + Math.random() * 2500; // milk 式：1.5~4s 后显示已读
+      var __typingDelay = __readDelay + 400 + Math.random() * 500; // 已读后再弹输入动态
+      var _fm = parseFloat(localStorage.getItem("akini_num_typingDelayMin") || "3"),
+          _fx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5");
+      if (!(_fm > 0)) _fm = 3;
+      if (!(_fx >= _fm)) _fx = Math.max(_fm, 5);
+      // 回复时刻 = 输入动态出现 + 打字时长：输入动态必然持续一段打字时间后回复才到达，绝不秒回
+      var __replyDelay = __typingDelay + 1e3 * (_fm + Math.random() * (_fx - _fm));
+
+      var __isGroup = "group" === target.type;
+      var __member = pending.memberId || (__isGroup ? (target.memberIds || [])[0] : null);
+
+      function __lightReadReceipts() {
+        var cb = document.getElementById("chatBody");
+        if (!cb) return;
+        cb.querySelectorAll(".msg-row.me[data-read-pending]").forEach(function (row) {
+          try { __akiniShowReadReceipt(row); } catch (e) {}
+        });
+        // 兜底：卡片类消息（转账/商店/问卷）未打 pending 标记的也一并补已读
+        try {
+          cb.querySelectorAll(".msg-row.me").forEach(function (row) {
+            if (row.getAttribute("data-had-read-receipt") === "1") return;
+            try {
+              row.setAttribute("data-read-pending", "1");
+              __akiniShowReadReceipt(row);
+            } catch (err) {}
+          });
+        } catch (err) {}
       }
 
-      var o = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
-          r = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
-      if (!(o >= 0)) o = 2;
-      if (!(r >= o)) r = Math.max(o, 5);
-      var randomDelay = 1e3 * o + Math.random() * Math.max(0, 1e3 * (r - o));
-      var finalDelay = typeof delayOverride === "number" ? delayOverride : randomDelay;
+      // 已读：无论是否回复都延迟点亮（milk 已读不回也只亮已读）
+      pending.readTimer = setTimeout(function () {
+        pending.readTimer = null;
+        try { __lightReadReceipts(); } catch (e) {}
+        if ("none" === n.type) {
+          // 已读不回：点亮已读即结清，全程无输入动态、无回复
+          try { __akiniOnReplyComplete(chatId); } catch (e0) {}
+          try {
+            var __s = window.akiniContacts.getSession(chatId);
+            __s && window.akiniContacts.updateSession(chatId, { unread: 0 });
+          } catch (e1) {}
+          try {
+            var __rrt = document.getElementById("readReceiptToggle");
+            if (
+              (!__rrt || __rrt.classList.contains("on")) &&
+              window.__akiniMarkLastRead
+            )
+              window.__akiniMarkLastRead(chatId);
+          } catch (e2) {}
+        }
+      }, __readDelay);
 
-      // milk：回复等待期间如果激活当前会话，显示输入动态
-      if (chatId === window.akiniContacts.getActiveChatId()) {
-        showTypingBubble(chatId, "group" === target.type ? (target.memberIds || [])[0] : null);
-      }
+      if ("none" === n.type) return; // 已读不回：不排输入动态与回复
 
+      // 输入动态：已读亮起后再弹出（仅当前激活会话可见）
+      pending.typingTimer = setTimeout(function () {
+        pending.typingTimer = null;
+        if (chatId === window.akiniContacts.getActiveChatId()) {
+          var l = document.getElementById("typingIndicator");
+          if (l) l.style.display = "block";
+          showTypingBubble(chatId, __member);
+        }
+      }, __typingDelay);
+
+      // 回复：输入动态持续打字时长后到达
       pending.timer = setTimeout(function () {
         pending.timer = null;
         try {
           var currentTarget = window.akiniContacts.getChatTarget(chatId);
           if (!currentTarget) { __akiniOnReplyComplete(chatId); return; }
-          var n = _();
-          if ("none" === n.type) {
-            // 已读不回
-            __akiniOnReplyComplete(chatId);
-            return;
-          }
           I(chatId, currentTarget, n, true);
         } catch (err) {
           console.error("[Akini] reply error:", err);
           __akiniOnReplyComplete(chatId);
         }
-      }, finalDelay);
+      }, __replyDelay);
     }
     function b(t) {
       if (we && we.active) return;
@@ -4192,11 +4193,15 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
       if (!n) return;
-      // 统一走发消息同款回复流程：先已读 → 弹"对方正在输入"动态 → 再发回复消息
+      // 统一走发消息同款回复流程：先已读 → 弹"对方正在输入"动态 → 打字时长后才发回复消息
       var isActive = (t === window.akiniContacts.getActiveChatId());
       var __readDelay = 1500 + Math.random() * 2500;
       var __typingDelay = __readDelay + 400;
-      var __replyDelay = __typingDelay + 1200 + Math.random() * 1800;
+      var _tm = parseFloat(localStorage.getItem("akini_num_typingDelayMin") || "3"),
+          _tx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5");
+      if (!(_tm > 0)) _tm = 3;
+      if (!(_tx >= _tm)) _tx = Math.max(_tm, 5);
+      var __replyDelay = __typingDelay + 1e3 * (_tm + Math.random() * (_tx - _tm));
       setTimeout(function () {
         var cb = document.getElementById("chatBody");
         if (!cb) return;
@@ -12067,63 +12072,121 @@ document.addEventListener("DOMContentLoaded", function () {
         e = document.getElementById("msgContextMenuOverlay");
       if (!t || !e) return;
       let n = null;
-      function i(i, a, o) {
-        n = o;
-        const r = o.classList.contains("me"),
-          c = document.getElementById("ctxRevoke");
-        c && (c.style.display = r ? "flex" : "none");
-        const l = c ? c.previousElementSibling : null;
-        (l &&
-          l.classList.contains("ctx-sep") &&
-          (l.style.display = r ? "" : "none"),
-          (t.style.display = "block"),
-          (e.style.display = "block"),
-          (e.style.pointerEvents = "auto"));
-        let s = i,
-          d = a;
-        (s + 150 > window.innerWidth && (s = window.innerWidth - 150 - 8),
-          d + 170 > window.innerHeight && (d = a - 170 - 8),
-          s < 8 && (s = 8),
-          d < 8 && (d = 8),
-          (t.style.left = s + "px"),
-          (t.style.top = d + "px"));
+      let currentBubble = null;
+
+      function i(bubbleEl, rowEl) {
+        if (!bubbleEl || !rowEl) return;
+        n = rowEl;
+        currentBubble = bubbleEl;
+        t.style.display = "block";
+
+        // 依据被点击气泡定位浮动胶囊菜单
+        const rect = bubbleEl.getBoundingClientRect();
+        const menuWidth = t.offsetWidth || 120;
+        const menuHeight = t.offsetHeight || 42;
+
+        // 水平居中对齐气泡，留出屏幕边缘安全间距
+        let left = rect.left + (rect.width - menuWidth) / 2;
+        const minLeft = 10;
+        const maxLeft = window.innerWidth - menuWidth - 10;
+        if (left < minLeft) left = minLeft;
+        if (left > maxLeft) left = maxLeft;
+
+        // 垂直定位：优先放在气泡上方 8px
+        let top = rect.top - menuHeight - 8;
+        // 若气泡上方空间不足（贴近顶部导航栏 < 54px），则自适应放在气泡下方 8px
+        if (top < 54) {
+          top = rect.bottom + 8;
+        }
+        // 若超出底部
+        if (top + menuHeight > window.innerHeight - 10) {
+          top = window.innerHeight - menuHeight - 10;
+        }
+        if (top < 10) top = 10;
+
+        t.style.left = Math.round(left) + "px";
+        t.style.top = Math.round(top) + "px";
       }
+
       function a() {
-        ((t.style.display = "none"),
-          (e.style.display = "none"),
-          (e.style.pointerEvents = "none"),
-          (n = null));
+        t.style.display = "none";
+        if (e) {
+          e.style.display = "none";
+          e.style.pointerEvents = "none";
+        }
+        n = null;
+        currentBubble = null;
       }
+
       e.addEventListener("click", a);
-      let o = null;
-      (document.addEventListener(
-        "touchstart",
-        function (t) {
-          const e = t.target.closest(".bubble");
-          if (!e) return;
-          const n = e.closest(".msg-row");
-          if (!n || n.classList.contains("system")) return;
-          const a = t.touches[0];
-          o = setTimeout(function () {
-            (t.preventDefault(), i(a.clientX, a.clientY, n));
-          }, 500);
-        },
-        { passive: !0 },
-      ),
-        document.addEventListener("touchend", function () {
-          clearTimeout(o);
-        }),
-        document.addEventListener("touchmove", function () {
-          clearTimeout(o);
-        }),
-        document.addEventListener("contextmenu", function (t) {
-          const e = t.target.closest(".bubble");
-          if (!e) return;
-          const n = e.closest(".msg-row");
-          n &&
-            !n.classList.contains("system") &&
-            (t.preventDefault(), i(t.clientX, t.clientY, n));
-        }),
+
+      // 出现方式改成点击气泡出现（触摸滚动时防误触）
+      let touchStartX = 0;
+      let touchStartY = 0;
+      let isTouchScrolling = false;
+
+      document.addEventListener("touchstart", function (evt) {
+        if (evt.touches && evt.touches.length > 0) {
+          touchStartX = evt.touches[0].clientX;
+          touchStartY = evt.touches[0].clientY;
+          isTouchScrolling = false;
+        }
+      }, { passive: true });
+
+      document.addEventListener("touchmove", function (evt) {
+        if (evt.touches && evt.touches.length > 0) {
+          const dx = Math.abs(evt.touches[0].clientX - touchStartX);
+          const dy = Math.abs(evt.touches[0].clientY - touchStartY);
+          if (dx > 8 || dy > 8) {
+            isTouchScrolling = true;
+            // 列表滚动时自动收起菜单
+            if (t.style.display === "block") {
+              a();
+            }
+          }
+        }
+      }, { passive: true });
+
+      document.addEventListener("click", function (evt) {
+        // 如果点击发生在已弹出的菜单内部，由具体按钮事件处理
+        if (evt.target.closest("#msgContextMenu")) return;
+
+        // 检查是否点击了消息气泡
+        const clickedBubble = evt.target.closest(".bubble");
+        if (clickedBubble) {
+          const rowEl = clickedBubble.closest(".msg-row");
+          if (rowEl && !rowEl.classList.contains("system")) {
+            // 如果用户正在滑动，不触发点击
+            if (isTouchScrolling) return;
+
+            // 如果当前已经打开此气泡的菜单，再次点击则收起（toggle）
+            if (t.style.display === "block" && currentBubble === clickedBubble) {
+              a();
+              return;
+            }
+
+            // 点击气泡弹出菜单
+            i(clickedBubble, rowEl);
+            return;
+          }
+        }
+
+        // 点击气泡外部其他地方，收起菜单
+        if (t.style.display === "block") {
+          a();
+        }
+      });
+
+      // 兼顾桌面端右键 contextmenu 触发
+      document.addEventListener("contextmenu", function (evt) {
+        const bubbleEl = evt.target.closest(".bubble");
+        if (!bubbleEl) return;
+        const rowEl = bubbleEl.closest(".msg-row");
+        if (rowEl && !rowEl.classList.contains("system")) {
+          evt.preventDefault();
+          i(bubbleEl, rowEl);
+        }
+      });
         document
           .getElementById("ctxCopy")
           .addEventListener("click", function () {
@@ -12229,7 +12292,7 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (e) {}
             n.remove();
             a();
-          }));
+          });
     })();
     (function () {
       const t = {

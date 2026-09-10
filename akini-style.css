@@ -2101,41 +2101,68 @@ body:not(.bubble-css-on)
 #msgContextMenu {
   position: fixed;
   z-index: 9000;
-  background: #1c1c1e;
-  border-radius: 14px;
-  padding: 0;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+  background: rgba(30, 30, 32, 0.94);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  padding: 3px 5px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  animation: ctxBubblePopIn 0.16s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  transform-origin: center center;
+}
+@keyframes ctxBubblePopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 #msgContextMenu .ctx-row {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
 }
 #msgContextMenu .ctx-item {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 13px 24px;
-  font-size: 14px;
-  color: #fff;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  font-size: 0;
+  color: #f5f5f7;
   cursor: pointer;
-  transition: background 0.15s;
+  border-radius: 18px;
+  border: none;
+  border-bottom: none;
+  transition: background 0.15s, transform 0.1s;
   white-space: nowrap;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  min-width: 120px;
+  -webkit-tap-highlight-color: transparent;
 }
-#msgContextMenu .ctx-item:last-child {
-  border-right: none;
+#msgContextMenu .ctx-item svg {
+  display: block;
+  pointer-events: none;
 }
 #msgContextMenu .ctx-item:active {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(0.92);
 }
 #msgContextMenu .ctx-item.danger {
-  color: #ff453a;
+  color: #ff5252;
 }
-.ctx-item:last-child {
-  border-bottom: none !important;
+#msgContextMenu .ctx-item.danger:active {
+  background: rgba(255, 82, 82, 0.22);
 }
 #msgContextMenu .ctx-sep {
   display: none;
