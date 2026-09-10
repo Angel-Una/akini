@@ -77,6 +77,7 @@
   var _backingUp = false;
 
   function backup(immediate) {
+    if (window.__akiniWiping) return; // 清除数据期间禁止上传，避免把中间态写回云端
     if (_backingUp && !immediate) return;
     if (document.hidden && !immediate) return; // 页面在后台时不跑周期备份，省电省 CPU（切后台瞬间已有 immediate 备份兜底）
     if (_backupTimer) { clearTimeout(_backupTimer); _backupTimer = null; }
@@ -117,6 +118,8 @@
   // ---- 启动恢复：只补本地缺失的 key，绝不覆盖本地已有数据 ----
   function restore() {
     try {
+      // 清除数据后的首次启动（?reset= 时间戳）：用户要求全部归0，绝不从云端复活
+      if (/[?&]reset=/.test(location.search || "")) { console.warn("[云备份] 检测到清除数据后的启动，跳过恢复"); return; }
       fetch(SUPA_URL + "/rest/v1/" + TABLE + "?device_id=eq." + encodeURIComponent(DEVICE_ID) + "&select=payload,updated_at", {
         headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SUPA_KEY },
       }).then(function (r) {
@@ -150,8 +153,9 @@
         // 缺失较多说明本地被清理过：回填后刷新一次让界面用上恢复的数据（防循环）
         if (missing.length >= 3) {
           try {
-            if (!sessionStorage.getItem("akini_cloud_restored")) {
-              sessionStorage.setItem("akini_cloud_restored", "1");
+            var lock = +(localStorage.getItem("akini_cloud_restore_lock") || 0);
+            if (Date.now() - lock > 10 * 60 * 1000) {
+              localStorage.setItem("akini_cloud_restore_lock", String(Date.now()));
               location.reload();
             }
           } catch (e) {}
@@ -170,12 +174,26 @@
   setInterval(function () { backup(false); }, 150000);
   // 启动：先恢复（补缺），30 秒后开始周期备份
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", function () { setTimeout(restore, 1500); });
+    document.addEventListener("DOMContentLoaded", function () { setTimeout(restore, 6000); });
   } else {
-    setTimeout(restore, 1500);
+    setTimeout(restore, 6000);
   }
   setTimeout(function () { backup(false); }, 30000);
 
-  window.__akiniCloudBackup = { backup: backup, restore: restore, deviceId: DEVICE_ID };
+  // ---- 清除云端备份：清除数据时调用，保证云端同样归0 ----
+  function wipeCloud() {
+    try {
+      return fetch(SUPA_URL + "/rest/v1/" + TABLE + "?device_id=eq." + encodeURIComponent(DEVICE_ID), {
+        method: "DELETE",
+        headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SUPA_KEY },
+        keepalive: true,
+      }).then(function (r) {
+        if (r.ok) { _lastBackupSig = ""; try { localStorage.removeItem("akini_cloud_backup_at"); } catch (e) {} }
+        return r.ok;
+      }).catch(function () { return false; });
+    } catch (e) { return Promise.resolve(false); }
+  }
+
+  window.__akiniCloudBackup = { backup: backup, restore: restore, wipeCloud: wipeCloud, deviceId: DEVICE_ID };
   console.log("[云备份] 已启用，设备 " + DEVICE_ID);
 })();

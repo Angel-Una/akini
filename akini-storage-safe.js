@@ -13,6 +13,14 @@
   try {
     if (/(?:^|;\s*)akini_wipe_pending=1/.test(document.cookie || "")) {
       try { document.cookie = "akini_wipe_pending=;path=/;max-age=0"; } catch (e) {}
+      // 清除数据后的启动：10 秒后摘掉的 ?reset= 参数，避免用户收藏带参链接导致云恢复永久失效
+      try {
+        if (/[?&]reset=/.test(location.search || "") && window.history && history.replaceState) {
+          setTimeout(function () {
+            try { history.replaceState(null, "", location.pathname); } catch (e) {}
+          }, 10000);
+        }
+      } catch (e) {}
       try { localStorage.clear(); } catch (e) {}
       try { sessionStorage.clear(); } catch (e) {}
       try {

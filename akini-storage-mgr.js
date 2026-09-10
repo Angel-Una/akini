@@ -122,9 +122,23 @@
         try { indexedDB.deleteDatabase("akini_img_db"); } catch (e) {}
         finish();
       };
-      // 等待主库真正清空后再删库，最后刷新
+      // 云端备份同步删除（用户要求全部归0，防止重启后云恢复把数据复活）；最多等 2.5s，失败也不阻塞本地清理
       try {
-        if (window._idbStore && window._idbStore.clearAll) window._idbStore.clearAll(function () { deleteAllIdb(); });
+        if (window.__akiniCloudBackup && window.__akiniCloudBackup.wipeCloud) {
+          var cloudDone = false;
+          var proceed = function () {
+            if (cloudDone) return;
+            cloudDone = true;
+            try {
+              if (window._idbStore && window._idbStore.clearAll) window._idbStore.clearAll(function () { deleteAllIdb(); });
+              else deleteAllIdb();
+            } catch (e) { deleteAllIdb(); }
+          };
+          Promise.race([
+            window.__akiniCloudBackup.wipeCloud(),
+            new Promise(function (res) { setTimeout(res, 2500); })
+          ]).then(proceed).catch(proceed);
+        } else if (window._idbStore && window._idbStore.clearAll) window._idbStore.clearAll(function () { deleteAllIdb(); });
         else deleteAllIdb();
       } catch (e) { deleteAllIdb(); }
       // 终极兜底：6 秒仍未完成则再补一轮清空后强制刷新
