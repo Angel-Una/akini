@@ -155,10 +155,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .anniv-preview-row {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 12px;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 14px;
+  padding: 0 4px;
 }
 .anniv-preview-row .right-card {
   margin-left: 0;
@@ -169,15 +169,46 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   min-width: 0;
   margin-left: 0;
 }
+/* 模拟状态栏：左时间 右信号+WiFi+电量（iOS 风格，覆盖在安全区内） */
+.fake-statusbar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 44px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px 0 24px;
+  box-sizing: border-box;
+  z-index: 6;
+  pointer-events: none;
+  color: #1a1a1a;
+}
+.fake-statusbar .fs-time {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  font-variant-numeric: tabular-nums;
+}
+.fake-statusbar .fs-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.fake-statusbar svg { display: block; }
+.fake-statusbar .fs-batt-pct {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
 /* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
-.fit-gap-lg { margin-top: 14px; }
-.fit-gap { margin-top: 10px; }
+.fit-gap-lg { margin-top: 12px; }
+.fit-gap { margin-top: 8px; }
 .fit-bottom { margin-top: auto; }
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px 6px;
-  padding: 2px 14px;
+  gap: 8px 4px;
+  padding: 2px 4px;
   box-sizing: border-box;
   width: 100%;
 }
@@ -197,7 +228,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-  padding: 0 10px 12px;
+  padding: 0 6px 10px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -206,7 +237,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .top-card .cover-img {
   width: 100%;
-  height: 160px;
+  height: 140px;
   border-radius: 22px;
   background: transparent;
   background-size: cover !important;
@@ -392,10 +423,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   justify-content: center;
   align-items: center;
   padding: 14px;
-  width: 140px;
-  height: 140px;
-  min-width: 140px;
-  min-height: 140px;
+  width: 128px;
+  height: 128px;
+  min-width: 128px;
+  min-height: 128px;
   max-width: none;
   max-height: none;
   cursor: default;
@@ -509,7 +540,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   background: rgba(255, 255, 255, 0.75);
 }
 .bottom-bar {
-  padding: 15px 16px 16px;
+  padding: 10px 16px 12px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
@@ -5015,7 +5046,7 @@ button.back-btn[type="button"] {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px;
+  padding: 14px 16px;
   box-sizing: border-box;
   color: #fff;
   position: relative;
