@@ -136,12 +136,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   /* 首页是一个统一整体：彻底禁止任何滑动，全部平铺显示 */
   overflow: visible !important;
   padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  justify-content: flex-end;
 }
 .top-card {
-  margin: calc(16px + env(safe-area-inset-top, 0px)) auto 4px;
-  width: calc(100% - 32px);
-  max-width: 382px;
+  margin: calc(16px + env(safe-area-inset-top, 0px)) 16px 4px;
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
@@ -151,7 +148,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   align-items: center;
   flex-shrink: 0;
   position: relative;
-  z-index: 2;
 }
 .top-card .cover-img {
   width: 100%;
@@ -5002,12 +4998,8 @@ button.back-btn[type="button"] {
 }
 
 .music-player-section {
-  margin: 8px auto 12px;
-  width: calc(100% - 32px);
-  max-width: 382px;
+  margin: 8px 16px 12px;
   flex-shrink: 0;
-  position: relative;
-  z-index: 2;
 }
 .music-player-card {
   width: 100%;
