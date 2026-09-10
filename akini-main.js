@@ -3734,13 +3734,14 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
-      }, 8000);
-      /* 后台/低功耗设备可能丢定时器，周期性 catch-up 确保任务不遗漏 */
+      }, 15000);
+      /* 后台/低功耗设备可能丢定时器，周期性 catch-up 确保任务不遗漏
+         性能优化：8s→15s，60s→120s，减少频繁定时器导致的卡顿 */
       setInterval(function () {
         try {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
-      }, 60000);
+      }, 120000);
     })();
     window._akiniTransferAmount = e;
     window._akiniTransferNote = n;
@@ -6431,6 +6432,7 @@ document.addEventListener("DOMContentLoaded", function () {
           console.warn("[Akini] csCache load error", e);
         }
       }),
+      // 性能优化：60s→120s，减少频繁写入导致的卡顿
       setInterval(function () {
         if (document.hidden || window._restoringData) return;
         window._idbStore &&
@@ -6587,12 +6589,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }),
       // 定期备份到 IndexedDB：移动端 beforeunload/pagehide 不可靠，靠定时器保证数据落盘
+      // 性能优化：60s→120s，减少频繁写入导致的卡顿
       setInterval(function () {
         try {
           if (document.hidden || window._restoringData || window._restoringChatHistory) return;
           V();
         } catch (t) {}
-      }, 60000),
+      }, 120000),
       (window._restoringChatHistory = !0),
       U && (U.innerHTML = ""),
       setTimeout(function () {
