@@ -5988,14 +5988,6 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) {}
       window.__akiniSplashDone = !0;
     };
-    // 绑定手动进入按钮：加载完成前不隐藏，点击后才进入主界面
-    (function bindSplashEnter() {
-      var btn = document.getElementById("akiniSplashEnterBtn");
-      if (!btn) return;
-      btn.addEventListener("click", function () {
-        if (window.__akiniHideSplash) window.__akiniHideSplash();
-      });
-    })();
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
       try { window.__akiniBootApp = __akiniBootApp; } catch (e) {}
@@ -6030,12 +6022,13 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(_bootRefresh, 500);
         setTimeout(_bootRefresh, 1500);
         setTimeout(_bootRefresh, 3000);
-        // 开屏动画：关键数据与界面渲染完成后，给头像/聊天记录等异步恢复预留时间，再显示「进入」
+        // 开屏动画：关键数据与界面渲染完成后，给头像/聊天记录等异步恢复预留时间
         window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(92);
         setTimeout(function () {
           window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
+          // milk 式：加载完成自动进入主界面，无需手动点击
+          try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch (e) {}
         }, 900);
-        // 不自动调用 __akiniHideSplash，等待用户点击 #akiniSplashEnterBtn
       }, 300);
       if (
         (window.__akiniAvatarCache &&

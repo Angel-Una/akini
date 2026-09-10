@@ -135,10 +135,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   align-items: stretch;
   /* 首页是一个统一整体：彻底禁止任何滑动，全部平铺显示 */
   overflow: visible !important;
-  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 54px;
 }
 .top-card {
-  margin: calc(16px + env(safe-area-inset-top, 0px)) 5px 4px;
+  margin: 63px 5px 4px;
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
