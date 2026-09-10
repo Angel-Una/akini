@@ -122,23 +122,36 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transition: opacity 0.3s;
 }
 .content-wrapper {
-  position: relative;
-  flex: 1;
+  flex: none;
   width: 100%;
-  max-width: 414px;
+  max-width: 480px;
   margin: 0 auto;
-  box-sizing: border-box;
-  min-height: 0;
-  z-index: 2;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  /* 首页是一个统一整体：彻底禁止任何滑动，全部平铺显示 */
+  justify-content: space-evenly;
+  align-items: center;
   overflow: visible !important;
-  padding-bottom: 8px;
+  padding-bottom: 0;
+  position: relative;
+  z-index: 1;
 }
+/* 模块级独立缩放壳：inner 固定 390/380 基准宽渲染，按屏宽等比缩放，垂直 flex 分布 */
+.fit-mod {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* 阻止 stretch 拉伸 inner，保证量取真实自然高 */
+  flex-shrink: 0;
+  position: relative;
+  overflow: visible;
+}
+.fit-inner {
+  transform-origin: top center;
+  flex-shrink: 0;
+}
+
 .top-card {
-  margin: 8px 5px 4px;
+  margin: 0;
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
@@ -251,7 +264,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .middle-row {
   display: flex;
   justify-content: flex-start;
-  padding: 0 16px 8px;
+  padding: 0 16px 2px;
   flex: none;
   width: 100%;
   box-sizing: border-box;
@@ -259,10 +272,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   /* 首页是一个统一整体：彻底禁止局部单独滑动，全部平铺显示 */
   overflow: visible !important;
   gap: 16px;
-  /* 图二圈起内容上移 3px */
-  margin-top: -3px;
-  /* 圈起区域整体左移 5px */
-  margin-left: -10px;
+  /* 圈起区域整体左移（用户要求） */
+  margin: 0 0 0 -20px;
 }
 .left-apps-container {
   display: flex;
@@ -5000,7 +5011,7 @@ button.back-btn[type="button"] {
 }
 
 .music-player-section {
-  margin: 4px 5px 8px;
+  margin: 0;
   flex-shrink: 0;
 }
 .music-player-card {
