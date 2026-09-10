@@ -128,7 +128,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  justify-content: space-evenly;
+  justify-content: flex-start;
   align-items: center;
   overflow: visible !important;
   padding-bottom: 0;
@@ -150,42 +150,29 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-shrink: 0;
 }
 
-/* ===== 首页新排布：纪念日横条 / 4×2图标网格 / 气泡行 ===== */
-.anniv-bar {
+/* ===== 首页排布 v2 ===== */
+/* 纪念日方卡 + 竖排气泡 同行：纪念日左、气泡右 */
+.anniv-preview-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
   width: 100%;
   box-sizing: border-box;
-  background: #ffffff;
-  border-radius: 18px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
-  background-size: cover !important;
-  background-position: center !important;
-  padding: 14px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  padding: 0 14px;
 }
-.anniv-bar .anniv-left {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+.anniv-preview-row .right-card {
+  margin-left: 0;
+  flex-shrink: 0;
 }
-.anniv-bar .label {
-  font-size: 15px;
-  color: #555;
-  font-weight: 600;
-  letter-spacing: 1px;
+.anniv-preview-row .chat-preview {
+  flex: 1;
+  min-width: 0;
+  margin-left: 0;
 }
-.anniv-bar .unit {
-  font-size: 12px;
-  color: #999;
-}
-.anniv-bar .number {
-  font-size: 36px;
-  font-weight: 700;
-  color: #333;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
+/* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
+.fit-gap-lg { margin-top: 14px; }
+.fit-gap { margin-top: 10px; }
+.fit-bottom { margin-top: auto; }
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -203,31 +190,6 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .app-item .icon-wrap {
   width: 40px;
   height: 40px;
-}
-.chat-preview {
-  display: flex;
-  flex-direction: row !important;
-  align-items: flex-end;
-  gap: 10px;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 2px;
-  margin: 0;
-}
-.chat-preview .preview-row {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 6px;
-  margin: 0 !important;
-}
-.chat-preview .preview-row:nth-child(2) {
-  justify-content: flex-end;
-}
-.chat-preview .preview-bubble {
-  max-width: calc(100% - 44px);
-  font-size: 12px;
 }
 
 .top-card {
@@ -472,16 +434,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
 }
 .chat-preview {
-  width: 206px;
   max-width: 100%;
-  padding: 8px 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
   position: relative;
-  left: -55px;
   margin-left: 0;
-  top: -3px;
 }
 .preview-row {
   display: flex;
@@ -491,9 +450,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .preview-row:nth-child(2) {
   justify-content: flex-end;
 }
-.preview-row:first-child {
-  transform: translateX(-20px);
-}
+
 .preview-row:first-child .preview-bubble {
   margin-right: 0; /* 外侧不留 margin：206px 行宽内确保 8 个汉字完整显示 */
 }
@@ -540,7 +497,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   user-select: text;
   cursor: text;
   word-break: break-word;
-  max-width: min(240px, 64vw); /* 8 个汉字一行完整放得下，不被省略号截断 */
+  max-width: 100%; /* 宽度随容器（任何机型一致缩放） */
 }
 /* 8 字以内的预览气泡文字强制单行，不折行 */
 .preview-bubble.no-wrap {
