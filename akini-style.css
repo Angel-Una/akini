@@ -6442,3 +6442,26 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
 /* v20260909zb: 不再强制 bubble overflow（milk 的 .message 是 overflow:hidden，
    美化设计靠它把内部弧带装饰裁剪成胶囊形；强制 visible 会让装饰溢出上下边缘形成隔断）。
    裁不裁完全交给美化 CSS 自己决定；祖先容器保持 overflow:visible 防止外部裁切。 */
+
+/* ===== 观影聊天输入动态（对方正在输入 三点跳动） ===== */
+.wt-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #999;
+  animation: wtBlink 1.2s infinite;
+}
+.wt-dot:nth-child(2) { animation-delay: 0.2s; }
+.wt-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes wtBlink {
+  0%, 60%, 100% { opacity: 0.3; }
+  30% { opacity: 1; }
+}
+
+/* ===== 观影聊天底部输入栏：上移不贴屏幕边缘 ===== */
+#watchInputBar {
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+#watchFloatInputBar {
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+}

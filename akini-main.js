@@ -16207,9 +16207,11 @@ document.addEventListener("DOMContentLoaded", function () {
           .addEventListener("click", function () {
             this.classList.contains("on")
               ? (n(),
+                _kaAudioStart(),
                 "function" == typeof startKeepAliveIsland &&
                   startKeepAliveIsland())
               : (i(),
+                _kaAudioStop(),
                 "function" == typeof stopKeepAliveIsland &&
                   stopKeepAliveIsland());
           }),
@@ -16237,6 +16239,7 @@ document.addEventListener("DOMContentLoaded", function () {
                           ka.classList.add("on");
                           localStorage.setItem("akini_toggle_keepAliveToggle", "1");
                           "function" == typeof window.requestWakeLock && window.requestWakeLock();
+                          _kaAudioStart();
                           "function" == typeof startKeepAliveIsland && startKeepAliveIsland();
                         }
                       } catch (e) {}
@@ -16256,12 +16259,49 @@ document.addEventListener("DOMContentLoaded", function () {
                       ka2.classList.add("on");
                       localStorage.setItem("akini_toggle_keepAliveToggle", "1");
                       "function" == typeof window.requestWakeLock && window.requestWakeLock();
+                      _kaAudioStart();
                       "function" == typeof startKeepAliveIsland && startKeepAliveIsland();
                     }
                   } catch (e) {}
                 }
               } else alert("此浏览器不支持通知功能");
           }));
+      // ===== 静音循环音频保活（与 milk 同方案）=====
+      // iOS/微信里 WakeLock 在后台基本无效，只有"正在播放音频"的页面系统才不会冻结回收
+      var _kaAudio = null;
+      function _kaAudioEnabled() {
+        try { return "1" === localStorage.getItem("akini_toggle_keepAliveToggle"); } catch (e) { return false; }
+      }
+      function _kaAudioStart() {
+        try {
+          if (!_kaAudio) {
+            _kaAudio = new Audio("silence.wav");
+            _kaAudio.loop = true;
+            _kaAudio.volume = 0.01;
+            _kaAudio.preload = "auto";
+          }
+          var p = _kaAudio.play();
+          if (p && p.catch) p.catch(function () {
+            // 自动播放被拦截：等下一次触摸/点击解锁后再播
+            var unlock = function () { if (_kaAudioEnabled() && _kaAudio) _kaAudio.play().catch(function () {}); };
+            document.addEventListener("touchstart", unlock, { once: true });
+            document.addEventListener("click", unlock, { once: true });
+          });
+        } catch (e) {}
+      }
+      function _kaAudioStop() {
+        if (_kaAudio) { try { _kaAudio.pause(); _kaAudio.currentTime = 0; } catch (e) {} }
+      }
+      (window._akiniKeepAliveAudioStart = _kaAudioStart,
+        window._akiniKeepAliveAudioStop = _kaAudioStop,
+        // 切回前台时若保活开着但音频被系统暂停，自动续播
+        document.addEventListener("visibilitychange", function () {
+          if (_kaAudioEnabled() && "visible" === document.visibilityState && _kaAudio && _kaAudio.paused) {
+            _kaAudio.play().catch(function () {});
+          }
+        }),
+        // 启动时若已开启保活则尝试开播（被自动播放策略拦截时由 unlock 兜底）
+        setTimeout(function () { if (_kaAudioEnabled()) _kaAudioStart(); }, 1200));
       var o = window.showInAppNotif,
         r = Date.now();
       ((window.showInAppNotif = function (t) {
@@ -20519,6 +20559,25 @@ document.addEventListener("DOMContentLoaded", function () {
     body.scrollTop = body.scrollHeight;
     if (isFullscreen()) fireDanmaku((c.name ? c.name + "：" : "") + text);
   }
+  // 观影聊天输入动态：与微信聊天一致的"对方正在输入"三点气泡
+  function showWatchTyping() {
+    var body = $("watchChatBody");
+    if (!body || $("watchTypingRow")) return;
+    var c = watchPartners[0];
+    var row = document.createElement("div");
+    row.id = "watchTypingRow";
+    row.className = "msg-row other";
+    row.innerHTML =
+      '<div class="msg-content-line"><div class="msg-avatar">' + partnerAvatarHtml(c && c.avatar) + '</div>' +
+      '<div class="bubble" style="display:inline-flex;align-items:center;gap:4px;padding:12px 16px">' +
+      '<span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span></div></div>';
+    body.appendChild(row);
+    body.scrollTop = body.scrollHeight;
+  }
+  function hideWatchTyping() {
+    var r = $("watchTypingRow");
+    if (r) r.remove();
+  }
   function schedulePartnerReply() {
     if (!watchPartners.length) return;
     watchPendingCount++;
@@ -20529,9 +20588,11 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!(dMin >= 0)) dMin = 2;
     if (!(dMax >= dMin)) dMax = Math.max(dMin, 5);
     var delayMs = 1e3 * (dMin + Math.random() * (dMax - dMin));
+    showWatchTyping(); // 回复延迟期间显示"对方正在输入"
     partnerReplyTimer = setTimeout(function () {
       partnerReplyTimer = null;
       watchPendingCount = 0;
+      hideWatchTyping();
       var wa = $("watchArea");
       if (!wa || wa.style.display === "none") return;
       // 与微信聊天一致：一轮回复 1~3 条（75%/20%/5% 同 AKR.getReplyCount），逐条间隔发出
@@ -20889,6 +20950,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (dk) dk.innerHTML = "";
       if (partnerReplyTimer) { clearTimeout(partnerReplyTimer); partnerReplyTimer = null; }
       watchPendingCount = 0;
+      hideWatchTyping();
       $("watchArea").style.display = "none";
     });
     $("watchImportBtn").addEventListener("click", importVideo);
