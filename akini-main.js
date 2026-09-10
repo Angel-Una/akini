@@ -7805,7 +7805,7 @@ document.addEventListener("DOMContentLoaded", function () {
         return it.type === "image" ? !!it.dataUrl : !!(it.text || "").trim();
       }).length;
       goBtn.textContent = n > 0 ? "发送 (" + n + ")" : "发送";
-      goBtn.style.opacity = n > 0 ? "1" : "0.4";
+      goBtn.style.opacity = "1"; /* 底图纯黑常显，可点性由 pointerEvents 控制 */
       goBtn.style.pointerEvents = n > 0 ? "auto" : "none";
     }
     window.__akiniOpenBatchSend = function () {
