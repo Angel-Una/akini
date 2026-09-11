@@ -6565,20 +6565,20 @@ document.addEventListener("DOMContentLoaded", function () {
           window._idbStore.backupAll &&
           window._idbStore.backupAll();
         try {
+          // 超大键（图片/表情包 dataURL）由各自模块独立备份到 IDB，
+          // 全量快照跳过它们，避免周期性 stringify 大字符串造成内存峰值（iOS 随机闪退根因之一）
           for (var t = {}, e = 0; e < localStorage.length; e++) {
             var n = localStorage.key(e);
-            n && (t[n] = localStorage.getItem(n));
+            if (!n) continue;
+            var _v = localStorage.getItem(n);
+            if (_v && _v.length > 262144) continue;
+            t[n] = _v;
           }
+          var _snapStr = JSON.stringify(t);
           window._idbStore &&
             window._idbStore.set &&
-            (window._idbStore.set(
-              "akini_localstorage_snapshot",
-              JSON.stringify(t),
-            ),
-            window._idbStore.set(
-              "akini_localstorage_snapshot_backup",
-              JSON.stringify(t),
-            ));
+            (window._idbStore.set("akini_localstorage_snapshot", _snapStr),
+            window._idbStore.set("akini_localstorage_snapshot_backup", _snapStr));
         } catch (t) {}
         if (window.akiniContacts && window.akiniContacts.backupToIDB) {
           (window.akiniContacts.backupToIDB(
@@ -9195,6 +9195,38 @@ document.addEventListener("DOMContentLoaded", function () {
                     x.customPokes.forEach((t) => a(t, { tab: "pat" }));
                   if (sel.emoji && Array.isArray(x.customEmojis))
                     x.customEmojis.forEach((t) => a(t, { tab: "emoji" }));
+                  /* 表情包模块导入恢复：按归属联系人合并写回，分组同步恢复 */
+                  if (sel.sticker !== false && Array.isArray(x.customStickers) && x.customStickers.length) {
+                    try {
+                      var _byOwner = {};
+                      x.customStickers.forEach(function (it) {
+                        if (!it || !it.s) return;
+                        var oc = String(it.o || "me");
+                        (_byOwner[oc] = _byOwner[oc] || []).push({ s: it.s, g: it.g || "", n: it.n || "", b: it.b ? 1 : 0 });
+                      });
+                      Object.keys(_byOwner).forEach(function (oc) {
+                        var cur = window.__wbRead("akini_stickers_" + oc, []) || [];
+                        var seen = {};
+                        cur.forEach(function (it) { if (it && it.s) seen[String(it.s).slice(0, 64)] = 1; });
+                        _byOwner[oc].forEach(function (it) {
+                          var kk = String(it.s).slice(0, 64);
+                          if (seen[kk]) return;
+                          cur.push(it); seen[kk] = 1;
+                        });
+                        window.__wbWrite && window.__wbWrite("akini_stickers_" + oc, cur);
+                      });
+                    } catch (e) {}
+                  }
+                  if (sel.sticker !== false && Array.isArray(x.customStickerGroups) && x.customStickerGroups.length) {
+                    try {
+                      var _sg = window.__wbRead("akini_stk_groups", []) || [];
+                      x.customStickerGroups.forEach(function (g2) {
+                        if (!g2 || !g2.id) return;
+                        if (!_sg.some(function (z) { return String(z.id) === String(g2.id); })) _sg.push({ id: g2.id, name: g2.name || "分组" });
+                      });
+                      window.__wbWrite && window.__wbWrite("akini_stk_groups", _sg);
+                    } catch (e) {}
+                  }
                   if (sel.other && 0 === v && 0 === h) {
                     if (x.ls) {
                       var o = x.ls.akini_wordbank;
@@ -9657,7 +9689,8 @@ document.addEventListener("DOMContentLoaded", function () {
             ((sec.style.cssText = "font-size:12px;color:#999;margin:10px 4px 6px"),
               (sec.textContent = tb[1] + "（" + cards.length + "）"),
               WEL.appendChild(sec),
-              cards.forEach((t) => {
+              /* 渲染上限防卡死：超量只渲染前 300 条 */
+              cards.slice(0, 300).forEach((t) => {
                 const text = (t.text || t.content || "").trim();
                 if (!text) return;
                 const ck = tb[0] + "::" + text,
@@ -9825,14 +9858,40 @@ document.addEventListener("DOMContentLoaded", function () {
               data.modules.push("groups");
             }
           }
+          /* 表情包模块：合并导出所有联系人的表情包及表情包分组 */
+          if (sel.sticker && !hasGroupFilter) {
+            var stkAll = [];
+            try {
+              var _ppl = ["me"];
+              (window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : []).forEach(function (c) { _ppl.push(String(c.id)); });
+              _ppl.forEach(function (cid) {
+                (window.__wbRead("akini_stickers_" + cid, []) || []).forEach(function (it) {
+                  if (it && it.s) stkAll.push({ o: cid, s: it.s, g: it.g || "", n: it.n || "", b: it.b ? 1 : 0 });
+                });
+              });
+            } catch (e) {}
+            var stkGs = window.__wbRead("akini_stk_groups", []) || [];
+            if (stkAll.length) { data.customStickers = stkAll; data.modules.push("stickers"); }
+            if (stkGs.length) { data.customStickerGroups = stkGs; }
+          }
           return data;
         }
+        window.__wbCollectMilkData = __wbCollectMilkData;
         function __wbDownloadJson(data, moduleTag) {
           var pad = function (n) { return n < 10 ? "0" + n : n; };
           var d0 = new Date();
           var name = "reply-library-" + (moduleTag || data.modules.join("+") || "empty") + "-" +
             d0.getFullYear() + "-" + pad(d0.getMonth() + 1) + "-" + pad(d0.getDate()) + ".json";
           var blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+          /* iOS Safari 会把 a[download] 的 blob: 链接当导航打开，大 JSON 直接渲染导致页面崩溃（闪退）；
+             优先用 Web Share Level 2 系统分享面板保存文件，不支持时回退传统下载 */
+          try {
+            var f = new File([blob], name, { type: "application/json" });
+            if (navigator.canShare && navigator.canShare({ files: [f] })) {
+              navigator.share({ files: [f], title: name }).catch(function () {});
+              return;
+            }
+          } catch (e) {}
           var url = URL.createObjectURL(blob);
           var aEl = document.createElement("a");
           aEl.href = url;
@@ -9889,7 +9948,13 @@ document.addEventListener("DOMContentLoaded", function () {
             var cntMain = all.filter(function (t) { return ((t && t.tab) || "main") === "main"; }).length;
             var cntEmoji = all.filter(function (t) { return (t && t.tab) === "emoji"; }).length;
             var cntPat = all.filter(function (t) { return (t && t.tab) === "pat"; }).length;
-            if (!all.length && !gs.length) {
+            var cntStk = 0;
+            try {
+              var _ppl2 = ["me"];
+              (window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : []).forEach(function (c) { _ppl2.push(String(c.id)); });
+              _ppl2.forEach(function (cid) { cntStk += (window.__wbRead("akini_stickers_" + cid, []) || []).length; });
+            } catch (e) {}
+            if (!all.length && !gs.length && !cntStk) {
               window.__akiniToast ? window.__akiniToast("暂无字卡数据") : alert("暂无字卡数据");
               return;
             }
@@ -9907,6 +9972,7 @@ document.addEventListener("DOMContentLoaded", function () {
               (cntMain ? modRow("main", "主字卡", cntMain) : "") +
               (cntEmoji ? modRow("emoji", "Emoji", cntEmoji) : "") +
               (cntPat ? modRow("pat", "拍一拍", cntPat) : "") +
+              (cntStk ? modRow("sticker", "表情包（含分组）", cntStk) : "") +
               (gs.length ? modRow("groups", "字卡分组（含组内字卡）", gs.length) : "") +
               (gs.length ? '<button type="button" data-act="bygroup" style="width:100%;padding:12px;margin:2px 0 12px;border:1.5px dashed #e0e0e0;border-radius:13px;background:#fafafa;color:#555;font-size:13px;cursor:pointer">按分组导出 ›</button>' : "") +
               '<div style="display:flex;gap:10px"><button type="button" data-act="cancel" style="flex:1;padding:12px;border:1.5px solid #e5e5e5;border-radius:13px;background:none;color:#888;font-size:13px;cursor:pointer">取消</button>' +
@@ -9920,7 +9986,7 @@ document.addEventListener("DOMContentLoaded", function () {
               var sel = {};
               ov.querySelectorAll("input[type=checkbox][data-key]").forEach(function (cb) { sel[cb.dataset.key] = cb.checked; });
               ov.remove();
-              if (!sel.main && !sel.emoji && !sel.pat && !sel.groups) {
+              if (!sel.main && !sel.emoji && !sel.pat && !sel.groups && !sel.sticker) {
                 window.__akiniToast && window.__akiniToast("请至少选择一个模块");
                 return;
               }
@@ -20014,6 +20080,19 @@ document.addEventListener("DOMContentLoaded", function () {
         if (window._akiniEndingLock) return;
         window._akiniEndingLock = !0;
         setTimeout(function () { window._akiniEndingLock = !1; }, 500);
+        // 播放模式以 localStorage 为准（单一事实源）：避免闭包变量与 UI 状态
+        // 不一致导致"选了单曲循环却仍跳下一首"
+        try {
+          var _lsm = parseInt(localStorage.getItem("akini_music_mode") || "0", 10);
+          if (0 === _lsm || 1 === _lsm || 2 === _lsm) s = _lsm;
+        } catch (t) {}
+        try {
+          console.log(
+            "[一起听] 歌曲结束,播放模式:",
+            s,
+            1 === s ? "单曲循环" : 2 === s ? "随机播放" : "列表循环",
+          );
+        } catch (t) {}
         ((__akiniManualPlay = !1),
           (w = 0),
           X(),
@@ -21760,10 +21839,10 @@ document.addEventListener("DOMContentLoaded", function () {
             var el = document.querySelector('.post-item[data-idx="' + idx + '"]');
             if (el) {
               el.scrollIntoView({ behavior: "smooth", block: "center" });
-              el.style.transition = "background .3s";
-              var oldBg = el.style.background;
-              el.style.background = "#fffbe6";
-              setTimeout(function () { el.style.background = oldBg; }, 1600);
+              /* 朋友圈：黑色线条包裹跳转动效（与 icity 蓝色线条同机制） */
+              el.style.transition = "box-shadow .3s";
+              el.style.boxShadow = "0 0 0 2px #1a1a1a";
+              setTimeout(function () { el.style.boxShadow = ""; }, 1600);
             }
           }
         } catch (e) {}
@@ -22053,7 +22132,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:12px 16px;background:#fff;border-bottom:1px solid #f0f0f0;-webkit-overflow-scrolling:touch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:12px 16px;background:#fff;-webkit-overflow-scrolling:touch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
@@ -22065,10 +22144,11 @@ window.__akiniNowTs = function () {
     var groups = _stkGRead();
     if (groups.length) {
       var arr0 = _stkRead(cid);
-      h += '<div style="display:flex;gap:8px;overflow-x:auto;padding:10px 16px;background:#fff;border-bottom:1px solid #f0f0f0;-webkit-overflow-scrolling:touch;">';
+      h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:8px 16px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;">';
+      /* chips 样式统一走 .wb-gf-btn（图五：灰底圆角条 + 选中白底黑色线条包裹），不再内联 */
       var chip = function (gid, label, count) {
         var on2 = String(_stkFilterGid) === String(gid);
-        return '<button type="button" class="wb-stk-chip" data-gid="' + gid + '" style="flex-shrink:0;padding:6px 14px;border-radius:16px;border:1px solid ' + (on2 ? '#1a1a1a' : '#e5e5e5') + ';background:' + (on2 ? '#1a1a1a' : '#f5f5f5') + ';color:' + (on2 ? '#fff' : '#555') + ';font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;">' + label + (count != null ? '(' + count + ')' : '') + '</button>';
+        return '<button type="button" class="wb-stk-chip wb-gf-btn' + (on2 ? ' active' : '') + '" data-gid="' + gid + '" style="flex-shrink:0;-webkit-tap-highlight-color:transparent;">' + label + (count != null ? '(' + count + ')' : '') + '</button>';
       };
       h += chip('', '全部', null);
       h += chip('__ungrouped__', '未分组', arr0.filter(function (x) { return !x.g; }).length);
@@ -22094,38 +22174,40 @@ window.__akiniNowTs = function () {
     h += '</div>' + (shown.length ? '' : '<div style="text-align:center;color:#bbb;font-size:13px;padding:40px 0;">' + (arr.length ? '没有匹配的表情包' : '还没有表情包，点右上角「新增」添加图片') + '</div>') + '</div>';
     box.innerHTML = h;
     _syncModeBars();
-    /* 头像切换：pointerdown/touchend/click 三通道 + 去抖锁，修复 iOS 上点击无效 */
-    box.querySelectorAll('.wb-stk-person').forEach(function (el) {
-      var lock = 0;
-      var go = function (e) {
-        if (e) { e.preventDefault(); e.stopPropagation(); }
-        var n = Date.now(); if (n - lock < 350) return; lock = n;
-        _setCid(el.getAttribute('data-cid'));
-        renderStickerTab();
-      };
-      el.addEventListener('pointerdown', go, true);
-      el.addEventListener('touchend', go, true);
-      el.addEventListener('click', go, true);
-    });
-    box.querySelectorAll('.wb-stk-chip').forEach(function (el) {
-      el.addEventListener('click', function () {
-        _stkFilterGid = this.getAttribute('data-gid') || '';
-        _stkSel = {};
-        renderStickerTab();
-      });
-    });
-    box.querySelectorAll('.wb-stk-item').forEach(function (el) {
-      el.addEventListener('click', function () {
-        var idx = parseInt(this.getAttribute('data-idx'), 10);
-        if (isNaN(idx)) return;
-        if (_stkSelMode || _stkBlockMode) {
-          if (_stkSel[idx]) delete _stkSel[idx]; else _stkSel[idx] = true;
+    /* 容器级事件委托：只绑一次，innerHTML 重绘后依然有效（修复真机点击全失效） */
+    if (!box.__stkDelegated) {
+      box.__stkDelegated = true;
+      box.addEventListener('click', function (ev) {
+        if (window.__wbTab !== 'sticker') return;
+        var t = ev.target && ev.target.closest ? ev.target : null;
+        if (!t) return;
+        var person = t.closest('.wb-stk-person');
+        if (person && box.contains(person)) {
+          _setCid(person.getAttribute('data-cid'));
+          _stkSel = {};
           renderStickerTab();
-        } else {
-          _askDelete(_getCid(), idx);
+          return;
+        }
+        var chipEl = t.closest('.wb-stk-chip');
+        if (chipEl && box.contains(chipEl)) {
+          _stkFilterGid = chipEl.getAttribute('data-gid') || '';
+          _stkSel = {};
+          renderStickerTab();
+          return;
+        }
+        var item = t.closest('.wb-stk-item');
+        if (item && box.contains(item)) {
+          var idx = parseInt(item.getAttribute('data-idx'), 10);
+          if (isNaN(idx)) return;
+          if (_stkSelMode || _stkBlockMode) {
+            if (_stkSel[idx]) delete _stkSel[idx]; else _stkSel[idx] = true;
+            renderStickerTab();
+          } else {
+            _askDelete(_getCid(), idx);
+          }
         }
       });
-    });
+    }
   }
 
   /* ---- 删除确认 ---- */

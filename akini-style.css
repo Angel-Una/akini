@@ -6564,3 +6564,47 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
 .akini-deep-safe .music-player-ecg,
 .akini-deep-safe .music-player-disc { animation: none !important; }
 .akini-deep-safe .chat-body img { content-visibility: auto !important; }
+
+/* ============ v20260911zzv ============ */
+/* 字卡库「新增」/「新建分组」改全胶囊圆角 */
+.wb-head-add { height: 36px !important; padding: 0 16px !important; border-radius: 999px !important; gap: 5px; }
+.group-modal .modal-box .add-group-btn { border-radius: 999px !important; padding: 14px !important; }
+/* 加号菜单：左右留边撑满，图标格子不再挤压溢出 */
+.plus-menu { left: 12px; right: 12px; min-width: 0; }
+/* 聊天页横向防裁切：窄屏加号按钮被挡根因 */
+.content-area { overflow-x: hidden; }
+.chat-wrapper { width: 100%; min-width: 0; }
+.chat-body { min-width: 0; }
+.chat-input-bar { width: 100%; box-sizing: border-box; }
+/* 消息中心角标：白底黑字（与桌面 home-badge 统一） */
+#icityNotifBadge, #friendsNotifBadge { background: #fff !important; color: #1a1a1a !important; border: 1px solid rgba(0,0,0,.08); box-shadow: 0 1px 4px rgba(0,0,0,.18); font-weight: 700; }
+/* 分组筛选 chips 统一图五样式：灰底圆角条 + 选中白底黑色线条包裹 */
+.wb-gf-btn { border: none !important; background: transparent !important; box-shadow: none !important; color: #777 !important; }
+.wb-gf-btn.active { background: #fff !important; color: #111 !important; box-shadow: 0 0 0 1.5px #1a1a1a !important; font-weight: 600; }
+body.dark-mode .wb-gf-btn { color: #9a9a9e !important; }
+body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !important; }
+/* 表情包分组 chips 复用同款 */
+.wb-stk-chip { border: none !important; }
+
+/* ============ v20260911zzv ============ */
+/* 字卡库「新增」「新建分组」改 icity 发送键式全胶囊圆角 */
+.wb-head-add { height: 36px !important; padding: 0 16px !important; border-radius: 999px !important; gap: 5px; }
+.group-modal .modal-box .add-group-btn { border-radius: 999px !important; padding: 14px !important; }
+/* 加号菜单：撑满宽度，grid 三列均分，防止图标底图互相挤压溢出 */
+.plus-menu { left: 12px; right: 12px; min-width: 0; }
+/* 聊天页横向防裁切：长内容撑宽容器导致加号按钮被挡的根因修复 */
+.content-area { overflow-x: hidden; }
+.chat-wrapper { width: 100%; min-width: 0; }
+.chat-body { min-width: 0; }
+.chat-input-bar { width: 100%; box-sizing: border-box; }
+.chat-input-bar .input-wrap { min-width: 0; }
+.chat-input-bar .input-wrap input { min-width: 0; }
+.chat-body .msg-row .bubble { overflow-wrap: anywhere; }
+/* 消息中心角标（朋友圈/icity）改白底黑字，与桌面 home-badge 一致 */
+#icityNotifBadge, #friendsNotifBadge { background: #fff !important; color: #1a1a1a !important; border: 1px solid rgba(0,0,0,.08); box-shadow: 0 1px 4px rgba(0,0,0,.18); font-weight: 700; }
+/* 分组筛选 chips 统一为图五样式：浅灰圆角底条 + 选中项白色卡片黑色线条包裹 */
+#wbGroupFilter { background: #f5f5f5 !important; border-bottom: none !important; border-radius: 14px; margin: 6px 18px 8px; padding: 5px !important; }
+.wb-gf-btn { border: none !important; background: transparent !important; box-shadow: none !important; color: #777 !important; }
+.wb-gf-btn.active { background: #fff !important; color: #111 !important; box-shadow: 0 0 0 1.5px #1a1a1a !important; font-weight: 600; }
+body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
+body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !important; box-shadow: 0 0 0 1.5px #ddd !important; }

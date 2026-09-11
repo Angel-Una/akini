@@ -296,6 +296,32 @@
     }, 2000);
   }
 
+  /* iOS Safari 会把 a[download] 的 blob: 链接当作"打开文件"来导航，
+     大 JSON 直接在标签页渲染 → 内存爆掉 → 页面被系统杀掉（用户看到的"闪退"）。
+     优先走 Web Share Level 2（系统分享面板，可"存储到文件"）；不支持时回退传统下载。 */
+  function saveBlobSmart(blob, fileName, done) {
+    try {
+      var f = new File([blob], fileName, {
+        type: blob.type || "application/octet-stream",
+      });
+      if (navigator.canShare && navigator.canShare({ files: [f] })) {
+        navigator
+          .share({ files: [f], title: fileName })
+          .then(function () {
+            done && done();
+          })
+          .catch(function (e) {
+            if (e && e.name === "AbortError") return; // 用户主动取消分享，不算失败
+            downloadBlob(blob, fileName);
+            done && done();
+          });
+        return;
+      }
+    } catch (e) {}
+    downloadBlob(blob, fileName);
+    done && done();
+  }
+
   function notify(title, body, type) {
     try {
       if (window.__akiniCenterModal) {
@@ -495,12 +521,13 @@
     var fileName = "akini-backup-" + dateStr + ".json";
     var str = "\uFEFF" + JSON.stringify(payload);
     var blob = new Blob([str], { type: "application/json;charset=utf-8" });
-    downloadBlob(blob, fileName);
-    notify(
-      "导出成功",
-      "已导出 JSON 备份文件，可随时导入恢复",
-      "success"
-    );
+    saveBlobSmart(blob, fileName, function () {
+      notify(
+        "导出成功",
+        "已导出 JSON 备份文件，可随时导入恢复",
+        "success"
+      );
+    });
   }
 
   function applyBackupToStorage(data, done, errCb) {
