@@ -8444,14 +8444,9 @@ document.addEventListener("DOMContentLoaded", function () {
       ue = document.getElementById("fileInputChatWallpaper");
     function me() {
       const t = document.getElementById("emojiPanel");
-      /* zze：表情包按当前聊天对象独立——读字卡库中该联系人的表情包，无聊天对象时用“我”的 */
-      var _cid = "me";
-      try {
-        var _ac = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
-        if (_ac) _cid = _ac;
-      } catch (e0) {}
+      /* zzf：表情面板只显示“我”的表情包；联系人发表情包走对方回复逻辑（已用其独立表情包） */
       t &&
-        N(_cid, function (e) {
+        N("me", function (e) {
           if (
             (t.querySelectorAll(".sticker-img-btn").forEach((t) => t.remove()),
             0 === e.length)
@@ -22008,18 +22003,20 @@ document.addEventListener("DOMContentLoaded", function () {
             if (el) {
               el.scrollIntoView({ behavior: "smooth", block: "center" });
               /* 朋友圈：黑色线条包裹跳转动效（与 icity 蓝色线条同机制） */
-              /* zze：整框圈选 + 浅灰底填充，用户反馈单条细线看不出是哪条 */
-              el.style.transition = "outline .2s, background .2s";
-              el.style.outline = "2px solid #1a1a1a";
+              /* zzf：整框圈选加强——outline+box-shadow 双层描边 + 底色填充，确保任何机型都明显 */
+              el.style.transition = "outline .2s, background .2s, box-shadow .2s";
+              el.style.outline = "3px solid #1a1a1a";
               el.style.outlineOffset = "2px";
+              el.style.boxShadow = "0 0 0 6px rgba(26,26,26,0.15)";
               el.style.borderRadius = "10px";
-              el.style.background = "rgba(0,0,0,0.05)";
+              el.style.background = "rgba(0,0,0,0.06)";
               setTimeout(function () {
                 el.style.outline = "";
                 el.style.outlineOffset = "";
+                el.style.boxShadow = "";
                 el.style.background = "";
                 el.style.borderRadius = "";
-              }, 1800);
+              }, 2000);
             }
           }
         } catch (e) {}
@@ -22346,7 +22343,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:2px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:8px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
