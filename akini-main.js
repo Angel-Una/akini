@@ -1,4 +1,61 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
+/* ===== mochi 式媒体池：聊天图片 base64 抽离为 hash 引用，HTML 字符串只存占位 =====
+   根治内存爆炸：老数据打开会话保存时自动瘦身迁移，新数据发送时直接入池 */
+window.__akiniMedia = (function () {
+  var MEM = {};
+  var PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+  function hash(s) {
+    var h = 5381;
+    for (var i = 0; i < s.length; i += 7) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+    return "m" + (h >>> 0).toString(36) + "_" + s.length;
+  }
+  return {
+    PLACEHOLDER: PLACEHOLDER,
+    /* 存 base64 入池，返回 hash（同步写内存，异步写 IDB） */
+    put: function (dataUrl) {
+      if (!dataUrl || dataUrl.indexOf("data:") !== 0) return null;
+      var h = hash(dataUrl);
+      if (!MEM[h]) {
+        MEM[h] = dataUrl;
+        try { window._idbStore && window._idbStore.set("akini_media_" + h, dataUrl); } catch (e) {}
+      }
+      return h;
+    },
+    get: function (h, cb) {
+      if (MEM[h]) return cb(MEM[h]);
+      try {
+        window._idbStore.get("akini_media_" + h, function (v) {
+          if (v) MEM[h] = v;
+          cb(v || null);
+        });
+      } catch (e) { cb(null); }
+    },
+    /* DOM 回填：扫描容器内 img[data-mh] 从池取真图 */
+    resolve: function (root) {
+      if (!root || !root.querySelectorAll) return;
+      var self = this;
+      var imgs = root.querySelectorAll("img[data-mh]");
+      for (var i = 0; i < imgs.length; i++) {
+        (function (img) {
+          var h = img.getAttribute("data-mh");
+          if (!h || img.__mhDone) return;
+          self.get(h, function (url) {
+            if (url) { img.src = url; img.__mhDone = true; }
+          });
+        })(imgs[i]);
+      }
+    }
+  };
+})();
+/* 字符串级瘦身：把 HTML 里 >8KB 的 base64 图抽离入池，替换为 data-mh 引用（行数不变） */
+function __akiniStripMedia(html) {
+  if (!html || html.indexOf("data:image") < 0 || !window.__akiniMedia) return html;
+  return html.replace(/<img([^>]*?)src="(data:image\/[^"]{8000,})"([^>]*)>/g, function (m, pre, url, post) {
+    var h = window.__akiniMedia.put(url);
+    if (!h) return m;
+    return '<img data-mh="' + h + '"' + pre + ' src="' + window.__akiniMedia.PLACEHOLDER + '"' + post + ">";
+  });
+}
 /* 图片压缩：所有 FileReader 读取的图片统一压缩，避免 base64 过大撑爆 localStorage 配额导致数据丢失 */
 (function () {
   if (window.__akiniFRCompress) return;
@@ -737,6 +794,10 @@ document.addEventListener("DOMContentLoaded", function () {
           ready(function (inst) {
             if (!inst) { done(); return; }
             inst.iterate(function (v, k) {
+              /* 启动内存减负：聊天历史冗余副本（akini_chat_history_*）不在启动时全量入内存，
+                 由 openChat 时按需 _idbStore.get 单会话读取——聊天记录含图片 base64，
+                 全量 iterate 会让 iOS WebContent 内存爆掉被 jetsam 杀掉（崩溃循环根因） */
+              if (k && k.indexOf("akini_chat_history_") === 0) return;
               if (k && k.indexOf("akini_app_icon_") !== 0 && !isSnapKey(k) && !isEmpty(v)) {
                 // 把 IDB 权威数据同步到内存缓存，避免 localStorage 满后读不到最新数据
                 if (window.akiniStore && window.akiniStore.memorySet) {
@@ -750,6 +811,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
               }
             }).then(function () {
+              /* 深度安全模式：跳过快照兜底的全量 JSON.parse（内存峰值大），逐键恢复已够 */
+              if (document.documentElement.classList.contains("akini-deep-safe")) { done(); return; }
               // 兜底：全量快照回填空键（覆盖逐键恢复之外的缺失场景，如 IDB 键被单独清理）
               inst.getItem("akini_idb_full_snapshot").then(function (snapRaw) {
                 try {
@@ -3967,11 +4030,16 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function __doStickerSend(o) {
         if (!o || !o.length) return;
+        /* 媒体池化：先取出随机图统一入池，data-mh 与 src 必须同源 */
+        var picked = o[Math.floor(Math.random() * o.length)];
+        var _mh = window.__akiniMedia ? window.__akiniMedia.put(picked) : null;
         const n =
           '<div class="msg-row other"><div class="msg-content-line"><div class="msg-avatar">' +
           i +
-          '</div><div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;"><img src="' +
-          o[Math.floor(Math.random() * o.length)] +
+          '</div><div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;"><img ' +
+          (_mh ? 'data-mh="' + _mh + '" ' : "") +
+          'src="' +
+          picked +
           '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;"></div></div></div>' +
           "";
         if (a && U) {
@@ -4329,7 +4397,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
     }
-    var AKINI_CHAT_BATCH_SIZE = 200;
+    /* 深度安全模式首批渲染减半：少解码图片，降低崩溃风险 */
+    var AKINI_CHAT_BATCH_SIZE = document.documentElement.classList.contains("akini-deep-safe") ? 60 : 200;
     function __akiniStripTypingRows(html) {
       if (!html || "string" != typeof html) return html || "";
       var hasTyping =
@@ -4468,6 +4537,7 @@ document.addEventListener("DOMContentLoaded", function () {
           window.akiniContacts ? window.akiniContacts.getActiveChatId() : "",
         );
       } catch (e) {}
+      try { window.__akiniMedia && window.__akiniMedia.resolve(U); } catch (e) {}
       U.scrollTop = U.scrollHeight;
       [120, 400, 900].forEach(function (_ms) {
         setTimeout(function () { try { U.scrollTop = U.scrollHeight; } catch (e) {} }, _ms);
@@ -4486,6 +4556,7 @@ document.addEventListener("DOMContentLoaded", function () {
       // 记录旧高度，避免加载后滚动位置跳到底部
       var oldHeight = U.scrollHeight, oldTop = U.scrollTop;
       U.innerHTML = newHTML;
+      try { window.__akiniMedia && window.__akiniMedia.resolve(U); } catch (e) {}
       U.scrollTop = oldTop + (U.scrollHeight - oldHeight);
       __akiniSetupChatMetaObserver();
     }
@@ -4507,6 +4578,7 @@ document.addEventListener("DOMContentLoaded", function () {
         while (temp.firstChild) {
           U.appendChild(temp.firstChild);
         }
+        try { window.__akiniMedia && window.__akiniMedia.resolve(U); } catch (e) {}
         // 最多只保留最近 200 条在界面上：超出后从顶部裁剪，并启用下拉加载回看更早记录
         var excess = U.querySelectorAll('.msg-row').length - AKINI_CHAT_BATCH_SIZE;
         if (excess > 0) {
@@ -4526,7 +4598,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function C(t, e) {
       if (!t || "string" != typeof e) return;
       // 持久化前清理输入动态残留
-      var clean = __akiniStripTypingRows(e);
+      var clean = __akiniStripMedia(__akiniStripTypingRows(e));
       var key = "akini_chat_history_" + t;
       var backup = "akini_chat_history_backup_" + t;
       // 关键防护：如果新记录比现有记录短，不覆盖任何备份，防止恢复时选错源导致数据被截断
@@ -4548,12 +4620,9 @@ document.addEventListener("DOMContentLoaded", function () {
         // 使用安全存储层：优先写 IDB，同时尝试写 localStorage 热备
         if (window.akiniStore && window.akiniStore.set) {
           window.akiniStore.set(key, clean);
-          window.akiniStore.set(backup, clean);
         } else {
           try { _idbStore.set(key, clean); } catch (err) {}
-          try { _idbStore.set(backup, clean); } catch (err) {}
           try { localStorage.setItem(key, clean); } catch (i) {}
-          try { localStorage.setItem(backup, clean); } catch (i) {}
         }
       };
       try {
@@ -14662,9 +14731,17 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         return true;
       }
-      /* 缓存命中：立即同步渲染，切换秒开 */
+      /* 缓存命中：立即同步渲染，切换秒开（milk 式单次渲染） */
       if (_mailRawCache[t] != null) {
         _renderMailList(t, _mailRawCache[t]);
+        /* 后台静默校验：仅当数据真的变化才重绘，避免每次切换双渲染闪烁卡顿 */
+        D(e, function (v) {
+          if (v && loadRaw(v) && v !== _mailRawCache[t]) {
+            _mailRawCache[t] = v;
+            _renderMailList(t, v);
+          }
+        });
+        return;
       }
       D(e, function (v) {
         if (v && loadRaw(v)) {
@@ -14686,6 +14763,10 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
     function _renderMailList(t, raw) {
+      /* 渲染签名：同 tab 同数据不重绘，杜绝重复 innerHTML 全量重建 */
+      var _sig = t + "|" + (raw || "").length + "|" + (raw || "").slice(0, 64);
+      if (dn && dn.__mailSig === _sig) return;
+      if (dn) dn.__mailSig = _sig;
       var n = [];
       try {
         n = JSON.parse(raw || "[]");
@@ -16709,6 +16790,8 @@ document.addEventListener("DOMContentLoaded", function () {
         clearTimeout(_kaRetryTimer);
         _kaRetryTimer = setTimeout(function () {
           if (!_kaAudioEnabled() || _kaUserStopped || !_kaAudio) return;
+          /* 双保险：退避到期时若在后台，不抢音频焦点，等 visible 续播 */
+          if (document.hidden) { _kaDelay = 0; return; }
           var p = _kaAudio.play();
           if (p && p.catch) p.catch(function () { _kaScheduleRetry(); });
         }, _kaDelay);
@@ -16738,6 +16821,9 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (!_kaAudioEnabled() || _kaUserStopped) return;
                 // 稳定播放满 30s 后被打断 → 退避轨道清零重算
                 if (_kaLastPlayAt && Date.now() - _kaLastPlayAt > 30000) _kaDelay = 0;
+                /* milk 逻辑：后台被系统挂起时不挣扎（强推 play 会被 iOS 惩罚性彻底停掉），
+                   等切回前台时由 visibilitychange 续播；只有前台被异常暂停才退避重试 */
+                if (document.hidden) return;
                 _kaScheduleRetry();
               } catch (e) {}
             });
@@ -16768,7 +16854,7 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }),
         // 启动时若已开启保活则尝试开播（被自动播放策略拦截时由 unlock 兜底）
-        setTimeout(function () { if (_kaAudioEnabled()) _kaAudioStart(); }, 1200));
+        setTimeout(function () { if (_kaAudioEnabled() && !document.documentElement.classList.contains("akini-deep-safe")) _kaAudioStart(); }, 1200));
       var o = window.showInAppNotif,
         r = Date.now();
       ((window.showInAppNotif = function (t) {

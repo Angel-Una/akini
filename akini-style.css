@@ -6555,3 +6555,11 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
 .akini-safe-mode .content-wrapper { height: auto !important; margin-top: 44px !important; justify-content: flex-start !important; }
 .akini-safe-mode .phone-frame { overflow-y: auto !important; position: absolute !important; }
 .akini-safe-mode .fake-statusbar { display: none !important; }
+
+/* ===== 深度安全模式（连续崩溃≥4次）：最大幅度减负保数据 ===== */
+.akini-deep-safe *,
+.akini-deep-safe *::before,
+.akini-deep-safe *::after { animation: none !important; transition: none !important; }
+.akini-deep-safe .music-player-ecg,
+.akini-deep-safe .music-player-disc { animation: none !important; }
+.akini-deep-safe .chat-body img { content-visibility: auto !important; }
