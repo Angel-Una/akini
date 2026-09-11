@@ -3185,14 +3185,20 @@ document.addEventListener("DOMContentLoaded", function () {
             var _fb = (c.emoji && String(c.emoji).trim()) || "";
             return _fb ? nt(_fb, 38) : window.__akiniLineAvatarImg();
           })(),
-          // 表情包：优先该联系人专属收藏，为空时回退全局表情面板收藏（akini_stickers）
+          /* 表情包：仅使用「我」在字卡库给该联系人添加的收藏（akini_stickers_<cid>），
+             不再回退全局/内置；兼容字符串与 {s,g,b} 两种存储格式，过滤已屏蔽 */
           m = (function () {
-            var _own = getContactStickersSync(c.id);
-            if (_own && _own.length > 0) return _own;
-            try {
-              var _all = JSON.parse(localStorage.getItem("akini_stickers") || "[]");
-              return Array.isArray(_all) ? _all : [];
-            } catch (e) { return []; }
+            var _own = getContactStickersSync(c.id) || [];
+            var _out = [];
+            _own.forEach(function (it) {
+              var s = "";
+              if (typeof it === "string") s = it;
+              else if (it && typeof it.s === "string") s = it.s;
+              else if (it && (it.url || it.src || it.data)) s = String(it.url || it.src || it.data);
+              var blocked = it && typeof it === "object" && (it.b === 1 || it.b === true || it.b === "1");
+              if (!blocked && /^data:image\//.test(s)) _out.push(s);
+            });
+            return _out;
           })(),
           f = i("akini_wordbank", []).filter(function (t) {
             return !t.tab || "main" === t.tab;
@@ -3992,7 +3998,7 @@ document.addEventListener("DOMContentLoaded", function () {
         h();
         var o = [];
         try {
-          // 优先同步缓存（akini_stickers_<id>），联系人专属表情包
+          /* 仅使用「我」在字卡库给该联系人添加的收藏（akini_stickers_<id>），不回退全局/字卡库 */
           var key = "akini_stickers_" + (r || "");
           var cache = (window.__csCache && window.__csCache[key]) || null;
           if (Array.isArray(cache) && cache.length) o = cache;
@@ -4001,23 +4007,13 @@ document.addEventListener("DOMContentLoaded", function () {
             var raw = localStorage.getItem(key);
             if (raw) { try { var arr = JSON.parse(raw); if (Array.isArray(arr) && arr.length) o = arr; } catch(e){} }
           }
-          // 仍无则回退全局表情包 akini_stickers
-          if (!o.length) {
-            var g = (window.__csCache && window.__csCache["akini_stickers"]) || null;
-            if (Array.isArray(g) && g.length) o = g;
-            else {
-              var rawg = localStorage.getItem("akini_stickers");
-              if (rawg) { try { var arr2 = JSON.parse(rawg); if (Array.isArray(arr2) && arr2.length) o = arr2; } catch(e){} }
-            }
-          }
-          // 最后回退字卡库 sticker 分类
-          if (!o.length) {
-            var wb = i("akini_wordbank", []);
-            o = wb.filter(function (it) {
-              var tab = (it.tab || "").toLowerCase();
-              return (tab === "sticker" || tab === "stickers" || tab === "表情" || tab === "表情包") && (it.img || it.url || it.text);
-            }).map(function(it){ return it.img || it.url || it.text; }).filter(Boolean);
-          }
+          /* 规范化+过滤已屏蔽（兼容字符串与 {s,g,b} 格式） */
+          o = (o || []).map(function (it) {
+            if (typeof it === "string") return it;
+            if (it && typeof it.s === "string") return (it.b ? null : it.s);
+            if (it && (it.url || it.src || it.data)) return String(it.url || it.src || it.data);
+            return null;
+          }).filter(Boolean);
         } catch(e) { console.warn('doSticker load stickers fail', e); }
         if (!o.length) {
           // 终极兜底：刷新后 LS 已迁移清空、__csCache 未恢复时，从 IndexedDB 异步读取并立即发送
@@ -7094,8 +7090,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     window.renderChatList = ot;
     function rt(t) {
-      return t
-        ? t
+      return t || t === 0
+        ? String(t)
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -9605,11 +9601,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 row = document.createElement("div");
               ((row.className = "wb-excl-contact"), (row.dataset.cid = c.id));
               const _avt = c.avatar && String(c.avatar).trim() ? String(c.avatar).trim() : "";
+              /* 默认头像（emoji/空）统一走 nt()：与聊天页同款人形线条 SVG 兜底 */
               const av = /^(data:|https?:|\/|<img)/i.test(_avt)
                 ? '<img src="' + _avt.replace(/"/g, "&quot;") + '" style="width:100%;height:100%;object-fit:cover" alt=""/>'
-                : '<span style="font-size:20px">' +
-                  (_avt || String(c.name || "?").charAt(0) || "?") +
-                  "</span>";
+                : (typeof window.nt === "function" ? window.nt(_avt, 42) : '<span style="font-size:20px">' + (_avt || "?") + "</span>");
               const subTxt = gids.length || cards.length
                 ? "已设 " + (gids.length ? gids.length + " 个专属分组" : "") + (gids.length && cards.length ? "、" : "") + (cards.length ? cards.length + " 张专属字卡" : "")
                 : "未设置专属";
@@ -21220,19 +21215,39 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (e) { return ""; }
   }
   // 联系人消息：与聊天页相同的 msg-row other 结构，自动套用自定义CSS/时间戳
-  function appendPartnerMsg(c, text) {
+  /* 观影表情包池：仅「我」在字卡库给该联系人添加的收藏（规范化+过滤已屏蔽），与微信聊天数据源一致 */
+  function watchStickerPool(cid) {
+    var out = [];
+    try {
+      var own = typeof window.getContactStickersSync === "function" ? window.getContactStickersSync(cid) : [];
+      (Array.isArray(own) ? own : []).forEach(function (it) {
+        var s = "";
+        if (typeof it === "string") s = it;
+        else if (it && typeof it.s === "string") s = it.s;
+        else if (it && (it.url || it.src || it.data)) s = String(it.url || it.src || it.data);
+        var blocked = it && typeof it === "object" && (it.b === 1 || it.b === true || it.b === "1");
+        if (!blocked && /^data:image\//.test(s)) out.push(s);
+      });
+    } catch (e) {}
+    return out;
+  }
+  function appendPartnerMsg(c, text, img) {
     var body = $("watchChatBody");
     if (!body) return;
     var row = document.createElement("div");
     row.className = "msg-row other";
     row.setAttribute("data-ts", String(Date.now()));
+    /* 表情包消息：裸图无气泡（与微信一致）；文字消息保持原气泡 */
+    var bubbleHtml = img
+      ? '<div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;border:none;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/></div>'
+      : '<div class="bubble">' + esc(text) + '</div>';
     row.innerHTML =
       '<div class="msg-content-line"><div class="msg-avatar">' + partnerAvatarHtml(c.avatar) + '</div>' +
-      '<div class="bubble">' + esc(text) + '</div></div>';
+      bubbleHtml + '</div>';
     body.appendChild(row);
     try { if (typeof window.__akiniProcessMsgMeta === "function") window.__akiniProcessMsgMeta(row); } catch (e) {}
     body.scrollTop = body.scrollHeight;
-    if (isFullscreen()) fireDanmaku((c.name ? c.name + "：" : "") + text);
+    if (isFullscreen() && !img) fireDanmaku((c.name ? c.name + "：" : "") + text);
   }
   // 观影聊天输入动态：与微信聊天一致的"对方正在输入"三点气泡
   function showWatchTyping() {
@@ -21273,6 +21288,18 @@ document.addEventListener("DOMContentLoaded", function () {
       // 与微信聊天一致：一轮回复 1~3 条（75%/20%/5% 同 AKR.getReplyCount），逐条间隔发出
       var r = Math.random();
       var replyCount = r < 0.75 ? 1 : r < 0.95 ? 2 : 3;
+      /* 表情包：概率与微信聊天一致（同款 contactEmojiToggle 开关 + AKR.getProb('emoji')），仅限该联系人字卡库收藏，裸图无气泡 */
+      var c0 = watchPartners[Math.floor(Math.random() * watchPartners.length)];
+      var stkOn = true;
+      try { stkOn = localStorage.getItem("akini_toggle_contactEmojiToggle") === "1"; } catch (e) {}
+      var stkProb = (stkOn && window.AKR && typeof window.AKR.getProb === "function") ? window.AKR.getProb("emoji") : 0;
+      if (c0 && stkProb > 0 && Math.random() < stkProb) {
+        var _pool = watchStickerPool(c0.id);
+        if (_pool.length) {
+          appendPartnerMsg(c0, "", _pool[Math.floor(Math.random() * _pool.length)]);
+          replyCount = Math.max(0, replyCount - 1);
+        }
+      }
       var sendNext = function (left) {
         if (left <= 0) return;
         var c = watchPartners[Math.floor(Math.random() * watchPartners.length)];
@@ -21464,7 +21491,7 @@ document.addEventListener("DOMContentLoaded", function () {
     row.className = "msg-row me";
     row.setAttribute("data-ts", String(Date.now()));
     var bubbleHtml = img
-      ? '<div class="bubble" style="background:#fff;padding:4px;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/></div>'
+      ? '<div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;border:none;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/></div>'
       : '<div class="bubble">' + esc(text) + '</div>';
     row.innerHTML =
       '<div class="msg-content-line">' + bubbleHtml +
@@ -22049,7 +22076,9 @@ window.__akiniNowTs = function () {
   function _esc(s) { return String(s || '').replace(/</g, '&lt;'); }
   function _avHtml(av, size) {
     if (av && /^(data:|https?:|blob:|\/)/.test(av)) return '<img src="' + av + '" style="width:100%;height:100%;object-fit:cover;" alt=""/>';
-    return '<span style="font-size:' + Math.round(size * 0.45) + 'px;">' + (av || '🙂') + '</span>';
+    /* 默认头像（emoji/空）统一走 nt()：与聊天页同款人形线条 SVG 兜底 */
+    if (typeof window.nt === 'function') return window.nt(av || '', size || 40);
+    return '<span style="font-size:' + Math.round((size || 40) * 0.45) + 'px;">' + (av || '') + '</span>';
   }
   function _myAvatar() {
     try {
@@ -22132,7 +22161,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:12px 16px;background:#fff;-webkit-overflow-scrolling:touch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:4px 16px 8px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
@@ -22144,7 +22173,7 @@ window.__akiniNowTs = function () {
     var groups = _stkGRead();
     if (groups.length) {
       var arr0 = _stkRead(cid);
-      h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:8px 16px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;">';
+      h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:2px 16px 8px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;align-self:stretch;box-sizing:border-box;">';
       /* chips 样式统一走 .wb-gf-btn（图五：灰底圆角条 + 选中白底黑色线条包裹），不再内联 */
       var chip = function (gid, label, count) {
         var on2 = String(_stkFilterGid) === String(gid);
@@ -22160,7 +22189,7 @@ window.__akiniNowTs = function () {
     var arr = _stkRead(cid);
     var shown = _stkFiltered(arr);
     /* 白底（去掉灰底），网格每行四个 */
-    h += '<div style="padding:12px;background:#fff;min-height:200px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    h += '<div style="padding:2px 12px 12px;background:#fff;min-height:200px;width:100%;box-sizing:border-box;align-self:stretch;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
     shown.forEach(function (row) {
       var it = row.it, i = row.idx;
       var selOn = !!_stkSel[i];
@@ -22174,38 +22203,54 @@ window.__akiniNowTs = function () {
     h += '</div>' + (shown.length ? '' : '<div style="text-align:center;color:#bbb;font-size:13px;padding:40px 0;">' + (arr.length ? '没有匹配的表情包' : '还没有表情包，点右上角「新增」添加图片') + '</div>') + '</div>';
     box.innerHTML = h;
     _syncModeBars();
-    /* 容器级事件委托：只绑一次，innerHTML 重绘后依然有效（修复真机点击全失效） */
-    if (!box.__stkDelegated) {
-      box.__stkDelegated = true;
-      box.addEventListener('click', function (ev) {
+    /* 容器级事件委托：window 捕获阶段三通道（pointerdown/touchend/click）。
+       iOS 上主字卡模块在 wbContent 的 touchend 里无条件 preventDefault 会抑制 click，
+       导致头像切换/分组筛选/格子点击全部失效；捕获阶段先于其执行，彻底绕过。 */
+    if (!window.__stkTapDelegated) {
+      window.__stkTapDelegated = true;
+      var _tapLock = 0;
+      var _handle = function (ev) {
         if (window.__wbTab !== 'sticker') return;
         var t = ev.target && ev.target.closest ? ev.target : null;
         if (!t) return;
+        if (!t.closest || !t.closest('#wbContent')) return;
         var person = t.closest('.wb-stk-person');
-        if (person && box.contains(person)) {
-          _setCid(person.getAttribute('data-cid'));
-          _stkSel = {};
-          renderStickerTab();
-          return;
-        }
         var chipEl = t.closest('.wb-stk-chip');
-        if (chipEl && box.contains(chipEl)) {
-          _stkFilterGid = chipEl.getAttribute('data-gid') || '';
-          _stkSel = {};
-          renderStickerTab();
-          return;
-        }
         var item = t.closest('.wb-stk-item');
-        if (item && box.contains(item)) {
-          var idx = parseInt(item.getAttribute('data-idx'), 10);
-          if (isNaN(idx)) return;
-          if (_stkSelMode || _stkBlockMode) {
-            if (_stkSel[idx]) delete _stkSel[idx]; else _stkSel[idx] = true;
+        if (!person && !chipEl && !item) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+        var n = Date.now();
+        if (n - _tapLock < 350) return;
+        _tapLock = n;
+        try {
+          if (person) {
+            _setCid(person.getAttribute('data-cid'));
+            _stkSel = {};
             renderStickerTab();
-          } else {
-            _askDelete(_getCid(), idx);
+            return;
           }
-        }
+          if (chipEl) {
+            _stkFilterGid = chipEl.getAttribute('data-gid') || '';
+            _stkSel = {};
+            renderStickerTab();
+            return;
+          }
+          if (item) {
+            var idx = parseInt(item.getAttribute('data-idx'), 10);
+            if (isNaN(idx)) return;
+            if (_stkSelMode || _stkBlockMode) {
+              if (_stkSel[idx]) delete _stkSel[idx]; else _stkSel[idx] = true;
+              renderStickerTab();
+            } else {
+              _askDelete(_getCid(), idx);
+            }
+          }
+        } catch (x) {}
+      };
+      ['pointerdown', 'touchend', 'click'].forEach(function (evName) {
+        window.addEventListener(evName, _handle, true);
       });
     }
   }
@@ -22342,10 +22387,9 @@ window.__akiniNowTs = function () {
     if (!m || m.__bound) return;
     m.__bound = 1;
     m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
-    var close = document.getElementById('stkGroupClose');
-    close && close.addEventListener('click', function () { m.style.display = 'none'; });
-    var create = document.getElementById('stkGroupCreateBtn');
-    create && create.addEventListener('click', function () {
+    /* iOS 兜底：关闭/新建统一走 _cap 捕获三通道，避免 touch 链路吞 click */
+    _cap('stkGroupClose', function () { m.style.display = 'none'; });
+    _cap('stkGroupCreateBtn', function () {
       var name = prompt('请输入表情包分组名称：');
       if (!name || !name.trim()) return;
       var gs = _stkGRead();
