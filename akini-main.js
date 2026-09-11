@@ -6458,13 +6458,13 @@ document.addEventListener("DOMContentLoaded", function () {
       setTimeout(sweep, 4000);
     })();
     window.__akiniIsDefaultAvatarToken = function (t) {
-      // 判定是否为「默认占位」：空、emoji（含 VS16 变体）均转为线条头像；汉字/字母/数字昵称首字保留
+      // zzc：默认头像统一为线条人像——除真实图片（data:/http/blob/路径/<img）外，
+      // 空、emoji、昵称首字等一律视为默认占位，不再出现 emoji 或文字头像
       if (!t || "string" != typeof t) return !0;
-      var s = String(t).trim().replace(/️/g, "");
+      var s = String(t).trim();
       if (!s) return !0;
-      if ("👤" === s || "" === s || "🐱" === s) return !0;
-      var a = Array.from(s);
-      return a.length <= 2 && !/^[a-zA-Z0-9一-鿿]+$/.test(s);
+      if (/^(data:|https?:|blob:|\/|<img)/i.test(s)) return !1;
+      return !0;
     };
     function nt(t, e) {
       if (
@@ -22266,7 +22266,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:-8px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
@@ -22460,9 +22460,10 @@ window.__akiniNowTs = function () {
     var h = '';
     groups.forEach(function (g, gi) {
       var cnt = arr.filter(function (x) { return String(x.g) === String(g.id); }).length;
-      h += '<div class="g-item">' +
-        '<div style="display:flex;align-items:center;gap:8px;min-width:0;"><span>' + _esc(g.name) + '</span><span style="font-size:12px;color:#aaa;">' + cnt + '张</span></div>' +
-        '<button type="button" class="stk-group-del del-group" data-gi="' + gi + '" style="background:none;border:none;font-size:15px;min-width:40px;min-height:40px;touch-action:manipulation;">✕</button></div>';
+      /* zzc：行样式与其他三个 tab 的分组管理完全一致（同款内联样式，仅单位用"张"） */
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8f8f8;border-radius:10px;margin-bottom:8px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:14px;color:#333;font-weight:500;">' + _esc(g.name) + '</span><span style="font-size:12px;color:#aaa;">' + cnt + '张</span></div>' +
+        '<button type="button" class="stk-group-del del-group" data-gi="' + gi + '" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;">✕</button></div>';
     });
     list.innerHTML = h;
     list.querySelectorAll('.stk-group-del').forEach(function (btn) {
@@ -22520,7 +22521,6 @@ window.__akiniNowTs = function () {
     ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000000001;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;';
     var h = '<div style="background:#fff;border-radius:16px;padding:20px;width:85%;max-height:60%;overflow-y:auto;display:flex;flex-direction:column;gap:12px;box-sizing:border-box;">' +
       '<div style="font-size:16px;font-weight:600;color:#333">选择分组</div>';
-    h += '<button type="button" data-gid="" class="wb-pick-group-btn" style="padding:10px 14px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">未分组</button>';
     groups.forEach(function (g) {
       h += '<button type="button" data-gid="' + g.id + '" class="wb-pick-group-btn" style="padding:10px 14px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">' + _esc(g.name) + '</button>';
     });
