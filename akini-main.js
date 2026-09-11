@@ -8444,8 +8444,14 @@ document.addEventListener("DOMContentLoaded", function () {
       ue = document.getElementById("fileInputChatWallpaper");
     function me() {
       const t = document.getElementById("emojiPanel");
+      /* zze：表情包按当前聊天对象独立——读字卡库中该联系人的表情包，无聊天对象时用“我”的 */
+      var _cid = "me";
+      try {
+        var _ac = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
+        if (_ac) _cid = _ac;
+      } catch (e0) {}
       t &&
-        N("me", function (e) {
+        N(_cid, function (e) {
           if (
             (t.querySelectorAll(".sticker-img-btn").forEach((t) => t.remove()),
             0 === e.length)
@@ -10598,33 +10604,33 @@ document.addEventListener("DOMContentLoaded", function () {
           (u.style.backgroundPosition = "center"));
       }),
       /* zzd：来电背景图 / 通话mini背景图。传参直接应用，不传则从存储读取恢复 */
+      /* zze：改用 <style> 标签注入 !important 规则——通话最小化/拖拽会 ge.style.cssText 整段清空内联样式，内联背景会被抹掉；外部 CSS 规则不受影响 */
       (window.__applyCallBg = function (bg) {
         var apply = function (t) {
-          var el = document.getElementById("app-call");
-          if (!el) return;
-          if (t) {
-            el.style.backgroundImage = "url(" + t + ")";
-            el.style.backgroundSize = "cover";
-            el.style.backgroundPosition = "center";
-          } else {
-            el.style.backgroundImage = "";
+          var st = document.getElementById("akiniCallBgStyle");
+          if (!st) {
+            st = document.createElement("style");
+            st.id = "akiniCallBgStyle";
+            document.head.appendChild(st);
           }
+          /* 自定义图叠加 38% 暗遮罩：保证白色文字与半透明最小化按钮在浅色图上清晰可读 */
+          st.textContent = t
+            ? '#app-call{background:linear-gradient(rgba(0,0,0,.38),rgba(0,0,0,.38)) center/cover no-repeat,url("' + t + '") center/cover no-repeat!important}'
+            : "";
         };
         if (bg !== undefined) apply(bg); else D("akini_call_bg", apply);
       }),
       (window.__applyCallMiniBg = function (bg) {
         var apply = function (t) {
-          var el = document.getElementById("callMiniWindow");
-          if (!el) return;
-          if (t) {
-            el.style.setProperty("background", "url(" + t + ") center/cover no-repeat", "important");
-            el.style.setProperty("backdrop-filter", "none", "important");
-            el.style.setProperty("-webkit-backdrop-filter", "none", "important");
-          } else {
-            el.style.setProperty("background", "#f6f7fa", "important");
-            el.style.setProperty("backdrop-filter", "blur(40px) saturate(1.8)", "important");
-            el.style.setProperty("-webkit-backdrop-filter", "blur(40px) saturate(1.8)", "important");
+          var st = document.getElementById("akiniCallMiniBgStyle");
+          if (!st) {
+            st = document.createElement("style");
+            st.id = "akiniCallMiniBgStyle";
+            document.head.appendChild(st);
           }
+          st.textContent = t
+            ? '#callMiniWindow{background:url("' + t + '") center/cover no-repeat!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}'
+            : "";
         };
         if (bg !== undefined) apply(bg); else D("akini_callmini_bg", apply);
       }),
@@ -22002,9 +22008,18 @@ document.addEventListener("DOMContentLoaded", function () {
             if (el) {
               el.scrollIntoView({ behavior: "smooth", block: "center" });
               /* 朋友圈：黑色线条包裹跳转动效（与 icity 蓝色线条同机制） */
-              el.style.transition = "box-shadow .3s";
-              el.style.boxShadow = "0 0 0 2px #1a1a1a";
-              setTimeout(function () { el.style.boxShadow = ""; }, 1600);
+              /* zze：整框圈选 + 浅灰底填充，用户反馈单条细线看不出是哪条 */
+              el.style.transition = "outline .2s, background .2s";
+              el.style.outline = "2px solid #1a1a1a";
+              el.style.outlineOffset = "2px";
+              el.style.borderRadius = "10px";
+              el.style.background = "rgba(0,0,0,0.05)";
+              setTimeout(function () {
+                el.style.outline = "";
+                el.style.outlineOffset = "";
+                el.style.background = "";
+                el.style.borderRadius = "";
+              }, 1800);
             }
           }
         } catch (e) {}
@@ -22331,7 +22346,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:-3px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:2px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
