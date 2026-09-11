@@ -169,19 +169,50 @@
 
   // ========== 点赞/评论核心 ==========
 
+
+  // ========== 互动通知记录（消息中心数据源） ==========
+
+  function pushNotif(app, type, name, avatar, text, momentId) {
+    try {
+      var key = app === 'icity' ? 'akini_icity_notifications' : 'akini_friends_notifications';
+      var list = [];
+      try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { list = []; }
+      list.push({
+        id: 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        type: type,
+        name: name,
+        avatar: avatar,
+        text: text,
+        momentId: String(momentId),
+        ts: Date.now(),
+        read: false
+      });
+      if (list.length > 100) list = list.slice(-100);
+      localStorage.setItem(key, JSON.stringify(list));
+      if (window.__updateHomeBadges) window.__updateHomeBadges();
+    } catch (e) {}
+  }
+
   function likeMoment(moment, contact, app) {
     var name = getContactName(contact, app);
+    var liked = false;
     if (app === 'icity') {
       moment.likers = moment.likers || [];
       if (moment.likers.indexOf(name) < 0) {
         moment.likers.push(name);
         moment.likes = (moment.likes || 0) + 1;
+        liked = true;
       }
     } else {
       moment.likes = moment.likes || [];
       if (moment.likes.indexOf(name) < 0) {
         moment.likes.push(name);
+        liked = true;
       }
+    }
+    if (liked) {
+      var preview = (moment.content || moment.text || '').replace(/\n/g, ' ').slice(0, 30);
+      pushNotif(app, 'like', name, getContactAvatar(contact, app), preview, moment.id);
     }
   }
 
@@ -205,6 +236,7 @@
 
     moment.comments = moment.comments || [];
     moment.comments.push(comment);
+    pushNotif(app, 'comment', name, avatar, text, moment.id);
     return true;
   }
 

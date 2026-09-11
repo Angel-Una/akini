@@ -192,8 +192,17 @@
       }
     }
     try { localStorage.setItem("akini_next_mailAutoSend", String(now0 + delay)); } catch (e) {}
+    var _anchorLastSent = lastSent;
     autoTimer = setTimeout(function () {
       try { localStorage.removeItem("akini_next_mailAutoSend"); } catch (e) {}
+      /* 补发回写：离线错过的信，时间显示为离线期间的应发时刻（上次来信+最小间隔+随机） */
+      var _backdateTs = 0;
+      try {
+        if (_anchorLastSent > 0 && Date.now() - _anchorLastSent >= minMs) {
+          _backdateTs = _anchorLastSent + minMs + Math.floor(Math.random() * Math.max(60000, (maxMs - minMs) * 0.5));
+          if (_backdateTs > Date.now() - 30000) _backdateTs = Date.now() - (5 + Math.random() * 10) * 60000; /* 应发点落在未来时钳到 5~15 分钟前，还原离线来信观感 */
+        }
+      } catch (e0) {}
       try {
         if (window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("mail")) {
           manageAutoSendTimer();
@@ -216,7 +225,8 @@
         var recv = getReceived();
         recv.push({
           content: content,
-          date: fmtDate(),
+          date: _backdateTs ? fmtDateAt(_backdateTs) : fmtDate(),
+          ts: _backdateTs || Date.now(),
           from: c.name,
           fromId: c.id,
           subtype: "letter",
