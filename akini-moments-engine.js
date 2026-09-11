@@ -172,12 +172,12 @@
 
   // ========== 互动通知记录（消息中心数据源） ==========
 
-  function pushNotif(app, type, name, avatar, text, momentId) {
+  function pushNotif(app, type, name, avatar, text, momentId, extra) {
     try {
       var key = app === 'icity' ? 'akini_icity_notifications' : 'akini_friends_notifications';
       var list = [];
       try { list = JSON.parse(localStorage.getItem(key) || '[]'); } catch (e) { list = []; }
-      list.push({
+      var item = {
         id: 'n_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
         type: type,
         name: name,
@@ -186,7 +186,10 @@
         momentId: String(momentId),
         ts: Date.now(),
         read: false
-      });
+      };
+      if (extra && extra.sticker) item.sticker = extra.sticker;
+      if (extra && extra.replyTo) item.replyTo = extra.replyTo;
+      list.push(item);
       if (list.length > 100) list = list.slice(-100);
       localStorage.setItem(key, JSON.stringify(list));
       if (window.__updateHomeBadges) window.__updateHomeBadges();
@@ -217,13 +220,40 @@
   }
 
   function commentMoment(moment, contact, replyTo, app) {
+    var name = getContactName(contact, app);
+    var avatar = getContactAvatar(contact, app);
+
+    // syy 逻辑：20% 概率发表情包（优先该联系人专属库，回退全局库）
+    var stickers = getContactStickers(contact.id);
+    if (!stickers.length) {
+      try {
+        var g = JSON.parse(localStorage.getItem('akini_stickers') || '[]');
+        if (Array.isArray(g)) stickers = g.filter(function (s) { return s && String(s).trim(); });
+      } catch (e0) {}
+    }
+    if (stickers.length && Math.random() < 0.2) {
+      var st = pickRandom(stickers);
+      var scomment = {
+        id: 'c_' + Math.random().toString(36).slice(2) + '_' + Date.now(),
+        author: name,
+        authorId: contact.id,
+        text: '',
+        sticker: st,
+        ts: Date.now()
+      };
+      if (replyTo) scomment.replyTo = replyTo;
+      if (app === 'icity') scomment.avatar = avatar;
+      moment.comments = moment.comments || [];
+      moment.comments.push(scomment);
+      pushNotif(app, replyTo ? 'reply' : 'comment', name, avatar, '[表情包]', moment.id, { sticker: st, replyTo: replyTo });
+      return true;
+    }
+
     var texts = getWordbankTexts();
     if (!texts.length) return false;
     var text = pickRandom(texts);
     if (!text) return false;
 
-    var name = getContactName(contact, app);
-    var avatar = getContactAvatar(contact, app);
     var comment = {
       id: 'c_' + Math.random().toString(36).slice(2) + '_' + Date.now(),
       author: name,
@@ -236,7 +266,7 @@
 
     moment.comments = moment.comments || [];
     moment.comments.push(comment);
-    pushNotif(app, 'comment', name, avatar, text, moment.id);
+    pushNotif(app, replyTo ? 'reply' : 'comment', name, avatar, text, moment.id, { replyTo: replyTo });
     return true;
   }
 
@@ -262,7 +292,8 @@
     contacts.forEach(function (contact) {
       if (commentMoment(moment, contact, null, app)) {
         didAnything = true;
-        notify(app, getContactName(contact, app), getContactAvatar(contact, app), '评论了你的动态：' + moment.comments[moment.comments.length - 1].text.slice(0, 20));
+        var _lc = moment.comments[moment.comments.length - 1];
+        notify(app, getContactName(contact, app), getContactAvatar(contact, app), '评论了你的动态：' + (_lc.sticker ? '[表情包]' : String(_lc.text || '').slice(0, 20)));
       }
     });
 
@@ -285,8 +316,9 @@
     if (commentMoment(moment, contact, replyToName, app)) {
       saveData(app, data);
       render(app);
-      var text = moment.comments[moment.comments.length - 1].text;
-      notify(app, getContactName(contact, app), getContactAvatar(contact, app), '回复了你的评论：' + text.slice(0, 20));
+      var _lc2 = moment.comments[moment.comments.length - 1];
+      var _txt = _lc2.sticker ? '[表情包]' : String(_lc2.text || '');
+      notify(app, getContactName(contact, app), getContactAvatar(contact, app), '回复了你的评论：' + _txt.slice(0, 20));
     }
   }
 

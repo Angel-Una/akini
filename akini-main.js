@@ -10110,10 +10110,12 @@ document.addEventListener("DOMContentLoaded", function () {
         function submitComment() {
           if (!_commentInput) return;
           var text = _commentInput.value.trim();
-          if (!text) {
+          var _pst = window.__friendsPendingSticker || null;
+          if (!text && !_pst) {
             closeCommentModal();
             return;
           }
+          window.__friendsPendingSticker = null;
           var r = O().filter(function (t) {
             return "icity" !== t.source;
           });
@@ -10135,13 +10137,15 @@ document.addEventListener("DOMContentLoaded", function () {
             var l = (c.comments || [])[_commentCommentIdx];
             if (!l) return closeCommentModal();
             c.comments = c.comments || [];
-            c.comments.push({
+            var _nc = {
               id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
               author: a,
               text: text,
               replyTo: l.author,
               ts: Date.now(),
-            });
+            };
+            if (_pst) _nc.sticker = _pst;
+            c.comments.push(_nc);
             l.repliedByMe = !0;
             try {
               R(r);
@@ -10152,7 +10156,9 @@ document.addEventListener("DOMContentLoaded", function () {
             var e = r[_commentPidx];
             if (!e) return closeCommentModal();
             e.comments = e.comments || [];
-            e.comments.push({ id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(), author: a, text: text, ts: Date.now() });
+            var _nc2 = { id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(), author: a, text: text, ts: Date.now() };
+            if (_pst) _nc2.sticker = _pst;
+            e.comments.push(_nc2);
             try {
               R(r);
               if (window._idbStore && window._idbStore.set) {
@@ -10254,9 +10260,10 @@ document.addEventListener("DOMContentLoaded", function () {
                     e +
                     '">' +
                     a +
-                    '<span style="color:#333;">' +
-                    (t.text || "") +
-                    "</span></div>"
+                    (t.sticker
+                      ? '<img class="comment-sticker-img" src="' + t.sticker + '" style="max-width:80px;max-height:80px;border-radius:6px;display:inline-block;vertical-align:middle;" alt=""/>'
+                      : '<span style="color:#333;">' + (t.text || "") + "</span>") +
+                    "</div>"
                   );
                 })
                 .join("");
@@ -13156,7 +13163,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     '</div><div style="font-size:11px;color:#bbb;flex-shrink:0;margin-left:8px;">' +
                     a +
                     '</div></div><div style="font-size:13px;color:#333;line-height:1.5;margin-top:2px;word-break:break-word;">' +
-                    t.text +
+                    (t.sticker
+                      ? '<img class="comment-sticker-img" src="' + t.sticker + '" style="max-width:80px;max-height:80px;border-radius:6px;display:block;" alt=""/>'
+                      : (t.text || '')) +
                     "</div></div></div>"
                   );
                 })
@@ -13288,7 +13297,9 @@ document.addEventListener("DOMContentLoaded", function () {
               if (y.__lock && now - y.__lock < 600) return;
               y.__lock = now;
               var i = u.value.trim();
-              if (i) {
+              var _pst = window.__icityPendingSticker || null;
+              if (i || _pst) {
+                window.__icityPendingSticker = null;
                 var a = q(),
                   r = a.findIndex(function (t) {
                     return t.id == e._currentDiaryId;
@@ -13311,6 +13322,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     avatar: av,
                     ts: Date.now(),
                   };
+                  if (_pst) l.sticker = _pst;
                   (e._replyTo && (l.replyTo = e._replyTo),
                     a[r].comments.push(l),
                     j(a),
@@ -21359,7 +21371,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   // 观影消息复刻微信聊天界面：与聊天页完全相同的 msg-row 结构，
   // 走 __akiniProcessMsgMeta 自动套用自定义美化CSS、时间戳与已读回执（遵循美化面板开关）
-  function appendChatMsg(text) {
+  function appendChatMsg(text, img) {
     var body = $("watchChatBody");
     if (!body) return;
     var av = "";
@@ -21367,8 +21379,11 @@ document.addEventListener("DOMContentLoaded", function () {
     var row = document.createElement("div");
     row.className = "msg-row me";
     row.setAttribute("data-ts", String(Date.now()));
+    var bubbleHtml = img
+      ? '<div class="bubble" style="background:#fff;padding:4px;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/></div>'
+      : '<div class="bubble">' + esc(text) + '</div>';
     row.innerHTML =
-      '<div class="msg-content-line"><div class="bubble">' + esc(text) + '</div>' +
+      '<div class="msg-content-line">' + bubbleHtml +
       '<div class="msg-avatar">' + av + '</div></div>';
     body.appendChild(row);
     try { if (typeof window.__akiniProcessMsgMeta === "function") window.__akiniProcessMsgMeta(row); } catch (e) {}
@@ -21396,10 +21411,13 @@ document.addEventListener("DOMContentLoaded", function () {
     var input = fsMode ? $("watchMsgInputFs") : $("watchMsgInput");
     if (!input) return;
     var t = input.value.trim();
-    if (!t) return;
+    var _pst = window.__watchPendingSticker || null;
+    if (!t && !_pst) return;
+    window.__watchPendingSticker = null;
     input.value = "";
-    appendChatMsg(t);
-    if (isFullscreen()) fireDanmaku(t);
+    if (input.__stickerHint) { input.placeholder = input.__origPh || "输入消息..."; input.__stickerHint = false; }
+    appendChatMsg(t, _pst);
+    if (t && isFullscreen()) fireDanmaku(t);
     schedulePartnerReply();
     // 已读回执：与微信聊天一致，开关开启时发送后 1.5~4 秒点亮「已读」
     try {
@@ -21741,6 +21759,30 @@ document.addEventListener("DOMContentLoaded", function () {
       }, 200);
     }
   }
+  function _getMomentPreview(app, momentId) {
+    /* 查被互动动态的图片/文字，用于消息列表右侧预览 */
+    try {
+      if (app === "icity") {
+        var raw = localStorage.getItem("akini_icity_diaries");
+        var arr = raw ? JSON.parse(raw) : [];
+        for (var i = 0; i < arr.length; i++) {
+          if (String(arr[i] && arr[i].id) === String(momentId)) {
+            var d = arr[i];
+            return { img: (d.images && d.images[0]) || "", text: (d.text || "").trim() };
+          }
+        }
+      } else {
+        var posts = window.__akiniGetPosts ? window.__akiniGetPosts() : [];
+        for (var j = 0; j < posts.length; j++) {
+          if (String(posts[j] && posts[j].id) === String(momentId)) {
+            var p = posts[j];
+            return { img: (p.images && p.images[0]) || "", text: (p.text || p.content || "").trim() };
+          }
+        }
+      }
+    } catch (e) {}
+    return { img: "", text: "" };
+  }
   function _renderNotifList(app) {
     var body = document.getElementById(app === "icity" ? "icityNotifList" : "friendsNotifList");
     if (!body) return;
@@ -21752,17 +21794,36 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     list.forEach(function (n) {
       var item = document.createElement("div");
-      item.style.cssText = "background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start;cursor:pointer;-webkit-tap-highlight-color:transparent;";
-      var actionText = n.type === "like" ? "赞了你的" + (app === "icity" ? "日记" : "朋友圈") : "评论了你的" + (app === "icity" ? "日记" : "朋友圈");
+      item.style.cssText = "background:#fff;padding:12px 14px;display:flex;gap:12px;align-items:flex-start;cursor:pointer;-webkit-tap-highlight-color:transparent;border-bottom:1px solid #f0f0f0;";
+      var pv = _getMomentPreview(app, n.momentId);
+      var actIcon = n.type === "like"
+        ? '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#666" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#666" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+      /* zzr: 表情包评论显示缩略小图；回复显示「回复了XXX：」+ 内容 */
+      var midHtml = '';
+      if (n.type === 'reply') {
+        midHtml = '<span style="font-size:12px;color:#888;flex-shrink:0;">回复了' + String(n.replyTo || '').replace(/</g, "&lt;") + '：</span>' +
+          (n.sticker
+            ? '<img src="' + n.sticker + '" style="width:26px;height:26px;object-fit:contain;border-radius:4px;" alt=""/>'
+            : '<span style="font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + String(n.text || '').replace(/</g, "&lt;") + '</span>');
+      } else if (n.sticker) {
+        midHtml = '<img src="' + n.sticker + '" style="width:28px;height:28px;object-fit:contain;border-radius:4px;" alt=""/>';
+      } else {
+        midHtml = n.text ? '<span style="font-size:12px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + String(n.text).replace(/</g, "&lt;") + '</span>' : '';
+      }
+      /* 右侧：动态带图显示图片，纯文字显示文字 */
+      var rightHtml = pv.img
+        ? '<div style="width:56px;height:56px;border-radius:6px;overflow:hidden;flex-shrink:0;background:#eee;"><img src="' + pv.img + '" style="width:100%;height:100%;object-fit:cover;" alt=""/></div>'
+        : '<div style="width:72px;flex-shrink:0;font-size:12px;color:#666;line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;word-break:break-all;">' + (pv.text || "").replace(/</g, "&lt;") + '</div>';
       item.innerHTML =
         '<div style="width:40px;height:40px;border-radius:50%;background:#eee;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;">' +
         _avatarHtml(n.avatar, 40) +
-        '</div><div style="flex:1;min-width:0;"><div style="font-size:14px;color:#222;"><span style="font-weight:600;">' +
-        (n.name || "对方") +
-        '</span> <span style="color:#666;">' + actionText + "</span></div>" +
-        (n.text ? '<div style="font-size:13px;color:#888;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (n.type === "comment" ? "💬 " : "") + String(n.text).replace(/</g, "&lt;") + "</div>" : "") +
-        '<div style="font-size:11px;color:#bbb;margin-top:4px;">' + _fmtTs(n.ts) + "</div></div>" +
-        '<div style="flex-shrink:0;color:#ccc;font-size:16px;align-self:center;">›</div>';
+        '</div><div style="flex:1;min-width:0;">' +
+        '<div style="font-size:14px;font-weight:600;color:#222;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + (n.name || "对方") + '</div>' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-top:5px;">' + actIcon + midHtml +
+        '</div>' +
+        '<div style="font-size:11px;color:#bbb;margin-top:5px;">' + _fmtTs(n.ts) + '</div></div>' +
+        rightHtml;
       item.addEventListener("click", function () {
         _jumpToMoment(app, n.momentId);
       });
@@ -21845,3 +21906,259 @@ window.__akiniNowTs = function () {
 };
 
 
+
+/* ==================== zzr: 字卡库表情包模块 + 评论输入栏表情包按钮 ==================== */
+(function () {
+  'use strict';
+  if (window.__akiniStickerModuleReady) return;
+  window.__akiniStickerModuleReady = true;
+
+  function _stkKey(cid) { return 'akini_stickers_' + cid; }
+  function _stkRead(cid) {
+    try {
+      var a = JSON.parse(localStorage.getItem(_stkKey(cid)) || '[]');
+      if (Array.isArray(a)) return a.filter(function (s) { return s && String(s).trim(); });
+    } catch (e) {}
+    return [];
+  }
+  function _stkWrite(cid, arr) {
+    try { localStorage.setItem(_stkKey(cid), JSON.stringify(arr)); }
+    catch (e) {
+      if (window.__akiniCenterModal) window.__akiniCenterModal('存储失败', '图片过大，请换一张小图');
+    }
+  }
+  function _esc(s) { return String(s || '').replace(/</g, '&lt;'); }
+  function _avHtml(av, size) {
+    if (av && /^(data:|https?:|blob:|\/)/.test(av)) return '<img src="' + av + '" style="width:100%;height:100%;object-fit:cover;" alt=""/>';
+    return '<span style="font-size:' + Math.round(size * 0.45) + 'px;">' + (av || '🙂') + '</span>';
+  }
+  function _myAvatar() {
+    try {
+      if (typeof window.getMyAvatar === 'function') { var a = window.getMyAvatar(); if (a) return a; }
+    } catch (e) {}
+    return localStorage.getItem('akini_my_avatar') || (window.__akiniAvatarCache && window.__akiniAvatarCache.my) || '🐱';
+  }
+
+  var _curCid = null;
+  function _getCid() {
+    if (_curCid) return _curCid;
+    try { _curCid = localStorage.getItem('akini_wb_sticker_cid') || 'me'; } catch (e) { _curCid = 'me'; }
+    return _curCid;
+  }
+  function _setCid(cid) { _curCid = cid; try { localStorage.setItem('akini_wb_sticker_cid', cid); } catch (e) {} }
+
+  /* ---- 字卡库表情包面板：两行工具下面横排小头像（可滑动切换）+ 每行四个网格 ---- */
+  function renderStickerTab() {
+    var box = document.getElementById('wbContent');
+    if (!box) return;
+    var cid = _getCid();
+    var contacts = (window.akiniContacts && window.akiniContacts.getContacts) ? window.akiniContacts.getContacts() : [];
+    var myName = localStorage.getItem('akini_my_name') || '我';
+    var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
+      .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:12px 16px;background:#fff;border-bottom:1px solid #f0f0f0;-webkit-overflow-scrolling:touch;">';
+    people.forEach(function (p) {
+      var on = String(p.id) === String(cid);
+      h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
+        '<div style="width:44px;height:44px;border-radius:50%;background:#f0f0f0;overflow:hidden;display:flex;align-items:center;justify-content:center;' + (on ? 'box-shadow:0 0 0 2px #1a1a1a;' : '') + '">' + _avHtml(p.avatar, 44) + '</div>' +
+        '<div style="font-size:11px;' + (on ? 'color:#1a1a1a;font-weight:600;' : 'color:#888;') + 'max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(p.name) + '</div></div>';
+    });
+    h += '</div>';
+    var arr = _stkRead(cid);
+    h += '<div style="padding:12px;background:#fafafa;min-height:200px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    arr.forEach(function (s, i) {
+      h += '<div class="wb-stk-item" data-idx="' + i + '" style="aspect-ratio:1/1;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;"><img src="' + s + '" style="width:100%;height:100%;object-fit:contain;" alt=""/></div>';
+    });
+    h += '</div>' + (arr.length ? '' : '<div style="text-align:center;color:#bbb;font-size:13px;padding:40px 0;">还没有表情包，点右上角「新增」添加图片</div>') + '</div>';
+    box.innerHTML = h;
+    box.querySelectorAll('.wb-stk-person').forEach(function (el) {
+      el.addEventListener('click', function () { _setCid(this.getAttribute('data-cid')); renderStickerTab(); });
+    });
+    box.querySelectorAll('.wb-stk-item').forEach(function (el) {
+      el.addEventListener('click', function () { _askDelete(_getCid(), parseInt(this.getAttribute('data-idx'), 10)); });
+    });
+  }
+
+  /* ---- 删除确认 ---- */
+  var _delTarget = null;
+  function _askDelete(cid, idx) {
+    _delTarget = { cid: cid, idx: idx };
+    var sh = document.getElementById('wbStickerActionSheet');
+    if (sh) sh.style.display = 'flex';
+  }
+  function _bindDeleteSheet() {
+    var sh = document.getElementById('wbStickerActionSheet');
+    var ok = document.getElementById('wbStickerDelConfirm');
+    var no = document.getElementById('wbStickerDelCancel');
+    if (!sh || sh.__bound) return;
+    sh.__bound = 1;
+    sh.addEventListener('click', function (e) { if (e.target === sh) sh.style.display = 'none'; });
+    no && no.addEventListener('click', function () { sh.style.display = 'none'; });
+    ok && ok.addEventListener('click', function () {
+      if (_delTarget) {
+        var arr = _stkRead(_delTarget.cid);
+        if (_delTarget.idx >= 0 && _delTarget.idx < arr.length) {
+          arr.splice(_delTarget.idx, 1);
+          _stkWrite(_delTarget.cid, arr);
+        }
+      }
+      _delTarget = null;
+      sh.style.display = 'none';
+      renderStickerTab();
+    });
+  }
+
+  /* ---- tab 切换跟踪 ---- */
+  function _syncTab() {
+    var tabs = document.querySelector('.wb-tabs');
+    if (!tabs) return;
+    var act = tabs.querySelector('.tab.active');
+    window.__wbTab = act ? (act.getAttribute('data-tab') || 'main') : 'main';
+    if (window.__wbTab === 'sticker') renderStickerTab();
+  }
+  function _bindTabs() {
+    var tabs = document.querySelector('.wb-tabs');
+    if (!tabs || tabs.__stkBound) return;
+    tabs.__stkBound = 1;
+    tabs.addEventListener('click', function () { setTimeout(_syncTab, 0); });
+  }
+
+  /* ---- 右上角新增：表情包 tab 时添加图片 ---- */
+  function _bindAdd() {
+    var f = document.getElementById('wbStickerFileInput');
+    if (!f || f.__bound) return;
+    f.__bound = 1;
+    f.addEventListener('change', function () {
+      var files = Array.from(this.files || []);
+      this.value = '';
+      if (!files.length) return;
+      var cid = _getCid();
+      var arr = _stkRead(cid);
+      var left = files.length;
+      files.forEach(function (file) {
+        var rd = new FileReader();
+        rd.onload = function (ev) {
+          arr.push(ev.target.result);
+          if (--left === 0) { _stkWrite(cid, arr); renderStickerTab(); }
+        };
+        rd.readAsDataURL(file);
+      });
+    });
+  }
+
+  /* ---- 通用表情包选择面板（评论/观影输入栏用，读「我」的表情包库） ---- */
+  var _pickCb = null;
+  window.__openStickerPickPanel = function (onPick) {
+    _pickCb = onPick;
+    var p = document.getElementById('stickerPickPanel');
+    var g = document.getElementById('stickerPickGrid');
+    if (!p || !g) return;
+    var arr = _stkRead('me');
+    if (!arr.length) {
+      try {
+        var gb = JSON.parse(localStorage.getItem('akini_stickers') || '[]');
+        if (Array.isArray(gb)) arr = gb.filter(function (s) { return s && String(s).trim(); });
+      } catch (e) {}
+    }
+    var h = '';
+    arr.forEach(function (s, i) {
+      h += '<div class="stk-pick-item" data-idx="' + i + '" style="aspect-ratio:1/1;background:#f7f7f7;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;"><img src="' + s + '" style="width:100%;height:100%;object-fit:contain;" alt=""/></div>';
+    });
+    g.innerHTML = h || '<div style="grid-column:1/-1;text-align:center;color:#bbb;font-size:13px;padding:36px 0;">还没有表情包，去「字卡库 → 表情包」添加</div>';
+    g.querySelectorAll('.stk-pick-item').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var s = arr[parseInt(this.getAttribute('data-idx'), 10)];
+        p.style.display = 'none';
+        if (s && _pickCb) _pickCb(s);
+      });
+    });
+    p.style.display = 'flex';
+  };
+  function _bindPickPanel() {
+    var p = document.getElementById('stickerPickPanel');
+    var c = document.getElementById('stickerPickClose');
+    if (!p || p.__bound) return;
+    p.__bound = 1;
+    p.addEventListener('click', function (e) { if (e.target === p) p.style.display = 'none'; });
+    c && c.addEventListener('click', function () { p.style.display = 'none'; });
+  }
+
+  /* ---- 三处输入栏表情包按钮 ---- */
+  function _restorePh(input) {
+    if (input && input.__stickerHint) {
+      input.placeholder = input.__origPh || input.placeholder;
+      input.__stickerHint = false;
+    }
+  }
+  function _markPending(input, key, src) {
+    window[key] = src;
+    if (input) {
+      if (!input.__origPh) input.__origPh = input.placeholder || '';
+      input.placeholder = '[表情包] 已选好，点发送';
+      input.__stickerHint = true;
+      if (!input.__phBound) {
+        input.__phBound = 1;
+        input.addEventListener('input', function () { _restorePh(this); });
+      }
+    }
+  }
+  function _bindStickerBtns() {
+    var fb = document.getElementById('friendsCommentStickerBtn');
+    if (fb && !fb.__bound) {
+      fb.__bound = 1;
+      fb.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        window.__openStickerPickPanel(function (src) {
+          _markPending(document.getElementById('friendsCommentInput'), '__friendsPendingSticker', src);
+        });
+      });
+    }
+    var ib = document.getElementById('icityDetailCommentStickerBtn');
+    if (ib && !ib.__bound) {
+      ib.__bound = 1;
+      ib.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        window.__openStickerPickPanel(function (src) {
+          _markPending(document.getElementById('icityDetailCommentInput'), '__icityPendingSticker', src);
+        });
+      });
+    }
+    var wb = document.getElementById('watchStickerBtn');
+    if (wb && !wb.__bound) {
+      wb.__bound = 1;
+      wb.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        window.__openStickerPickPanel(function (src) {
+          _markPending(document.getElementById('watchMsgInput'), '__watchPendingSticker', src);
+        });
+      });
+    }
+    /* 朋友圈评论弹窗：点遮罩关闭 + 发送后恢复占位 */
+    var fm = document.getElementById('friendsCommentInputModal');
+    if (fm && !fm.__stkBound) {
+      fm.__stkBound = 1;
+      fm.addEventListener('click', function (e) { if (e.target === fm) fm.style.display = 'none'; });
+    }
+    /* 提交后恢复输入框占位提示 */
+    ['friendsCommentSubmit', 'icityDetailCommentSend'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b && !b.__phBound) {
+        b.__phBound = 1;
+        b.addEventListener('click', function () {
+          setTimeout(function () {
+            _restorePh(document.getElementById('friendsCommentInput'));
+            _restorePh(document.getElementById('icityDetailCommentInput'));
+          }, 50);
+        });
+      }
+    });
+  }
+
+  function _init() {
+    _bindTabs(); _bindAdd(); _bindDeleteSheet(); _bindPickPanel(); _bindStickerBtns();
+    _syncTab();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _init);
+  else _init();
+  setTimeout(_init, 800);
+})();
