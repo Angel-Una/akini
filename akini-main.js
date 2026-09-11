@@ -8297,11 +8297,11 @@ document.addEventListener("DOMContentLoaded", function () {
       plusMenu = document.getElementById("plusMenu");
     function hidePlusMenu() {
       plusMenu &&
-        ((plusMenu.style.display = "none"), plusMenu.classList.remove("show"));
+        ((plusMenu.style.display = ""), plusMenu.classList.remove("show"));
     }
     function showPlusMenu() {
       plusMenu &&
-        ((plusMenu.style.display = "flex"), plusMenu.classList.add("show"));
+        ((plusMenu.style.display = ""), plusMenu.classList.add("show"));
     }
     (plusMenuBtn &&
       plusMenu &&
@@ -8310,7 +8310,7 @@ document.addEventListener("DOMContentLoaded", function () {
       plusMenuBtn.addEventListener("click", function (t) {
         if (plusMenuBtn.getAttribute("data-bound") === "1") return;
         t && t.stopPropagation && t.stopPropagation();
-        "flex" === plusMenu.style.display ? hidePlusMenu() : showPlusMenu();
+        plusMenu.classList.contains("show") ? hidePlusMenu() : showPlusMenu();
       }),
       plusMenu.addEventListener("click", function (t) {
         var e = t.target.closest("[data-action]");
@@ -8346,7 +8346,7 @@ document.addEventListener("DOMContentLoaded", function () {
       })));
     document.addEventListener("click", function (t) {
       plusMenu &&
-        "flex" === plusMenu.style.display &&
+        plusMenu.classList.contains("show") &&
         plusMenuBtn &&
         !plusMenu.contains(t.target) &&
         !plusMenuBtn.contains(t.target) &&
@@ -13050,7 +13050,7 @@ document.addEventListener("DOMContentLoaded", function () {
           i = t.liked || n.indexOf(e) >= 0,
           a = document.getElementById("icityDetailLikeBtn");
         a &&
-          ((a.innerHTML = '<span style="font-size:16px;color:#000;">♡</span>'),
+          ((a.innerHTML = '<span style="font-size:16px;color:#000;">♡</span><span style="font-size:14px;margin-left:5px;">喜欢</span>'),
           (a.style.color = i ? "#e04040" : "#888"));
         var o = document.getElementById("icityDetailLikers");
         o &&
@@ -21926,10 +21926,16 @@ window.__akiniNowTs = function () {
   window.__akiniStickerModuleReady = true;
 
   function _stkKey(cid) { return 'akini_stickers_' + cid; }
+  /* 数据模型升级：每条为 {s:图片dataURL, g:分组id, b:是否屏蔽}，兼容旧版纯字符串数组 */
+  function _stkOne(it) {
+    if (typeof it === 'string') return it.trim() ? { s: it, g: '', b: 0 } : null;
+    if (it && typeof it === 'object' && it.s) return { s: String(it.s), g: it.g ? String(it.g) : '', b: it.b ? 1 : 0 };
+    return null;
+  }
   function _stkRead(cid) {
     try {
       var a = JSON.parse(localStorage.getItem(_stkKey(cid)) || '[]');
-      if (Array.isArray(a)) return a.filter(function (s) { return s && String(s).trim(); });
+      if (Array.isArray(a)) return a.map(_stkOne).filter(Boolean);
     } catch (e) {}
     return [];
   }
@@ -21938,6 +21944,28 @@ window.__akiniNowTs = function () {
     catch (e) {
       if (window.__akiniCenterModal) window.__akiniCenterModal('存储失败', '图片过大，请换一张小图');
     }
+  }
+  /* ---- 表情包独立分组（与主字卡/emoji/拍一拍平级的独立模块，分组互不影响） ---- */
+  function _stkGRead() {
+    try {
+      var g = JSON.parse(localStorage.getItem('akini_stk_groups') || '[]');
+      if (Array.isArray(g)) return g.filter(function (x) { return x && x.name; });
+    } catch (e) {}
+    return [];
+  }
+  function _stkGWrite(arr) { try { localStorage.setItem('akini_stk_groups', JSON.stringify(arr)); } catch (e) {} }
+  function _stkGName(gid) {
+    var g = _stkGRead();
+    for (var i = 0; i < g.length; i++) if (String(g[i].id) === String(gid)) return g[i].name;
+    return '';
+  }
+  function _stkAllCids() {
+    var ids = ['me'];
+    try {
+      var cs = (window.akiniContacts && window.akiniContacts.getContacts) ? window.akiniContacts.getContacts() : [];
+      cs.forEach(function (c) { if (c && c.id != null && ids.indexOf(String(c.id)) < 0) ids.push(String(c.id)); });
+    } catch (e) {}
+    return ids;
   }
   function _esc(s) { return String(s || '').replace(/</g, '&lt;'); }
   function _avHtml(av, size) {
@@ -21959,8 +21987,15 @@ window.__akiniNowTs = function () {
   }
   function _setCid(cid) { _curCid = cid; try { localStorage.setItem('akini_wb_sticker_cid', cid); } catch (e) {} }
 
-  /* ---- 字卡库表情包面板：两行工具下面横排小头像（可滑动切换）+ 每行四个网格 ---- */
-  /* 表情包 tab 时隐藏字卡专用工具栏/分组筛选/底部文字新增按钮（专属字卡等功能有单独入口，不属于表情包模块） */
+  /* ---- 字卡库表情包面板：两行工具下面横排小头像（可滑动切换）+ 分组筛选条 + 每行四个网格 ---- */
+  /* 表情包模块状态：分组筛选/搜索词/多选/屏蔽 */
+  var _stkFilterGid = '';      /* ''=全部 '__ungrouped__'=未分组 其余=分组id */
+  var _stkQuery = '';
+  var _stkSelMode = false;
+  var _stkBlockMode = false;
+  var _stkSel = {};            /* idx -> true */
+
+  /* 表情包 tab 时隐藏字卡专用分组筛选条/底部文字新增按钮（表情包分组筛选在内容区内自绘），工具栏恒显示 */
   function _applyStickerChrome(on) {
     var tb = document.querySelector('#wordbankOverlay .wb-toolbar');
     if (tb) tb.style.display = ''; /* 用户明确要求恢复表情包模块工具栏显示，绝不隐藏 */
@@ -21968,6 +22003,45 @@ window.__akiniNowTs = function () {
     if (gf && on) gf.style.display = 'none';
     var addBtn = document.getElementById('addWordBtn');
     if (addBtn) addBtn.style.display = on ? 'none' : '';
+    if (on) _syncModeBars();
+  }
+
+  function _syncModeBars() {
+    var on = window.__wbTab === 'sticker';
+    var sa = document.getElementById('wbSelectActions');
+    var ba = document.getElementById('wbBlockActions');
+    var cnt = Object.keys(_stkSel).length;
+    if (sa) sa.style.display = (on && _stkSelMode) ? 'flex' : 'none';
+    if (ba) ba.style.display = (on && _stkBlockMode) ? 'flex' : 'none';
+    var db = document.getElementById('wbSelectDeleteBtn');
+    if (db) db.textContent = '删除(' + cnt + ')';
+    var bd = document.getElementById('wbBlockDoBtn');
+    if (bd) bd.textContent = '屏蔽(' + cnt + ')';
+    var bu = document.getElementById('wbBlockUndoBtn');
+    if (bu) bu.textContent = '取消屏蔽(' + cnt + ')';
+    var sb = document.getElementById('selectBtn');
+    if (sb) { sb.style.background = (on && _stkSelMode) ? '#1a1a1a' : ''; sb.style.color = (on && _stkSelMode) ? '#fff' : ''; }
+    var bb = document.getElementById('wbBlockBtn');
+    if (bb) { bb.style.background = (on && _stkBlockMode) ? '#1a1a1a' : ''; bb.style.color = (on && _stkBlockMode) ? '#fff' : ''; }
+  }
+
+  function _stkExitModes() {
+    _stkSelMode = false; _stkBlockMode = false; _stkSel = {};
+    _syncModeBars();
+  }
+
+  function _stkFiltered(arr) {
+    var out = [];
+    arr.forEach(function (it, i) {
+      if (_stkFilterGid === '__ungrouped__') { if (it.g) return; }
+      else if (_stkFilterGid && String(it.g) !== String(_stkFilterGid)) return;
+      if (_stkQuery) {
+        var gn = (it.g ? _stkGName(it.g) : '未分组').toLowerCase();
+        if (gn.indexOf(_stkQuery.toLowerCase()) < 0) return;
+      }
+      out.push({ it: it, idx: i });
+    });
+    return out;
   }
 
   function renderStickerTab() {
@@ -21987,18 +22061,70 @@ window.__akiniNowTs = function () {
         '<div style="font-size:11px;' + (on ? 'color:#1a1a1a;font-weight:600;' : 'color:#888;') + 'max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(p.name) + '</div></div>';
     });
     h += '</div>';
+    /* 表情包独立分组筛选条 */
+    var groups = _stkGRead();
+    if (groups.length) {
+      var arr0 = _stkRead(cid);
+      h += '<div style="display:flex;gap:8px;overflow-x:auto;padding:10px 16px;background:#fff;border-bottom:1px solid #f0f0f0;-webkit-overflow-scrolling:touch;">';
+      var chip = function (gid, label, count) {
+        var on2 = String(_stkFilterGid) === String(gid);
+        return '<button type="button" class="wb-stk-chip" data-gid="' + gid + '" style="flex-shrink:0;padding:6px 14px;border-radius:16px;border:1px solid ' + (on2 ? '#1a1a1a' : '#e5e5e5') + ';background:' + (on2 ? '#1a1a1a' : '#f5f5f5') + ';color:' + (on2 ? '#fff' : '#555') + ';font-size:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;">' + label + (count != null ? '(' + count + ')' : '') + '</button>';
+      };
+      h += chip('', '全部', null);
+      h += chip('__ungrouped__', '未分组', arr0.filter(function (x) { return !x.g; }).length);
+      groups.forEach(function (g) {
+        h += chip(g.id, _esc(g.name), arr0.filter(function (x) { return String(x.g) === String(g.id); }).length);
+      });
+      h += '</div>';
+    }
     var arr = _stkRead(cid);
-    h += '<div style="padding:12px;background:#fafafa;min-height:200px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
-    arr.forEach(function (s, i) {
-      h += '<div class="wb-stk-item" data-idx="' + i + '" style="aspect-ratio:1/1;background:#fff;border:1px solid #eee;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;"><img src="' + s + '" style="width:100%;height:100%;object-fit:contain;" alt=""/></div>';
+    var shown = _stkFiltered(arr);
+    /* 白底（去掉灰底），网格每行四个 */
+    h += '<div style="padding:12px;background:#fff;min-height:200px;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    shown.forEach(function (row) {
+      var it = row.it, i = row.idx;
+      var selOn = !!_stkSel[i];
+      var inMode = _stkSelMode || _stkBlockMode;
+      h += '<div class="wb-stk-item" data-idx="' + i + '" style="position:relative;aspect-ratio:1/1;background:#fff;border:1px solid ' + (selOn ? '#1a1a1a' : '#eee') + ';border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;' + (it.b ? 'opacity:.4;' : '') + '">' +
+        '<img src="' + it.s + '" style="width:100%;height:100%;object-fit:contain;" alt=""/>' +
+        (inMode ? '<span style="position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;border:1.5px solid ' + (selOn ? '#1a1a1a' : '#ccc') + ';background:' + (selOn ? '#1a1a1a' : 'rgba(255,255,255,.9)') + ';color:#fff;font-size:12px;line-height:17px;text-align:center;">' + (selOn ? '✓' : '') + '</span>' : '') +
+        (it.b ? '<span style="position:absolute;bottom:3px;right:3px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 5px;">已屏蔽</span>' : '') +
+        '</div>';
     });
-    h += '</div>' + (arr.length ? '' : '<div style="text-align:center;color:#bbb;font-size:13px;padding:40px 0;">还没有表情包，点右上角「新增」添加图片</div>') + '</div>';
+    h += '</div>' + (shown.length ? '' : '<div style="text-align:center;color:#bbb;font-size:13px;padding:40px 0;">' + (arr.length ? '没有匹配的表情包' : '还没有表情包，点右上角「新增」添加图片') + '</div>') + '</div>';
     box.innerHTML = h;
+    _syncModeBars();
+    /* 头像切换：pointerdown/touchend/click 三通道 + 去抖锁，修复 iOS 上点击无效 */
     box.querySelectorAll('.wb-stk-person').forEach(function (el) {
-      el.addEventListener('click', function () { _setCid(this.getAttribute('data-cid')); renderStickerTab(); });
+      var lock = 0;
+      var go = function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        var n = Date.now(); if (n - lock < 350) return; lock = n;
+        _setCid(el.getAttribute('data-cid'));
+        renderStickerTab();
+      };
+      el.addEventListener('pointerdown', go, true);
+      el.addEventListener('touchend', go, true);
+      el.addEventListener('click', go, true);
+    });
+    box.querySelectorAll('.wb-stk-chip').forEach(function (el) {
+      el.addEventListener('click', function () {
+        _stkFilterGid = this.getAttribute('data-gid') || '';
+        _stkSel = {};
+        renderStickerTab();
+      });
     });
     box.querySelectorAll('.wb-stk-item').forEach(function (el) {
-      el.addEventListener('click', function () { _askDelete(_getCid(), parseInt(this.getAttribute('data-idx'), 10)); });
+      el.addEventListener('click', function () {
+        var idx = parseInt(this.getAttribute('data-idx'), 10);
+        if (isNaN(idx)) return;
+        if (_stkSelMode || _stkBlockMode) {
+          if (_stkSel[idx]) delete _stkSel[idx]; else _stkSel[idx] = true;
+          renderStickerTab();
+        } else {
+          _askDelete(_getCid(), idx);
+        }
+      });
     });
   }
 
@@ -22035,8 +22161,10 @@ window.__akiniNowTs = function () {
   function _syncTab(tabName) {
     var tabs = document.querySelector('.wb-tabs');
     var act = tabs ? tabs.querySelector('.tab.active') : null;
+    var prev = window.__wbTab;
     window.__wbTab = tabName || (act ? (act.getAttribute('data-tab') || 'main') : 'main');
     var on = window.__wbTab === 'sticker';
+    if (!on && prev === 'sticker') { _stkExitModes(); _stkQuery = ''; }
     _applyStickerChrome(on);
     if (on) renderStickerTab();
   }
@@ -22058,6 +22186,307 @@ window.__akiniNowTs = function () {
       var mo = new MutationObserver(function () { _syncTab(); });
       mo.observe(tabs, { subtree: true, attributes: true, attributeFilter: ['class'] });
     }
+  }
+
+  /* ---- 工具栏接管：表情包 tab 下由表情包模块独立处理（与主字卡/emoji/拍一拍平级） ---- */
+  function _cap(id, fn) {
+    var lock = 0;
+    ['pointerdown', 'touchend', 'click'].forEach(function (ev) {
+      window.addEventListener(ev, function (e) {
+        if (window.__wbTab !== 'sticker') return;
+        var t = e.target && e.target.closest ? e.target.closest('#' + id) : null;
+        if (!t) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        var n = Date.now();
+        if (n - lock < 400) return;
+        lock = n;
+        try { fn(); } catch (x) {}
+      }, true);
+    });
+  }
+
+  /* 分组管理弹窗 */
+  function _stkRenderGroupModal() {
+    var list = document.getElementById('stkGroupList');
+    var empty = document.getElementById('stkGroupEmpty');
+    if (!list) return;
+    var groups = _stkGRead();
+    var arr = _stkRead(_getCid());
+    if (!groups.length) {
+      list.innerHTML = '';
+      if (empty) empty.style.display = 'block';
+      return;
+    }
+    if (empty) empty.style.display = 'none';
+    var h = '';
+    groups.forEach(function (g, gi) {
+      var cnt = arr.filter(function (x) { return String(x.g) === String(g.id); }).length;
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8f8f8;border-radius:10px;">' +
+        '<div style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:14px;color:#333;font-weight:500;">' + _esc(g.name) + '</span><span style="font-size:12px;color:#aaa;">' + cnt + '张</span></div>' +
+        '<button type="button" class="stk-group-del" data-gi="' + gi + '" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;">✕</button></div>';
+    });
+    list.innerHTML = h;
+    list.querySelectorAll('.stk-group-del').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var gi = parseInt(this.getAttribute('data-gi'), 10);
+        var gs = _stkGRead();
+        if (isNaN(gi) || gi < 0 || gi >= gs.length) return;
+        var gid = String(gs[gi].id);
+        if (!confirm('删除分组「' + gs[gi].name + '」？组内表情包会变为未分组')) return;
+        gs.splice(gi, 1);
+        _stkGWrite(gs);
+        _stkAllCids().forEach(function (c) {
+          var a2 = _stkRead(c), dirty = false;
+          a2.forEach(function (x) { if (String(x.g) === gid) { x.g = ''; dirty = true; } });
+          if (dirty) _stkWrite(c, a2);
+        });
+        if (String(_stkFilterGid) === gid) _stkFilterGid = '';
+        _stkRenderGroupModal();
+        renderStickerTab();
+      });
+    });
+  }
+  function _stkOpenGroupModal() {
+    var m = document.getElementById('stkGroupModal');
+    if (!m) return;
+    _stkRenderGroupModal();
+    m.style.display = 'flex';
+  }
+  function _bindStkGroupModal() {
+    var m = document.getElementById('stkGroupModal');
+    if (!m || m.__bound) return;
+    m.__bound = 1;
+    m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
+    var close = document.getElementById('stkGroupClose');
+    close && close.addEventListener('click', function () { m.style.display = 'none'; });
+    var create = document.getElementById('stkGroupCreateBtn');
+    create && create.addEventListener('click', function () {
+      var name = prompt('请输入表情包分组名称：');
+      if (!name || !name.trim()) return;
+      var gs = _stkGRead();
+      gs.push({ id: Date.now(), name: name.trim() });
+      _stkGWrite(gs);
+      _stkRenderGroupModal();
+      renderStickerTab();
+    });
+  }
+
+  /* 多选「加入分组」选择面板 */
+  function _stkPickGroupForSel(cb) {
+    var groups = _stkGRead();
+    if (!groups.length) { alert('请先通过工具栏「分组」创建分组'); return; }
+    var ov = document.createElement('div');
+    ov.id = 'stkGroupPickOv';
+    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:1000000001;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;';
+    var h = '<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-sizing:border-box;">' +
+      '<div style="font-size:15px;font-weight:600;color:#222;margin-bottom:12px;text-align:center;">移动到分组</div>';
+    h += '<button type="button" data-gid="" style="width:100%;padding:13px 14px;margin-bottom:8px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;color:#333;cursor:pointer;text-align:left;">未分组</button>';
+    groups.forEach(function (g) {
+      h += '<button type="button" data-gid="' + g.id + '" style="width:100%;padding:13px 14px;margin-bottom:8px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;color:#333;cursor:pointer;text-align:left;">' + _esc(g.name) + '</button>';
+    });
+    h += '<button type="button" data-cancel="1" style="width:100%;padding:13px;background:#fff;border:1px solid #eee;border-radius:10px;font-size:14px;color:#888;cursor:pointer;">取消</button></div>';
+    ov.innerHTML = h;
+    ov.addEventListener('click', function (e) {
+      if (e.target === ov) { ov.remove(); return; }
+      var b = e.target && e.target.closest ? e.target.closest('button') : null;
+      if (!b) return;
+      ov.remove();
+      if (b.getAttribute('data-cancel')) return;
+      cb(b.getAttribute('data-gid') || '');
+    });
+    document.body.appendChild(ov);
+  }
+
+  /* 导出当前角色表情包（含表情包分组定义） */
+  function _stkExport() {
+    var cid = _getCid();
+    var arr = _stkRead(cid);
+    if (!arr.length) { alert('当前角色还没有表情包可导出'); return; }
+    var data = { customStickers: arr, stickerGroups: _stkGRead(), exportedAt: new Date().toISOString() };
+    try {
+      var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      var aEl = document.createElement('a');
+      aEl.href = URL.createObjectURL(blob);
+      aEl.download = 'akini-stickers-' + cid + '-' + Date.now() + '.json';
+      document.body.appendChild(aEl);
+      aEl.click();
+      setTimeout(function () { try { URL.revokeObjectURL(aEl.href); aEl.remove(); } catch (e) {} }, 800);
+      window.__akiniToast && window.__akiniToast('✓ 表情包已导出');
+    } catch (e) { alert('导出失败：' + e.message); }
+  }
+
+  /* 导入表情包到当前角色（支持数组 / {customStickers} / {stickers}，合并分组定义） */
+  function _stkImport() {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.txt';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', function () {
+      var f = input.files && input.files[0];
+      input.remove();
+      if (!f) return;
+      var rd = new FileReader();
+      rd.onload = function () {
+        try {
+          var txt = String(rd.result || '');
+          var data = null;
+          try { data = JSON.parse(txt); } catch (e1) {
+            try { data = JSON.parse(txt.replace(/,\s*([}\]])/g, '$1')); } catch (e2) {}
+          }
+          if (!data) { alert('导入失败：文件格式不正确'); return; }
+          var items = [];
+          if (Array.isArray(data)) items = data;
+          else if (Array.isArray(data.customStickers)) items = data.customStickers;
+          else if (Array.isArray(data.stickers)) items = data.stickers;
+          items = items.map(_stkOne).filter(Boolean);
+          if (!items.length) { alert('导入失败：文件里没有表情包'); return; }
+          if (Array.isArray(data.stickerGroups) && data.stickerGroups.length) {
+            var gs = _stkGRead();
+            data.stickerGroups.forEach(function (g) {
+              if (g && g.name && !gs.some(function (x) { return String(x.id) === String(g.id); })) gs.push(g);
+            });
+            _stkGWrite(gs);
+          }
+          var cid = _getCid();
+          var arr = _stkRead(cid);
+          items.forEach(function (it) { arr.push(it); });
+          _stkWrite(cid, arr);
+          renderStickerTab();
+          alert('成功导入 ' + items.length + ' 张表情包');
+        } catch (err) { alert('导入失败：' + err.message); }
+      };
+      rd.readAsText(f, 'UTF-8');
+    });
+    input.click();
+  }
+
+  /* 查重：按图片内容去除当前角色重复表情包 */
+  function _stkDedup() {
+    var cid = _getCid();
+    var arr = _stkRead(cid);
+    var seen = {};
+    var out = [];
+    arr.forEach(function (it) { if (!seen[it.s]) { seen[it.s] = 1; out.push(it); } });
+    var removed = arr.length - out.length;
+    alert(removed > 0 ? '成功去重 ' + removed + ' 张表情包' : '没有重复表情包');
+    if (removed > 0) { _stkWrite(cid, out); _stkSel = {}; renderStickerTab(); }
+  }
+
+  function _stkToggleSearch() {
+    var bar = document.getElementById('wbSearchBar');
+    if (!bar) return;
+    var showing = bar.style.display !== 'none' && bar.style.display !== '';
+    var ip = document.getElementById('wbSearchInput');
+    if (showing) {
+      bar.style.display = 'none';
+      _stkQuery = '';
+      if (ip) ip.value = '';
+      renderStickerTab();
+    } else {
+      bar.style.display = 'flex';
+      if (ip) { ip.placeholder = '按分组名搜索表情包...'; try { ip.focus(); } catch (e) {} }
+    }
+  }
+  function _stkToggleSelMode() {
+    _stkSelMode = !_stkSelMode;
+    if (_stkSelMode) _stkBlockMode = false;
+    _stkSel = {};
+    renderStickerTab();
+  }
+  function _stkToggleBlockMode() {
+    _stkBlockMode = !_stkBlockMode;
+    if (_stkBlockMode) _stkSelMode = false;
+    _stkSel = {};
+    renderStickerTab();
+  }
+  function _stkSelAll() {
+    var arr = _stkRead(_getCid());
+    _stkFiltered(arr).forEach(function (row) { _stkSel[row.idx] = true; });
+    renderStickerTab();
+  }
+  function _stkSelDelete() {
+    var idxs = Object.keys(_stkSel).map(Number).sort(function (a, b) { return b - a; });
+    if (!idxs.length) { alert('请先选择表情包'); return; }
+    if (!confirm('确定删除选中的 ' + idxs.length + ' 张表情包？')) return;
+    var cid = _getCid();
+    var arr = _stkRead(cid);
+    idxs.forEach(function (i) { if (i >= 0 && i < arr.length) arr.splice(i, 1); });
+    _stkWrite(cid, arr);
+    _stkSel = {};
+    renderStickerTab();
+  }
+  function _stkSelGroup() {
+    var idxs = Object.keys(_stkSel).map(Number);
+    if (!idxs.length) { alert('请先选择表情包'); return; }
+    _stkPickGroupForSel(function (gid) {
+      var cid = _getCid();
+      var arr = _stkRead(cid);
+      idxs.forEach(function (i) { if (arr[i]) arr[i].g = gid || ''; });
+      _stkWrite(cid, arr);
+      _stkSel = {};
+      renderStickerTab();
+    });
+  }
+  function _stkBlockDo(blocked) {
+    var idxs = Object.keys(_stkSel).map(Number);
+    if (!idxs.length) { alert('请先选择表情包'); return; }
+    var cid = _getCid();
+    var arr = _stkRead(cid);
+    idxs.forEach(function (i) { if (arr[i]) arr[i].b = blocked ? 1 : 0; });
+    _stkWrite(cid, arr);
+    _stkSel = {};
+    renderStickerTab();
+  }
+
+  function _bindStickerToolbar() {
+    if (window.__stkToolbarBound) return;
+    window.__stkToolbarBound = 1;
+    _cap('searchBtn', _stkToggleSearch);
+    _cap('wbSearchClose', function () {
+      var bar = document.getElementById('wbSearchBar');
+      if (bar) bar.style.display = 'none';
+      _stkQuery = '';
+      var ip = document.getElementById('wbSearchInput');
+      if (ip) ip.value = '';
+      renderStickerTab();
+    });
+    _cap('groupBtn', _stkOpenGroupModal);
+    _cap('dedupBtn', _stkDedup);
+    _cap('wbExportBtn', _stkExport);
+    _cap('wbImportBtn', _stkImport);
+    _cap('wbBlockBtn', _stkToggleBlockMode);
+    _cap('selectBtn', _stkToggleSelMode);
+    _cap('wbSelectAllBtn', _stkSelAll);
+    _cap('wbSelectDeleteBtn', _stkSelDelete);
+    _cap('wbSelectGroupBtn', _stkSelGroup);
+    _cap('wbSelectCancelBtn', function () { _stkSelMode = false; _stkSel = {}; renderStickerTab(); });
+    _cap('wbBlockDoBtn', function () { _stkBlockDo(true); });
+    _cap('wbBlockUndoBtn', function () { _stkBlockDo(false); });
+    _cap('wbBlockExitBtn', function () { _stkBlockMode = false; _stkSel = {}; renderStickerTab(); });
+    /* 搜索输入：拦截主模块处理器，避免其重绘覆盖表情包网格 */
+    window.addEventListener('input', function (e) {
+      if (window.__wbTab !== 'sticker') return;
+      var t = e.target;
+      if (!t || t.id !== 'wbSearchInput') return;
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      _stkQuery = t.value.trim();
+      renderStickerTab();
+    }, true);
+    /* 兜底：主模块重绘 wbContent 时自动恢复表情包面板 */
+    var box = document.getElementById('wbContent');
+    if (box && window.MutationObserver) {
+      var mo = new MutationObserver(function () {
+        if (window.__wbTab !== 'sticker') return;
+        if (!box.querySelector('.wb-stk-person')) renderStickerTab();
+      });
+      mo.observe(box, { childList: true });
+    }
+    _bindStkGroupModal();
   }
 
 
@@ -22100,6 +22529,13 @@ window.__akiniNowTs = function () {
     var modal = document.getElementById('addStickerModal');
     if (!modal) return;
     _renderStickerPreviews();
+    /* 填充「添加进分组」下拉 */
+    var sel = document.getElementById('wbStickerGroupSelect');
+    if (sel) {
+      var oh = '<option value="">-- 不分组 --</option>';
+      _stkGRead().forEach(function (g) { oh += '<option value="' + g.id + '">' + _esc(g.name) + '</option>'; });
+      sel.innerHTML = oh;
+    }
     modal.style.display = 'flex';
     modal.classList.add('show');
   }
@@ -22161,10 +22597,12 @@ window.__akiniNowTs = function () {
           alert('请先选择要添加的表情包图片');
           return;
         }
+        var gidSel = document.getElementById('wbStickerGroupSelect');
+        var gid = gidSel ? (gidSel.value || '') : '';
         var cid = _getCid();
         var arr = _stkRead(cid);
         _pendingStickerFiles.forEach(function (s) {
-          arr.push(s);
+          arr.push({ s: s, g: gid, b: 0 });
         });
         _stkWrite(cid, arr);
         _pendingStickerFiles = [];
@@ -22204,23 +22642,23 @@ window.__akiniNowTs = function () {
     var p = document.getElementById('stickerPickPanel');
     var g = document.getElementById('stickerPickGrid');
     if (!p || !g) return;
-    var arr = _stkRead('me');
+    var arr = _stkRead('me').filter(function (it) { return !it.b; });
     if (!arr.length) {
       try {
         var gb = JSON.parse(localStorage.getItem('akini_stickers') || '[]');
-        if (Array.isArray(gb)) arr = gb.filter(function (s) { return s && String(s).trim(); });
+        if (Array.isArray(gb)) arr = gb.map(_stkOne).filter(Boolean).filter(function (it) { return !it.b; });
       } catch (e) {}
     }
     var h = '';
-    arr.forEach(function (s, i) {
-      h += '<div class="stk-pick-item" data-idx="' + i + '" style="aspect-ratio:1/1;background:#f7f7f7;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;"><img src="' + s + '" style="width:100%;height:100%;object-fit:contain;" alt=""/></div>';
+    arr.forEach(function (it, i) {
+      h += '<div class="stk-pick-item" data-idx="' + i + '" style="aspect-ratio:1/1;background:#f7f7f7;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;"><img src="' + it.s + '" style="width:100%;height:100%;object-fit:contain;" alt=""/></div>';
     });
     g.innerHTML = h || '<div style="grid-column:1/-1;text-align:center;color:#bbb;font-size:13px;padding:36px 0;">还没有表情包，去「字卡库 → 表情包」添加</div>';
     g.querySelectorAll('.stk-pick-item').forEach(function (el) {
       el.addEventListener('click', function () {
-        var s = arr[parseInt(this.getAttribute('data-idx'), 10)];
+        var it = arr[parseInt(this.getAttribute('data-idx'), 10)];
         p.style.display = 'none';
-        if (s && _pickCb) _pickCb(s);
+        if (it && _pickCb) _pickCb(it.s);
       });
     });
     p.style.display = 'flex';
@@ -22307,6 +22745,7 @@ window.__akiniNowTs = function () {
 
   function _init() {
     _bindTabs(); _bindAdd(); _bindDeleteSheet(); _bindPickPanel(); _bindStickerBtns();
+    _bindStickerToolbar();
     _syncTab();
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _init);
