@@ -8866,6 +8866,10 @@ document.addEventListener("DOMContentLoaded", function () {
         })(),
           k &&
             a(k, function () {
+              try {
+                var _gmT2 = _.querySelector(".title");
+                if (_gmT2) _gmT2.textContent = ({ main: "主字卡", emoji: "Emoji", pat: "拍一拍" }[window.__wbTab] || "主字卡") + "分组管理";
+              } catch (e) {}
               (x(),
                 _ &&
                   ((_.style.display = "flex"),
@@ -8910,10 +8914,11 @@ document.addEventListener("DOMContentLoaded", function () {
               i && !e.has(i) && (e.add(i), n.push(t));
             });
             const removed = t.length - n.length;
+            var _mn = { main: "主字卡", emoji: "Emoji", pat: "拍一拍" }[window.__wbTab] || "主字卡";
             alert(
               removed > 0
-                ? "成功去重 " + removed + " 条字卡"
-                : "没有重复字卡",
+                ? "成功去重 " + removed + " 条" + _mn
+                : "没有重复" + _mn,
             );
             (s(n), c.clear(), f(), m());
           });
@@ -10138,6 +10143,12 @@ document.addEventListener("DOMContentLoaded", function () {
           (window.renderGroupFilter = m));
       })());
     (function () {
+      /* zzb：评论弹窗状态提升到模块级 —— t() 每次渲染都会重进，原 var 声明会重置状态并叠加监听器，
+         导致发表情包评论时先跑的旧闭包把 __friendsPendingSticker 清掉、真正持有 pidx 的闭包最后跑拿不到 → 永远发不出 */
+      var _commentPidx = null,
+        _commentReplyTo = null,
+        _commentReplyIdx = null,
+        _commentCommentIdx = null;
       function t() {
         const e = document.getElementById("postList"),
           n = document.getElementById("emptyTip");
@@ -10146,10 +10157,6 @@ document.addEventListener("DOMContentLoaded", function () {
           _commentInput = document.getElementById("friendsCommentInput"),
           _commentCancel = document.getElementById("friendsCommentCancel"),
           _commentSubmit = document.getElementById("friendsCommentSubmit");
-        var _commentPidx = null,
-          _commentReplyTo = null,
-          _commentReplyIdx = null,
-          _commentCommentIdx = null;
         function openCommentModal(pidx, replyTo, replyIdx, commentIdx) {
           _commentPidx = pidx;
           _commentReplyTo = replyTo || null;
@@ -10247,21 +10254,29 @@ document.addEventListener("DOMContentLoaded", function () {
             window._renderPosts && window._renderPosts(),
             closeCommentModal());
         }
-        if (_commentCancel)
+        if (_commentCancel && !_commentCancel.__boundCmt) {
+          _commentCancel.__boundCmt = 1;
           _commentCancel.addEventListener("click", closeCommentModal);
-        if (_commentSubmit)
+        }
+        if (_commentSubmit && !_commentSubmit.__boundCmt) {
+          _commentSubmit.__boundCmt = 1;
           _commentSubmit.addEventListener("click", submitComment);
-        if (_commentInput)
+        }
+        if (_commentInput && !_commentInput.__boundCmt) {
+          _commentInput.__boundCmt = 1;
           _commentInput.addEventListener("keydown", function (e) {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               submitComment();
             }
           });
-        if (_commentModal)
+        }
+        if (_commentModal && !_commentModal.__boundCmt) {
+          _commentModal.__boundCmt = 1;
           _commentModal.addEventListener("click", function (e) {
             if (e.target === _commentModal) closeCommentModal();
           });
+        }
         const i = O().filter((t) => "icity" !== t.source);
         if (
           (i.sort((t, e) => (e.ts || 0) - (t.ts || 0)),
@@ -10477,7 +10492,7 @@ document.addEventListener("DOMContentLoaded", function () {
               : alert("还没有收藏表情包，请先在字卡库添加"));
           var _ov = document.createElement("div");
           _ov.style.cssText =
-            "position:fixed;inset:0;z-index:1000003;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center";
+            "position:fixed;inset:0;z-index:1000000002;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center";
           var _cells = _ls
             .map(function (x, xi) {
               return (
@@ -22380,6 +22395,11 @@ window.__akiniNowTs = function () {
     var act = tabs ? tabs.querySelector('.tab.active') : null;
     var prev = window.__wbTab;
     window.__wbTab = tabName || (act ? (act.getAttribute('data-tab') || 'main') : 'main');
+    /* zzb：分组管理弹窗标题按当前模块命名（表情包 tab 用独立的 stkGroupModal，标题已静态写好） */
+    try {
+      var _gmT = document.querySelector('#groupModal .title');
+      if (_gmT) _gmT.textContent = ({ main: '主字卡', emoji: 'Emoji', pat: '拍一拍' }[window.__wbTab] || '主字卡') + '分组管理';
+    } catch (e) {}
     var on = window.__wbTab === 'sticker';
     if (!on && prev === 'sticker') { _stkExitModes(); _stkQuery = ''; }
     _applyStickerChrome(on);
@@ -22496,16 +22516,20 @@ window.__akiniNowTs = function () {
     if (!groups.length) { alert('请先通过工具栏「分组」创建分组'); return; }
     var ov = document.createElement('div');
     ov.id = 'stkGroupPickOv';
-    ov.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:1000000001;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;';
-    var h = '<div style="background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:480px;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-sizing:border-box;">' +
-      '<div style="font-size:15px;font-weight:600;color:#222;margin-bottom:12px;text-align:center;">移动到分组</div>';
-    h += '<button type="button" data-gid="" style="width:100%;padding:13px 14px;margin-bottom:8px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;color:#333;cursor:pointer;text-align:left;">未分组</button>';
+    /* zzb：与其他三个 tab 的「选择分组」弹窗样式统一（居中白卡 + wb-pick-group-btn） */
+    ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:1000000001;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;';
+    var h = '<div style="background:#fff;border-radius:16px;padding:20px;width:85%;max-height:60%;overflow-y:auto;display:flex;flex-direction:column;gap:12px;box-sizing:border-box;">' +
+      '<div style="font-size:16px;font-weight:600;color:#333">选择分组</div>';
+    h += '<button type="button" data-gid="" class="wb-pick-group-btn" style="padding:10px 14px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">未分组</button>';
     groups.forEach(function (g) {
-      h += '<button type="button" data-gid="' + g.id + '" style="width:100%;padding:13px 14px;margin-bottom:8px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;color:#333;cursor:pointer;text-align:left;">' + _esc(g.name) + '</button>';
+      h += '<button type="button" data-gid="' + g.id + '" class="wb-pick-group-btn" style="padding:10px 14px;background:#f5f5f5;border:none;border-radius:10px;font-size:14px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:8px;">' + _esc(g.name) + '</button>';
     });
-    h += '<button type="button" data-cancel="1" style="width:100%;padding:13px;background:#fff;border:1px solid #eee;border-radius:10px;font-size:14px;color:#888;cursor:pointer;">取消</button></div>';
+    h += '<button type="button" data-cancel="1" style="padding:10px;background:#eee;border:none;border-radius:10px;font-size:14px;cursor:pointer;">取消</button></div>';
     ov.innerHTML = h;
     ov.addEventListener('click', function (e) {
+      /* zzb：创建本弹窗的原始点击会继续冒泡经过 body，closest('button') 会误匹配工具栏按钮导致弹窗闪关并被移到未分组；
+         只响应发生在弹窗内部的点击 */
+      if (!ov.contains(e.target)) return;
       if (e.target === ov) { ov.remove(); return; }
       var b = e.target && e.target.closest ? e.target.closest('button') : null;
       if (!b) return;
@@ -22624,37 +22648,47 @@ window.__akiniNowTs = function () {
     _stkFiltered(arr).forEach(function (row) { _stkSel[row.idx] = true; });
     renderStickerTab();
   }
+  /* zzb：confirm 原生弹窗阻塞期间 _cap 的 400ms 锁会过期，click 兜底再触发导致删完又弹「请先选择」；
+     操作成功后 1.5s 内空选择静默忽略 */
+  function _stkEmptyGuard() {
+    if (Date.now() - (window.__stkJustDone || 0) < 1500) return true;
+    alert('请先选择表情包');
+    return false;
+  }
   function _stkSelDelete() {
     var idxs = Object.keys(_stkSel).map(Number).sort(function (a, b) { return b - a; });
-    if (!idxs.length) { alert('请先选择表情包'); return; }
+    if (!idxs.length) { _stkEmptyGuard(); return; }
     if (!confirm('确定删除选中的 ' + idxs.length + ' 张表情包？')) return;
     var cid = _getCid();
     var arr = _stkRead(cid);
     idxs.forEach(function (i) { if (i >= 0 && i < arr.length) arr.splice(i, 1); });
     _stkWrite(cid, arr);
     _stkSel = {};
+    window.__stkJustDone = Date.now();
     renderStickerTab();
   }
   function _stkSelGroup() {
     var idxs = Object.keys(_stkSel).map(Number);
-    if (!idxs.length) { alert('请先选择表情包'); return; }
+    if (!idxs.length) { _stkEmptyGuard(); return; }
     _stkPickGroupForSel(function (gid) {
       var cid = _getCid();
       var arr = _stkRead(cid);
       idxs.forEach(function (i) { if (arr[i]) arr[i].g = gid || ''; });
       _stkWrite(cid, arr);
       _stkSel = {};
+      window.__stkJustDone = Date.now();
       renderStickerTab();
     });
   }
   function _stkBlockDo(blocked) {
     var idxs = Object.keys(_stkSel).map(Number);
-    if (!idxs.length) { alert('请先选择表情包'); return; }
+    if (!idxs.length) { _stkEmptyGuard(); return; }
     var cid = _getCid();
     var arr = _stkRead(cid);
     idxs.forEach(function (i) { if (arr[i]) arr[i].b = blocked ? 1 : 0; });
     _stkWrite(cid, arr);
     _stkSel = {};
+    window.__stkJustDone = Date.now();
     renderStickerTab();
   }
 

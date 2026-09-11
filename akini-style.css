@@ -2567,9 +2567,19 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   gap: 6px;
   min-width: 216px;
 }
+/* zzb：内联 display:grid 会覆盖本类，必须 !important；菜单项紧凑排列、整体靠最右 */
 .plus-menu.show {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: flex-start;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  margin-left: auto;
+}
+.plus-menu-item {
+  width: 58px;
+  flex: none;
 }
 .plus-menu-item {
   flex: 1;
@@ -6639,7 +6649,7 @@ body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !
 body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
 body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !important; box-shadow: 0 0 0 1.5px #ddd !important; }
 
-/* ============ v20260912zza ============ */
+/* ============ v20260912zzb ============ */
 /* 字卡库工具栏：图标聚集靠最右（覆盖旧 4 列均分网格） */
 .wb-toolbar { display: flex !important; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 6px 16px 10px; overflow-x: visible; background: transparent; border-bottom: none; }
 .wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }
