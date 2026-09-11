@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20260911zzb';
+const CACHE_NAME = 'akini-cache-v20260911zzd';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -110,9 +110,9 @@ self.addEventListener('notificationclick', function(event) {
           return client.focus();
         }
       }
-      return self.clients.openWindow('./akini.html');
+      return self.clients.openWindow('./akini.html?notifApp=' + encodeURIComponent(payload.app || '') + '&notifChat=' + encodeURIComponent(payload.chatId || ''));
     }).catch(function() {
-      return self.clients.openWindow('./akini.html');
+      return self.clients.openWindow('./akini.html?notifApp=' + encodeURIComponent(payload.app || '') + '&notifChat=' + encodeURIComponent(payload.chatId || ''));
     })
   );
 });

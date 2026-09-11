@@ -975,11 +975,6 @@ document.addEventListener("DOMContentLoaded", function () {
           try { window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll(true); } catch (e) {}
           try { window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll(); } catch (e) {}
         });
-        window.addEventListener("beforeunload", function () {
-          if (!window._akiniDataRestored) return;
-          try { snapshotLs(); } catch (e) {}
-          try { window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll(true); } catch (e) {}
-        });
         function doBackup() {
           if (backupTimer) return;
           // 启动恢复完成前不触发备份，避免用可能不完整的 localStorage 覆盖 IDB/Cache 里的完整数据
@@ -5351,13 +5346,6 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           window._akiniSaveDiaries &&
             window._akiniSaveDiaries(window._akiniGetDiaries());
-          if (typeof window._akiniEmergencySnapshot === "function") window._akiniEmergencySnapshot();
-        } catch (e) {}
-      }),
-      window.addEventListener("beforeunload", function () {
-        try {
-          window._akiniSaveDiaries &&
-            window._akiniSaveDiaries(window._akiniGetDiaries());
           if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge();
           if (typeof window._akiniEmergencySnapshot === "function") window._akiniEmergencySnapshot();
         } catch (e) {}
@@ -5988,6 +5976,41 @@ document.addEventListener("DOMContentLoaded", function () {
       } catch (e) {}
       window.__akiniSplashDone = !0;
     };
+    /* SW 通知点击跳转：提前无条件绑定（此前藏在 showInAppNotif 内，冷启动点通知时未绑定导致点击无反应） */
+    window.__akiniBindNotifTap = function () {
+      try {
+        if (window.__akiniNotifTapBound || !navigator.serviceWorker) return;
+        window.__akiniNotifTapBound = true;
+        navigator.serviceWorker.addEventListener("message", function (ev) {
+          var d = ev && ev.data;
+          if (!d || d.type !== "AKINI_NOTIF_TAP") return;
+          window.__akiniHandleNotifTap && window.__akiniHandleNotifTap(d);
+        });
+      } catch (e) {}
+    };
+    /* 通知点击统一处理：信箱/聊天跳转（app 段兼容英文 id 与中文名） */
+    window.__akiniHandleNotifTap = function (d) {
+      try {
+        if (!d) return;
+        if (d.app === "mail" || d.app === "信箱") {
+          if (window.navTo) window.navTo("mail");
+          if (window.__mailShowTab) window.__mailShowTab("received");
+        } else if (d.chatId && window.openChat) {
+          window.openChat(d.chatId);
+        }
+      } catch (e) {}
+    };
+    window.__akiniBindNotifTap();
+    /* 冷启动点通知：SW openWindow 带 ?notifApp&notifChat，boot 后读取跳转并清参数 */
+    window.__akiniConsumeNotifUrl = function () {
+      try {
+        var m = /[?&]notifApp=([^&]*)/.exec(location.search), c = /[?&]notifChat=([^&]*)/.exec(location.search);
+        if (!m && !c) return;
+        var d = { app: m ? decodeURIComponent(m[1]) : "", chatId: c ? decodeURIComponent(c[1]) : "" };
+        try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) {}
+        setTimeout(function () { window.__akiniHandleNotifTap && window.__akiniHandleNotifTap(d); }, 1500);
+      } catch (e) {}
+    };
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
       try { window.__akiniBootApp = __akiniBootApp; } catch (e) {}
@@ -5996,6 +6019,7 @@ document.addEventListener("DOMContentLoaded", function () {
         window._restoringData = !1;
         window._akiniDataRestored = !0;
         console.log("[Akini] boot complete, data restore gate open");
+        try { window.__akiniConsumeNotifUrl && window.__akiniConsumeNotifUrl(); } catch (e) {}
         // 恢复完成后统一刷新界面，避免多条恢复路径重复 resetCache
         if (window.akiniContacts && window.akiniContacts.resetCache) window.akiniContacts.resetCache();
         // 恢复完成后执行一次联系人迁移，首次使用时会创建默认联系人
@@ -6172,6 +6196,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function V() {
       try {
+        /* boot 恢复完成前禁止备份，防空内存覆盖 IDB 好备份（随机数据消失根因） */
+        if (!window._akiniDataRestored) return;
         (A(),
           window._idbStore &&
             window._idbStore.backupAll &&
@@ -6479,6 +6505,8 @@ document.addEventListener("DOMContentLoaded", function () {
     function flushAllData() {
       try {
         if (window._restoringData) return;
+        /* boot 恢复完成前禁止落盘，防恢复慢时空数据覆盖（随机数据消失根因） */
+        if (!window._akiniDataRestored) return;
         try {
           "function" == typeof A && A();
         } catch (e) {}
@@ -6494,6 +6522,11 @@ document.addEventListener("DOMContentLoaded", function () {
         for (var e = 0; e < localStorage.length; e++) {
           var key = localStorage.key(e);
           key && (snapshot[key] = localStorage.getItem(key));
+        }
+        /* 空快照禁止覆盖：localStorage 被系统清空/未恢复时，保留 IDB 里的好备份 */
+        if (Object.keys(snapshot).length === 0) {
+          console.warn("[Akini] flushAllData: 空快照，跳过覆盖 IDB 备份");
+          return;
         }
         if (window._idbStore && window._idbStore.set) {
           window._idbStore.set(
@@ -6537,12 +6570,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
     ((window._flushAllData = flushAllData),
-      window.addEventListener("beforeunload", function () {
-        V();
-        try {
-          flushAllData();
-        } catch (t) {}
-      }),
       window.addEventListener("pagehide", function () {
         try {
           V();
@@ -6562,10 +6589,30 @@ document.addEventListener("DOMContentLoaded", function () {
         } else if (U && window.akiniContacts) {
           try {
             var e = window.akiniContacts.getActiveChatId();
-            if (e && (!U.innerHTML || "" === U.innerHTML.trim())) {
+            if (e) {
               var sess = window.akiniContacts.getSession(e);
-              if (sess && sess.messagesHTML && "" !== sess.messagesHTML.trim()) {
-                __akiniRenderChatBody(__akiniDeduplicateChatHTML(sess.messagesHTML), e);
+              var sessHtml = (sess && sess.messagesHTML) || "";
+              if (!U.innerHTML || "" === U.innerHTML.trim()) {
+                if (sessHtml.trim()) __akiniRenderChatBody(__akiniDeduplicateChatHTML(sessHtml), e);
+              } else {
+                /* milk 式：切回前台对比消息行数，会话/IDB 备份比 UI 多则自动恢复（防后台吞消息） */
+                var uiRows = __akiniCountMsgRows(U.innerHTML || "");
+                if (__akiniCountMsgRows(sessHtml) > uiRows) {
+                  __akiniRenderChatBody(__akiniDeduplicateChatHTML(sessHtml), e);
+                } else if (window._idbStore && window._idbStore.get) {
+                  window._idbStore.get("akini_chat_history_" + e, function (bak) {
+                    try {
+                      if (!bak) return;
+                      var curSess = window.akiniContacts.getSession(e);
+                      var curRows = __akiniCountMsgRows((curSess && curSess.messagesHTML) || "");
+                      if (__akiniCountMsgRows(bak) > curRows) {
+                        window.akiniContacts.updateSession(e, { messagesHTML: bak });
+                        __akiniRenderChatBody(__akiniDeduplicateChatHTML(bak), e);
+                        console.warn("[Akini] 切回前台检测到更多备份消息，已自动恢复");
+                      }
+                    } catch (e2) {}
+                  });
+                }
               }
             }
           } catch (t) {}
@@ -16773,24 +16820,7 @@ document.addEventListener("DOMContentLoaded", function () {
               } catch (e) { fallbackNotify(); }
             };
 
-            // SW 通知点击跳转：系统通知经 SW 展示时 onTap 会丢失，由 SW notificationclick 回填
-            try {
-              if (!window.__akiniNotifTapBound && navigator.serviceWorker) {
-                window.__akiniNotifTapBound = true;
-                navigator.serviceWorker.addEventListener("message", function (ev) {
-                  var d = ev && ev.data;
-                  if (!d || d.type !== "AKINI_NOTIF_TAP") return;
-                  try {
-                    if (d.app === "信箱") {
-                      if (window.o) window.o("mail");
-                      if (window.__mailShowTab) window.__mailShowTab("received");
-                    } else if (d.chatId && window.openChat) {
-                      window.openChat(d.chatId);
-                    }
-                  } catch (e) {}
-                });
-              }
-            } catch (e) {}
+            try { window.__akiniBindNotifTap && window.__akiniBindNotifTap(); } catch (e) {}
             window.__akiniSystemNotify(i, {
               body: body,
               icon: "./favicon.png",
@@ -18535,9 +18565,6 @@ document.addEventListener("DOMContentLoaded", function () {
             document.hidden ? ct() : rt();
           }),
           window.addEventListener("pagehide", function () {
-            ct();
-          }),
-          window.addEventListener("beforeunload", function () {
             ct();
           }),
           setInterval(function () {
@@ -20557,7 +20584,6 @@ document.addEventListener("DOMContentLoaded", function () {
           "hidden" === document.visibilityState && e();
         }),
           window.addEventListener("pagehide", e),
-          window.addEventListener("beforeunload", e),
           "complete" === document.readyState ||
           "interactive" === document.readyState
             ? setTimeout(n, 80)
@@ -20795,7 +20821,6 @@ document.addEventListener("DOMContentLoaded", function () {
       if (document.hidden) _akiniImmediateBackup();
     });
     window.addEventListener("pagehide", _akiniImmediateBackup);
-    window.addEventListener("beforeunload", _akiniImmediateBackup);
 
     // ===== milk 核心防丢机制：页面重新可见时，对比备份与内存数据，备份更完整则自动恢复 =====
     // 防止移动端系统回收内存后（微信内置浏览器长时间后台），内存数据被清空导致聊天记录丢失

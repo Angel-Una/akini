@@ -203,7 +203,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 /* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
 .fit-gap-lg { margin-top: 12px; }
 .fit-gap { margin-top: 8px; }
-.fit-bottom { margin-top: auto; }
+.fit-bottom { margin-top: 8px; }
 .apps-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -6541,3 +6541,17 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
 #watchFloatInputBar {
   padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
 }
+
+/* ===== 崩溃自愈安全模式：禁重渲染特性、允许滚动 ===== */
+.akini-safe-mode .preview-bubble,
+.akini-safe-mode .bubble,
+.akini-safe-mode [style*="backdrop-filter"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.akini-safe-mode .preview-bubble { background: rgba(255, 255, 255, 0.95) !important; }
+.akini-safe-mode .fit-inner { transform: none !important; }
+.akini-safe-mode .fit-mod { height: auto !important; margin-top: 8px !important; }
+.akini-safe-mode .content-wrapper { height: auto !important; margin-top: 44px !important; justify-content: flex-start !important; }
+.akini-safe-mode .phone-frame { overflow-y: auto !important; position: absolute !important; }
+.akini-safe-mode .fake-statusbar { display: none !important; }
