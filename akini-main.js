@@ -247,6 +247,7 @@ window.__akiniToggleOn = function (key, defaultOn) {
       "quoteReplyToggle",
       "emojiMixToggle",
       "readNoReplyToggle",
+      "pinyinCardToggle",
       "contactEmojiToggle",
       "contactPokeToggle",
       "contactTransferToggle",
@@ -1204,7 +1205,6 @@ document.addEventListener("DOMContentLoaded", function () {
       var jobs = {};
       window._akiniTimer = {
         schedule: function (name, fn, delayMs, opts) {
-          var overduePlannedAt = 0;
           try {
             if (jobs[name]) clearTimeout(jobs[name]);
             var now = Date.now();
@@ -1225,8 +1225,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     delayMs = freshDelay;
                   }
                 } else {
-                  delayMs = 5000 + Math.floor(Math.random() * 10000);
-                  overduePlannedAt = existing; /* 过期补发：保留原计划时间供回调回写 */
+                  /* 离线错过的周期任务不补发：直接按新间隔重排到下一周期 */
+                  delayMs = freshDelay;
                 }
               }
             }
@@ -1236,9 +1236,9 @@ document.addEventListener("DOMContentLoaded", function () {
             );
           } catch (e) {}
           jobs[name] = setTimeout(function () {
-            var _planned = overduePlannedAt || 0;
+            var _planned = 0;
             try {
-              if (!_planned) _planned = parseFloat(localStorage.getItem("akini_next_" + name) || "0") || 0;
+              _planned = parseFloat(localStorage.getItem("akini_next_" + name) || "0") || 0;
               localStorage.setItem("akini_last_" + name, String(Date.now()));
               localStorage.removeItem("akini_next_" + name);
             } catch (e) {}
@@ -4130,11 +4130,23 @@ document.addEventListener("DOMContentLoaded", function () {
         window.taPoke(t);
       } // === 最外层：文字回复（已读必回，100%）===
       var __isQuote = !!ex.quote;
-      // syy 逻辑：固定概率 1/2/3 条，每条作为独立消息发送
-      var replyCount = window.AKR.getReplyCount();
+      // syy 照搬「拼字卡」：30% 概率从字卡库随机抽 min~max 句，用「，」拼成一条发出
+      var _pinyinMerged = null;
+      if (window.__akiniToggleOn("pinyinCardToggle", false) && Math.random() < 0.3 && window.pickWordCards) {
+        var _pcMin = Math.max(2, parseInt(localStorage.getItem("akini_num_pinyinCardMin") || "2", 10) || 2),
+          _pcMax = Math.max(_pcMin, parseInt(localStorage.getItem("akini_num_pinyinCardMax") || "3", 10) || 3),
+          _pcCount = _pcMin + Math.floor(Math.random() * (_pcMax - _pcMin + 1));
+        var _pcRaw = window.pickWordCards(_pcCount, e && e.id);
+        if (_pcRaw) {
+          var _pcPicked = _pcRaw.split("\n").map(function (s) { return (s || "").trim(); }).filter(Boolean);
+          if (_pcPicked.length >= 2) _pinyinMerged = _pcPicked.join("，");
+        }
+      }
+      // syy 逻辑：固定概率 1/2/3 条，每条作为独立消息发送（拼字卡命中时只有拼合的一条）
+      var replyCount = _pinyinMerged ? 1 : window.AKR.getReplyCount();
       var messages = [];
       for (var _ci = 0; _ci < replyCount; _ci++) {
-        var _one = window.pickWordCards ? window.pickWordCards(1, e && e.id) : "";
+        var _one = _pinyinMerged || (window.pickWordCards ? window.pickWordCards(1, e && e.id) : "");
         if (_one && _one.trim()) messages.push(_one.trim());
       }
       if (0 === messages.length) {
@@ -15030,11 +15042,10 @@ document.addEventListener("DOMContentLoaded", function () {
                             var minD2 = parseFloat(localStorage.getItem("akini_num_mailDelayMin") || "10"),
                               maxD2 = parseFloat(localStorage.getItem("akini_num_mailDelayMax") || "24"),
                               unitMs2 = (function () {
-                                var un = localStorage.getItem("akini_str_mailDelayUnit") || "hours";
-                                return un === "minutes" ? 60000 : un === "days" ? 86400000 : 3600000;
+                                return 3600000;
                               })();
                             sentItem.replyTime = Date.now() + unitMs2 * (minD2 + Math.random() * Math.max(0, maxD2 - minD2) || 1);
-                            sentItem.replyContent = Dn();
+                            sentItem.replyContent = (window.__akiniGenReplyText && window.__akiniGenReplyText()) || Dn();
                             sentItem.replyFromId = originalLetter.fromId;
                             sentItem.replyFromName = originalLetter.from;
                             sentItem.replyAvatar = originalLetter.avatar;
@@ -15199,7 +15210,7 @@ document.addEventListener("DOMContentLoaded", function () {
           gn && (gn.value = ""),
           mn && (mn.style.display = "none"),
           "sent" === kn && _n("sent"));
-        const r = Dn();
+        const r = (window.__akiniGenReplyText && window.__akiniGenReplyText()) || Dn();
         if (r) {
           // syy 回信规则：默认 10~24 小时随机，单位可选（分钟/小时/天）
           const minD = parseFloat(
@@ -15209,8 +15220,7 @@ document.addEventListener("DOMContentLoaded", function () {
               localStorage.getItem("akini_num_mailDelayMax") || "24",
             ),
             unitMs = (function () {
-              var un = localStorage.getItem("akini_str_mailDelayUnit") || "hours";
-              return un === "minutes" ? 60000 : un === "days" ? 86400000 : 3600000;
+              return 3600000;
             })(),
             delayMs = unitMs * (minD + Math.random() * Math.max(0, maxD - minD) || 1);
           // syy envelope 模式：把回信预约时间持久化到 sent，
@@ -16474,8 +16484,7 @@ document.addEventListener("DOMContentLoaded", function () {
             var delay = isFirst ? s : (s + Math.random() * (d - s));
             // 回信分支按设置单位换算（分钟/小时/天），主动写信分支固定小时
             var m = delay * (u ? 3600 * 1000 : (function () {
-              var un = localStorage.getItem("akini_str_mailDelayUnit") || "hours";
-              return un === "minutes" ? 60000 : un === "days" ? 86400000 : 3600000;
+              return 3600000;
             })());
             console.log("[Akini 信箱] 下次调度：", (u ? "主动写信" : "回信"), delay.toFixed(1), "小时后触发");
             function mailAction() {
@@ -16948,6 +16957,7 @@ document.addEventListener("DOMContentLoaded", function () {
         t("quoteReplyToggle", !1),
         t("readReceiptToggle", !1),
         t("readNoReplyToggle", !1),
+        t("pinyinCardToggle", !1),
         t("emojiMixToggle", !1),
         t("contactEmojiToggle", !1),
         t("contactPokeToggle", !1),
@@ -17040,7 +17050,8 @@ document.addEventListener("DOMContentLoaded", function () {
         { id: "replyDelayMax", key: "akini_num_replyDelayMax", def: "5" },
         { id: "mailDelayMin", key: "akini_num_mailDelayMin", def: "10" },
         { id: "mailDelayMax", key: "akini_num_mailDelayMax", def: "24" },
-        { id: "mailDelayUnit", key: "akini_str_mailDelayUnit", def: "hours" },
+        { id: "pinyinCardMin", key: "akini_num_pinyinCardMin", def: "2" },
+        { id: "pinyinCardMax", key: "akini_num_pinyinCardMax", def: "3" },
         { id: "activeMsgMin", key: "akini_num_activeMsgMin", def: "5" },
         { id: "activeMsgMax", key: "akini_num_activeMsgMax", def: "10" },
         { id: "activeMailMin", key: "akini_num_activeMailMin", def: "3" },
@@ -21616,7 +21627,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!b) {
       b = document.createElement("span");
       b.className = "home-badge";
-      b.style.cssText = "display:none;position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#f43530;color:#fff;font-size:11px;font-weight:600;line-height:18px;text-align:center;box-sizing:border-box;pointer-events:none;z-index:5;";
+      b.style.cssText = "display:none;position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#fff;color:#1a1a1a;font-size:11px;font-weight:600;line-height:16px;text-align:center;box-sizing:border-box;border:1px solid rgba(0,0,0,.1);box-shadow:0 1px 4px rgba(0,0,0,.18);pointer-events:none;z-index:5;";
       wrap.appendChild(b);
     }
     return b;
@@ -21833,56 +21844,4 @@ window.__akiniNowTs = function () {
   return now;
 };
 
-/* zzj: 全站页面切换动画——进 app 右滑入；返回主屏时主屏左滑入（主屏一直在底层，被全屏 app 页覆盖） */
-(function () {
-  "use strict";
-  var PAGE_CLS = ["content-area", "icity-area", "settings-area", "beautify-area"];
-  function _isPage(el) {
-    for (var i = 0; i < PAGE_CLS.length; i++) if (el.classList.contains(PAGE_CLS[i])) return true;
-    return false;
-  }
-  function _play(el, cls) {
-    el.classList.remove("akini-page-in", "akini-page-in-left");
-    void el.offsetWidth;
-    el.classList.add(cls);
-    if (!el.__animBound) {
-      el.__animBound = 1;
-      el.addEventListener("animationend", function () {
-        el.classList.remove("akini-page-in", "akini-page-in-left");
-      });
-    }
-  }
-  function _anyPageOpen() {
-    var all = document.querySelectorAll(".content-area, .icity-area, .settings-area, .beautify-area");
-    for (var i = 0; i < all.length; i++) {
-      if (all[i].style.display !== "none") return true;
-    }
-    return false;
-  }
-  function onMut(muts) {
-    for (var i = 0; i < muts.length; i++) {
-      var t = muts[i].target;
-      if (!(t instanceof HTMLElement) || !_isPage(t)) continue;
-      var oldV = muts[i].oldValue || "";
-      var wasHidden = /display:\s*none/.test(oldV);
-      var nowHidden = t.style.display === "none";
-      if (wasHidden && !nowHidden) {
-        _play(t, "akini-page-in");
-      } else if (!wasHidden && nowHidden && oldV.indexOf("display") >= 0) {
-        /* 页面关闭：若无其他页面开着（返回主屏），主屏左滑入 */
-        setTimeout(function () {
-          if (!_anyPageOpen()) {
-            var pf = document.getElementById("phoneFrame");
-            if (pf) _play(pf, "akini-page-in-left");
-          }
-        }, 30);
-      }
-    }
-  }
-  function start() {
-    var obs = new MutationObserver(onMut);
-    obs.observe(document.body, { attributes: true, attributeFilter: ["style"], subtree: true, attributeOldValue: true });
-  }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
-  else start();
-})();
+

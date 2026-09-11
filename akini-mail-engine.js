@@ -87,6 +87,22 @@
     return content.trim();
   }
 
+  // syy 照搬：回信内容生成（8~12 句，每句随机标点 20%「！」/20%「...」/其余「。」）
+  function genReplyText() {
+    if (!window.pickWordCards) return "";
+    var count = Math.floor(Math.random() * 5) + 8;
+    var raw = window.pickWordCards(count);
+    if (!raw) return "";
+    var sentences = raw.split("\n").filter(function (s) { return s && s.trim(); });
+    var out = "";
+    for (var i = 0; i < sentences.length; i++) {
+      var s = sentences[i].trim().replace(/[。！!]+$/, "");
+      var r = Math.random();
+      out += s + (r < 0.2 ? "！" : r < 0.4 ? "..." : "。");
+    }
+    return out;
+  }
+
   // ========== 离线回信投递：检查所有已预约 replyTime 且到点的回信 ==========
   function checkStatus() {
     try {
@@ -103,7 +119,7 @@
           }
           var recv = getReceived();
           recv.push({
-            content: s.replyContent || genLetter(),
+            content: s.replyContent || genReplyText() || genLetter(),
             // 用回信预约时间作为显示时间，还原"离线期间"对方回信的时间段
             date: fmtDateAt(s.replyTime),
             ts: s.replyTime,
@@ -119,9 +135,10 @@
         }
       }
       if (changed) saveSent(sent);
-      // 通知 UI
+      // 通知 UI（离线错过的回信静默入库：不弹通知不弹窗，就像它早就在信箱里）
       for (var d = 0; d < delivered.length; d++) {
         var s2 = delivered[d];
+        if (s2.replyTime && now - s2.replyTime > 60000) continue;
         if (window.showInAppNotif) {
           // 头像实时从联系人取：预约时存的 replyAvatar 可能是换头像前的旧值
           var _rc = null;
@@ -129,7 +146,6 @@
           var _rava = (_rc && _rc.avatar && String(_rc.avatar).trim()) || s2.replyAvatar || "";
           window.showInAppNotif({
             app: "信箱",
-            appIcon: "✉️",
             avatar: window.nt ? window.nt(_rava, 40) : "",
             chatId: s2.replyFromId || "",
             name: s2.replyFromName || "对方",
@@ -234,10 +250,9 @@
         saveReceived(recv);
         // 记录本次来信时间，作为下次调度的锚点（跨重启补发依据）
         try { localStorage.setItem("akini_mail_last_sent", String(Date.now())); } catch (e) {}
-        if (window.showInAppNotif) {
+        if (!_backdateTs && window.showInAppNotif) {
           window.showInAppNotif({
             app: "信箱",
-            appIcon: "✉️",
             avatar: window.nt ? window.nt(c.avatar, 40) : "",
             chatId: c.id || "",
             name: c.name,
@@ -264,6 +279,8 @@
     // 每 30 秒巡检一次，确保应用保持打开时也能按时投递
     setInterval(checkStatus, 30000);
   }
+
+  window.__akiniGenReplyText = genReplyText;
 
   window.akiniMailEngine = {
     checkStatus: checkStatus,
