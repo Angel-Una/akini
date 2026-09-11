@@ -4699,6 +4699,8 @@ document.addEventListener("DOMContentLoaded", function () {
         "akini_home_bg",
         "akini_bg_img",
         "akini_friends_bg",
+        "akini_call_bg",
+        "akini_callmini_bg",
         "akini_cover_img",
         "akini_chat_bg",
         "akini_contact_stickers",
@@ -4762,6 +4764,8 @@ document.addEventListener("DOMContentLoaded", function () {
         "akini_home_bg",
         "akini_cover_img",
         "akini_friends_bg",
+        "akini_call_bg",
+        "akini_callmini_bg",
         "akini_chat_bg",
         "akini_music_playlist",
         "akini_music_index",
@@ -10593,6 +10597,39 @@ document.addEventListener("DOMContentLoaded", function () {
           (u.style.backgroundSize = "cover"),
           (u.style.backgroundPosition = "center"));
       }),
+      /* zzd：来电背景图 / 通话mini背景图。传参直接应用，不传则从存储读取恢复 */
+      (window.__applyCallBg = function (bg) {
+        var apply = function (t) {
+          var el = document.getElementById("app-call");
+          if (!el) return;
+          if (t) {
+            el.style.backgroundImage = "url(" + t + ")";
+            el.style.backgroundSize = "cover";
+            el.style.backgroundPosition = "center";
+          } else {
+            el.style.backgroundImage = "";
+          }
+        };
+        if (bg !== undefined) apply(bg); else D("akini_call_bg", apply);
+      }),
+      (window.__applyCallMiniBg = function (bg) {
+        var apply = function (t) {
+          var el = document.getElementById("callMiniWindow");
+          if (!el) return;
+          if (t) {
+            el.style.setProperty("background", "url(" + t + ") center/cover no-repeat", "important");
+            el.style.setProperty("backdrop-filter", "none", "important");
+            el.style.setProperty("-webkit-backdrop-filter", "none", "important");
+          } else {
+            el.style.setProperty("background", "#f6f7fa", "important");
+            el.style.setProperty("backdrop-filter", "blur(40px) saturate(1.8)", "important");
+            el.style.setProperty("-webkit-backdrop-filter", "blur(40px) saturate(1.8)", "important");
+          }
+        };
+        if (bg !== undefined) apply(bg); else D("akini_callmini_bg", apply);
+      }),
+      window.__applyCallBg(),
+      window.__applyCallMiniBg(),
         t(),
         (window._renderPosts = t),
         (window.__akiniGetPosts = O),
@@ -15161,7 +15198,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   ) {
                     l.innerHTML =
                       '<div style="font-size:12px;color:#999;letter-spacing:1px;margin-bottom:8px;">✎ 写下你的回信</div>' +
-                      '<textarea id="mailDetailReplyInput" placeholder="回复这封信…" style="width:100%;min-height:88px;border:none;background:#faf8f3;border-radius:14px;padding:12px 14px;font-size:14px;font-family:inherit;resize:none;outline:none;color:#333;box-sizing:border-box;line-height:1.6;box-shadow:inset 0 1px 3px rgba(0,0,0,.04);"></textarea>' +
+                      '<textarea id="mailDetailReplyInput" placeholder="回复这封信…" style="width:100%;min-height:88px;border:none;background:#f2f2f2;border-radius:14px;padding:12px 14px;font-size:14px;font-family:inherit;resize:none;outline:none;color:#333;box-sizing:border-box;line-height:1.6;box-shadow:inset 0 1px 3px rgba(0,0,0,.04);"></textarea>' +
                       '<button type="button" id="mailDetailReplyBtn" style="margin-top:12px;width:100%;height:42px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;letter-spacing:2px;cursor:pointer;font-family:inherit;">寄出回信</button>';
                     var s = document.getElementById("mailDetailReplyBtn");
                     s &&
@@ -16034,6 +16071,33 @@ document.addEventListener("DOMContentLoaded", function () {
                 (n.style.backgroundSize = "cover"),
                 (n.style.backgroundPosition = "center")),
                 L("akini_friends_bg", e));
+            }),
+              e.readAsDataURL(t),
+              (this.value = ""));
+          });
+        /* zzd：来电背景图 / 通话mini背景图上传 */
+        const cbf = document.getElementById("fileInputCallBgBeautify");
+        cbf &&
+          cbf.addEventListener("change", function () {
+            const t = this.files[0];
+            if (!t) return;
+            const e = new FileReader();
+            ((e.onload = function (t) {
+              const e = t.target.result;
+              (window.__applyCallBg && window.__applyCallBg(e), L("akini_call_bg", e));
+            }),
+              e.readAsDataURL(t),
+              (this.value = ""));
+          });
+        const cmbf = document.getElementById("fileInputCallMiniBgBeautify");
+        cmbf &&
+          cmbf.addEventListener("change", function () {
+            const t = this.files[0];
+            if (!t) return;
+            const e = new FileReader();
+            ((e.onload = function (t) {
+              const e = t.target.result;
+              (window.__applyCallMiniBg && window.__applyCallMiniBg(e), L("akini_callmini_bg", e));
             }),
               e.readAsDataURL(t),
               (this.value = ""));
@@ -21927,7 +21991,8 @@ document.addEventListener("DOMContentLoaded", function () {
       setTimeout(function () {
         try {
           var posts = window.__akiniGetPosts ? window.__akiniGetPosts() : [];
-          var sorted = posts.slice().sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
+          /* zzd：与渲染侧一致，先过滤 icity 来源再按 ts 倒序，否则 idx 错位黑线打不到目标帖子 */
+          var sorted = posts.filter(function (t) { return "icity" !== t.source; }).sort(function (a, b) { return (b.ts || 0) - (a.ts || 0); });
           var idx = -1;
           for (var i = 0; i < sorted.length; i++) {
             if (String(sorted[i].id) === String(momentId)) { idx = i; break; }
@@ -22266,7 +22331,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:-8px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:-3px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
