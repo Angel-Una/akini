@@ -2047,6 +2047,10 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
         for (var a in e) e.hasOwnProperty(a) && (i[a] = e[a]);
+        // zza：未读数变化时实时刷新首页微信角标
+        if (e && typeof e.unread !== "undefined") {
+          try { window.__updateHomeBadges && window.__updateHomeBadges(); } catch (e2) {}
+        }
         // 内存中保留 messagesHTML 用于即时渲染，但不随 sessions 写入 localStorage
         var memHtml = __akiniStripTypingRows(i.messagesHTML);
         delete i.messagesHTML;
@@ -8437,7 +8441,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function me() {
       const t = document.getElementById("emojiPanel");
       t &&
-        N(J(), function (e) {
+        N("me", function (e) {
           if (
             (t.querySelectorAll(".sticker-img-btn").forEach((t) => t.remove()),
             0 === e.length)
@@ -8450,11 +8454,13 @@ document.addEventListener("DOMContentLoaded", function () {
               t.appendChild(e));
           }
           e.forEach((e, n) => {
+            var _src = e && typeof e === "object" ? e.s : e;
+            if ((e && typeof e === "object" && e.b) || !_src) return;
             const i = document.createElement("button");
             ((i.className = "sticker-img-btn"),
               (i.style.cssText =
                 "background:none;border:none;padding:2px;cursor:pointer;"),
-              (i.innerHTML = `<img src="${e}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;">`),
+              (i.innerHTML = `<img src="${_src}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;">`),
               i.addEventListener("click", function (t) {
                 !(function (t) {
                   if (!U || !window.akiniContacts) return;
@@ -8483,7 +8489,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     (i.style.pointerEvents = "none"));
                   b();
                   window.akiniTriggerReply && window.akiniTriggerReply(n);
-                })(e);
+                })(_src);
               }),
               t.appendChild(i));
           });
@@ -10453,6 +10459,55 @@ document.addEventListener("DOMContentLoaded", function () {
         (l.style.display = "none"),
         document.body.appendChild(l));
       let s = null;
+      /* zza：朋友圈支持发表情包（来源：字卡库中“我”的收藏） */
+      var _pst = document.getElementById("addStickerBtnPost");
+      _pst &&
+        a(_pst, function () {
+          var _ls = [];
+          try {
+            /* 直读 LS，绕过 __csCache 缓存（初始化期会缓存空数组导致陈旧） */
+            var _raw = JSON.parse(localStorage.getItem("akini_stickers_me") || "[]") || [];
+            _ls = _raw
+              .map(function (x) { return x && typeof x === "object" ? x : { s: x }; })
+              .filter(function (x) { return x.s && typeof x.s === "string" && x.s.indexOf("data:image") === 0 && !x.b; });
+          } catch (e) {}
+          if (!_ls.length)
+            return void (window.__akiniToast
+              ? window.__akiniToast("还没有收藏表情包，请先在字卡库添加")
+              : alert("还没有收藏表情包，请先在字卡库添加"));
+          var _ov = document.createElement("div");
+          _ov.style.cssText =
+            "position:fixed;inset:0;z-index:1000003;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center";
+          var _cells = _ls
+            .map(function (x, xi) {
+              return (
+                '<button type="button" data-xi="' + xi + '" style="background:none;border:none;padding:2px;cursor:pointer;">' +
+                '<img src="' + x.s + '" style="width:64px;height:64px;object-fit:cover;border-radius:8px;"></button>'
+              );
+            })
+            .join("");
+          _ov.innerHTML =
+            '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-height:60vh;display:flex;flex-direction:column;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));box-sizing:border-box;">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;"><span style="font-size:15px;font-weight:600;color:#222;">选择表情包</span>' +
+            '<button type="button" data-act="x" style="background:#f0f0f0;border:none;width:30px;height:30px;border-radius:50%;font-size:15px;color:#666;cursor:pointer;">✕</button></div>' +
+            '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;overflow-y:auto;">' + _cells + "</div></div>";
+          _ov.addEventListener("click", function (ev) {
+            var _tg = ev.target;
+            if (_tg === _ov || (_tg.closest && _tg.closest('[data-act="x"]'))) return void _ov.remove();
+            var _b = _tg.closest && _tg.closest("button[data-xi]");
+            if (!_b) return;
+            var _it = _ls[parseInt(_b.getAttribute("data-xi"), 10)];
+            if (!_it || !_it.s) return void _ov.remove();
+            s = _it.s;
+            c &&
+              setHtmlKeepInput(
+                c,
+                '<img src="' + _it.s + '" style="height:60px;border-radius:8px;object-fit:cover;"> <span style="font-size:12px;color:#999;margin-left:8px;">已选表情包</span>',
+              );
+            _ov.remove();
+          });
+          document.body.appendChild(_ov);
+        });
       (l.addEventListener("change", function () {
         const t = this.files[0];
         if (!t) return;
@@ -22014,6 +22069,41 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(window.__updateHomeBadges, 1200);
 })();
 
+/* zza: 字卡库打开/返回单击修复——iOS 上 click 可能被吞，显式 pointerup/touchend/click 三通道绑定（350ms 防重锁） */
+(function () {
+  function _bindTap(el, fn) {
+    if (!el || el.__zzaTap) return;
+    el.__zzaTap = true;
+    var lock = 0;
+    function go() {
+      var now = Date.now();
+      if (now - lock < 350) return;
+      lock = now;
+      try { fn(); } catch (e) {}
+    }
+    el.addEventListener("pointerup", go, true);
+    el.addEventListener("touchend", go, true);
+    el.addEventListener("click", go, true);
+  }
+  function _closeWb() {
+    var w = document.getElementById("wordbankOverlay");
+    var eo = document.getElementById("wbExclOverlay");
+    if (eo) { eo.style.display = "none"; eo.classList.remove("show"); }
+    if (w) { w.style.display = "none"; w.classList.remove("show"); }
+    try { if (typeof exitBlockMode === "function") exitBlockMode(); } catch (e) {}
+    /* 再走一遍主模块的关闭链路，保证内部状态（搜索词/多选/专属页）同步复位 */
+    try { var b = document.getElementById("closeWordBank"); b && b.click && b.click(); } catch (e) {}
+  }
+  function init() {
+    _bindTap(document.getElementById("wordBtn"), function () {
+      window.__openWordBank && window.__openWordBank();
+    });
+    _bindTap(document.querySelector("#wordbankOverlay .wb-head-close"), _closeWb);
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+
 /* zzj: 补发内容时间戳回写——离线期间应发的内容，时间用计划时间而非上线时间 */
 window.__akiniBackdateTs = 0;
 window.__akiniNowTs = function () {
@@ -22161,7 +22251,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:4px 16px 8px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
@@ -22173,7 +22263,7 @@ window.__akiniNowTs = function () {
     var groups = _stkGRead();
     if (groups.length) {
       var arr0 = _stkRead(cid);
-      h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:2px 16px 8px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;align-self:stretch;box-sizing:border-box;">';
+      h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:0 16px 6px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;align-self:stretch;box-sizing:border-box;">';
       /* chips 样式统一走 .wb-gf-btn（图五：灰底圆角条 + 选中白底黑色线条包裹），不再内联 */
       var chip = function (gid, label, count) {
         var on2 = String(_stkFilterGid) === String(gid);
@@ -22189,7 +22279,7 @@ window.__akiniNowTs = function () {
     var arr = _stkRead(cid);
     var shown = _stkFiltered(arr);
     /* 白底（去掉灰底），网格每行四个 */
-    h += '<div style="padding:2px 12px 12px;background:#fff;min-height:200px;width:100%;box-sizing:border-box;align-self:stretch;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    h += '<div style="padding:0 12px 12px;background:#fff;min-height:200px;width:100%;box-sizing:border-box;align-self:stretch;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
     shown.forEach(function (row) {
       var it = row.it, i = row.idx;
       var selOn = !!_stkSel[i];
@@ -22350,9 +22440,9 @@ window.__akiniNowTs = function () {
     var h = '';
     groups.forEach(function (g, gi) {
       var cnt = arr.filter(function (x) { return String(x.g) === String(g.id); }).length;
-      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8f8f8;border-radius:10px;">' +
-        '<div style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:14px;color:#333;font-weight:500;">' + _esc(g.name) + '</span><span style="font-size:12px;color:#aaa;">' + cnt + '张</span></div>' +
-        '<button type="button" class="stk-group-del" data-gi="' + gi + '" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;">✕</button></div>';
+      h += '<div class="g-item">' +
+        '<div style="display:flex;align-items:center;gap:8px;min-width:0;"><span>' + _esc(g.name) + '</span><span style="font-size:12px;color:#aaa;">' + cnt + '张</span></div>' +
+        '<button type="button" class="stk-group-del del-group" data-gi="' + gi + '" style="background:none;border:none;font-size:15px;min-width:40px;min-height:40px;touch-action:manipulation;">✕</button></div>';
     });
     list.innerHTML = h;
     list.querySelectorAll('.stk-group-del').forEach(function (btn) {
@@ -22582,7 +22672,7 @@ window.__akiniNowTs = function () {
     });
     _cap('groupBtn', _stkOpenGroupModal);
     _cap('dedupBtn', _stkDedup);
-    _cap('wbExportBtn', _stkExport);
+    /* zza：表情包导出与其他 tab 一致，统一走 __wbExportCards（勾选模块合并导出），不再独立导出 */
     _cap('wbImportBtn', _stkImport);
     _cap('wbBlockBtn', _stkToggleBlockMode);
     _cap('selectBtn', _stkToggleSelMode);

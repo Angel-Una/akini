@@ -6638,3 +6638,18 @@ body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !
 .wb-gf-btn.active { background: #fff !important; color: #111 !important; box-shadow: 0 0 0 1.5px #1a1a1a !important; font-weight: 600; }
 body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
 body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !important; box-shadow: 0 0 0 1.5px #ddd !important; }
+
+/* ============ v20260912zza ============ */
+/* 字卡库工具栏：图标聚集靠最右（覆盖旧 4 列均分网格） */
+.wb-toolbar { display: flex !important; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 6px 16px 10px; overflow-x: visible; background: transparent; border-bottom: none; }
+.wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }
+.wb-toolbar .tool-btn { width: 36px !important; min-width: 36px; height: 36px !important; flex: none; padding: 0 !important; border-radius: 10px; }
+/* 聊天系统消息胶囊缩小（优先级需高于 v20260909w 默认胶囊规则） */
+.chat-body .msg-row.system { margin: 2px 0 6px; }
+html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { font-size: 11px !important; padding: 2px 8px !important; line-height: 1.5 !important; }
+/* 输入栏防挤压：保证表情/发送/加号按钮在所有界面完整显示 */
+.chat-input-bar { width: 100%; box-sizing: border-box; }
+.chat-input-bar .input-wrap { min-width: 0; flex: 1 1 0; }
+.chat-input-bar .emoji-btn, .chat-input-bar .action-btn, .chat-input-bar .plus-btn { flex-shrink: 0; }
+#watchInputBar { box-sizing: border-box; }
+#watchInputBar input { min-width: 0; }
