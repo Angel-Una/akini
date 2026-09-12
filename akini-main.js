@@ -9442,6 +9442,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const B = document.getElementById("wbSelectDeleteBtn");
         B &&
           a(B, function () {
+            if (window.__wbTab === "sticker") return;
             if (0 === c.size) return void alert("请先选择字卡");
             if (!confirm(`确定删除选中的 ${c.size} 条字卡？`)) return;
             const t = l();
@@ -18261,43 +18262,40 @@ document.addEventListener("DOMContentLoaded", function () {
             );
           var LH = 34;
           for (var t = 0, n = 0; n < b.length && w >= b[n].time; n++) t = n;
-          var next = b[t + 1] ? b[t + 1].time : b[t] ? b[t].time + 4 : 0;
-          var dur = Math.max(0.4, next - b[t].time);
-          var prog = Math.min(1, Math.max(0, (w - b[t].time) / dur));
-          if (H.length !== b.length) {
-            var i = "";
-            for (n = 0; n < b.length; n++)
-              i +=
-                '<div class="lyric-line" data-idx="' +
-                n +
-                '" style="text-align:center;padding:6px 0;font-size:13px;color:rgba(255,255,255,0.45);font-weight:400;line-height:1.6;transition:color 0.2s,font-size 0.2s,opacity 0.2s;height:' +
-                LH +
-                'px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;">' +
-                J(b[n].text) +
-                "</div>";
-            ((e.lyricsBody.innerHTML = i),
-              (H = Array.from(e.lyricsBody.querySelectorAll(".lyric-line"))));
-          }
-          var a = t - 2 + prog;
-          a = Math.max(0, Math.min(a, b.length - 5));
-          var containerH =
-            (e.lyricsBody.parentElement &&
-              e.lyricsBody.parentElement.clientHeight) ||
-            200;
-          var activeTop = t * LH + prog * LH;
-          var target = activeTop - containerH / 2 + LH / 2;
-          var maxScroll = Math.max(0, b.length * LH - containerH);
-          target = Math.max(0, Math.min(target, maxScroll));
-          (H.forEach(function (el, n) {
-            if (!el || !el.style) return;
-            var d = Math.abs(n - t),
-              o = n === t;
-            ((el.style.fontSize = o ? "15px" : "13px"),
-              (el.style.color = o ? "#fff" : "rgba(255,255,255,0.45)"),
-              (el.style.fontWeight = o ? "600" : "400"),
-              (el.style.opacity = o ? "1" : d <= 1 ? "0.6" : "0.35"));
-          }),
-            (e.lyricsBody.style.transform = "translateY(" + -target + "px)"));
+          /* 固定五行：容器整体不位移不滚动，当前播放到的歌词固定显示在第三行 */
+          e.lyricsBody.style.transform = "none";
+          var rows = [t - 2, t - 1, t, t + 1, t + 2];
+          var html = "";
+          rows.forEach(function (idx, pos) {
+            var isCurrent = pos === 2;
+            var text = idx >= 0 && idx < b.length ? b[idx].text : "";
+            var d = Math.abs(pos - 2);
+            var fs = isCurrent ? "16px" : d === 1 ? "13px" : "12px";
+            var col = isCurrent
+              ? "#ffffff"
+              : d === 1
+                ? "rgba(255,255,255,0.65)"
+                : "rgba(255,255,255,0.3)";
+            var fw = isCurrent ? "600" : "400";
+            var op = isCurrent ? "1" : d === 1 ? "0.65" : "0.35";
+            html +=
+              '<div class="lyric-line' +
+              (isCurrent ? " active" : "") +
+              '" style="text-align:center;padding:5px 0;font-size:' +
+              fs +
+              ";color:" +
+              col +
+              ";font-weight:" +
+              fw +
+              ";line-height:1.5;min-height:" +
+              LH +
+              "px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;opacity:" +
+              op +
+              ';transition:color 0.2s,font-size 0.2s,opacity 0.2s;">' +
+              J(text || " ") +
+              "</div>";
+          });
+          e.lyricsBody.innerHTML = html;
         }
       }
       function loadUserPlaylists(n, uid, nickname) {
@@ -21381,24 +21379,27 @@ document.addEventListener("DOMContentLoaded", function () {
     body.scrollTop = body.scrollHeight;
     if (isFullscreen() && !img) fireDanmaku((c.name ? c.name + "：" : "") + text);
   }
-  // 观影聊天输入动态：与微信聊天一致的"对方正在输入"三点气泡
+  // 观影聊天输入动态：与微信聊天一致的"对方正在输入"三点气泡，悬浮在输入栏左下角/左上方
   function showWatchTyping() {
-    var body = $("watchChatBody");
-    if (!body || $("watchTypingRow")) return;
+    var bar = $("watchInputBar");
+    if (!bar) return;
+    if ($("watchTypingFloat")) return;
     var c = watchPartners[0];
-    var row = document.createElement("div");
-    row.id = "watchTypingRow";
-    row.className = "msg-row other";
-    row.innerHTML =
-      '<div class="msg-content-line"><div class="msg-avatar">' + partnerAvatarHtml(c && c.avatar) + '</div>' +
-      '<div class="bubble" style="display:inline-flex;align-items:center;gap:4px;padding:12px 16px">' +
-      '<span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span></div></div>';
-    body.appendChild(row);
-    body.scrollTop = body.scrollHeight;
+    var floatEl = document.createElement("div");
+    floatEl.id = "watchTypingFloat";
+    floatEl.className = "akini-typing-float";
+    floatEl.style.cssText = "position:absolute;left:12px;bottom:calc(100% + 8px);z-index:20;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.96);padding:5px 12px 5px 8px;border-radius:18px;box-shadow:0 3px 12px rgba(0,0,0,0.12);pointer-events:none;transition:opacity 0.2s ease;";
+    floatEl.innerHTML =
+      '<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + partnerAvatarHtml(c && c.avatar) + '</div>' +
+      '<div style="display:flex;align-items:center;gap:3px;"><span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span></div>';
+    bar.style.position = "relative";
+    bar.appendChild(floatEl);
   }
   function hideWatchTyping() {
-    var r = $("watchTypingRow");
+    var r = $("watchTypingFloat");
     if (r) r.remove();
+    var oldRow = $("watchTypingRow");
+    if (oldRow) oldRow.remove();
   }
   function schedulePartnerReply() {
     if (!watchPartners.length) return;
@@ -21650,6 +21651,17 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     setTimeout(function () { d.remove(); }, 7300);
   }
+  window.__watchSendStickerDirect = function (src) {
+    appendChatMsg("", src);
+    schedulePartnerReply();
+  };
+  // 观影聊天挂载直接发送表情包接口
+  window.__watchSendStickerDirect = function (src) {
+    if (!src) return;
+    appendChatMsg("", src);
+    schedulePartnerReply();
+  };
+
   function sendMsg(fsMode) {
     var input = fsMode ? $("watchMsgInputFs") : $("watchMsgInput");
     if (!input) return;
@@ -22337,19 +22349,19 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:4px 16px 8px;margin-top:4px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:6px 16px 8px;margin-top:4px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;flex-shrink:0;min-height:72px;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
-        '<div style="width:44px;height:44px;border-radius:50%;background:#f0f0f0;overflow:hidden;display:flex;align-items:center;justify-content:center;' + (on ? 'box-shadow:0 0 0 2px #1a1a1a;' : '') + '">' + _avHtml(p.avatar, 44) + '</div>' +
-        '<div style="font-size:11px;' + (on ? 'color:#1a1a1a;font-weight:600;' : 'color:#888;') + 'max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(p.name) + '</div></div>';
+        '<div style="width:44px;height:44px;border-radius:50%;background:#f0f0f0;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;' + (on ? 'box-shadow:0 0 0 2px #1a1a1a;' : '') + '">' + _avHtml(p.avatar, 44) + '</div>' +
+        '<div style="font-size:11px;' + (on ? 'color:#1a1a1a;font-weight:600;' : 'color:#888;') + 'max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;">' + _esc(p.name) + '</div></div>';
     });
     h += '</div>';
     /* 表情包独立分组筛选条 */
     var groups = _stkGRead();
     if (groups.length) {
       var arr0 = _stkRead(cid);
-      h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:0 16px 6px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;align-self:stretch;box-sizing:border-box;">';
+      h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:0 16px 8px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;align-self:stretch;box-sizing:border-box;flex-shrink:0;min-height:40px;">';
       /* chips 样式统一走 .wb-gf-btn（图五：灰底圆角条 + 选中白底黑色线条包裹），不再内联 */
       var chip = function (gid, label, count) {
         var on2 = String(_stkFilterGid) === String(gid);
@@ -22365,7 +22377,7 @@ window.__akiniNowTs = function () {
     var arr = _stkRead(cid);
     var shown = _stkFiltered(arr);
     /* 白底（去掉灰底），网格每行四个 */
-    h += '<div style="padding:0 12px 12px;background:#fff;min-height:200px;width:100%;box-sizing:border-box;align-self:stretch;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+    h += '<div style="padding:0 12px 12px;background:#fff;min-height:200px;width:100%;box-sizing:border-box;align-self:stretch;flex:1 1 auto;"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
     shown.forEach(function (row) {
       var it = row.it, i = row.idx;
       var selOn = !!_stkSel[i];
@@ -22420,7 +22432,7 @@ window.__akiniNowTs = function () {
               if (_stkSel[idx]) delete _stkSel[idx]; else _stkSel[idx] = true;
               renderStickerTab();
             } else {
-              _askDelete(_getCid(), idx);
+              /* 彻底删掉点击表情包删除功能：统一用星星选择功能删除，普通点击不做删除操作 */
             }
           }
         } catch (x) {}
@@ -22499,20 +22511,19 @@ window.__akiniNowTs = function () {
   /* ---- 工具栏接管：表情包 tab 下由表情包模块独立处理（与主字卡/emoji/拍一拍平级） ---- */
   function _cap(id, fn) {
     var lock = 0;
-    ['pointerdown', 'touchend', 'click'].forEach(function (ev) {
-      window.addEventListener(ev, function (e) {
-        if (window.__wbTab !== 'sticker') return;
-        var t = e.target && e.target.closest ? e.target.closest('#' + id) : null;
-        if (!t) return;
-        e.preventDefault();
-        e.stopPropagation();
-        if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-        var n = Date.now();
-        if (n - lock < 400) return;
-        lock = n;
-        try { fn(); } catch (x) {}
-      }, true);
-    });
+    /* 弹窗类/动作类点击统一只走 click 捕获，避免 pointerdown 触发原生 confirm/prompt 挂起后后续 click 导致弹窗弹两遍 */
+    window.addEventListener('click', function (e) {
+      if (window.__wbTab !== 'sticker') return;
+      var t = e.target && e.target.closest ? e.target.closest('#' + id) : null;
+      if (!t) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+      var n = Date.now();
+      if (n - lock < 800) return;
+      lock = n;
+      try { fn(); } catch (x) {}
+    }, true);
   }
 
   /* 分组管理弹窗 */
@@ -22726,10 +22737,19 @@ window.__akiniNowTs = function () {
     alert('请先选择表情包');
     return false;
   }
+  var _stkDelInProgress = false;
   function _stkSelDelete() {
+    if (_stkDelInProgress) return;
     var idxs = Object.keys(_stkSel).map(Number).sort(function (a, b) { return b - a; });
     if (!idxs.length) { _stkEmptyGuard(); return; }
-    if (!confirm('确定删除选中的 ' + idxs.length + ' 张表情包？')) return;
+    _stkDelInProgress = true;
+    var ok = false;
+    try {
+      ok = confirm('确定删除选中的 ' + idxs.length + ' 张表情包？');
+    } finally {
+      setTimeout(function () { _stkDelInProgress = false; }, 1000);
+    }
+    if (!ok) return;
     var cid = _getCid();
     var arr = _stkRead(cid);
     idxs.forEach(function (i) { if (i >= 0 && i < arr.length) arr.splice(i, 1); });
@@ -22827,9 +22847,9 @@ window.__akiniNowTs = function () {
     }
     var html = '';
     _pendingStickerFiles.forEach(function (dataUrl, idx) {
-      html += '<div style="position:relative;aspect-ratio:1/1;background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;">' +
-        '<img src="' + dataUrl + '" style="width:100%;height:100%;object-fit:contain;" alt=""/>' +
-        '<button type="button" class="wb-stk-del-item" data-idx="' + idx + '" style="position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;border:none;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;">✕</button>' +
+      html += '<div style="position:relative;width:100%;aspect-ratio:1/1;min-height:64px;height:auto;background:#fff;border:1px solid #e0e0e0;border-radius:10px;overflow:hidden;box-sizing:border-box;">' +
+        '<img src="' + dataUrl + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;" alt=""/>' +
+        '<button type="button" class="wb-stk-del-item" data-idx="' + idx + '" style="position:absolute;top:2px;right:2px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,0.65);color:#fff;border:none;font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation;z-index:2;">✕</button>' +
         '</div>';
     });
     grid.innerHTML = html;
@@ -23039,7 +23059,14 @@ window.__akiniNowTs = function () {
       wb.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
         window.__openStickerPickPanel(function (src) {
-          _markPending(document.getElementById('watchMsgInput'), '__watchPendingSticker', src);
+          /* 观影聊天选择表情包直接发送 */
+          if (typeof window.__watchSendStickerDirect === 'function') {
+            window.__watchSendStickerDirect(src);
+          } else {
+            _markPending(document.getElementById('watchMsgInput'), '__watchPendingSticker', src);
+            var sb = document.getElementById('watchSendBtn');
+            if (sb) sb.click();
+          }
         });
       });
     }
