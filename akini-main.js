@@ -1399,6 +1399,25 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch(e){}
   }, 100);
 });
+/* ===== 全局轻提示 toast：顶部居中胶囊，默认 3 秒自动消失 ===== */
+(function () {
+  var _el = null, _tm = null;
+  window.__akiniToast = window.akiniShowToast = function (msg, durMs) {
+    try {
+      if (!msg) return;
+      if (!_el) {
+        _el = document.createElement("div");
+        _el.style.cssText = "position:fixed;top:calc(14px + var(--ak-sat, 0px));left:50%;transform:translateX(-50%);z-index:10000010;max-width:82%;padding:10px 18px;border-radius:999px;background:rgba(26,26,26,.92);color:#fff;font-size:13px;font-weight:500;line-height:1.4;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transition:opacity .18s;pointer-events:none;white-space:pre-wrap";
+        document.body.appendChild(_el);
+      }
+      _el.textContent = String(msg);
+      requestAnimationFrame(function () { _el.style.opacity = "1"; });
+      clearTimeout(_tm);
+      _tm = setTimeout(function () { if (_el) _el.style.opacity = "0"; }, durMs || 3000);
+    } catch (e) {}
+  };
+})();
+
 /* ===== 字卡库全局过滤：屏蔽字卡 + 联系人专属字卡 ===== */
     (function () {
       window.__wbRead = function (key, def) {
@@ -9994,17 +10013,35 @@ document.addEventListener("DOMContentLoaded", function () {
           /* 表情包模块：合并导出所有联系人的表情包及表情包分组 */
           if (sel.sticker && !hasGroupFilter) {
             var stkAll = [];
+            var _roleOf = function (cid) {
+              if (cid === "me") return "我";
+              try {
+                var _co = window.akiniContacts && window.akiniContacts.getContactById ? window.akiniContacts.getContactById(cid) : null;
+                if (_co && _co.name) return _co.name;
+              } catch (e2) {}
+              return cid;
+            };
             try {
               var _ppl = ["me"];
               (window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : []).forEach(function (c) { _ppl.push(String(c.id)); });
               _ppl.forEach(function (cid) {
                 (window.__wbRead("akini_stickers_" + cid, []) || []).forEach(function (it) {
-                  if (it && it.s) stkAll.push({ o: cid, s: it.s, g: it.g || "", n: it.n || "", b: it.b ? 1 : 0 });
+                  if (it && it.s) stkAll.push({ o: cid, oname: _roleOf(cid), s: it.s, g: it.g || "", n: it.n || "", b: it.b ? 1 : 0 });
                 });
               });
             } catch (e) {}
             var stkGs = window.__wbRead("akini_stk_groups", []) || [];
-            if (stkAll.length) { data.customStickers = stkAll; data.modules.push("stickers"); }
+            if (stkAll.length) {
+              data.customStickers = stkAll;
+              // 按角色区分：每个角色的表情包独立成组，方便查看与选择性导入
+              var byRole = {};
+              stkAll.forEach(function (it) {
+                var rn = it.oname || it.o;
+                (byRole[rn] = byRole[rn] || []).push({ s: it.s, g: it.g, n: it.n, b: it.b });
+              });
+              data.customStickersByRole = byRole;
+              data.modules.push("stickers");
+            }
             if (stkGs.length) { data.customStickerGroups = stkGs; }
           }
           return data;
@@ -10250,15 +10287,18 @@ document.addEventListener("DOMContentLoaded", function () {
                 i = n.map((t) => (t.text || t.content || "").trim()),
                 a = document.getElementById("groupSelect"),
                 o = a ? a.value : "";
+              var _addedCnt = 0;
               (e.forEach((e) => {
                 if (i.includes(e)) return;
                 const a = { text: e, tab: t };
-                (o && (a.gid = o), n.push(a), i.push(e));
+                (o && (a.gid = o), n.push(a), i.push(e), _addedCnt++);
               }),
                 s(n),
                 z && ((z.style.display = "none"), z.classList.remove("show")),
                 f(),
                 m());
+              var _tabName = { main: "主字卡", emoji: "Emoji", pat: "拍一拍" }[t] || "字卡";
+              window.__akiniToast && window.__akiniToast(_addedCnt > 0 ? ("✓ 成功添加 " + _addedCnt + " 条" + _tabName) : "内容已存在，未重复添加");
             }),
           q &&
             a(q, function () {
@@ -22498,6 +22538,10 @@ window.__akiniNowTs = function () {
     return [];
   }
   function _stkWrite(cid, arr) {
+    /* 优先走 akiniStore（超 200KB 自动分流内存+IndexedDB，不再受 localStorage 5MB 上限限制，表情包随便加） */
+    if (window.akiniStore && window.akiniStore.setJson) {
+      try { window.akiniStore.setJson(_stkKey(cid), arr); return; } catch (e) {}
+    }
     try { localStorage.setItem(_stkKey(cid), JSON.stringify(arr)); }
     catch (e) {
       if (window.__akiniCenterModal) window.__akiniCenterModal('存储失败', '图片过大，请换一张小图');
@@ -23298,6 +23342,7 @@ window.__akiniNowTs = function () {
         var gid = gidSel ? (gidSel.value || '') : '';
         var cid = _getCid();
         var arr = _stkRead(cid);
+        var _addCnt = _pendingStickerFiles.length;
         _pendingStickerFiles.forEach(function (s) {
           arr.push({ s: s, g: gid, b: 0 });
         });
@@ -23306,6 +23351,14 @@ window.__akiniNowTs = function () {
         modal.style.display = 'none';
         modal.classList.remove('show');
         renderStickerTab();
+        var _roleName = '我';
+        if (cid !== 'me') {
+          try {
+            var _co = window.akiniContacts && window.akiniContacts.getContactById ? window.akiniContacts.getContactById(cid) : null;
+            if (_co && _co.name) _roleName = _co.name;
+          } catch (e2) {}
+        }
+        window.__akiniToast && window.__akiniToast('✓ 成功添加 ' + _addCnt + ' 个表情包到「' + _roleName + '」');
       });
     }
   }

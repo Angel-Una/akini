@@ -972,12 +972,12 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(0px + env(safe-area-inset-top, 0px)) 12px 4px;
+  padding: calc(0px + var(--ak-sat, 0px)) 12px 4px;
   /* iOS Safari 崩溃修复：position:fixed + backdrop-filter 会在切换 App 时崩溃渲染进程，改用不透明背景 */
   background: rgba(255, 255, 255, 0.97);
   border-bottom: 1px solid #e8e8e8;
   z-index: 100;
-  height: calc(50px + env(safe-area-inset-top, 0px));
+  height: calc(50px + var(--ak-sat, 0px));
   position: fixed;
   top: 0;
   left: 0;
@@ -1506,7 +1506,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body {
   flex: 1;
   overflow-y: auto;
-  padding: calc(64px + env(safe-area-inset-top, 0px)) 14px 34px;
+  padding: calc(64px + var(--ak-sat, 0px)) 14px 34px;
   transition: background 0.3s;
   background-size: cover;
   background-position: center;
@@ -2790,7 +2790,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .friends-header .back-btn {
   position: absolute;
-  top: calc(12px + env(safe-area-inset-top, 0px));
+  top: calc(12px + var(--ak-sat, 0px));
   left: 16px;
   z-index: 10;
 }
@@ -3186,7 +3186,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   padding: 60px 16px 16px;
   overflow-y: auto;
   background: #f9f9f9;
-  padding-top: calc(60px + env(safe-area-inset-top, 0px)) !important;
+  padding-top: calc(60px + var(--ak-sat, 0px)) !important;
 }
 .mail-tab {
   flex: 1;
@@ -4588,7 +4588,7 @@ select {
 }
 .friends-header .back-btn {
   position: fixed !important;
-  top: calc(12px + env(safe-area-inset-top, 0px)) !important;
+  top: calc(12px + var(--ak-sat, 0px)) !important;
   left: 12px !important;
   z-index: 1000 !important;
   background: rgba(255, 255, 255, 0.8) !important;
@@ -5038,7 +5038,7 @@ a,
   align-items: center !important;
   justify-content: space-between !important;
   padding: 12px 16px !important;
-  padding-top: max(12px, env(safe-area-inset-top, 12px)) !important;
+  padding-top: max(12px, var(--ak-sat, 12px)) !important;
   background: #fff !important;
   border-bottom: 1px solid #e8e8e8 !important;
   z-index: 10 !important;
@@ -5572,13 +5572,13 @@ button.back-btn[type="button"] {
 }
 #app-create-group .create-group-body,
 #app-create-group.create-group-wrapper .create-group-body {
-  padding-top: calc(16px + max(12px, env(safe-area-inset-top, 12px)) + 44px) !important;
+  padding-top: calc(16px + max(12px, var(--ak-sat, 12px)) + 44px) !important;
 }
 .settings-header,
 .beautify-header,
 .icity-header,
 .create-group-header {
-  padding-top: max(12px, env(safe-area-inset-top, 12px)) !important;
+  padding-top: max(12px, var(--ak-sat, 12px)) !important;
   min-height: 56px !important;
 }
 
@@ -6676,7 +6676,7 @@ body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !
 body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
 body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !important; box-shadow: 0 0 0 1.5px #ddd !important; }
 
-/* ============ v20260912zzo ============ */
+/* ============ v20260912zzs ============ */
 /* 字卡库工具栏：图标聚集靠最右（覆盖旧 4 列均分网格） */
 /* zzc：恢复两行四列布局（用户要求），6241 行规则生效 */
 .wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }
