@@ -8797,6 +8797,7 @@ document.addEventListener("DOMContentLoaded", function () {
           w = document.getElementById("wbSearchClose");
         (p &&
           a(p, function () {
+            if (window.__wbTab === "sticker") return;
             if (!v) return;
             const t = "none" !== v.style.display && "" !== v.style.display;
             ((v.style.display = t ? "none" : "flex"),
@@ -8809,6 +8810,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }),
           w &&
             a(w, function () {
+              if (window.__wbTab === "sticker") return;
               ((e = ""),
                 h && (h.value = ""),
                 v && (v.style.display = "none"),
@@ -8868,6 +8870,7 @@ document.addEventListener("DOMContentLoaded", function () {
         })(),
           k &&
             a(k, function () {
+              if (window.__wbTab === "sticker") return;
               try {
                 var _gmT2 = _.querySelector(".title");
                 if (_gmT2) _gmT2.textContent = ({ main: "主字卡", emoji: "Emoji", pat: "拍一拍" }[window.__wbTab] || "主字卡") + "分组管理";
@@ -8908,6 +8911,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const E = document.getElementById("dedupBtn");
         E &&
           a(E, function () {
+            if (window.__wbTab === "sticker") return;
             const t = l(),
               e = new Set(),
               n = [];
@@ -9412,6 +9416,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const A = document.getElementById("selectBtn");
         A &&
           a(A, function () {
+            if (window.__wbTab === "sticker") return;
             ((r = !r),
               c.clear(),
               r && bm && exitBlockMode(),
@@ -9422,6 +9427,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const C = document.getElementById("wbSelectAllBtn");
         C &&
           a(C, function () {
+            if (window.__wbTab === "sticker") return;
             let i = l()
               .map((t, e) => ({ item: t, idx: e }))
               .filter(({ item: e }) => (e.tab || "main") === t);
@@ -9460,6 +9466,7 @@ document.addEventListener("DOMContentLoaded", function () {
           D = document.getElementById("wbPickGroupCancel");
         (T &&
           a(T, function () {
+            if (window.__wbTab === "sticker") return;
             if (0 === c.size) return void alert("请先选择字卡");
             const t = d();
             0 !== t.length
@@ -9509,6 +9516,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         WB &&
           a(WB, function () {
+            if (window.__wbTab === "sticker") return;
             if (((bm = !bm), bc.clear(), bm && r)) {
               ((r = !1), c.clear());
               const sb = document.getElementById("selectBtn");
@@ -9521,6 +9529,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const WBDo = document.getElementById("wbBlockDoBtn");
         WBDo &&
           a(WBDo, function () {
+            if (window.__wbTab === "sticker") return;
             if (0 === bc.size) return void alert("请先选择要屏蔽的字卡");
             const cards = l(),
               blocked = window.__wbRead("akini_wb_blocked", []);
@@ -9539,6 +9548,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const WBUndo = document.getElementById("wbBlockUndoBtn");
         WBUndo &&
           a(WBUndo, function () {
+            if (window.__wbTab === "sticker") return;
             if (0 === bc.size) return void alert("请先选择要取消屏蔽的字卡");
             const cards = l(),
               keys = new Set();
@@ -9561,6 +9571,7 @@ document.addEventListener("DOMContentLoaded", function () {
         const WBExit = document.getElementById("wbBlockExitBtn");
         WBExit &&
           a(WBExit, function () {
+            if (window.__wbTab === "sticker") return;
             (exitBlockMode(), f());
           });
         /* ===== 联系人专属字卡：选联系人 → 选 TA 专属分组 ===== */
@@ -22357,10 +22368,9 @@ window.__akiniNowTs = function () {
         '<div style="font-size:11px;' + (on ? 'color:#1a1a1a;font-weight:600;' : 'color:#888;') + 'max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;">' + _esc(p.name) + '</div></div>';
     });
     h += '</div>';
-    /* 表情包独立分组筛选条：「全部/未分组」恒定显示，用户分组按数据追加，
-       避免无分组数据时整条消失造成"分组不见了"的错觉 */
+    /* 表情包独立分组筛选条：与其他三个 tab 一致，无分组数据时不显示 */
     var groups = _stkGRead();
-    {
+    if (groups.length) {
       var arr0 = _stkRead(cid);
       h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:0 16px 8px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;align-self:stretch;box-sizing:border-box;flex-shrink:0;min-height:40px;">';
       /* chips 样式统一走 .wb-gf-btn（图五：灰底圆角条 + 选中白底黑色线条包裹），不再内联 */
@@ -22511,27 +22521,65 @@ window.__akiniNowTs = function () {
   }
 
   /* ---- 工具栏接管：表情包 tab 下由表情包模块独立处理（与主字卡/emoji/拍一拍平级） ---- */
-  function _cap(id, fn) {
-    var lock = 0;
-    /* touchend + click 双通道捕获：
-       - iOS 主模块 a() 在元素 touchend 里 preventDefault 会抑制合成 click，
-         只绑 click 会导致工具栏在真机上全部失效，必须 touchend 捕获执行；
-       - touchend 捕获阶段 preventDefault 后系统不再合成 click，confirm/prompt 类弹窗不会弹两遍；
-       - click 通道兜底桌面浏览器；800ms 锁防偶发双触发。 */
-    var handler = function (e) {
-      if (window.__wbTab !== 'sticker') return;
-      var t = e.target && e.target.closest ? e.target.closest('#' + id) : null;
-      if (!t) return;
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-      var n = Date.now();
-      if (n - lock < 800) return;
-      lock = n;
-      try { fn(); } catch (x) {}
+  /* 与主模块 a() 完全相同的绑定模式：元素级 touchstart/touchmove/touchend/click，
+     touchend fire 后 preventDefault 抑制合成 click + swallow 吞残余 + __stkHandled 双保险，
+     confirm/prompt 弹窗不会弹两遍；行为与主字卡/Emoji/拍一拍工具栏完全一致 */
+  function _stkTap(el, fn) {
+    if (typeof el === 'string') el = document.getElementById(el);
+    if (!el || el.__stkTapBound) return;
+    el.__stkTapBound = 1;
+    el.style.cursor = 'pointer';
+    el.style.webkitTapHighlightColor = 'transparent';
+    el.style.touchAction = 'manipulation';
+    el.__stkLock = 0;
+    el.__stkHandled = 0;
+    var _moved = false, _sx = 0, _sy = 0;
+    var swallowNext = function () {
+      var done = 0;
+      var h = function (ev) {
+        if (done) return;
+        if (ev.target !== el && !(el.contains && el.contains(ev.target))) return;
+        done = 1;
+        document.removeEventListener('click', h, true);
+        document.removeEventListener('touchend', h, true);
+        try { ev.preventDefault(); ev.stopPropagation(); } catch (x) {}
+      };
+      document.addEventListener('click', h, true);
+      document.addEventListener('touchend', h, true);
+      setTimeout(function () {
+        document.removeEventListener('click', h, true);
+        document.removeEventListener('touchend', h, true);
+      }, 400);
     };
-    window.addEventListener('touchend', handler, true);
-    window.addEventListener('click', handler, true);
+    var fire = function (evt) {
+      var n = Date.now();
+      if (n - el.__stkLock < 120) return;
+      el.__stkLock = n;
+      el.__stkHandled = 1;
+      swallowNext();
+      if (evt) { try { evt.preventDefault(); evt.stopPropagation(); } catch (x) {} }
+      try { fn(evt); } catch (x) {}
+    };
+    el.addEventListener('touchstart', function (evt) {
+      if (evt.touches && evt.touches.length > 0) {
+        _sx = evt.touches[0].clientX; _sy = evt.touches[0].clientY; _moved = false;
+      }
+    }, { passive: true });
+    el.addEventListener('touchmove', function (evt) {
+      if (evt.touches && evt.touches.length > 0) {
+        if (Math.abs(evt.touches[0].clientX - _sx) > 8 || Math.abs(evt.touches[0].clientY - _sy) > 8) _moved = true;
+      }
+    }, { passive: true });
+    el.addEventListener('touchend', function (evt) {
+      if (_moved) { _moved = false; return; }
+      if (window.__wbTab !== 'sticker') return;
+      fire(evt);
+    }, { passive: false });
+    el.addEventListener('click', function (evt) {
+      if (window.__wbTab !== 'sticker') return;
+      if (el.__stkHandled) { el.__stkHandled = 0; return; }
+      fire(evt);
+    });
   }
 
   /* 分组管理弹窗 */
@@ -22589,8 +22637,8 @@ window.__akiniNowTs = function () {
     m.__bound = 1;
     m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
     /* iOS 兜底：关闭/新建统一走 _cap 捕获三通道，避免 touch 链路吞 click */
-    _cap('stkGroupClose', function () { m.style.display = 'none'; });
-    _cap('stkGroupCreateBtn', function () {
+    _stkTap('stkGroupClose', function () { m.style.display = 'none'; });
+    _stkTap('stkGroupCreateBtn', function () {
       var name = prompt('请输入表情包分组名称：');
       if (!name || !name.trim()) return;
       var gs = _stkGRead();
@@ -22803,8 +22851,8 @@ window.__akiniNowTs = function () {
   function _bindStickerToolbar() {
     if (window.__stkToolbarBound) return;
     window.__stkToolbarBound = 1;
-    _cap('searchBtn', _stkToggleSearch);
-    _cap('wbSearchClose', function () {
+    _stkTap('searchBtn', _stkToggleSearch);
+    _stkTap('wbSearchClose', function () {
       var bar = document.getElementById('wbSearchBar');
       if (bar) bar.style.display = 'none';
       _stkQuery = '';
@@ -22812,19 +22860,19 @@ window.__akiniNowTs = function () {
       if (ip) ip.value = '';
       renderStickerTab();
     });
-    _cap('groupBtn', _stkOpenGroupModal);
-    _cap('dedupBtn', _stkDedup);
+    _stkTap('groupBtn', _stkOpenGroupModal);
+    _stkTap('dedupBtn', _stkDedup);
     /* zza：表情包导出与其他 tab 一致，统一走 __wbExportCards（勾选模块合并导出），不再独立导出 */
-    _cap('wbImportBtn', _stkImport);
-    _cap('wbBlockBtn', _stkToggleBlockMode);
-    _cap('selectBtn', _stkToggleSelMode);
-    _cap('wbSelectAllBtn', _stkSelAll);
-    _cap('wbSelectDeleteBtn', _stkSelDelete);
-    _cap('wbSelectGroupBtn', _stkSelGroup);
-    _cap('wbSelectCancelBtn', function () { _stkSelMode = false; _stkSel = {}; renderStickerTab(); });
-    _cap('wbBlockDoBtn', function () { _stkBlockDo(true); });
-    _cap('wbBlockUndoBtn', function () { _stkBlockDo(false); });
-    _cap('wbBlockExitBtn', function () { _stkBlockMode = false; _stkSel = {}; renderStickerTab(); });
+    window.__stkImport = _stkImport; /* wbImportBtn 走 akini.html 内联 onclick 的 sticker 分支 */
+    _stkTap('wbBlockBtn', _stkToggleBlockMode);
+    _stkTap('selectBtn', _stkToggleSelMode);
+    _stkTap('wbSelectAllBtn', _stkSelAll);
+    _stkTap('wbSelectDeleteBtn', _stkSelDelete);
+    _stkTap('wbSelectGroupBtn', _stkSelGroup);
+    _stkTap('wbSelectCancelBtn', function () { _stkSelMode = false; _stkSel = {}; renderStickerTab(); });
+    _stkTap('wbBlockDoBtn', function () { _stkBlockDo(true); });
+    _stkTap('wbBlockUndoBtn', function () { _stkBlockDo(false); });
+    _stkTap('wbBlockExitBtn', function () { _stkBlockMode = false; _stkSel = {}; renderStickerTab(); });
     /* 搜索输入：拦截主模块处理器，避免其重绘覆盖表情包网格 */
     window.addEventListener('input', function (e) {
       if (window.__wbTab !== 'sticker') return;
