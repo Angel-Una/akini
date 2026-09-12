@@ -22357,9 +22357,10 @@ window.__akiniNowTs = function () {
         '<div style="font-size:11px;' + (on ? 'color:#1a1a1a;font-weight:600;' : 'color:#888;') + 'max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;">' + _esc(p.name) + '</div></div>';
     });
     h += '</div>';
-    /* 表情包独立分组筛选条 */
+    /* 表情包独立分组筛选条：「全部/未分组」恒定显示，用户分组按数据追加，
+       避免无分组数据时整条消失造成"分组不见了"的错觉 */
     var groups = _stkGRead();
-    if (groups.length) {
+    {
       var arr0 = _stkRead(cid);
       h += '<div style="display:flex;gap:6px;overflow-x:auto;margin:0 16px 8px;padding:5px;background:#f5f5f5;border-radius:14px;-webkit-overflow-scrolling:touch;align-self:stretch;box-sizing:border-box;flex-shrink:0;min-height:40px;">';
       /* chips 样式统一走 .wb-gf-btn（图五：灰底圆角条 + 选中白底黑色线条包裹），不再内联 */
@@ -22486,6 +22487,7 @@ window.__akiniNowTs = function () {
     var on = window.__wbTab === 'sticker';
     if (!on && prev === 'sticker') { _stkExitModes(); _stkQuery = ''; }
     _applyStickerChrome(on);
+    window.__wbSyncSearchScope && window.__wbSyncSearchScope();
     if (on) renderStickerTab();
   }
   function _bindTabs() {
@@ -22511,8 +22513,12 @@ window.__akiniNowTs = function () {
   /* ---- 工具栏接管：表情包 tab 下由表情包模块独立处理（与主字卡/emoji/拍一拍平级） ---- */
   function _cap(id, fn) {
     var lock = 0;
-    /* 弹窗类/动作类点击统一只走 click 捕获，避免 pointerdown 触发原生 confirm/prompt 挂起后后续 click 导致弹窗弹两遍 */
-    window.addEventListener('click', function (e) {
+    /* touchend + click 双通道捕获：
+       - iOS 主模块 a() 在元素 touchend 里 preventDefault 会抑制合成 click，
+         只绑 click 会导致工具栏在真机上全部失效，必须 touchend 捕获执行；
+       - touchend 捕获阶段 preventDefault 后系统不再合成 click，confirm/prompt 类弹窗不会弹两遍；
+       - click 通道兜底桌面浏览器；800ms 锁防偶发双触发。 */
+    var handler = function (e) {
       if (window.__wbTab !== 'sticker') return;
       var t = e.target && e.target.closest ? e.target.closest('#' + id) : null;
       if (!t) return;
@@ -22523,7 +22529,9 @@ window.__akiniNowTs = function () {
       if (n - lock < 800) return;
       lock = n;
       try { fn(); } catch (x) {}
-    }, true);
+    };
+    window.addEventListener('touchend', handler, true);
+    window.addEventListener('click', handler, true);
   }
 
   /* 分组管理弹窗 */
@@ -22698,6 +22706,14 @@ window.__akiniNowTs = function () {
     if (removed > 0) { _stkWrite(cid, out); _stkSel = {}; renderStickerTab(); }
   }
 
+  /* 搜索栏顶部显示当前搜索范围（主字卡/Emoji/拍一拍/表情包） */
+  window.__wbSyncSearchScope = function () {
+    var el = document.getElementById('wbSearchScope');
+    if (!el) return;
+    var map = { main: '主字卡', emoji: 'Emoji', pat: '拍一拍', sticker: '表情包' };
+    el.textContent = '搜索范围：' + (map[window.__wbTab] || '主字卡');
+  };
+
   function _stkToggleSearch() {
     var bar = document.getElementById('wbSearchBar');
     if (!bar) return;
@@ -22709,7 +22725,8 @@ window.__akiniNowTs = function () {
       if (ip) ip.value = '';
       renderStickerTab();
     } else {
-      bar.style.display = 'flex';
+      bar.style.display = 'block';
+      window.__wbSyncSearchScope();
       if (ip) { ip.placeholder = '按分组名搜索表情包...'; try { ip.focus(); } catch (e) {} }
     }
   }
@@ -22826,6 +22843,12 @@ window.__akiniNowTs = function () {
         if (!box.querySelector('.wb-stk-person')) renderStickerTab();
       });
       mo.observe(box, { childList: true });
+    }
+    /* 搜索栏被任一模块打开时同步顶部搜索范围标签 */
+    var sb = document.getElementById('wbSearchBar');
+    if (sb && window.MutationObserver) {
+      var smo = new MutationObserver(function () { window.__wbSyncSearchScope && window.__wbSyncSearchScope(); });
+      smo.observe(sb, { attributes: true, attributeFilter: ['style'] });
     }
     _bindStkGroupModal();
   }
