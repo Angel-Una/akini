@@ -27,6 +27,10 @@ html {
   touch-action: pan-y;
   position: fixed;
 }
+:root {
+  --ak-sat: env(safe-area-inset-top, 0px);
+  --ak-sab: env(safe-area-inset-bottom, 0px);
+}
 @media all and (display-mode: standalone) {
   html, body {
     width: 100% !important;
@@ -36,6 +40,10 @@ html {
     -webkit-text-size-adjust: 100% !important;
     text-size-adjust: 100% !important;
     zoom: 1 !important;
+  }
+  /* standalone 全屏：仿状态栏避开系统状态栏区域（!important 覆盖后置 top:0） */
+  .fake-statusbar {
+    top: var(--ak-sat) !important;
   }
 }
 body {
@@ -550,11 +558,19 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .preview-bubble:focus {
   background: rgba(255, 255, 255, 0.75);
 }
+/* 底栏固定沉底：任何视口高度计算差异（浏览器/standalone）下都贴可视区底部 */
 .bottom-bar {
   padding: 10px 16px 12px;
-  flex-shrink: 0;
   display: flex;
   justify-content: center;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(8px + var(--ak-sab, 0px));
+  width: calc(100% - 32px);
+  max-width: 448px;
+  box-sizing: border-box;
+  z-index: 50;
 }
 .bottom-btn-container {
   background: #ffffff;
@@ -6660,7 +6676,7 @@ body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !
 body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
 body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !important; box-shadow: 0 0 0 1.5px #ddd !important; }
 
-/* ============ v20260912zzj ============ */
+/* ============ v20260912zzk ============ */
 /* 字卡库工具栏：图标聚集靠最右（覆盖旧 4 列均分网格） */
 /* zzc：恢复两行四列布局（用户要求），6241 行规则生效 */
 .wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }

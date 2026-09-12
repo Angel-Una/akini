@@ -644,6 +644,64 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) { if (__origAlert) __origAlert(msg); }
       };
     })();
+    // 居中输入弹窗（替代原生 prompt），黑白简约样式与 __akiniCenterModal 一致
+    window.__akiniPromptModal = function (title, placeholder, cb, opts) {
+      opts = opts || {};
+      var old = document.getElementById("__akiniPromptModal");
+      if (old) old.remove();
+      var overlay = document.createElement("div");
+      overlay.id = "__akiniPromptModal";
+      overlay.style.cssText =
+        "position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);";
+      var panel = document.createElement("div");
+      panel.style.cssText =
+        "background:#fff;border-radius:24px;width:100%;max-width:320px;padding:24px 20px 20px;box-shadow:0 24px 80px rgba(0,0,0,.28);display:flex;flex-direction:column;gap:12px;";
+      var titleEl = document.createElement("div");
+      titleEl.style.cssText = "font-size:17px;font-weight:700;color:#1a1a1a;line-height:1.3;text-align:center;";
+      titleEl.textContent = title || "请输入";
+      var input = document.createElement("input");
+      input.type = "text";
+      input.placeholder = placeholder || "";
+      input.maxLength = opts.maxLength || 30;
+      input.style.cssText =
+        "height:44px;border:1px solid #e0e0e0;border-radius:12px;padding:0 12px;font-size:16px;outline:none;background:#f7f7f7;color:#1a1a1a;box-sizing:border-box;width:100%;";
+      var row = document.createElement("div");
+      row.style.cssText = "display:flex;gap:10px;margin-top:8px;";
+      var cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "取消";
+      cancel.style.cssText =
+        "flex:1;height:44px;border:1px solid #e0e0e0;border-radius:14px;background:#f7f7f7;color:#555;font-size:15px;font-weight:600;cursor:pointer;";
+      var ok = document.createElement("button");
+      ok.type = "button";
+      ok.textContent = "确定";
+      ok.style.cssText =
+        "flex:1;height:44px;border:none;border-radius:14px;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer;";
+      var done = false;
+      var onKey = function (e) {
+        if (e.key === "Enter") { e.preventDefault(); close(input.value); }
+        else if (e.key === "Escape") { e.preventDefault(); close(null); }
+      };
+      var close = function (val) {
+        if (done) return;
+        done = true;
+        overlay.remove();
+        document.removeEventListener("keydown", onKey, true);
+        if (typeof cb === "function") cb(val);
+      };
+      document.addEventListener("keydown", onKey, true);
+      cancel.addEventListener("click", function () { close(null); });
+      ok.addEventListener("click", function () { close(input.value); });
+      overlay.addEventListener("click", function (e) { if (e.target === overlay) close(null); });
+      row.appendChild(cancel);
+      row.appendChild(ok);
+      panel.appendChild(titleEl);
+      panel.appendChild(input);
+      panel.appendChild(row);
+      overlay.appendChild(panel);
+      document.body.appendChild(overlay);
+      try { setTimeout(function () { try { input.focus(); } catch (e) {} }, 80); } catch (e) {}
+    };
     window._idbStore = (function () {
       // 存储逻辑对齐 milk/syy：localforage（IndexedDB→WebSQL→localStorage 自动降级）为唯一主存储；
       // localStorage 仅作小键热备与同步读取缓存。旧自研库 akini_img_db 的数据首次启动自动迁入。
@@ -8886,27 +8944,28 @@ document.addEventListener("DOMContentLoaded", function () {
             }),
           I &&
             a(I, function () {
-              const t = prompt("请输入分组名称：");
-              if (!t || !t.trim()) return;
-              const e = d(),
-                n = [
-                  "#38D9A9",
-                  "#74C0FC",
-                  "#FFA94D",
-                  "#F783AC",
-                  "#A9E34B",
-                  "#9775FA",
-                  "#63E6BE",
-                  "#FFD43B",
-                ];
-              (e.push({
-                id: Date.now(),
-                name: t.trim(),
-                color: n[e.length % n.length],
-              }),
-                u(e),
-                x(),
-                m());
+              window.__akiniPromptModal("新建分组", "请输入分组名称", function (t) {
+                if (!t || !t.trim()) return;
+                const e = d(),
+                  n = [
+                    "#38D9A9",
+                    "#74C0FC",
+                    "#FFA94D",
+                    "#F783AC",
+                    "#A9E34B",
+                    "#9775FA",
+                    "#63E6BE",
+                    "#FFD43B",
+                  ];
+                (e.push({
+                  id: Date.now(),
+                  name: t.trim(),
+                  color: n[e.length % n.length],
+                }),
+                  u(e),
+                  x(),
+                  m());
+              });
             }));
         const E = document.getElementById("dedupBtn");
         E &&
@@ -9450,15 +9509,22 @@ document.addEventListener("DOMContentLoaded", function () {
           a(B, function () {
             if (window.__wbTab === "sticker") return;
             if (0 === c.size) return void alert("请先选择字卡");
-            if (!confirm(`确定删除选中的 ${c.size} 条字卡？`)) return;
-            const t = l();
-            (Array.from(c)
-              .sort((t, e) => e - t)
-              .forEach((e) => t.splice(e, 1)),
-              s(t),
-              c.clear(),
-              f(),
-              m());
+            window.__akiniCenterModal("确认", `确定删除选中的 ${c.size} 条字卡？`, {
+              confirm: true,
+              okText: "删除",
+              cancelText: "取消",
+              onClose: function (ok) {
+                if (!ok) return;
+                const t = l();
+                (Array.from(c)
+                  .sort((t, e) => e - t)
+                  .forEach((e) => t.splice(e, 1)),
+                  s(t),
+                  c.clear(),
+                  f(),
+                  m());
+              },
+            });
           });
         const T = document.getElementById("wbSelectGroupBtn"),
           M = document.getElementById("wbPickGroupModal"),
@@ -22591,9 +22657,11 @@ window.__akiniNowTs = function () {
     var arr = _stkRead(_getCid());
     if (!groups.length) {
       list.innerHTML = '';
+      list.style.display = 'none';
       if (empty) empty.style.display = 'block';
       return;
     }
+    list.style.display = 'flex';
     if (empty) empty.style.display = 'none';
     var h = '';
     groups.forEach(function (g, gi) {
@@ -22611,17 +22679,25 @@ window.__akiniNowTs = function () {
         var gs = _stkGRead();
         if (isNaN(gi) || gi < 0 || gi >= gs.length) return;
         var gid = String(gs[gi].id);
-        if (!confirm('删除分组「' + gs[gi].name + '」？组内表情包会变为未分组')) return;
-        gs.splice(gi, 1);
-        _stkGWrite(gs);
-        _stkAllCids().forEach(function (c) {
-          var a2 = _stkRead(c), dirty = false;
-          a2.forEach(function (x) { if (String(x.g) === gid) { x.g = ''; dirty = true; } });
-          if (dirty) _stkWrite(c, a2);
+        var gname = gs[gi].name;
+        window.__akiniCenterModal('确认', '删除分组「' + gname + '」？组内表情包会变为未分组', {
+          confirm: true,
+          okText: '删除',
+          cancelText: '取消',
+          onClose: function (ok) {
+            if (!ok) return;
+            gs.splice(gi, 1);
+            _stkGWrite(gs);
+            _stkAllCids().forEach(function (c) {
+              var a2 = _stkRead(c), dirty = false;
+              a2.forEach(function (x) { if (String(x.g) === gid) { x.g = ''; dirty = true; } });
+              if (dirty) _stkWrite(c, a2);
+            });
+            if (String(_stkFilterGid) === gid) _stkFilterGid = '';
+            _stkRenderGroupModal();
+            renderStickerTab();
+          }
         });
-        if (String(_stkFilterGid) === gid) _stkFilterGid = '';
-        _stkRenderGroupModal();
-        renderStickerTab();
       });
     });
   }
@@ -22639,13 +22715,14 @@ window.__akiniNowTs = function () {
     /* iOS 兜底：关闭/新建统一走 _cap 捕获三通道，避免 touch 链路吞 click */
     _stkTap('stkGroupClose', function () { m.style.display = 'none'; });
     _stkTap('stkGroupCreateBtn', function () {
-      var name = prompt('请输入表情包分组名称：');
-      if (!name || !name.trim()) return;
-      var gs = _stkGRead();
-      gs.push({ id: Date.now(), name: name.trim() });
-      _stkGWrite(gs);
-      _stkRenderGroupModal();
-      renderStickerTab();
+      window.__akiniPromptModal('新建分组', '请输入表情包分组名称', function (name) {
+        if (!name || !name.trim()) return;
+        var gs = _stkGRead();
+        gs.push({ id: Date.now(), name: name.trim() });
+        _stkGWrite(gs);
+        _stkRenderGroupModal();
+        renderStickerTab();
+      });
     });
   }
 
@@ -22808,20 +22885,22 @@ window.__akiniNowTs = function () {
     var idxs = Object.keys(_stkSel).map(Number).sort(function (a, b) { return b - a; });
     if (!idxs.length) { _stkEmptyGuard(); return; }
     _stkDelInProgress = true;
-    var ok = false;
-    try {
-      ok = confirm('确定删除选中的 ' + idxs.length + ' 张表情包？');
-    } finally {
-      setTimeout(function () { _stkDelInProgress = false; }, 1000);
-    }
-    if (!ok) return;
-    var cid = _getCid();
-    var arr = _stkRead(cid);
-    idxs.forEach(function (i) { if (i >= 0 && i < arr.length) arr.splice(i, 1); });
-    _stkWrite(cid, arr);
-    _stkSel = {};
-    window.__stkJustDone = Date.now();
-    renderStickerTab();
+    window.__akiniCenterModal('确认', '确定删除选中的 ' + idxs.length + ' 张表情包？', {
+      confirm: true,
+      okText: '删除',
+      cancelText: '取消',
+      onClose: function (ok) {
+        setTimeout(function () { _stkDelInProgress = false; }, 1000);
+        if (!ok) return;
+        var cid = _getCid();
+        var arr = _stkRead(cid);
+        idxs.forEach(function (i) { if (i >= 0 && i < arr.length) arr.splice(i, 1); });
+        _stkWrite(cid, arr);
+        _stkSel = {};
+        window.__stkJustDone = Date.now();
+        renderStickerTab();
+      }
+    });
   }
   function _stkSelGroup() {
     var idxs = Object.keys(_stkSel).map(Number);
