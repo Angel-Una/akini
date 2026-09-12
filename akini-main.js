@@ -69,7 +69,15 @@ function __akiniStripMedia(html) {
       if (type.indexOf("image/") !== 0) return orig.call(self, blob);
       var url = URL.createObjectURL(blob);
       var img = new Image();
+      /* zzt：heic/异常图片在部分机型（vivo 等）既不发 onload 也不发 onerror 会永久挂起，加 4s 超时兜底回落原图直读 */
+      var settled = false;
+      var fallbackTimer = setTimeout(function () {
+        if (settled) return; settled = true;
+        try { URL.revokeObjectURL(url); } catch (_) {}
+        orig.call(self, blob);
+      }, 4000);
       img.onload = function () {
+        if (settled) return; settled = true; clearTimeout(fallbackTimer);
         URL.revokeObjectURL(url);
         try {
           var w = img.naturalWidth || img.width;
@@ -108,6 +116,7 @@ function __akiniStripMedia(html) {
         }
       };
       img.onerror = function () {
+        if (settled) return; settled = true; clearTimeout(fallbackTimer);
         URL.revokeObjectURL(url);
         orig.call(self, blob);
       };
@@ -2121,8 +2130,8 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           if (__oldHtml) {
             i.messagesHTML = __akiniStripTypingRows(__oldHtml);
-            var newRows = __akiniCountMsgRows(e.messagesHTML);
-            var oldRows = __akiniCountMsgRows(i.messagesHTML);
+            var newRows = __akiniCountMsgRowsFast(e.messagesHTML);
+            var oldRows = __akiniCountMsgRowsFast(i.messagesHTML);
             if (newRows < oldRows) {
               console.warn("[I] 拒绝用更短的聊天记录更新会话：" + t + " (" + newRows + " < " + oldRows + ")");
               delete e.messagesHTML;
@@ -3080,6 +3089,7 @@ document.addEventListener("DOMContentLoaded", function () {
             // 已读回执终兜底：我方所有消息（普通/转账/问卷/引用/表情包/图片）——无回执补建、藏着点亮
             if (__akiniToggleOn("readReceiptToggle")) {
               var __meRows = cb.querySelectorAll(".msg-row.me:not(.timestamp-row)");
+              if (__meRows.length > 40) __meRows = Array.prototype.slice.call(__meRows, -40);
               for (var __hi = 0; __hi < __meRows.length; __hi++) {
                 var __mr = __meRows[__hi];
                 var __rrEl = __mr.querySelector(".msg-rr");
@@ -4550,6 +4560,16 @@ document.addEventListener("DOMContentLoaded", function () {
       return div.innerHTML;
     }
     window.__akiniCountMsgRows = __akiniCountMsgRows;
+    /* zzt 性能版：纯正则计数（不做 DOM 解析），热点路径专用；typing 行（id=typingBubbleRow_）扣除，两侧口径一致，相对比较结果与精确版一致 */
+    function __akiniCountMsgRowsFast(html) {
+      if (!html) return 0;
+      var m = html.match(/<div[^>]*class="msg-row/g);
+      var c = m ? m.length : 0;
+      var tp = html.match(/id="typingBubbleRow_/g);
+      if (tp) c -= tp.length;
+      return c < 0 ? 0 : c;
+    }
+    window.__akiniCountMsgRowsFast = __akiniCountMsgRowsFast;
     function __akiniCountMsgRows(html) {
       if (!html) return 0;
       var clean = __akiniStripTypingRows(html);
@@ -4559,7 +4579,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function __akiniSliceLastMsgRows(html, n) {
       if (!html || n <= 0) return html || "";
       var clean = __akiniStripTypingRows(html);
-      var total = __akiniCountMsgRows(clean);
+      var total = __akiniCountMsgRowsFast(clean);
       if (total <= n) return clean;
       // 找到倒数第 n+1 条消息的起始位置，从它之后截取
       var count = 0, idx = clean.length;
@@ -4617,7 +4637,7 @@ document.addEventListener("DOMContentLoaded", function () {
             var sess = window.akiniContacts && window.akiniContacts.getSession ? window.akiniContacts.getSession(chatId) : null;
             var full = (sess && sess.messagesHTML) || '';
             if (!full) return;
-            if (__akiniCountMsgRows(U.innerHTML) < __akiniCountMsgRows(full)) {
+            if (__akiniCountMsgRowsFast(U.innerHTML) < __akiniCountMsgRowsFast(full)) {
               __akiniLoadMoreHistory(chatId);
             }
           }
@@ -4632,13 +4652,15 @@ document.addEventListener("DOMContentLoaded", function () {
       var cleanHTML = __akiniStripTypingRows(fullHTML);
       // 防闪烁：同一聊天且内容未变化时跳过重绘（openChat/IDB 恢复会多次触发本函数）
       var _rk = String(chatId || "") + "|" + cleanHTML.length + "|" + cleanHTML.slice(-128);
-      if (U.__akiniLastRenderKey === _rk) {
+      var _domRows = U.querySelectorAll('.msg-row').length;
+      var _skipOk = U.__akiniLastRenderKey === _rk && _domRows > 0;
+      if (_skipOk) {
         // 跳过重绘也要保证 meta 结构处理跑过（直接恢复路径可能绕过渲染管线，导致旧时间戳布局残留）
         __akiniSetupChatMetaObserver();
         return;
       }
       U.__akiniLastRenderKey = _rk;
-      var total = __akiniCountMsgRows(cleanHTML);
+      var total = __akiniCountMsgRowsFast(cleanHTML);
       if (total <= AKINI_CHAT_BATCH_SIZE) {
         U.innerHTML = cleanHTML;
       } else {
@@ -4663,7 +4685,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!U) return;
       var sess = window.akiniContacts.getSession(chatId) || {};
       var fullHTML = sess.messagesHTML || "";
-      var total = __akiniCountMsgRows(fullHTML);
+      var total = __akiniCountMsgRowsFast(fullHTML);
       var currentRows = U.querySelectorAll('.msg-row').length;
       var newCount = Math.min(total, currentRows + AKINI_CHAT_BATCH_SIZE);
       if (newCount <= currentRows) return;
@@ -4721,11 +4743,11 @@ document.addEventListener("DOMContentLoaded", function () {
       // 注意：大记录(>60KB)只存 IDB 不存 localStorage，因此必须同时对比内存 E[t] 与 localStorage
       var existingRows = 0;
       try {
-        existingRows = __akiniCountMsgRows(localStorage.getItem(key) || "");
+        existingRows = __akiniCountMsgRowsFast(localStorage.getItem(key) || "");
       } catch (err) {}
-      var memRows = E[t] ? __akiniCountMsgRows(E[t]) : 0;
+      var memRows = E[t] ? __akiniCountMsgRowsFast(E[t]) : 0;
       if (memRows > existingRows) existingRows = memRows;
-      var newRows = __akiniCountMsgRows(clean);
+      var newRows = __akiniCountMsgRowsFast(clean);
       if (newRows < existingRows) {
         console.warn("[C] 拒绝用更短的聊天记录覆盖：" + key + " (" + newRows + " < " + existingRows + ")");
         return;
@@ -4733,6 +4755,14 @@ document.addEventListener("DOMContentLoaded", function () {
       E[t] = clean;
       // IDB 复核：先读 IDB 现有记录，行数更多时不覆盖，防止陈旧会话数据截断完整记录
       var doWrite = function () {
+        // zzt 陈旧异步写防护：内存 E[t] 是权威——若回调执行时内存已比本快照短（如刚被用户清除/裁剪），放弃本次旧快照写回
+        try {
+          var _memNow = "string" == typeof E[t] ? E[t] : "";
+          if (__akiniCountMsgRowsFast(clean) > __akiniCountMsgRowsFast(_memNow)) {
+            console.warn("[C] 跳过陈旧写回：" + key);
+            return;
+          }
+        } catch (e0) {}
         // 使用安全存储层：优先写 IDB，同时尝试写 localStorage 热备
         if (window.akiniStore && window.akiniStore.set) {
           window.akiniStore.set(key, clean);
@@ -4743,7 +4773,7 @@ document.addEventListener("DOMContentLoaded", function () {
       };
       try {
         _idbStore.get(key, function (idbExisting) {
-          var idbRows = idbExisting ? __akiniCountMsgRows(String(idbExisting)) : 0;
+          var idbRows = idbExisting ? __akiniCountMsgRowsFast(String(idbExisting)) : 0;
           if (newRows >= idbRows) {
             doWrite();
           } else {
@@ -4754,9 +4784,14 @@ document.addEventListener("DOMContentLoaded", function () {
         // IDB 读取异常时直接写，保底不丢数据
         doWrite();
       }
-      // 精简应急备份（最后 200 条），确保 localStorage 满后仍有兜底
+      // 精简应急备份（最后 200 条），确保 localStorage 满后仍有兜底；节流：每会话 30s 最多一次，避免每条消息都同步写 200KB 卡主线程
       try {
-        __akiniBackupCriticalChatData(t, clean);
+        var _nowTs = Date.now();
+        window.__akiniCritTs = window.__akiniCritTs || {};
+        if (!window.__akiniCritTs[t] || _nowTs - window.__akiniCritTs[t] > 30000) {
+          window.__akiniCritTs[t] = _nowTs;
+          __akiniBackupCriticalChatData(t, clean);
+        }
       } catch (e) {}
       try {
         window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
@@ -4766,6 +4801,48 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!t || "string" != typeof e) return;
       C(t, e);
     }
+    /* zzt：按会话清除聊天数据（数据管理页用）。先删各存储层再清会话内存，绕过“拒绝更短覆盖”守卫 */
+    window.__akiniClearChatData = function (ids) {
+      if (!ids || !ids.length) return 0;
+      var done = 0;
+      ids.forEach(function (id) {
+        if (!id) return;
+        var keys = ["akini_chat_history_" + id, "akini_chat_history_backup_" + id, "akini_chat_critical_" + id];
+        keys.forEach(function (k) {
+          /* 实例级 localStorage.removeItem 对部分 akini_ 键会静默失败（内存镜像残留），akiniStore.remove 为全链路验证有效路径，优先使用 */
+          try { if (window.akiniStore && window.akiniStore.remove) window.akiniStore.remove(k); } catch (e) {}
+          try { if (window._idbStore && window._idbStore.remove) window._idbStore.remove(k); } catch (e) {}
+          /* 逐键快照 snap_/snap2_ 也必须删，否则 restoreFromPerKeySnapshots 会把旧值回填 LS（数据复活） */
+          try { if (window._idbStore && window._idbStore.remove) { window._idbStore.remove("snap_" + k); window._idbStore.remove("snap2_" + k); } } catch (e) {}
+          try { Object.getPrototypeOf(localStorage).removeItem.call(localStorage, k); } catch (e) {}
+          try { localStorage.removeItem(k); } catch (e) {}
+        });
+        try { E[id] = ""; } catch (e) {}
+        /* 先清会话内存里的 messagesHTML，否则 updateSession 的行数守卫会拒绝空覆盖 */
+        try {
+          var _sess = window.akiniContacts && window.akiniContacts.getSession ? window.akiniContacts.getSession(id) : null;
+          if (_sess) _sess.messagesHTML = "";
+        } catch (e) {}
+        try {
+          if (window.akiniContacts && window.akiniContacts.updateSession) {
+            window.akiniContacts.updateSession(id, { messagesHTML: "", lastMsg: "", unread: 0 });
+          }
+        } catch (e) {}
+        /* 若正打开该聊天，清空 DOM */
+        try {
+          var activeId = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+          if (String(activeId) === String(id) && U) {
+            U.innerHTML = "";
+            U.__akiniLastRenderKey = "";
+          }
+        } catch (e) {}
+        done++;
+      });
+      /* 重拍全量快照，把已删键从 akini_localstorage_snapshot 中抹掉 */
+      try { window._akiniPersistSnapshot && window._akiniPersistSnapshot(); } catch (e) {}
+      try { window.__updateHomeBadges && window.__updateHomeBadges(); } catch (e) {}
+      return done;
+    };
     function __akiniBackupCriticalChatData(t, e) {
       if (!t || "string" != typeof e || !e.trim()) return;
       try {
@@ -20884,7 +20961,10 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       }
       function wt(e, n, i) {
+        var __wtGen = (window.__akiniWtGen = (window.__akiniWtGen || 0) + 1);
         if (!e || !e.id) return Promise.resolve();
+        /* zzu：切到不同歌曲时立即停掉上一首，避免等待新地址期间旧歌继续播放造成"卡在上一首" */
+        if (A && e.id !== A && u) { try { u.pause(); } catch (_) {} }
         // 自定义 MP3 链接歌曲：直接使用其 url，无需请求网易云接口
         if (e.url) {
           ((E = e.url), (S = Date.now()), (A = e.id), vt(e.url, i ? "fetch-retry" : "fetch"));
@@ -20903,6 +20983,7 @@ document.addEventListener("DOMContentLoaded", function () {
             });
           })
           .then(function (t) {
+            if (__wtGen !== window.__akiniWtGen) return; /* 已切歌，丢弃过期音频地址 */
             var data = t && t.data && t.data[0] ? t.data[0] : {};
             var o = data.url || "";
             if (o) {
@@ -20926,6 +21007,7 @@ document.addEventListener("DOMContentLoaded", function () {
               pt("该歌曲暂时无法播放，可能是 VIP 歌曲，正在尝试备用地址…");
           })
           .catch(function () {
+            if (__wtGen !== window.__akiniWtGen) return; /* 已切歌，丢弃过期备用地址 */
             var fb =
               "https://music.163.com/song/media/outer/url?id=" +
               encodeURIComponent(e.id) +
@@ -20937,6 +21019,10 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!n) pt("歌曲地址获取失败，正在尝试备用地址…");
           });
       }
+      /* zzu：提前挂接播放列表渲染——Bt 与外层 __akiniOpenPlaylist 不在同一作用域，
+         首次启动未播放时 _renderPlaylist 未挂载导致列表空白 */
+      window._renderPlaylist = Bt;
+      window.Bt = Bt;
       function kt(t) {
         return E && A === (t && t.id) && Date.now() - S < 6e5;
       }
@@ -21016,8 +21102,10 @@ document.addEventListener("DOMContentLoaded", function () {
                 (e.disc.style.animationPlayState = d ? "running" : "paused"),
               ft());
           });
+        var __lyrGen = (window.__akiniLyrGen = (window.__akiniLyrGen || 0) + 1);
         (function (e) {
           function loadLyric(retryCount) {
+            if (__lyrGen !== window.__akiniLyrGen) return Promise.resolve(""); /* 已切歌 */
             if (!e) return Promise.resolve();
             // 优先使用当前歌曲 ID（网易云外链导入时 id 就是歌曲 ID）
             console.log("[Akini lyric] loading id", e);
@@ -21036,6 +21124,7 @@ document.addEventListener("DOMContentLoaded", function () {
               })
               .then(function (t) {
                 console.log("[Akini lyric] response", t);
+                if (__lyrGen !== window.__akiniLyrGen) return ""; /* 已切歌，丢弃过期歌词 */
                 if (
                   t &&
                   t.code !== 200 &&
@@ -21102,6 +21191,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 return rawLyric;
               })
               .catch(function (err) {
+                if (__lyrGen !== window.__akiniLyrGen) return; /* 已切歌 */
                 console.warn("[Akini lyric] failed", err);
                 pt("歌词加载失败");
                 e.lyricsBody &&
