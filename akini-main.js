@@ -4588,6 +4588,7 @@ document.addEventListener("DOMContentLoaded", function () {
       U.scrollTop = oldTop + (U.scrollHeight - oldHeight);
       __akiniSetupChatMetaObserver();
     }
+    window.__akiniAppendMessageHTML = __akiniAppendMessageHTML;
     function __akiniAppendMessageHTML(chatId, html, meta) {
       // meta: {lastMsg, lastSenderAvatar, lastSenderName}
       if (!chatId || !html) return;
@@ -8468,24 +8469,20 @@ document.addEventListener("DOMContentLoaded", function () {
               (i.innerHTML = `<img src="${_src}" style="width:52px;height:52px;object-fit:cover;border-radius:6px;">`),
               i.addEventListener("click", function (t) {
                 !(function (t) {
-                  if (!U || !window.akiniContacts) return;
+                  if (!window.akiniContacts) return;
                   h();
-                  const e = document.createElement("div");
-                  ((e.className = "msg-row me"),
-                    (e.innerHTML =
-                      `<div class="msg-content-line"><div class="bubble sticker-bubble" style="background:transparent;box-shadow:none;padding:0;"><img src="${t}" style="max-width:120px;max-height:120px;border-radius:8px;"></div><div class="msg-avatar">${f()}</div></div>` +
-                      d("right")),
-                    U.appendChild(e));
+                  /* zzg：必须走 __akiniAppendMessageHTML——它会同步 session.messagesHTML 并 C() 落盘；
+                     旧代码只 appendChild 到 DOM，S() 保存的是 session 旧内容，退出重进表情包消息丢失 */
                   var n = window.akiniContacts.getActiveChatId();
-                  (window.akiniContacts.updateSession(n, {
+                  var _rowHtml =
+                    '<div class="msg-row me"><div class="msg-content-line"><div class="bubble sticker-bubble" style="background:transparent;box-shadow:none;padding:0;"><img src="' + t + '" style="max-width:120px;max-height:120px;border-radius:8px;"></div><div class="msg-avatar">' + f() + '</div></div>' +
+                    d("right") + '</div>';
+                  window.__akiniAppendMessageHTML(n, _rowHtml, {
                     lastMsg: "【表情包】",
-                    lastTime: Date.now(),
                     lastSenderAvatar: f() || "👤",
                     lastSenderName: g() || "我",
-                  }),
-                    S(),
-                    V(),
-                    (U.scrollTop = U.scrollHeight));
+                  });
+                  (V(), U && (U.scrollTop = U.scrollHeight));
                   const i = document.getElementById("emojiPanel");
                   document.getElementById("emojiToggleBtn");
                   i &&
@@ -22003,19 +22000,16 @@ document.addEventListener("DOMContentLoaded", function () {
             if (el) {
               el.scrollIntoView({ behavior: "smooth", block: "center" });
               /* 朋友圈：黑色线条包裹跳转动效（与 icity 蓝色线条同机制） */
-              /* zzf：整框圈选加强——outline+box-shadow 双层描边 + 底色填充，确保任何机型都明显 */
-              el.style.transition = "outline .2s, background .2s, box-shadow .2s";
-              el.style.outline = "3px solid #1a1a1a";
-              el.style.outlineOffset = "2px";
-              el.style.boxShadow = "0 0 0 6px rgba(26,26,26,0.15)";
-              el.style.borderRadius = "10px";
-              el.style.background = "rgba(0,0,0,0.06)";
+              /* zzg：插入 absolute 边框层（普通子元素，四边必然完整渲染），2px 细框 + 浅底，iOS 不再被裁成横线 */
+              var _hl = document.createElement("div");
+              _hl.className = "jump-highlight-layer";
+              _hl.style.cssText = "position:absolute;inset:0;border:2px solid #1a1a1a;border-radius:10px;background:rgba(0,0,0,0.04);pointer-events:none;z-index:10;box-sizing:border-box;";
+              var _oldPos = el.style.position;
+              if (getComputedStyle(el).position === "static") el.style.position = "relative";
+              el.appendChild(_hl);
               setTimeout(function () {
-                el.style.outline = "";
-                el.style.outlineOffset = "";
-                el.style.boxShadow = "";
-                el.style.background = "";
-                el.style.borderRadius = "";
+                try { _hl.remove(); } catch (e) {}
+                el.style.position = _oldPos || "";
               }, 2000);
             }
           }
@@ -22343,7 +22337,7 @@ window.__akiniNowTs = function () {
     var myName = localStorage.getItem('akini_my_name') || '我';
     var people = [{ id: 'me', name: myName, avatar: _myAvatar() }]
       .concat(contacts.map(function (c) { return { id: c.id, name: c.name || '对方', avatar: c.avatar || '' }; }));
-    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:0 16px 4px;margin-top:8px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
+    var h = '<div style="display:flex;gap:14px;overflow-x:auto;padding:4px 16px 8px;margin-top:4px;background:#fff;-webkit-overflow-scrolling:touch;width:100%;box-sizing:border-box;align-self:stretch;">';
     people.forEach(function (p) {
       var on = String(p.id) === String(cid);
       h += '<div class="wb-stk-person" data-cid="' + p.id + '" style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;">' +
