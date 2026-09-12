@@ -41,9 +41,9 @@ html {
     text-size-adjust: 100% !important;
     zoom: 1 !important;
   }
-  /* standalone 全屏：仿状态栏避开系统状态栏区域（!important 覆盖后置 top:0） */
+  /* zzv：standalone 全屏时系统状态栏已显示时间/信号/电量，直接隐藏仿状态栏，避免与封面卡重叠 */
   .fake-statusbar {
-    top: var(--ak-sat) !important;
+    display: none !important;
   }
 }
 body {
@@ -189,9 +189,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   margin-left: 0;
 }
 /* 模拟状态栏：左时间 右信号+WiFi+电量（iOS 风格，覆盖在安全区内） */
+/* zzv：top 改为 var(--ak-sat)，微信等全屏 webview 下仿栏落在系统状态栏下方，不再压封面卡 */
 .fake-statusbar {
   position: absolute;
-  top: 0; left: 0; right: 0;
+  top: var(--ak-sat); left: 0; right: 0;
   height: 44px;
   display: flex;
   justify-content: space-between;
@@ -223,11 +224,12 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .fit-gap-lg { margin-top: 12px; }
 .fit-gap { margin-top: 8px; }
 .fit-bottom { margin-top: 8px; }
+/* zzv：5 个一行，两行共 10 个应用入口 */
 .apps-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px 4px;
-  padding: 2px 4px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px 2px;
+  padding: 2px 2px;
   box-sizing: border-box;
   width: 100%;
 }
@@ -756,13 +758,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   border-color: #4f7cff;
 }
 .time-fmt-btn {
-  height: 34px;
-  padding: 0 12px;
+  height: 30px;
+  padding: 0 7px;
   border: 1px solid #e0e0e0;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #fafafa;
   color: #888;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   flex-shrink: 0;
   transition: all .15s;
@@ -5782,6 +5784,7 @@ button.back-btn[type="button"] {
 .ak-stor-btn { width: 100%; height: 42px; border-radius: 12px; border: 1px solid #e8e8e8; background: #f8f8f8; color: #333; font-size: 14px; cursor: pointer; }
 .ak-stor-btn.primary { background: #07c160; border-color: #07c160; color: #fff; font-weight: 600; }
 .ak-stor-btn.danger { background: #fff; border-color: #ffd6d3; color: #ff3b30; }
+.ak-stor-btn.danger-solid { background: #ff3b30; border-color: #ff3b30; color: #fff; font-weight: 600; }
 .ak-stor-btn:active { opacity: .8; }
 
 /* me 行裸引用块进 wrap 后右对齐（v20261002） */

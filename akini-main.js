@@ -15070,6 +15070,17 @@ document.addEventListener("DOMContentLoaded", function () {
                 e.readAsDataURL(t));
             }
           }));
+      /* zzv：我的主页背景区域直接点击即可换图（原先只能进编辑弹窗，用户感知"没反应"） */
+      var _myBgAreaTap = document.getElementById("icityMyBgArea");
+      _myBgAreaTap &&
+        E &&
+        _myBgAreaTap.addEventListener("click", function (t) {
+          try {
+            t.preventDefault();
+            t.stopPropagation();
+            E.click();
+          } catch (t) {}
+        });
       var M = document.getElementById("icityEditTaBgBtn"),
         N = document.getElementById("icityTaBgInput");
       M &&

@@ -25,7 +25,7 @@
       '<div class="settings-card"><div class="card-title">清除聊天数据</div>' +
         '<div class="ak-hint" style="margin-top:0">选择要清除的联系人/群聊，仅删除其聊天记录，其余数据保留，不可恢复</div>' +
         '<div class="ak-btn-col">' +
-          '<button class="ak-stor-btn" id="akStorClearChat" type="button">选择要清除的对话</button>' +
+          '<button class="ak-stor-btn danger-solid" id="akStorClearChat" type="button">选择要清除的对话</button>' +
         "</div>" +
       "</div>" +
 
