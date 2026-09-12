@@ -662,7 +662,8 @@ document.addEventListener("DOMContentLoaded", function () {
       var input = document.createElement("input");
       input.type = "text";
       input.placeholder = placeholder || "";
-      input.maxLength = opts.maxLength || 30;
+      input.maxLength = opts.maxLength || 200;
+      if (opts.value !== undefined && opts.value !== null) input.value = String(opts.value);
       input.style.cssText =
         "height:44px;border:1px solid #e0e0e0;border-radius:12px;padding:0 12px;font-size:16px;outline:none;background:#f7f7f7;color:#1a1a1a;box-sizing:border-box;width:100%;";
       var row = document.createElement("div");
@@ -696,6 +697,12 @@ document.addEventListener("DOMContentLoaded", function () {
       row.appendChild(cancel);
       row.appendChild(ok);
       panel.appendChild(titleEl);
+      if (opts.desc) {
+        var descEl = document.createElement("div");
+        descEl.style.cssText = "font-size:13px;color:#888;line-height:1.6;text-align:left;white-space:pre-wrap;";
+        descEl.textContent = opts.desc;
+        panel.appendChild(descEl);
+      }
       panel.appendChild(input);
       panel.appendChild(row);
       overlay.appendChild(panel);
@@ -7655,15 +7662,23 @@ document.addEventListener("DOMContentLoaded", function () {
     var Bt = document.getElementById("contactDetailDeleteBtn");
     if (Bt) {
       function Tt(t) {
-        (t && (t.stopPropagation(), t.preventDefault()),
-          Et &&
-            confirm("确定删除该联系人吗？相关聊天记录也会被删除。") &&
-            window.akiniContacts.deleteContact(Et) &&
-            ((Et = null),
-            "function" == typeof renderHomeAvatarContacts &&
-              renderHomeAvatarContacts(),
-            "function" == typeof window._renderIcity && window._renderIcity(),
-            Nt()));
+        t && (t.stopPropagation(), t.preventDefault());
+        if (!Et) return;
+        var _delCid = Et;
+        window.__akiniCenterModal("确认", "确定删除该联系人吗？相关聊天记录也会被删除。", {
+          confirm: true,
+          okText: "删除",
+          cancelText: "取消",
+          onClose: function (ok) {
+            if (!ok) return;
+            window.akiniContacts.deleteContact(_delCid) &&
+              ((Et = null),
+              "function" == typeof renderHomeAvatarContacts &&
+                renderHomeAvatarContacts(),
+              "function" == typeof window._renderIcity && window._renderIcity(),
+              Nt());
+          }
+        });
       }
       (Bt.addEventListener("click", Tt),
         Bt.addEventListener("touchend", Tt, { passive: !1 }));
@@ -8584,25 +8599,31 @@ document.addEventListener("DOMContentLoaded", function () {
               ? window.akiniContacts.getActiveChatId()
               : null,
             e = t ? window.akiniContacts.getChatTarget(t) : null;
-          e &&
-            "group" === e.type &&
-            confirm("确定解散群聊“" + e.name + "”吗？群聊记录也会被删除。") &&
-            (window.akiniContacts.deleteGroup(t),
-            (Y.style.display = "none"),
-            (Y.style.pointerEvents = "none"),
-            // 显式关闭聊天窗口并清除当前会话，避免解散后聊天窗口残留
-            window.akiniContacts.setActiveChatId && window.akiniContacts.setActiveChatId(null),
-            (function () {
-              var _chat = document.getElementById("app-chat");
-              if (_chat) { _chat.classList.remove("show"); _chat.style.display = "none"; }
-              var _body = document.getElementById("chatBody");
-              if (_body) _body.innerHTML = "";
-            })(),
-            o("chat-list"),
-            ot(),
-            // 多次刷新列表，确保异步清理与 UI 渲染一致
-            setTimeout(function(){ try { ot(); } catch(e){} }, 50),
-            setTimeout(function(){ try { ot(); } catch(e){} }, 300));
+          if (!e || "group" !== e.type) return;
+          window.__akiniCenterModal("确认", "确定解散群聊“" + e.name + "”吗？群聊记录也会被删除。", {
+            confirm: true,
+            okText: "解散",
+            cancelText: "取消",
+            onClose: function (ok) {
+              if (!ok) return;
+              (window.akiniContacts.deleteGroup(t),
+              (Y.style.display = "none"),
+              (Y.style.pointerEvents = "none"),
+              // 显式关闭聊天窗口并清除当前会话，避免解散后聊天窗口残留
+              window.akiniContacts.setActiveChatId && window.akiniContacts.setActiveChatId(null),
+              (function () {
+                var _chat = document.getElementById("app-chat");
+                if (_chat) { _chat.classList.remove("show"); _chat.style.display = "none"; }
+                var _body = document.getElementById("chatBody");
+                if (_body) _body.innerHTML = "";
+              })(),
+              o("chat-list"),
+              ot(),
+              // 多次刷新列表，确保异步清理与 UI 渲染一致
+              setTimeout(function(){ try { ot(); } catch(e){} }, 50),
+              setTimeout(function(){ try { ot(); } catch(e){} }, 300));
+            }
+          });
         }));
     (me(),
       (function () {
@@ -8897,7 +8918,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     o = document.createElement("div");
                   ((o.style.cssText =
                     "display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8f8f8;border-radius:10px;margin-bottom:8px;"),
-                    (o.innerHTML = `\n                        <div style="display:flex;align-items:center;gap:8px;">\n                            <span style="font-size:14px;color:#333;font-weight:500;">${e.name}</span>\n                            <span style="font-size:12px;color:#aaa;">${a}条</span>\n                        </div>\n                        <button type="button" data-gi="${i}" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;" class="del-group-btn">✕</button>\n                    `),
+                    (o.innerHTML = `\n                        <div style="display:flex;align-items:center;gap:8px;">\n                            <span style="font-size:14px;color:#333;font-weight:500;">${e.name}</span>\n                            <span style="font-size:12px;color:#aaa;">${a}条</span>\n                        </div>\n                        <div style="display:flex;align-items:center;gap:2px;margin:-10px -12px -10px 0;">\n                            <button type="button" data-gi="${i}" class="edit-group-btn" title="修改分组名称" style="background:none;border:none;color:#666;cursor:pointer;padding:10px 8px;min-width:36px;min-height:40px;touch-action:manipulation;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>\n                            <button type="button" data-gi="${i}" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;min-width:40px;min-height:40px;touch-action:manipulation;" class="del-group-btn">✕</button>\n                        </div>\n                    `),
                     n.appendChild(o));
                 })),
             P());
@@ -8906,6 +8927,28 @@ document.addEventListener("DOMContentLoaded", function () {
           const t = document.getElementById("groupList");
           t &&
             a(t, function (t) {
+              var editBtn = t.target.closest
+                ? t.target.closest(".edit-group-btn")
+                : null;
+              if (editBtn) {
+                var giE = parseInt(editBtn.dataset.gi);
+                if (isNaN(giE)) return;
+                var garrE = d();
+                if (giE < 0 || giE >= garrE.length) return;
+                var gidE = garrE[giE].id;
+                window.__akiniPromptModal("修改分组名称", "请输入新的分组名称", function (v) {
+                  if (!v || !v.trim()) return;
+                  var cur = d();
+                  var target = null;
+                  for (var _i = 0; _i < cur.length; _i++) {
+                    if (String(cur[_i].id) === String(gidE)) { target = cur[_i]; break; }
+                  }
+                  if (!target) return;
+                  target.name = v.trim();
+                  (u(cur), x(), m());
+                }, { value: garrE[giE].name });
+                return;
+              }
               var e = t.target.closest
                 ? t.target.closest(".del-group-btn")
                 : null;
@@ -9550,7 +9593,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 M &&
                   ((M.style.display = "flex"),
                   (M.style.pointerEvents = "auto")))
-              : alert("请先创建分组");
+              : alert("请先通过工具栏「分组」创建分组");
           }),
           L &&
             a(L, function (t) {
@@ -13150,7 +13193,7 @@ document.addEventListener("DOMContentLoaded", function () {
             n
               ? ((t.innerHTML = n), (t.style.display = "flex"))
               : ((t.innerHTML =
-                  '<div class="icity-contact-card" data-contact-id="" onclick="console.log(&#39;[icity] 点击兜底联系人入口&#39;); if(window.showIcityTaProfile){window.showIcityTaProfile();}else{alert(&#39;暂无联系人&#39;);}" style="background:#fff;border-radius:14px;padding:14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);display:flex;align-items:center;gap:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;pointer-events:auto;"><div style="width:48px;height:48px;border-radius:50%;background:#e8e8e8;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;pointer-events:none;">' + (window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : "") + '</div><div style="flex:1;min-width:0;pointer-events:none;"><div style="font-size:15px;font-weight:600;color:#222;margin-bottom:2px;">对方</div><div style="font-size:13px;color:#999;">查看 TA 的主页 →</div></div></div>'),
+                  '<div style="background:#fff;border-radius:14px;padding:22px 14px;box-shadow:0 1px 6px rgba(0,0,0,0.06);text-align:center;font-size:14px;color:#999;line-height:1.8;">还没有联系人<br/>去通讯录添加一位吧</div>'),
                 (t.style.display = "flex")),
             t.querySelectorAll(".icity-contact-card").forEach(function (t) {
               t.addEventListener("click", function (e) {
@@ -16875,89 +16918,31 @@ document.addEventListener("DOMContentLoaded", function () {
           var ver = localStorage.getItem("akini_app_version");
           if (ver !== "20261016") {
             localStorage.setItem("akini_app_version", "20261016");
-            // 不再删除用户显式设置过的开关（readReceiptToggle/timestampToggle 等），避免刷新后消失
-            // 联系人拍一拍：默认关闭，需用户显式手动开启
-            localStorage.setItem("akini_toggle_contactPokeToggle", "0");
-            // 联系人主动发朋友圈/发iCity：默认关闭，需用户手动开启才生效
-            localStorage.setItem("akini_toggle_contactFriendsToggle", "0");
-            localStorage.setItem("akini_toggle_contactIcityToggle", "0");
-            localStorage.setItem("akini_toggle_contactMailToggle", "1");
-            // emoji 融入消息默认关闭（旧版本误设为开启则重置）
-            localStorage.setItem("akini_toggle_emojiMixToggle", "0");
-            // 朋友圈/iCity 默认改为 30-60 分钟；任何一项异常（<=3、>=1000、乱填、min>max）都重置为新默认
-            var _resetPostRange = function (minKey, maxKey) {
+            // 迁移只补缺省值：用户已设置过的开关/时间一律保留（没动用默认，动了就用自定义）
+            var _defIfMissing = function (k, v) {
+              if (localStorage.getItem(k) === null) localStorage.setItem(k, v);
+            };
+            _defIfMissing("akini_toggle_contactPokeToggle", "0");
+            _defIfMissing("akini_toggle_contactFriendsToggle", "0");
+            _defIfMissing("akini_toggle_contactIcityToggle", "0");
+            _defIfMissing("akini_toggle_contactMailToggle", "1");
+            _defIfMissing("akini_toggle_emojiMixToggle", "0");
+            // 时间范围仅在非法（空/非数字/越下限/min>max）时回退默认，合法自定义值原样保留
+            var _sanitizeRange = function (minKey, maxKey, defMin, defMax, floor) {
               var mn = parseFloat(localStorage.getItem(minKey) || "");
               var mx = parseFloat(localStorage.getItem(maxKey) || "");
-              if (
-                isNaN(mn) || isNaN(mx) ||
-                mn <= 3 || mx <= 3 ||
-                mn >= 1000 || mx >= 1000 ||
-                mn > mx
-              ) {
-                localStorage.setItem(minKey, "30");
-                localStorage.setItem(maxKey, "60");
+              if (isNaN(mn) || isNaN(mx) || mn < floor || mx < floor || mn > mx) {
+                localStorage.setItem(minKey, String(defMin));
+                localStorage.setItem(maxKey, String(defMax));
               }
             };
-            _resetPostRange(
-              "akini_num_friendsPostMin",
-              "akini_num_friendsPostMax",
-            );
-            _resetPostRange("akini_num_icityPostMin", "akini_num_icityPostMax");
-            // 主动写信默认改为 3-6 小时，任何异常都重置为 3-6
-            var _resetActiveMailRange = function (minKey, maxKey) {
-              var mn = parseFloat(localStorage.getItem(minKey) || "");
-              var mx = parseFloat(localStorage.getItem(maxKey) || "");
-              if (
-                isNaN(mn) || isNaN(mx) ||
-                mn <= 0 || mx <= 0 ||
-                mn >= 1000 || mx >= 1000 ||
-                mn > mx
-              ) {
-                localStorage.setItem(minKey, "3");
-                localStorage.setItem(maxKey, "6");
-              }
-            };
-            _resetActiveMailRange("akini_num_activeMailMin", "akini_num_activeMailMax");
-            // 主动发消息默认改为 3-6 小时；旧版本均为分钟单位，统一按小时重置
-            var _resetActiveMsgRange = function (minKey, maxKey) {
-              var mn = parseFloat(localStorage.getItem(minKey) || "");
-              var mx = parseFloat(localStorage.getItem(maxKey) || "");
-              // 只要存在旧值（无论 3/10 分钟还是 180/360 分钟），都重置为 5-10 分钟
-              if (!isNaN(mn) || !isNaN(mx)) {
-                localStorage.setItem(minKey, "5");
-                localStorage.setItem(maxKey, "10");
-                return;
-              }
-              localStorage.setItem(minKey, "5");
-              localStorage.setItem(maxKey, "10");
-            };
-            _resetActiveMsgRange("akini_num_activeMsgMin", "akini_num_activeMsgMax");
-            // 主动写信/发消息 之前按“分钟”单位存储，现在改为按“小时”读取，需要把旧值除以 60。
-            // 朋友圈/iCity 本来就是按“分钟”读取，不参与此次转换，避免 30 分钟被误转成 1 分钟。
-            [
-              "akini_num_activeMailMin",
-              "akini_num_activeMailMax",
-              "akini_num_activeMsgMin",
-              "akini_num_activeMsgMax",
-            ].forEach(function (k) {
-              var v = localStorage.getItem(k);
-              if (v) {
-                var fv = parseFloat(v);
-                // 旧值 > 10 时认为是按分钟误存，转换为小时；小数值保留用户设置
-                if (!isNaN(fv) && fv > 10) {
-                  localStorage.setItem(k, String(Math.max(1, Math.round(fv / 60))));
-                }
-              }
-            });
-            // 朋友圈/iCity 统一做一次兜底：若仍因历史 bug 变成 <=3 分钟，则恢复为 30-60 分钟
-            ["akini_num_friendsPost", "akini_num_icityPost"].forEach(function (prefix) {
-              var mn = parseFloat(localStorage.getItem(prefix + "Min") || "");
-              var mx = parseFloat(localStorage.getItem(prefix + "Max") || "");
-              if (isNaN(mn) || isNaN(mx) || mn <= 3 || mn > mx || mx > 1000) {
-                localStorage.setItem(prefix + "Min", "30");
-                localStorage.setItem(prefix + "Max", "60");
-              }
-            });
+            _sanitizeRange("akini_num_friendsPostMin", "akini_num_friendsPostMax", 30, 60, 1);
+            _sanitizeRange("akini_num_icityPostMin", "akini_num_icityPostMax", 30, 60, 1);
+            _sanitizeRange("akini_num_activeMailMin", "akini_num_activeMailMax", 3, 6, 0.1);
+            _sanitizeRange("akini_num_activeMsgMin", "akini_num_activeMsgMax", 5, 10, 0.1);
+            _sanitizeRange("akini_num_replyDelayMin", "akini_num_replyDelayMax", 2, 5, 0.5);
+            _sanitizeRange("akini_num_mailDelayMin", "akini_num_mailDelayMax", 10, 24, 0.1);
+            _sanitizeRange("akini_num_pinyinCardMin", "akini_num_pinyinCardMax", 2, 3, 1);
           }
         } catch (e) {}
       })();
@@ -17359,6 +17344,20 @@ document.addEventListener("DOMContentLoaded", function () {
         const n = localStorage.getItem(t.key);
         (null !== n && (e.value = n),
           e.addEventListener("change", function () {
+            if (t.key.indexOf("akini_num_") === 0) {
+              var v = parseFloat(this.value);
+              if (isNaN(v) || v < 0) v = parseFloat(t.def);
+              this.value = String(v);
+              var pairId = /Min$/.test(t.id) ? t.id.replace(/Min$/, "Max") : (/Max$/.test(t.id) ? t.id.replace(/Max$/, "Min") : null);
+              if (pairId) {
+                var pairEl = document.getElementById(pairId);
+                var pv = pairEl ? parseFloat(pairEl.value) : NaN;
+                if (!isNaN(pv) && ((/Min$/.test(t.id) && v > pv) || (/Max$/.test(t.id) && v < pv))) {
+                  pairEl.value = String(v);
+                  localStorage.setItem("akini_num_" + pairId, String(v));
+                }
+              }
+            }
             localStorage.setItem(t.key, this.value);
             // 主动写信/发消息/朋友圈/iCity 间隔变化时立即重新调度，避免旧延迟导致长时间不触发
             if (t.key === "akini_num_activeMailMin" || t.key === "akini_num_activeMailMax" || t.key === "akini_num_activeMsgMin" || t.key === "akini_num_activeMsgMax" || t.key === "akini_num_friendsPostMin" || t.key === "akini_num_friendsPostMax" || t.key === "akini_num_icityPostMin" || t.key === "akini_num_icityPostMax") {
@@ -18411,25 +18410,14 @@ document.addEventListener("DOMContentLoaded", function () {
             ? window.akiniContacts.getContacts()
             : [];
           if (!t || 0 === t.length) {
-            t = [
-              {
-                id: "ta",
-                name: localStorage.getItem("akini_ta_name") || "TA",
-                avatar: localStorage.getItem("akini_ta_avatar") || "",
-                isDefault: !0,
-              },
-            ];
+            // 未添加联系人时不显示默认联系人，仅提示去添加
+            e.contactList.innerHTML =
+              '<div style="text-align:center;color:#999;font-size:14px;padding:48px 0;line-height:1.8;">还没有联系人<br/>先去通讯录添加一位吧</div>';
+            var _selInfoEl = document.getElementById("musicPickerSelectedInfo");
+            if (_selInfoEl) _selInfoEl.textContent = "已选择 0 人";
+            return;
           }
-          ((t && 0 !== t.length) ||
-            (t = [
-              {
-                id: "ta",
-                name: p ? p() : "对方",
-                avatar: y ? y() : "",
-                isDefault: !0,
-              },
-            ]),
-            (e.contactList.innerHTML = ""),
+          ((e.contactList.innerHTML = ""),
             t.forEach(function (t, n) {
               var i = T.some(function (e) {
                   return e.id === t.id;
@@ -21645,8 +21633,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (pa) pa.style.display = playing ? "block" : "none";
   }
   function importVideo() {
-    var raw = window.prompt("粘贴视频链接：\n· 哔哩哔哩：含 BV 号的视频页链接（站内直接播放）\n· mp4/m3u8 视频直链（站内直接播放）\n\n链接仅本次有效，不会保存");
-    if (raw === null) return;
+    window.__akiniPromptModal("粘贴视频链接", "粘贴含 BV 号的链接或视频直链", function (raw) {
+    if (raw === null || raw === undefined) return;
     raw = String(raw).trim();
     if (!raw) return;
     var urlMatch = raw.match(/https?:\/\/[^\s"'<>]+/);
@@ -21689,6 +21677,7 @@ document.addEventListener("DOMContentLoaded", function () {
       v.play && v.play().catch(function () {});
       return;
     }
+    }, { desc: "· 哔哩哔哩：含 BV 号的视频页链接（站内直接播放）\n· mp4/m3u8 视频直链（站内直接播放）\n\n链接仅本次有效，不会保存" });
   }
   // 观影消息复刻微信聊天界面：与聊天页完全相同的 msg-row 结构，
   // 走 __akiniProcessMsgMeta 自动套用自定义美化CSS、时间戳与已读回执（遵循美化面板开关）
@@ -22669,9 +22658,28 @@ window.__akiniNowTs = function () {
       /* zzc：行样式与其他三个 tab 的分组管理完全一致（同款内联样式，仅单位用"张"） */
       h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f8f8f8;border-radius:10px;margin-bottom:8px;">' +
         '<div style="display:flex;align-items:center;gap:8px;min-width:0;"><span style="font-size:14px;color:#333;font-weight:500;">' + _esc(g.name) + '</span><span style="font-size:12px;color:#aaa;">' + cnt + '张</span></div>' +
-        '<button type="button" class="stk-group-del del-group" data-gi="' + gi + '" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;margin:-10px -12px -10px 0;min-width:40px;min-height:40px;touch-action:manipulation;">✕</button></div>';
+        '<div style="display:flex;align-items:center;gap:2px;margin:-10px -12px -10px 0;">' +
+        '<button type="button" class="stk-group-edit" data-gi="' + gi + '" title="修改分组名称" style="background:none;border:none;color:#666;cursor:pointer;padding:10px 8px;min-width:36px;min-height:40px;touch-action:manipulation;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>' +
+        '<button type="button" class="stk-group-del del-group" data-gi="' + gi + '" style="background:none;border:none;color:#ff6b6b;font-size:16px;cursor:pointer;padding:10px 12px;min-width:40px;min-height:40px;touch-action:manipulation;">✕</button></div></div>';
     });
     list.innerHTML = h;
+    list.querySelectorAll('.stk-group-edit').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault(); e.stopPropagation();
+        var gi = parseInt(this.getAttribute('data-gi'), 10);
+        var gs = _stkGRead();
+        if (isNaN(gi) || gi < 0 || gi >= gs.length) return;
+        window.__akiniPromptModal('修改分组名称', '请输入新的分组名称', function (v) {
+          if (!v || !v.trim()) return;
+          var cur = _stkGRead();
+          if (gi >= cur.length) return;
+          cur[gi].name = v.trim();
+          _stkGWrite(cur);
+          _stkRenderGroupModal();
+          renderStickerTab();
+        }, { value: gs[gi].name });
+      });
+    });
     list.querySelectorAll('.stk-group-del').forEach(function (btn) {
       btn.addEventListener('click', function (e) {
         e.preventDefault(); e.stopPropagation();
