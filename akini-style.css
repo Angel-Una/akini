@@ -41,9 +41,9 @@ html {
     text-size-adjust: 100% !important;
     zoom: 1 !important;
   }
-  /* zzv：standalone 全屏时系统状态栏已显示时间/信号/电量，直接隐藏仿状态栏，避免与封面卡重叠 */
+  /* zzw：standalone 添加到主屏幕时恢复显示仿状态栏（用户要求保留仿栏观感），落在系统栏下方 var(--ak-sat) */
   .fake-statusbar {
-    display: none !important;
+    display: flex !important;
   }
 }
 body {
@@ -202,6 +202,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   z-index: 6;
   pointer-events: none;
   color: #1a1a1a;
+  display: none; /* zzw：浏览器/微信已有真状态栏，仿栏默认隐藏，仅 standalone 恢复显示 */
 }
 .fake-statusbar .fs-time {
   font-size: 15px;
@@ -6695,3 +6696,13 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 
 /* zzc：加号菜单固定两行三列（项不拉伸，58px 定宽，右靠对齐） */
 .plus-menu.show .plus-menu-item { flex: 0 0 58px !important; width: 58px !important; }
+
+/* ===== zzw 陪伴页 ===== */
+.akcp-ring-svg{position:absolute;left:50%;top:50%;width:290px;height:130px;transform:translate(-50%,-50%);pointer-events:none;overflow:visible}
+.akcp-ring-svg ellipse{animation:akcpDashFlow 2.8s linear infinite;filter:drop-shadow(0 0 5px rgba(255,177,199,.55))}
+@keyframes akcpDashFlow{to{stroke-dashoffset:-88}}
+#companionMsgs{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 36px);mask-image:linear-gradient(to bottom,transparent 0,#000 36px)}
+.akcp-bubble{max-width:76%;padding:9px 13px;border-radius:16px;font-size:15px;line-height:1.5;word-break:break-all;width:fit-content}
+/* ===== zzw 阅读器左右翻页 ===== */
+#novelReaderContent.paged{overflow-x:auto;overflow-y:hidden;column-gap:40px;height:100%}
+#novelReaderContent.paged p{break-inside:avoid}
