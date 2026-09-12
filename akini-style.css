@@ -6676,7 +6676,7 @@ body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !
 body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
 body.dark-mode .wb-gf-btn.active { background: #2a2a2e !important; color: #eee !important; box-shadow: 0 0 0 1.5px #ddd !important; }
 
-/* ============ v20260912zzl ============ */
+/* ============ v20260912zzm ============ */
 /* 字卡库工具栏：图标聚集靠最右（覆盖旧 4 列均分网格） */
 /* zzc：恢复两行四列布局（用户要求），6241 行规则生效 */
 .wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }

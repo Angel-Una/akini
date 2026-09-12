@@ -16526,8 +16526,8 @@ document.addEventListener("DOMContentLoaded", function () {
                   comments: [],
                 };
                 window.__akiniPostLog && __akiniPostLog("friends", "已发布：" + String(a || "").slice(0, 20));
-                // 联系人发朋友圈时，8% 概率附带用户给该联系人添加的表情包
-                if (Math.random() < 0.08) {
+                // 联系人发朋友圈/iCity时，20% 概率附带用户给该联系人添加的表情包（与评论表情包概率一致）
+                if (Math.random() < 0.2) {
                   var stickers = window.getContactStickersSync
                     ? window.getContactStickersSync(e.id)
                     : [];
@@ -16613,13 +16613,26 @@ document.addEventListener("DOMContentLoaded", function () {
                       d.unshift(t);
                     } else {
                       ((e.comments = e.comments || []),
-                        e.comments.push({
-                          id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
-                          author: n,
-                          text: t.text,
-                          replyTo: t.replyTo || a,
-                          ts: Date.now(),
-                        }),
+                        (function () {
+                          var _stkA =
+                            Math.random() < 0.2 && window.getContactStickersSync
+                              ? window.getContactStickersSync(myId)
+                              : [];
+                          var _cmtA = {
+                            id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
+                            author: n,
+                            text: t.text,
+                            replyTo: t.replyTo || a,
+                            ts: Date.now(),
+                          };
+                          if (_stkA && _stkA.length) {
+                            _cmtA.text = "";
+                            _cmtA.sticker =
+                              _stkA[Math.floor(Math.random() * _stkA.length)];
+                            t.text = "[表情包]";
+                          }
+                          e.comments.push(_cmtA);
+                        })(),
                         (s = !0));
                       var dmsg = t.replyTo
                         ? "回复了你的评论：" + t.text.slice(0, 20)
@@ -16637,13 +16650,26 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                   } else {
                     ((e.comments = e.comments || []),
-                      e.comments.push({
-                        id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
-                        author: n,
-                        text: t.text,
-                        replyTo: t.replyTo || a,
-                        ts: Date.now(),
-                      }),
+                      (function () {
+                        var _stkB =
+                          Math.random() < 0.2 && window.getContactStickersSync
+                            ? window.getContactStickersSync(myId)
+                            : [];
+                        var _cmtB = {
+                          id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
+                          author: n,
+                          text: t.text,
+                          replyTo: t.replyTo || a,
+                          ts: Date.now(),
+                        };
+                        if (_stkB && _stkB.length) {
+                          _cmtB.text = "";
+                          _cmtB.sticker =
+                            _stkB[Math.floor(Math.random() * _stkB.length)];
+                          t.text = "[表情包]";
+                        }
+                        e.comments.push(_cmtB);
+                      })(),
                       (s = !0));
                     var dmsg = t.replyTo
                       ? "回复了你的评论：" + t.text.slice(0, 20)
@@ -16718,14 +16744,25 @@ document.addEventListener("DOMContentLoaded", function () {
                   var p = replyOnContactPosts[Math.floor(Math.random() * replyOnContactPosts.length)],
                     v = l.indexOf(p);
                   if (v >= 0) {
-                    l[v].comments = l[v].comments || [];
-                    l[v].comments.push({
+                    var _stkC =
+                      Math.random() < 0.2 && window.getContactStickersSync
+                        ? window.getContactStickersSync(myId)
+                        : [];
+                    var _cmtC = {
                       id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
                       author: n,
                       text: y,
                       replyTo: a,
                       ts: Date.now(),
-                    });
+                    };
+                    if (_stkC && _stkC.length) {
+                      _cmtC.text = "";
+                      _cmtC.sticker =
+                        _stkC[Math.floor(Math.random() * _stkC.length)];
+                      y = "[表情包]";
+                    }
+                    l[v].comments = l[v].comments || [];
+                    l[v].comments.push(_cmtC);
                     s = !0;
                     window.showInAppNotif({
                       app: "朋友圈",
@@ -17384,6 +17421,40 @@ document.addEventListener("DOMContentLoaded", function () {
             localStorage.setItem(t.key, this.value);
           }));
       }),
+        // syy 评论数量：留空=随机 1~3 条；填了则区间随机（0~20 条），只填一边时另一边按 0/20 计
+        (["commentCountMin", "commentCountMax"]).forEach(function (t) {
+          var e = document.getElementById(t);
+          if (!e) return;
+          var saved = localStorage.getItem("akini_num_" + t);
+          e.value = saved === null ? "" : saved;
+          e.addEventListener("change", function () {
+            var key = "akini_num_" + t;
+            if (this.value === "" || this.value === null) {
+              window.akiniStore
+                ? window.akiniStore.remove(key)
+                : localStorage.removeItem(key);
+              return;
+            }
+            var v = parseFloat(this.value);
+            if (isNaN(v) || v < 0) {
+              this.value = "";
+              window.akiniStore
+                ? window.akiniStore.remove(key)
+                : localStorage.removeItem(key);
+              return;
+            }
+            v = Math.min(20, Math.round(v));
+            this.value = String(v);
+            localStorage.setItem(key, String(v));
+            var pairId = /Min$/.test(t) ? t.replace(/Min$/, "Max") : t.replace(/Max$/, "Min");
+            var pairEl = document.getElementById(pairId);
+            var pv = pairEl && pairEl.value !== "" ? parseFloat(pairEl.value) : NaN;
+            if (!isNaN(pv) && ((/Min$/.test(t) && v > pv) || (/Max$/.test(t) && v < pv))) {
+              pairEl.value = String(v);
+              localStorage.setItem("akini_num_" + pairId, String(v));
+            }
+          });
+        }),
         [
           "inputSignature",
           "inputFriendsSignature",
@@ -17917,13 +17988,26 @@ document.addEventListener("DOMContentLoaded", function () {
                     var l = interactor.name,
                       s = interactor.avatar;
                     ((n.comments = n.comments || []),
-                      n.comments.push({
-                        author: l,
-                        authorId: interactor.id,
-                        text: i,
-                        avatar: s,
-                        ts: Date.now(),
-                      }),
+                      (function () {
+                        var _stkD =
+                          Math.random() < 0.2 && window.getContactStickersSync
+                            ? window.getContactStickersSync(interactor.id)
+                            : [];
+                        var _cmtD = {
+                          author: l,
+                          authorId: interactor.id,
+                          text: i,
+                          avatar: s,
+                          ts: Date.now(),
+                        };
+                        if (_stkD && _stkD.length) {
+                          _cmtD.text = "";
+                          _cmtD.sticker =
+                            _stkD[Math.floor(Math.random() * _stkD.length)];
+                          i = "[表情包]";
+                        }
+                        n.comments.push(_cmtD);
+                      })(),
                       j(e),
                       window._renderIcity && window._renderIcity(),
                       window.renderIcityProfileDiaries &&
@@ -17973,15 +18057,28 @@ document.addEventListener("DOMContentLoaded", function () {
                 } catch (t) {}
                 if (!g) break;
                 ((f.repliedByTa = !0),
-                  n.comments.push({
-                    id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
-                    author: l,
-                    authorId: n.authorId,
-                    text: g,
-                    avatar: s,
-                    replyTo: f.author,
-                    ts: Date.now(),
-                  }),
+                  (function () {
+                    var _stkE =
+                      Math.random() < 0.2 && window.getContactStickersSync
+                        ? window.getContactStickersSync(n.authorId)
+                        : [];
+                    var _cmtE = {
+                      id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
+                      author: l,
+                      authorId: n.authorId,
+                      text: g,
+                      avatar: s,
+                      replyTo: f.author,
+                      ts: Date.now(),
+                    };
+                    if (_stkE && _stkE.length) {
+                      _cmtE.text = "";
+                      _cmtE.sticker =
+                        _stkE[Math.floor(Math.random() * _stkE.length)];
+                      g = "[表情包]";
+                    }
+                    n.comments.push(_cmtE);
+                  })(),
                   (u = !0),
                   "function" == typeof window.showInAppNotif &&
                     window.showInAppNotif({

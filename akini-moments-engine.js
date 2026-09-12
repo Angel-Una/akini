@@ -4,7 +4,7 @@
  * - 用户发布动态后，按"消息回复延迟"等待，随后所有联系人 100% 点赞 + 100% 评论
  * - 每个联系人只评论 1 条文字，评论内容仅来自用户字卡库，无兜底句库/表情
  * - 用户回复某联系人评论后，该联系人再回复 1 条（同样延迟）
- * - 联系人自己发朋友圈时，有 8% 概率附带用户给 TA 添加的表情包（仅朋友圈贴文，非评论）
+ * - 联系人自己发朋友圈/iCity 时，有 20% 概率附带用户给 TA 添加的表情包（与评论表情包概率一致，仅贴文非评论）
  */
 (function () {
   'use strict';
@@ -288,12 +288,28 @@
       didAnything = true;
     });
 
-    // 每个联系人评论一条文字（无表情包）
-    contacts.forEach(function (contact) {
-      if (commentMoment(moment, contact, null, app)) {
-        didAnything = true;
-        var _lc = moment.comments[moment.comments.length - 1];
-        notify(app, getContactName(contact, app), getContactAvatar(contact, app), '评论了你的动态：' + (_lc.sticker ? '[表情包]' : String(_lc.text || '').slice(0, 20)));
+    // syy 评论数量逻辑：总数按设置（空=随机1~3），打乱联系人、60% 概率参与且至少 1 人，逐人分 1~2 条
+    var totalComments = getCommentCount();
+    var shuffled = contacts.slice().sort(function () { return Math.random() - 0.5; });
+    var repliers = [];
+    for (var ri = 0; ri < shuffled.length; ri++) {
+      if (Math.random() < 0.6) repliers.push(shuffled[ri]);
+    }
+    if (!repliers.length) repliers.push(shuffled[0]);
+    var remaining = totalComments;
+    var plan = [];
+    for (var pi = 0; pi < repliers.length && remaining > 0; pi++) {
+      var pc = pi === repliers.length - 1 ? remaining : (Math.random() < 0.5 ? 1 : Math.min(2, remaining));
+      plan.push({ contact: repliers[pi], count: pc });
+      remaining -= pc;
+    }
+    plan.forEach(function (p) {
+      for (var ci = 0; ci < p.count; ci++) {
+        if (commentMoment(moment, p.contact, null, app)) {
+          didAnything = true;
+          var _lc = moment.comments[moment.comments.length - 1];
+          notify(app, getContactName(p.contact, app), getContactAvatar(p.contact, app), '评论了你的动态：' + (_lc.sticker ? '[表情包]' : String(_lc.text || '').slice(0, 20)));
+        }
       }
     });
 
@@ -322,12 +338,26 @@
     }
   }
 
-  // ========== 联系人自己发朋友圈时，8% 概率带表情包 ==========
+  // syy 评论数量：min/max 都留空 = 随机（70% 1条 / 20% 2条 / 10% 3条）；有值则区间随机（0~20）
+  function getCommentCount() {
+    var minS = localStorage.getItem('akini_num_commentCountMin');
+    var maxS = localStorage.getItem('akini_num_commentCountMax');
+    if (!minS && !maxS) {
+      return Math.random() < 0.7 ? 1 : (Math.random() < 0.9 ? 2 : 3);
+    }
+    var min = minS ? Math.max(0, parseInt(minS, 10) || 0) : 0;
+    var max = maxS ? Math.min(20, parseInt(maxS, 10) || 20) : 20;
+    if (min > max) { var tmp = min; min = max; max = tmp; }
+    if (min === max) return min;
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+
+  // ========== 联系人自己发朋友圈/iCity 时，20% 概率带表情包（同评论表情包概率） ==========
 
   function maybeAttachSticker(contactId) {
     var stickers = getContactStickers(contactId);
     if (!stickers.length) return null;
-    if (Math.random() >= 0.08) return null;
+    if (Math.random() >= 0.2) return null;
     return pickRandom(stickers);
   }
 
@@ -391,5 +421,5 @@
   window.akiniMomentMaybeAttachSticker = maybeAttachSticker;
   window.akiniMomentEngineActive = true;
 
-  console.log('[akini-moments-engine] 朋友圈/iCity 点赞/评论引擎已加载（100% 全联系人，仅文字评论，延迟=消息回复延迟）');
+  console.log('[akini-moments-engine] 朋友圈/iCity 点赞/评论引擎已加载（评论数量可调，20% 表情包评论，延迟=消息回复延迟）');
 })();
