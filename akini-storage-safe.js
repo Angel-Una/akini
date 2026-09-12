@@ -154,8 +154,20 @@
     if (m !== null) return m;
     return lsGet(k);
   }
+  // 核心数据资产键：启动恢复竞态窗口内拒绝被空数组覆盖（含 akiniStore 直写路径）
+  var _GUARD_KEYS2 = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1 };
+  var _guardUntil2 = Date.now() + 20000;
   function akiniSet(k, v, cb) {
     if (typeof v !== 'string') v = String(v);
+    if (v === '[]' && _GUARD_KEYS2[k] && Date.now() < _guardUntil2) {
+      var _gp = memGet(k);
+      if (_gp == null) _gp = lsGet(k);
+      if (_gp && _gp !== '[]' && _gp.length > 2) {
+        console.warn('[存储] 窗口期内拒绝空数组覆盖核心键(akiniSet)', k);
+        if (cb) cb(true);
+        return;
+      }
+    }
     memSet(k, v);
     var lsOk = true;
     if (isBigVal(v)) {
@@ -236,7 +248,16 @@
                   _reconciledKeys[k] = 1;
                   // 对账策略（mochi 同款）：localStorage 有值且【不在脏键集合】且非恢复前程序性写入 → 以 LS 为准并回写 IDB；
                   // LS 丢失 / LS 是脏键（上次写失败残留旧值）/ 恢复完成前的启动默认值 → 一律信 IDB 镜像回填，杜绝旧数据回滚
+                  // 【安卓/鸿蒙加固】空值永不覆盖非空：IDB 异步落盘滞后/写失败时易残留旧空值（'[]'/'{}'），
+                  // 若 LS 存有真实数据，空语义 IDB 值一律视为陈旧，改信 LS（根治重启后数据被空值回填消失）
+                  var _idbEmpty = v === '[]' || v === '{}' || v === 'null';
                   var ls = lsGet(k);
+                  if (_idbEmpty && ls != null && ls !== '' && ls !== '[]' && ls !== '{}' && ls !== 'null') {
+                    memSet(k, ls);
+                    queueIdbWrite(k, ls); // 回写 IDB 纠正陈旧空值
+                    if (--pending === 0) setTimeout(nextBatch, 25);
+                    return;
+                  }
                   var big = isBigVal(v);
                   var preRestore = !_restored && _preRestorePending.hasOwnProperty(k);
                   if (ls != null && ls !== '' && !_lsDirty[k] && !preRestore) {
@@ -322,10 +343,23 @@
           return self.origGet ? self.origGet.call(this, k) : null;
         } catch (e) { return null; }
       };
+      // 核心数据资产键：启动恢复竞态窗口内拒绝被空数组覆盖（安卓/鸿蒙慢机恢复未完成时高发数据消失）
+      var _GUARD_KEYS = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1 };
+      var _guardUntil = Date.now() + 20000;
       lsProto.setItem = function (k, v) {
         // 清除数据期间：akini_ 键一律拒写（含原始 LS 层），杜绝清完复活
         if (window.__akiniWiping && k && String(k).indexOf('akini_') === 0) return;
         var sv = String(v);
+        if (sv === '[]' && _GUARD_KEYS[k] && Date.now() < _guardUntil) {
+          try {
+            var _gp = self.memGet(k);
+            if (_gp == null) _gp = self.origGet ? self.origGet.call(this, k) : null;
+            if (_gp && _gp !== '[]' && _gp.length > 2) {
+              console.warn('[存储] 窗口期内拒绝空数组覆盖核心键', k);
+              return;
+            }
+          } catch (e) {}
+        }
         var big = self.isCritical(k) && self.isBigVal(sv);
         var ok = true;
         // 1) 原始写入永远先执行（大键跳过 LS 并清残留，防撑爆配额）；任何异常都不影响镜像
@@ -345,6 +379,13 @@
           }
         } catch (e) {}
       };
+      if (typeof lsProto.clear === 'function') {
+        var _origClear = lsProto.clear;
+        lsProto.clear = function () {
+          try { _origClear.call(this); } catch (e) {}
+          try { if (window.akiniStore && window.akiniStore.wipeMemory) window.akiniStore.wipeMemory(); } catch (e) {}
+        };
+      }
       lsProto.removeItem = function (k) {
         try { self.origRemove.call(this, k); } catch (e) {}
         try {

@@ -2156,7 +2156,12 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       window.pickWordCards = function (count, contactId) {
         count = Math.max(1, parseInt(count) || 1);
-        var wb = i("akini_wordbank", []);
+        // 自包含读取：初始化早期全局 i() 可能尚未就绪（TDZ），直接用 localStorage 兜底
+        var wb = [];
+        try {
+          wb = JSON.parse(localStorage.getItem("akini_wordbank") || "[]");
+          if (!Array.isArray(wb)) wb = [];
+        } catch (e0) { wb = []; }
         if (!wb.length) return "";
         var valid = wb.filter(function (t) {
           var e = (t.tab || "").toLowerCase(),
@@ -4278,10 +4283,8 @@ document.addEventListener("DOMContentLoaded", function () {
             return it.text;
           });
         } catch (err) {}
-        // 无 emoji 字卡时用内置常用表情兜底，保证「emoji 融入消息」开关打开后真实可见
-        if (!emojis.length) {
-          emojis = ["😊","😂","🥰","😍","🤭","😘","😉","🥺","😴","🤗","😆","😝","💕","✨","🎀","🌸","🍀","☀️","🌙","⭐"];
-        }
+        // 严格只用字卡库的 emoji 卡，无任何内置兜底；字卡库没有 emoji 卡时保持原文不融入
+        if (!emojis.length) return text;
         var emoji = emojis[Math.floor(Math.random() * emojis.length)];
         return Math.random() < 0.5 ? emoji + " " + text : text + " " + emoji;
       }
@@ -6586,6 +6589,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // 关键数据从 IDB 异步恢复完成后，强制刷新所有界面（联系人/聊天/iCity/预览），
     // 确保启动竞态期间读到空/缺头像快照后，恢复完成时能重新读到完整数据
     window.__akiniOnCriticalRestored = function () {
+      try { if (window.__akiniVaultRecover) window.__akiniVaultRecover(function () {}); } catch (e) {}
       try { setTimeout(__akiniRestorePendingReply, 3000); } catch (e) {}
       try { if (window.akiniContacts && window.akiniContacts.resetCache) window.akiniContacts.resetCache(); } catch (e) {}
       try { F = null; } catch (e) {}
@@ -15006,6 +15010,103 @@ document.addEventListener("DOMContentLoaded", function () {
         t());
     })();
     window._akiniSetupBackup && window._akiniSetupBackup();
+
+    /* ========== 数据保险箱：Cache API 第四副本（安卓/鸿蒙系统清理 LS+IDB 后的最后兜底） ========== */
+    (function () {
+      var VAULT_CACHE = "akini-vault-v1";
+      var VAULT_URL = "./akini_vault.json";
+      var _saveTimer = null;
+      function _collectVault() {
+        var out = {};
+        try {
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (!k || String(k).indexOf("akini_") !== 0) continue;
+            if (String(k).indexOf("akini_app_icon_") === 0) continue;
+            if (String(k).indexOf("_backup") >= 0) continue;
+            if (k === "akini_localstorage_snapshot" || k === "akini_localstorage_snapshot_backup") continue;
+            var v = null;
+            try { v = localStorage.getItem(k); } catch (e1) {}
+            if (v == null || v === "" || v === "[]" || v === "{}") continue;
+            if (v.length > 300000) continue; // 超大键（图片等）不进保险箱，控制体积
+            out[k] = v;
+          }
+        } catch (e2) {}
+        return out;
+      }
+      function _saveVault() {
+        try {
+          if (!window.caches || !caches.open) return;
+          var data = _collectVault();
+          if (!Object.keys(data).length) return;
+          caches
+            .open(VAULT_CACHE)
+            .then(function (c) {
+              return c.put(
+                VAULT_URL,
+                new Response(JSON.stringify({ ts: Date.now(), data: data }), {
+                  headers: { "Content-Type": "application/json" },
+                }),
+              );
+            })
+            .catch(function () {});
+        } catch (e) {}
+      }
+      window.__akiniVaultSave = _saveVault;
+      function _scheduleSave() {
+        if (_saveTimer) clearTimeout(_saveTimer);
+        _saveTimer = setTimeout(_saveVault, 15000);
+      }
+      // 页面隐藏/关闭前立即落一次保险箱；运行中每 60s 定期落一次
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) _saveVault();
+      });
+      window.addEventListener("pagehide", function () { _saveVault(); });
+      setInterval(_saveVault, 60000);
+      setTimeout(_scheduleSave, 20000); // 启动 20s 后落第一次
+      /* 恢复：核心键全空（疑似被系统清理）时从保险箱逐键回填；仅回填当前为空的键，绝不覆盖现有数据 */
+      window.__akiniVaultRecover = function (cb) {
+        try {
+          if (!window.caches || !caches.open) return cb && cb(false);
+          // 有联系人或信件说明数据健在，无需恢复
+          var core = localStorage.getItem("akini_contacts");
+          if (core && core !== "[]") return cb && cb(false);
+          caches
+            .open(VAULT_CACHE)
+            .then(function (c) { return c.match(VAULT_URL); })
+            .then(function (resp) {
+              if (!resp) return cb && cb(false);
+              resp
+                .json()
+                .then(function (pack) {
+                  var data = pack && pack.data;
+                  if (!data || typeof data !== "object") return cb && cb(false);
+                  var restored = 0;
+                  Object.keys(data).forEach(function (k) {
+                    try {
+                      var cur = localStorage.getItem(k);
+                      if (cur != null && cur !== "" && cur !== "[]" && cur !== "{}") return; // 只补空缺
+                      if (window.akiniStore && window.akiniStore.set) window.akiniStore.set(k, data[k]);
+                      else localStorage.setItem(k, data[k]);
+                      restored++;
+                    } catch (e3) {}
+                  });
+                  if (restored > 0) {
+                    console.log("[保险箱] 从 Cache 副本恢复", restored, "个键");
+                    try { window.akiniContacts && window.akiniContacts.resetCache && window.akiniContacts.resetCache(); } catch (e4) {}
+                    try { if (window.__renderMail && window.__renderMail.__resetCache) window.__renderMail.__resetCache(); } catch (e5) {}
+                    try { if (window.__renderMail) window.__renderMail(); } catch (e6) {}
+                    try { if (typeof window.renderChatList === "function") window.renderChatList(); } catch (e7) {}
+                  }
+                  cb && cb(restored > 0);
+                })
+                .catch(function () { cb && cb(false); });
+            })
+            .catch(function () { cb && cb(false); });
+        } catch (e) { cb && cb(false); }
+      };
+    })();
+
     const ln = document.getElementById("mailTabSent"),
       sn = document.getElementById("mailTabReceived"),
       dn = document.getElementById("mailContentArea"),

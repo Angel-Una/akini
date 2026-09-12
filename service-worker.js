@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20260912zzm';
+const CACHE_NAME = 'akini-cache-v20260912zzo';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -21,7 +21,8 @@ self.addEventListener('activate', function(event) {
     caches.keys().then(function(keys) {
       return Promise.all(
         keys.filter(function(key) {
-          return key !== CACHE_NAME;
+          // 数据保险箱缓存永不清除：它是 LS/IDB 被系统清理后的最后兜底
+          return key !== CACHE_NAME && key !== 'akini-vault-v1';
         }).map(function(key) {
           return caches.delete(key);
         })
@@ -91,6 +92,64 @@ self.addEventListener('push', function(event) {
     const options = { body: '你有一条新消息', icon: './favicon.png' };
     event.waitUntil(self.registration.showNotification(title, options));
   }
+});
+
+// ---- 周期性后台同步：应用被系统冻结/杀死后，系统定时唤醒 SW 检查未读并发系统通知 ----
+function akiniIdbGet(key) {
+  return new Promise(function(resolve) {
+    try {
+      var req = indexedDB.open('AkiniApp');
+      req.onsuccess = function() {
+        try {
+          var db = req.result;
+          var tx = db.transaction('akini_data', 'readonly');
+          var g = tx.objectStore('akini_data').get(key);
+          g.onsuccess = function() { resolve(g.result != null ? g.result : null); };
+          g.onerror = function() { resolve(null); };
+        } catch (e) { resolve(null); }
+      };
+      req.onerror = function() { resolve(null); };
+    } catch (e) { resolve(null); }
+  });
+}
+self.addEventListener('periodicsync', function(event) {
+  if (event.tag !== 'akini-bg-check') return;
+  event.waitUntil(
+    (async function() {
+      try {
+        // 有页面在前台时不打扰
+        var cls = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (var i = 0; i < cls.length; i++) { if (cls[i].visibilityState === 'visible') return; }
+        var unread = 0;
+        var ss = await akiniIdbGet('akini_chat_sessions');
+        if (ss) {
+          try {
+            var obj = typeof ss === 'string' ? JSON.parse(ss) : ss;
+            Object.keys(obj || {}).forEach(function(k) { unread += (obj[k] && obj[k].unread) || 0; });
+          } catch (e) {}
+        }
+        var mails = await akiniIdbGet('akini_mail_received');
+        var seen = await akiniIdbGet('akini_mail_seen_count');
+        var mailUnread = 0;
+        if (mails) {
+          try {
+            var arr = typeof mails === 'string' ? JSON.parse(mails) : mails;
+            mailUnread = Math.max(0, (Array.isArray(arr) ? arr.length : 0) - (parseInt(seen, 10) || 0));
+          } catch (e) {}
+        }
+        var total = unread + mailUnread;
+        if (total > 0) {
+          await self.registration.showNotification('Akini 情侣空间', {
+            body: 'Ta 给你留了 ' + total + ' 条新消息，快回来看看',
+            icon: './favicon.png',
+            badge: './favicon.png',
+            tag: 'akini_bg_check_' + Date.now(),
+            data: { app: 'chat' },
+          });
+        }
+      } catch (e) {}
+    })()
+  );
 });
 
 self.addEventListener('notificationclick', function(event) {
