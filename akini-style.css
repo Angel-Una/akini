@@ -216,9 +216,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }/* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
 .fit-gap-lg { margin-top: 14px; }.fit-gap { margin-top: 10px; }.fit-bottom { margin-top: auto; }.apps-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px 6px;
-  padding: 2px 14px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px 4px;
+  padding: 2px 10px;
   box-sizing: border-box;
   width: 100%;
 }
@@ -2315,6 +2315,16 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   position: relative;
   z-index: 10;
   padding-bottom: calc(env(safe-area-inset-bottom) + 4px);
+}
+.chat-quote-bar .quote-text img.quote-sticker-thumb {
+  width: 26px !important;
+  height: 26px !important;
+  max-width: 26px !important;
+  max-height: 26px !important;
+  border-radius: 5px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  object-fit: cover !important;
 }
 .chat-quote-bar {
   display: none;
