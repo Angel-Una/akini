@@ -15100,6 +15100,17 @@ document.addEventListener("DOMContentLoaded", function () {
         (I = "icityEditMyBgPreview"),
         (x = document.getElementById(k)),
         (E = document.getElementById(_)),
+        /* zzza：显式绑定按钮点击触发文件选择器，兼容严格手势策略的 WebView（点中全铺 input 时走原生默认行为，其余区域显式触发，避免双重/互消） */
+        x &&
+          E &&
+          x.addEventListener("click", function (t) {
+            try {
+              if (t.target !== E) {
+                t.preventDefault();
+                E.click();
+              }
+            } catch (t) {}
+          }),
         x &&
           E &&
           E.addEventListener("change", function () {
@@ -15111,6 +15122,14 @@ document.addEventListener("DOMContentLoaded", function () {
                 _idbStore.set(b, t.target.result, function () {
                   try {
                     localStorage.removeItem(b);
+                  } catch (t) {}
+                  /* zzza：持久化完成后给出明确反馈，避免用户感知"没反应" */
+                  try {
+                    var tip = document.createElement("div");
+                    tip.textContent = "背景图已更新";
+                    tip.style.cssText = "position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 22px;border-radius:20px;font-size:14px;z-index:2147483646;pointer-events:none";
+                    document.body.appendChild(tip);
+                    setTimeout(function () { tip.remove(); }, 1500);
                   } catch (t) {}
                 });
                 var e = document.getElementById(I);
@@ -15140,6 +15159,9 @@ document.addEventListener("DOMContentLoaded", function () {
                     (i.style.backgroundPosition = "center"));
                 }
               }),
+                (e.onerror = function () {
+                  try { alert("图片读取失败，请换一张试试"); } catch (t) {}
+                }),
                 e.readAsDataURL(t));
             }
           }));

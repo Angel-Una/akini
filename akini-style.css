@@ -139,7 +139,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .content-wrapper {
   flex: none;
   width: 100%;
-  max-width: 390px;
+  max-width: 448px; /* zzz7：手机上限放宽 */
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -567,7 +567,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: translateX(-50%);
   bottom: calc(8px + var(--ak-sab, 0px));
   width: calc(100% - 32px);
-  max-width: 390px;
+  max-width: 448px; /* zzz7 */
   box-sizing: border-box;
   z-index: 50;
 }
@@ -6719,14 +6719,15 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 /* ===== zzx 陪伴页 ===== */
 /* 陪伴头像心跳环：模仿真实心跳节奏（咚-咚...停顿），粉色光晕脉动 */
 /* zzz7：陪伴头像波动改为多个同心小圆圈——由内向外从深到浅，小幅扩散波动，精致克制 */
-.akcp-halo{position:absolute;inset:-4px;border-radius:50%;border:1.5px solid rgba(255,118,172,.8);pointer-events:none;transform-origin:center;opacity:0;animation:akcpRipple 2.4s ease-out infinite}
-.akcp-halo.d2{inset:-8px;border-width:1.5px;border-color:rgba(255,140,185,.5);animation-delay:.8s}
-.akcp-halo.d3{inset:-12px;border-width:1.5px;border-color:rgba(255,165,200,.26);animation-delay:1.6s}
-@keyframes akcpRipple{
-  0%{transform:scale(.94);opacity:0}
-  18%{opacity:1}
-  55%{opacity:.5}
-  100%{transform:scale(1.06);opacity:0}
+.akcp-halo{position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(255,130,180,.5);box-shadow:0 0 12px rgba(255,130,180,.3);pointer-events:none;animation:akcpHeartbeat 1.8s cubic-bezier(0.4,0,0.6,1) infinite;transform-origin:center}
+.akcp-halo.d2{animation-delay:0.4s}
+@keyframes akcpHeartbeat{
+  0%{transform:scale(1);opacity:.6;box-shadow:0 0 0 0 rgba(255,130,180,0)}
+  10%{transform:scale(1.08);opacity:.9;box-shadow:0 0 8px 2px rgba(255,130,180,.4)}
+  20%{transform:scale(1.02);opacity:.7;box-shadow:0 0 4px 1px rgba(255,130,180,.2)}
+  32%{transform:scale(1.14);opacity:1;box-shadow:0 0 16px 4px rgba(255,130,180,.5)}
+  48%{transform:scale(1);opacity:.5;box-shadow:0 0 0 0 rgba(255,130,180,0)}
+  100%{transform:scale(1);opacity:.5;box-shadow:0 0 0 0 rgba(255,130,180,0)}
 }
 #companionMsgs{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 36px);mask-image:linear-gradient(to bottom,transparent 0,#000 36px)}
 /* zzy：陪伴气泡完全对齐观影——复用全局 .chat-body .msg-row .bubble 体系（默认样式+美化CSS接管），
