@@ -167,7 +167,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .anniv-preview-row {
   display: flex;
   align-items: flex-start;
-  gap: 14px;
+  gap: 10px;
   width: 100%;
   box-sizing: border-box;
   padding: 0 14px;
@@ -184,8 +184,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 /* 模拟状态栏：左时间 右信号+WiFi+电量（iOS 风格，覆盖在安全区内） */
 /* zzv：top 改为 var(--ak-sat)，微信等全屏 webview 下仿栏落在系统状态栏下方，不再压封面卡 */
 .fake-statusbar {
-  position: absolute;
-  top: var(--ak-sat); left: 0; right: 0;
+  position: relative;
+  flex-shrink: 0;
+  width: 100%;
   height: 44px;
   display: flex;
   justify-content: space-between;
@@ -214,10 +215,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }/* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
-.fit-gap-lg { margin-top: 14px; }.fit-gap { margin-top: 10px; }.fit-bottom { margin-top: auto; }.apps-grid {
+.fit-gap-lg { margin-top: 9px; }.fit-gap { margin-top: 7px; }.fit-bottom { margin-top: auto; }.apps-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 12px 4px;
+  gap: 6px 4px;
   padding: 2px 6px;
   box-sizing: border-box;
   width: 100%;
@@ -229,14 +230,14 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 /* 图标放大 32→40，更显大 */
 .app-item .icon-wrap {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
 }.top-card {
   margin: 0;
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-  padding: 0 10px 12px;
+  padding: 0 10px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -244,7 +245,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: relative;
 }.top-card .cover-img {
   width: 100%;
-  height: 160px;
+  height: 96px;
   border-radius: 22px;
   background: transparent;
   background-size: cover !important;
@@ -261,7 +262,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   cursor: default;
   position: relative;
   z-index: 1;
-  margin-top: 14px;
+  margin-top: 10px;
   flex-shrink: 0;
 }
 .top-card .cover-img img {
@@ -271,9 +272,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: block;
 }
 .top-card .dual-avatar-wrap {
-  width: 148px;
-  height: 74px;
-  margin-top: -37px;
+  width: 128px;
+  height: 64px;
+  margin-top: -32px;
   margin-bottom: 4px;
   position: relative;
   display: flex;
@@ -287,8 +288,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 74px;
-  height: 74px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: #e8e8e8;
   border: 3.5px solid rgba(255, 255, 255, 0.8);
@@ -303,8 +304,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: absolute;
   right: 0;
   bottom: 0;
-  width: 74px;
-  height: 74px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background: #e8e8e8;
   border: 3.5px solid rgba(255, 255, 255, 0.8);
@@ -333,7 +334,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   z-index: 2;
 }
 .top-card .subtitle {
-  font-size: 13px;
+  font-size: 12px;
   color: rgba(60, 60, 60, 0.8);
   margin-top: 0;
   letter-spacing: 0.8px;
@@ -445,19 +446,19 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: translateX(0) !important;
 }
 .right-card .label {
-  font-size: 15px;
+  font-size: 14px;
   color: #2a2a2a;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
   z-index: 2;
   position: relative;
   text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
 }
 .right-card .number {
-  font-size: 44px;
+  font-size: 36px;
   font-weight: 300;
   color: #2a2a2a;
   line-height: 1;
-  margin-bottom: 6px;
+  margin-bottom: 3px;
   z-index: 2;
   position: relative;
   text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
@@ -474,7 +475,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
   position: relative;
   margin-left: 0;
 }
@@ -519,7 +520,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   -webkit-backdrop-filter: blur(10px);
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.35);
-  padding: 8px 12px;
+  padding: 6px 12px;
   font-size: 13px;
   color: #333;
   line-height: 1.5;
@@ -544,7 +545,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .preview-bubble:focus {
   background: rgba(255, 255, 255, 0.75);
 }.bottom-bar {
-  padding: 15px 16px 16px;
+  padding: 8px 16px 10px;
   flex-shrink: 0;
   display: flex;
   justify-content: center;
@@ -552,7 +553,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .bottom-btn-container {
   background: #ffffff;
   border-radius: 28px;
-  padding: 6px 12px;
+  padding: 4px 10px;
   display: flex;
   gap: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
@@ -5087,8 +5088,8 @@ button.back-btn[type="button"] {
   }
 }
 .music-player-disc {
-  width: 96px;
-  height: 96px;
+  width: 72px;
+  height: 72px;
   flex-shrink: 0;
   border-radius: 50%;
   background: #0c0c0e;
@@ -5184,8 +5185,8 @@ button.back-btn[type="button"] {
   display: block;
 }/* 网易云播放器新版 */
 .music-player-card {
-  padding: 12px !important;
-  gap: 10px !important;
+  padding: 8px 12px !important;
+  gap: 8px !important;
   justify-content: space-between !important;
 }
 .music-player-left {
@@ -5307,7 +5308,7 @@ button.back-btn[type="button"] {
   gap: 8px !important;
 }
 .music-player-disc {
-  width: 84px !important;
+  width: 72px !important;
   height: 84px !important;
   box-shadow: 0 4px 10px rgba(0,0,0,0.3), inset 0 0 0 2px #000 !important;
 }

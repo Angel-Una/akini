@@ -478,6 +478,7 @@
   var _booksLoaded = false;
   var _curBook = null;
   var _readerContact = null;
+  var _readerContacts = []; /* zzzj：共读多选 */
   var _readerParas = [];
   var _readerIdx = 0;
   var RENDER_CHUNK = 120;
@@ -537,6 +538,7 @@
         var bid = el.getAttribute('data-bid');
         lpTimer = setTimeout(function () {
           longFired = true;
+          if (_manageMode) return;
           _curBook = _books.filter(function (b) { return b.id === bid; })[0] || null;
           if (_curBook) openSheet('novelBookActions');
           try { if (navigator.vibrate) navigator.vibrate(30); } catch (e) {}
@@ -551,6 +553,7 @@
       el.addEventListener('mouseleave', cancel);
       el.addEventListener('click', function () {
         if (longFired) { longFired = false; return; }
+        if (_manageMode) { openEditBook(el.getAttribute('data-bid')); return; }
         var bid = el.getAttribute('data-bid');
         _curBook = _books.filter(function (b) { return b.id === bid; })[0] || null;
         if (_curBook) openNovelPicker();
@@ -612,6 +615,7 @@
   /* ---------- 选人共读弹层 ---------- */
   function openNovelPicker() {
     _readerContact = null;
+    _readerContacts = [];
     renderNovelPickerList();
     openSheet('novelPickerOverlay');
   }
@@ -625,7 +629,7 @@
       return;
     }
     list.innerHTML = cs.map(function (c) {
-      var on = _readerContact === c.id;
+      var on = _readerContacts.indexOf(c.id) >= 0;
       return '<div class="aknv-item" data-cid="' + esc(c.id) + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid #f0f0f0;cursor:pointer;-webkit-tap-highlight-color:transparent">'
         + '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (on ? '#1a1a1a' : '#ddd') + ';background:' + (on ? '#1a1a1a' : '#fff') + ';color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (on ? '\u2713' : '') + '</div>'
         + '<div style="width:40px;height:40px;border-radius:50%;background:#e8e8e8;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">' + avatarInner(c.avatar) + '</div>'
@@ -634,7 +638,10 @@
     }).join('');
     Array.prototype.forEach.call(list.querySelectorAll('.aknv-item'), function (el) {
       el.addEventListener('click', function () {
-        _readerContact = el.getAttribute('data-cid');
+        var cid = el.getAttribute('data-cid');
+        var ix = _readerContacts.indexOf(cid);
+        if (ix >= 0) _readerContacts.splice(ix, 1); else _readerContacts.push(cid);
+        _readerContact = _readerContacts[0] || null;
         renderNovelPickerList();
       });
     });
@@ -785,9 +792,11 @@
     var pageParas = _pagedPages[_pagedIdx] || [];
     var html = '';
     for (var i = 0; i < pageParas.length; i++) {
-      html += '<p style="margin:0 0 1em;text-indent:2em;word-break:break-all">' + esc(pageParas[i]) + '</p>';
+      var gi = _readerParas.indexOf(pageParas[i]);
+      html += '<p data-pidx="' + gi + '" style="margin:0 0 1em;text-indent:2em;word-break:break-all">' + esc(pageParas[i]) + '</p>';
     }
     content.innerHTML = html;
+    try { window._zzzjDecorateCm && window._zzzjDecorateCm(); } catch (e) {}
     ind.textContent = (_pagedIdx + 1) + '/' + _pagedPages.length;
     ind.style.display = 'block';
     
@@ -852,10 +861,17 @@
   function openReader() {
     if (!_curBook) return;
     closeSheet('novelPickerOverlay');
-    var c = _readerContact ? contactById(_readerContact) : null;
     var myA = $('novelReaderMyAvatar'), taA = $('novelReaderTaAvatar');
-    if (myA) myA.innerHTML = avatarInner(myAvatar());
-    if (taA) taA.innerHTML = c ? avatarInner(c.avatar) : '<span style="font-size:14px;color:#bbb">+</span>';
+    var avs = _readerContacts.map(function (id) { return contactById(id); }).filter(Boolean);
+    if (myA) { myA.style.width = '40px'; myA.style.height = '40px'; myA.innerHTML = avatarInner(myAvatar()); }
+    if (taA) {
+      taA.style.width = 'auto'; taA.style.height = '40px'; taA.style.background = 'transparent';
+      taA.style.border = 'none'; taA.style.overflow = 'visible'; taA.style.marginLeft = '0';
+      taA.style.display = 'flex'; taA.style.alignItems = 'center';
+      taA.innerHTML = avs.length ? avs.map(function (c2, i) {
+        return '<div style="width:40px;height:40px;border-radius:50%;background:#e8e8e8;overflow:hidden;border:2px solid #fff;margin-left:' + (i ? '-14px' : '-10px') + ';position:relative;z-index:' + (20 - i) + ';display:flex;align-items:center;justify-content:center;flex-shrink:0">' + avatarInner(c2.avatar) + '</div>';
+      }).join('') : '<span style="font-size:14px;color:#bbb;margin-left:-10px">+</span>';
+    }
     var tt = $('novelReaderTitle');
     if (tt) tt.textContent = _curBook.title;
     var content = $('novelReaderContent');
@@ -894,7 +910,7 @@
     var end = Math.min(_readerParas.length, _readerIdx + RENDER_CHUNK);
     var html = '';
     for (var i = _readerIdx; i < end; i++) {
-      html += '<p style="margin:0 0 1em;text-indent:2em;word-break:break-all">' + esc(_readerParas[i]) + '</p>';
+      html += '<p data-pidx="' + i + '" style="margin:0 0 1em;text-indent:2em;word-break:break-all">' + esc(_readerParas[i]) + '</p>';
     }
     if (end >= _readerParas.length) html += '<div id="novelProgressMarker" style="text-align:center;color:#bbb;font-size:12px;padding:24px 0">— 全书完 —</div>';
     var marker = $('novelProgressMarker');
@@ -903,6 +919,7 @@
     wrap.innerHTML = html;
     while (wrap.firstChild) content.appendChild(wrap.firstChild);
     _readerIdx = end;
+    try { window._zzzjDecorateCm && window._zzzjDecorateCm(); } catch (e) {}
   }
 
   function saveProgress() {
@@ -946,7 +963,7 @@
     var content = $('novelReaderContent');
 
     if (back) back.addEventListener('click', goHome);
-    if (addBtn) addBtn.addEventListener('click', function () { if (importInput) importInput.click(); });
+    /* zzzj：加号改为「导入/管理」菜单，绑定在补丁段 bindZzzj */
     if (importInput) importInput.addEventListener('change', function () {
       var f = this.files && this.files[0];
       this.value = '';
@@ -1049,7 +1066,8 @@
     if (pickerClose) pickerClose.addEventListener('click', function () { closeSheet('novelPickerOverlay'); });
     if (pickerOverlay) pickerOverlay.addEventListener('click', function (e) { if (e.target === pickerOverlay) closeSheet('novelPickerOverlay'); });
     if (pickerConfirm) pickerConfirm.addEventListener('click', function () {
-      if (!_readerContact) { alert('先选一位一起看的联系人吧~'); return; }
+      if (!_readerContacts.length) { alert('先选一位一起看的联系人吧~'); return; }
+      _readerContact = _readerContacts[0];
       openReader();
     });
 
@@ -1128,6 +1146,408 @@
     bindNovel();
   }
   if (document.readyState === 'loading') {
+
+  /* ============================================================
+     zzzj：书架管理（画笔改封面书名）+ 段评系统（长按选段/圆圈计数/定时回复/永久保存）
+     ============================================================ */
+  var _manageMode = false;
+  var _cmPending = null;   /* 待添加段评 {pidx, quote} */
+  var _cmViewing = null;   /* 查看中的段评 id */
+  var CM_PREFIX = 'akini_nvcm_';
+
+  function cmLoad() {
+    if (!_curBook) return [];
+    try { return JSON.parse(lsGet(CM_PREFIX + _curBook.id, '[]')) || []; } catch (e) { return []; }
+  }
+  function cmSave(list) {
+    if (!_curBook) return;
+    lsSet(CM_PREFIX + _curBook.id, JSON.stringify(list));
+  }
+  function cmFmtTime(ts) {
+    var d = new Date(ts);
+    function p(n) { return n < 10 ? '0' + n : '' + n; }
+    return (d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  /* ---------- 段评标记渲染：段落末尾圆圈+数量 ---------- */
+  window._zzzjDecorateCm = function () {
+    var content = $('novelReaderContent');
+    if (!content || !_curBook) return;
+    var list = cmLoad();
+    var byPara = {};
+    list.forEach(function (cm) {
+      if (cm.pidx == null || cm.pidx < 0) return;
+      (byPara[cm.pidx] = byPara[cm.pidx] || []).push(cm);
+    });
+    Array.prototype.forEach.call(content.querySelectorAll('p[data-pidx]'), function (p) {
+      Array.prototype.forEach.call(p.querySelectorAll('.aknv-cmmark'), function (m) { m.remove(); });
+      var pidx = parseInt(p.getAttribute('data-pidx'), 10);
+      var cms = byPara[pidx];
+      if (!cms || !cms.length) return;
+      var total = 0;
+      cms.forEach(function (cm) { total += (cm.list || []).length; });
+      var mk = document.createElement('span');
+      mk.className = 'aknv-cmmark';
+      mk.setAttribute('data-pidx', String(pidx));
+      mk.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border:1.5px solid #b08a4f;color:#b08a4f;border-radius:999px;font-size:11px;padding:0 4px;margin-left:4px;vertical-align:2px;cursor:pointer;box-sizing:border-box;background:rgba(255,255,255,.6)';
+      mk.textContent = String(total);
+      mk.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openCmView(pidx);
+      });
+      p.appendChild(mk);
+    });
+  };
+
+  /* ---------- 长按选择 → 添加段评浮动条 ---------- */
+  function ensureCmDom() {
+    if ($('aknvSelBar')) return;
+    var bar = document.createElement('div');
+    bar.id = 'aknvSelBar';
+    bar.style.cssText = 'display:none;position:fixed;z-index:1000010;background:#1a1a1a;color:#fff;font-size:14px;padding:8px 16px;border-radius:8px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.3);user-select:none;-webkit-user-select:none';
+    bar.textContent = '添加段评';
+    document.body.appendChild(bar);
+    bar.addEventListener('click', function () {
+      bar.style.display = 'none';
+      if (_cmPending) openCmAdd();
+    });
+
+    var add = document.createElement('div');
+    add.id = 'aknvCmAdd';
+    add.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000011;align-items:center;justify-content:center';
+    add.innerHTML = '<div style="width:86%;max-width:340px;background:#fff;border-radius:14px;padding:16px;box-sizing:border-box">'
+      + '<div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:8px">添加段评</div>'
+      + '<div id="aknvCmAddQuote" style="font-size:13px;color:#888;background:#f6f6f6;border-radius:8px;padding:8px 10px;margin-bottom:10px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all"></div>'
+      + '<textarea id="aknvCmAddInput" rows="3" maxlength="200" placeholder="写下你的段评（仅文字）" style="width:100%;box-sizing:border-box;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;font-size:15px;outline:0;resize:none;color:#1a1a1a;font-family:inherit"></textarea>'
+      + '<div style="display:flex;gap:10px;margin-top:12px"><button id="aknvCmAddCancel" type="button" style="flex:1;height:42px;border-radius:10px;border:1px solid #e0e0e0;background:#f8f8f8;color:#555;font-size:15px;cursor:pointer">取消</button><button id="aknvCmAddOk" type="button" style="flex:1;height:42px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">保存</button></div>'
+      + '</div>';
+    document.body.appendChild(add);
+    $('aknvCmAddCancel').addEventListener('click', function () { add.style.display = 'none'; _cmPending = null; });
+    add.addEventListener('click', function (e) { if (e.target === add) { add.style.display = 'none'; _cmPending = null; } });
+    $('aknvCmAddOk').addEventListener('click', saveCmAdd);
+
+    var view = document.createElement('div');
+    view.id = 'aknvCmView';
+    view.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000012;align-items:flex-end';
+    view.innerHTML = '<div style="width:100%;max-height:76vh;background:#fff;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+      + '<div style="display:flex;align-items:center;padding:14px 16px 10px;flex-shrink:0">'
+      + '<span style="flex:1;font-size:16px;font-weight:700;color:#1a1a1a">段评</span>'
+      + '<button id="aknvCmMoreBtn" type="button" style="background:none;border:none;font-size:20px;color:#666;cursor:pointer;padding:2px 8px">⋯</button>'
+      + '<button id="aknvCmViewClose" type="button" style="background:none;border:none;font-size:20px;color:#999;cursor:pointer;padding:2px 4px">✕</button></div>'
+      + '<div id="aknvCmReplyCfg" style="display:none;padding:0 16px 10px;flex-shrink:0;align-items:center;gap:8px">'
+      + '<span style="font-size:13px;color:#666;flex:1">联系人回复段评时间</span>'
+      + '<input id="aknvCmDelayInput" type="number" min="1" max="600" value="10" style="width:60px;height:32px;border:1px solid #e0e0e0;border-radius:8px;padding:0 8px;font-size:14px;outline:0;text-align:center"/>'
+      + '<span style="font-size:13px;color:#999">秒</span></div>'
+      + '<div id="aknvCmViewQuote" style="margin:0 16px 10px;font-size:13px;color:#888;background:#f6f6f6;border-radius:8px;padding:8px 10px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;flex-shrink:0"></div>'
+      + '<div id="aknvCmViewList" style="flex:1;overflow-y:auto;padding:0 16px;min-height:80px"></div>'
+      + '<div style="display:flex;gap:8px;padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid #f0f0f0;flex-shrink:0">'
+      + '<input id="aknvCmViewInput" maxlength="200" placeholder="写段评（仅文字）" style="flex:1;min-width:0;height:40px;border:1px solid #e0e0e0;border-radius:20px;padding:0 14px;font-size:14px;outline:0;color:#1a1a1a"/>'
+      + '<button id="aknvCmViewSend" type="button" style="height:40px;padding:0 18px;border:none;border-radius:20px;background:#1a1a1a;color:#fff;font-size:14px;cursor:pointer;flex-shrink:0">发送</button></div>'
+      + '</div>';
+    document.body.appendChild(view);
+    $('aknvCmViewClose').addEventListener('click', function () { view.style.display = 'none'; _cmViewing = null; });
+    view.addEventListener('click', function (e) { if (e.target === view) { view.style.display = 'none'; _cmViewing = null; } });
+    $('aknvCmViewSend').addEventListener('click', sendCmFromView);
+    $('aknvCmMoreBtn').addEventListener('click', function () {
+      var cfg = $('aknvCmReplyCfg');
+      cfg.style.display = cfg.style.display === 'flex' ? 'none' : 'flex';
+    });
+    $('aknvCmDelayInput').addEventListener('change', function () {
+      var v = Math.min(600, Math.max(1, parseInt(this.value, 10) || 10));
+      this.value = v;
+      lsSet('akini_nvcm_delay', String(v));
+    });
+  }
+
+  function openCmAdd() {
+    ensureCmDom();
+    var q = $('aknvCmAddQuote');
+    if (q) q.textContent = _cmPending.quote;
+    var inp = $('aknvCmAddInput');
+    if (inp) inp.value = '';
+    $('aknvCmAdd').style.display = 'flex';
+  }
+
+  function cmStripEmoji(t) {
+    /* 段评仅文字：剔除 emoji 与图片占位 */
+    return String(t || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').trim();
+  }
+
+  function saveCmAdd() {
+    var inp = $('aknvCmAddInput');
+    var text = cmStripEmoji(inp ? inp.value : '');
+    if (!text) { alert('段评不能为空哦'); return; }
+    var list = cmLoad();
+    var cm = {
+      id: 'cm' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
+      pidx: _cmPending.pidx,
+      quote: _cmPending.quote.slice(0, 120),
+      list: [{ who: 'me', text: text, ts: Date.now() }],
+      replied: false
+    };
+    list.push(cm);
+    cmSave(list);
+    $('aknvCmAdd').style.display = 'none';
+    _cmPending = null;
+    window._zzzjDecorateCm();
+    scheduleCmReply(cm);
+  }
+
+  /* ---------- 联系人定时回复段评（字卡库文字） ---------- */
+  function scheduleCmReply(cm) {
+    if (!cm || cm.replied) return;
+    var delay = Math.min(600, Math.max(1, parseInt(lsGet('akini_nvcm_delay', '10'), 10) || 10)) * 1000;
+    setTimeout(function () {
+      var list = cmLoad();
+      var cur = null;
+      for (var i = 0; i < list.length; i++) if (list[i].id === cm.id) { cur = list[i]; break; }
+      if (!cur || cur.replied) return;
+      var pool = _readerContacts.length ? _readerContacts : contacts().map(function (c) { return c.id; });
+      if (!pool.length) return;
+      var cid = pool[Math.floor(Math.random() * pool.length)];
+      var c = contactById(cid);
+      if (!c) return;
+      var t = '';
+      try { t = window.pickWordCards ? window.pickWordCards(1, cid) : ''; } catch (e) {}
+      t = cmStripEmoji((t || '').split('\n')[0]);
+      if (!t) return;
+      cur.list.push({ who: cid, name: c.name || '联系人', avatar: c.avatar || '', text: t, ts: Date.now() });
+      cur.replied = true;
+      cmSave(list);
+      window._zzzjDecorateCm();
+      if (_cmViewing) openCmView(_cmViewing, true);
+    }, delay);
+  }
+
+  /* ---------- 查看段评弹窗 ---------- */
+  function openCmView(pidx, keepOpen) {
+    ensureCmDom();
+    _cmViewing = pidx;
+    var list = cmLoad().filter(function (cm) { return cm.pidx === pidx; });
+    if (!list.length) { $('aknvCmView').style.display = 'none'; _cmViewing = null; return; }
+    $('aknvCmViewQuote').textContent = list.map(function (cm) { return cm.quote; })[0] || '';
+    var di = $('aknvCmDelayInput');
+    if (di) di.value = lsGet('akini_nvcm_delay', '10');
+    var items = [];
+    list.forEach(function (cm) { (cm.list || []).forEach(function (m) { items.push(m); }); });
+    items.sort(function (a, b) { return a.ts - b.ts; });
+    $('aknvCmViewList').innerHTML = items.map(function (m) {
+      var isMe = m.who === 'me';
+      var name = isMe ? '我' : (m.name || '联系人');
+      var av = isMe ? avatarInner(myAvatar()) : avatarInner(m.avatar || '');
+      return '<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f5f5f5">'
+        + '<div style="width:34px;height:34px;border-radius:50%;background:#e8e8e8;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">' + av + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="display:flex;align-items:baseline;gap:8px"><span style="font-size:13px;font-weight:600;color:#555">' + esc(name) + '</span>'
+        + '<span style="font-size:11px;color:#bbb">' + cmFmtTime(m.ts) + '</span></div>'
+        + '<div style="font-size:14px;color:#1a1a1a;margin-top:3px;word-break:break-all;line-height:1.5">' + esc(m.text) + '</div>'
+        + '</div></div>';
+    }).join('') || '<div style="text-align:center;color:#bbb;font-size:13px;padding:24px 0">暂无段评</div>';
+    var v = $('aknvCmView');
+    v.style.display = 'flex';
+    if (!keepOpen) { var lv = $('aknvCmViewList'); lv.scrollTop = lv.scrollHeight; }
+  }
+
+  function sendCmFromView() {
+    var inp = $('aknvCmViewInput');
+    var text = cmStripEmoji(inp ? inp.value : '');
+    if (!text) return;
+    var list = cmLoad();
+    var cur = null;
+    for (var i = list.length - 1; i >= 0; i--) if (list[i].pidx === _cmViewing) { cur = list[i]; break; }
+    if (!cur) return;
+    cur.list.push({ who: 'me', text: text, ts: Date.now() });
+    cmSave(list);
+    inp.value = '';
+    window._zzzjDecorateCm();
+    openCmView(_cmViewing, true);
+    if (!cur.replied) scheduleCmReply(cur);
+  }
+
+  /* ---------- 选择监听 ---------- */
+  function bindCmSelection() {
+    var content = $('novelReaderContent');
+    if (!content || content._aknvCmBound) return;
+    content._aknvCmBound = true;
+    ensureCmDom();
+    var check = function () {
+      setTimeout(function () {
+        var bar = $('aknvSelBar');
+        if (!bar) return;
+        var sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.rangeCount) { bar.style.display = 'none'; return; }
+        var range = sel.getRangeAt(0);
+        var node = range.commonAncestorContainer;
+        var el = node.nodeType === 1 ? node : node.parentNode;
+        var p = el && el.closest ? el.closest('p[data-pidx]') : null;
+        if (!p || !content.contains(p)) { bar.style.display = 'none'; return; }
+        var quote = sel.toString().trim();
+        if (!quote) { bar.style.display = 'none'; return; }
+        _cmPending = { pidx: parseInt(p.getAttribute('data-pidx'), 10), quote: quote };
+        var rc = range.getBoundingClientRect();
+        bar.style.left = Math.max(10, Math.min(window.innerWidth - 110, rc.left + rc.width / 2 - 50)) + 'px';
+        bar.style.top = Math.max(50, rc.top - 44) + 'px';
+        bar.style.display = 'block';
+      }, 60);
+    };
+    content.addEventListener('mouseup', check);
+    content.addEventListener('touchend', check);
+    content.addEventListener('click', function (e) {
+      if (!e.target.closest || !e.target.closest('.aknv-cmmark')) {
+        var bar = $('aknvSelBar');
+        var sel = window.getSelection();
+        if (bar && (!sel || sel.isCollapsed)) bar.style.display = 'none';
+      }
+    });
+  }
+
+  /* ---------- 书架管理模式 ---------- */
+  function ensureManageDom() {
+    if ($('aknvAddMenu')) return;
+    var menu = document.createElement('div');
+    menu.id = 'aknvAddMenu';
+    menu.style.cssText = 'display:none;position:fixed;top:52px;right:10px;z-index:1000013;background:#fff;border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.16);overflow:hidden;min-width:120px';
+    menu.innerHTML = '<button id="aknvMenuImport" type="button" style="display:block;width:100%;padding:13px 18px;background:#fff;border:none;font-size:15px;color:#1a1a1a;text-align:left;cursor:pointer;border-bottom:1px solid #f0f0f0">导入</button>'
+      + '<button id="aknvMenuManage" type="button" style="display:block;width:100%;padding:13px 18px;background:#fff;border:none;font-size:15px;color:#1a1a1a;text-align:left;cursor:pointer">管理</button>';
+    document.body.appendChild(menu);
+    $('aknvMenuImport').addEventListener('click', function () {
+      menu.style.display = 'none';
+      var inp = $('novelImportInput');
+      if (inp) inp.click();
+    });
+    $('aknvMenuManage').addEventListener('click', function () {
+      menu.style.display = 'none';
+      setManageMode(true);
+    });
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest || (!e.target.closest('#aknvAddMenu') && !e.target.closest('#novelAddBtn'))) menu.style.display = 'none';
+    });
+
+    var em = document.createElement('div');
+    em.id = 'aknvEditModal';
+    em.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000014;align-items:center;justify-content:center';
+    em.innerHTML = '<div style="width:84%;max-width:320px;background:#fff;border-radius:14px;padding:18px 16px 14px;box-sizing:border-box">'
+      + '<div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:12px;text-align:center">编辑书籍</div>'
+      + '<div style="display:flex;gap:14px;align-items:flex-start">'
+      + '<div id="aknvEditCover" style="width:72px;height:96px;border-radius:8px;overflow:hidden;background:#eee;flex-shrink:0;cursor:pointer;position:relative"></div>'
+      + '<div style="flex:1;min-width:0"><div style="font-size:12px;color:#999;margin-bottom:6px">书名</div>'
+      + '<input id="aknvEditTitle" maxlength="60" style="width:100%;box-sizing:border-box;height:40px;border:1px solid #e0e0e0;border-radius:10px;padding:0 12px;font-size:15px;outline:0;color:#1a1a1a"/>'
+      + '<div style="font-size:12px;color:#bbb;margin-top:8px">点左侧封面可更换</div></div></div>'
+      + '<input accept="image/*" type="file" id="aknvEditCoverInput" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0"/>'
+      + '<div style="display:flex;gap:10px;margin-top:16px"><button id="aknvEditCancel" type="button" style="flex:1;height:42px;border-radius:10px;border:1px solid #e0e0e0;background:#f8f8f8;color:#555;font-size:15px;cursor:pointer">取消</button><button id="aknvEditOk" type="button" style="flex:1;height:42px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">保存</button></div>'
+      + '</div>';
+    document.body.appendChild(em);
+    $('aknvEditCancel').addEventListener('click', function () { em.style.display = 'none'; });
+    em.addEventListener('click', function (e) { if (e.target === em) em.style.display = 'none'; });
+    $('aknvEditCover').addEventListener('click', function () { $('aknvEditCoverInput').click(); });
+    $('aknvEditCoverInput').addEventListener('change', function () {
+      var f = this.files && this.files[0];
+      if (!f || !_editBook) return;
+      var fr = new FileReader();
+      fr.onload = function () {
+        shrinkImage(fr.result, 300, 400, function (url) {
+          _editBook.cover = url;
+          renderEditCover();
+        });
+      };
+      fr.readAsDataURL(f);
+      this.value = '';
+    });
+    $('aknvEditOk').addEventListener('click', function () {
+      if (!_editBook) return;
+      var t = ($('aknvEditTitle').value || '').trim();
+      if (t) _editBook.title = t;
+      saveBooks();
+      em.style.display = 'none';
+      window.__renderNovelShelf();
+    });
+  }
+
+  var _editBook = null;
+  function renderEditCover() {
+    var box = $('aknvEditCover');
+    if (!box || !_editBook) return;
+    box.innerHTML = isImgSrc(_editBook.cover)
+      ? '<img src="' + esc(_editBook.cover) + '" style="width:100%;height:100%;object-fit:cover">'
+      : defaultCover(_editBook);
+  }
+
+  function setManageMode(on) {
+    _manageMode = !!on;
+    var addBtn = $('novelAddBtn');
+    if (addBtn) {
+      if (on) {
+        addBtn.innerHTML = '<span style="font-size:14px;color:#1a1a1a;white-space:nowrap">退出管理</span>';
+        addBtn.style.width = 'auto';
+        addBtn.style.padding = '0 4px';
+      } else {
+        addBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" style="width:24px;height:24px" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+        addBtn.style.width = '32px';
+        addBtn.style.padding = '0';
+      }
+    }
+    window.__renderNovelShelf();
+  }
+
+  function openEditBook(bid) {
+    ensureManageDom();
+    _editBook = _books.filter(function (b) { return b.id === bid; })[0] || null;
+    if (!_editBook) return;
+    $('aknvEditTitle').value = _editBook.title || '';
+    renderEditCover();
+    $('aknvEditModal').style.display = 'flex';
+  }
+
+  /* ---------- 包装书架渲染：管理模式加画笔 ---------- */
+  function injectPens() {
+    if (!_manageMode) return;
+    var grid = $('novelShelfGrid');
+    if (!grid) return;
+    Array.prototype.forEach.call(grid.querySelectorAll('.aknv-book'), function (el) {
+      el.style.position = 'relative';
+      if (el.querySelector('.aknv-editpen')) return;
+      var pen = document.createElement('div');
+      pen.className = 'aknv-editpen';
+      pen.style.cssText = 'position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,.25);cursor:pointer';
+      pen.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+      pen.addEventListener('click', function (e) {
+        e.stopPropagation();
+        openEditBook(el.getAttribute('data-bid'));
+      });
+      el.appendChild(pen);
+    });
+  }
+  var _origRenderShelf = window.__renderNovelShelf;
+  window.__renderNovelShelf = function () {
+    _origRenderShelf();
+    /* loadBooks 为异步回调，延迟注入画笔角标 */
+    setTimeout(injectPens, 80);
+    setTimeout(injectPens, 300);
+  };
+
+  /* ---------- 绑定加号 → 菜单 ---------- */
+  function bindZzzj() {
+    ensureManageDom();
+    ensureCmDom();
+    bindCmSelection();
+    var addBtn = $('novelAddBtn');
+    if (addBtn && !addBtn._aknvMenuBound) {
+      addBtn._aknvMenuBound = true;
+      addBtn.addEventListener('click', function (e) {
+        if (_manageMode) { setManageMode(false); return; }
+        var menu = $('aknvAddMenu');
+        if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        e.stopPropagation();
+      }, true);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(bindZzzj, 400); });
+  } else {
+    setTimeout(bindZzzj, 400);
+  }
+
     document.addEventListener('DOMContentLoaded', boot);
   } else {
     boot();
