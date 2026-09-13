@@ -251,8 +251,9 @@
     /* zzz：退出前归档陪伴历史（对象/时长/消息条数），再清空状态 */
     var st = companionState();
     if (st && st.cid) pushCompanionHistory(st);
-    /* 主程序重写了 localStorage.removeItem（失效），写 'null' 墓碑清空陪伴状态 */
-    lsSet(COMPANION_KEY, 'null');
+    /* 主程序重写了 localStorage.removeItem（失效），且快照恢复会把 'null' 视为丢失并复活旧值；
+       故写 '{"cleared":true}' 墓碑：非空不进恢复条件，解析后无 cid 即无会话 */
+    lsSet(COMPANION_KEY, '{"cleared":true}');
     if (_companionTimer) { clearInterval(_companionTimer); _companionTimer = null; }
     _companionSel = null;
     closeSheet('companionMenuSheet');
@@ -360,7 +361,13 @@
 
   window.__openCompanion = function () {
     idbGet(COMPANION_BG_KEY, function (v) { _companionBg = v || ''; applyCompanionBg(); });
-    /* zzz：陪伴时间不累计，每次进入选人页重新开始陪伴 */
+    /* zzz8：会话保持（与一起听一致）——存在进行中的陪伴会话时直接回到陪伴主界面，
+       切出/返回/刷新都不重置；仅「退出陪伴」主动操作才清除会话回选人页 */
+    var st = companionState();
+    if (st && st.cid && contactById(st.cid)) {
+      enterCompanionMain(st);
+      return;
+    }
     _companionSel = null;
     showCompanionView('picker');
     renderCompanionPicker();

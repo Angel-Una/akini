@@ -15104,6 +15104,7 @@ document.addEventListener("DOMContentLoaded", function () {
           E &&
           E.addEventListener("change", function () {
             var t = this.files[0];
+            this.value = "";
             if (t) {
               var e = new FileReader();
               ((e.onload = function (t) {
@@ -15142,17 +15143,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 e.readAsDataURL(t));
             }
           }));
-      /* zzv：我的主页背景区域直接点击即可换图（原先只能进编辑弹窗，用户感知"没反应"） */
-      var _myBgAreaTap = document.getElementById("icityMyBgArea");
-      _myBgAreaTap &&
-        E &&
-        _myBgAreaTap.addEventListener("click", function (t) {
-          try {
-            t.preventDefault();
-            t.stopPropagation();
-            E.click();
-          } catch (t) {}
-        });
       var M = document.getElementById("icityEditTaBgBtn"),
         N = document.getElementById("icityTaBgInput");
       M &&
@@ -21853,6 +21843,57 @@ document.addEventListener("DOMContentLoaded", function () {
   var partnerReplyTimer = null;
   var watchPendingCount = 0;   // 连发合并计数：与微信聊天一致，多条消息统一一轮回复结清
   var watchObjUrl = null;      // 本地视频 objectURL，换源时释放
+  /* ===== zzz8 观影会话保持（与一起听一致）：选人后切出/返回/刷新都不重置，仅「退出观看」主动清除 ===== */
+  var WATCH_SESSION_KEY = "akini_watch_session";
+  function saveWatchSession() {
+    try {
+      if (!watchPartners.length) { localStorage.setItem(WATCH_SESSION_KEY, '{"cleared":true}'); return; }
+      var v = $("watchVideo"), f = $("watchFrame");
+      var video = null;
+      if (f && f.style.display !== "none" && f.src && f.src.indexOf("about:blank") !== 0) {
+        video = { kind: "iframe", src: f.src };
+      } else if (v && v.style.display !== "none" && v.src && !/^blob:/.test(v.src)) {
+        video = { kind: "video", src: v.src };
+      }
+      localStorage.setItem(WATCH_SESSION_KEY, JSON.stringify({ partners: watchPartners, video: video, ts: Date.now() }));
+    } catch (e) {}
+  }
+  function loadWatchSession() {
+    try {
+      var s = JSON.parse(localStorage.getItem(WATCH_SESSION_KEY) || "null");
+      return (s && s.partners && s.partners.length) ? s : null;
+    } catch (e) { return null; }
+  }
+  function clearWatchSession() {
+    /* 主程序重写了 localStorage.removeItem（失效），且快照恢复会把 'null' 视为丢失并复活旧值；
+       故写 '{"cleared":true}' 墓碑：非空不进恢复条件，解析后无 partners 即无会话 */
+    try { localStorage.setItem(WATCH_SESSION_KEY, '{"cleared":true}'); } catch (e) {}
+  }
+  /* 主动退出观看：停止播放、清空会话与观影聊天区，下次进入回到选人页 */
+  function exitWatch() {
+    if (isFullscreen()) toggleFullscreen();
+    var v = $("watchVideo"), f = $("watchFrame");
+    try {
+      if (v) {
+        v.pause();
+        if (v.__hls) { try { v.__hls.destroy(); } catch (e) {} v.__hls = null; }
+        v.removeAttribute("src");
+        v.load && v.load();
+        v.style.display = "none";
+      }
+    } catch (e) {}
+    try { if (f) { f.src = "about:blank"; f.style.display = "none"; } } catch (e) {}
+    var em = $("watchEmpty"); if (em) em.style.display = "flex";
+    var ct = $("watchControls"); if (ct) ct.style.display = "none";
+    var dk = $("watchDanmakuLayer"); if (dk) dk.innerHTML = "";
+    if (partnerReplyTimer) { clearTimeout(partnerReplyTimer); partnerReplyTimer = null; }
+    watchPendingCount = 0;
+    hideWatchTyping();
+    var body = $("watchChatBody"); if (body) body.innerHTML = "";
+    watchPartners = [];
+    clearWatchSession();
+    var wa = $("watchArea"); if (wa) wa.style.display = "none";
+  }
   function partnerAvatarHtml(av) {
     var t = av && String(av).trim();
     if (t && /^(https?:|data:|blob:)/.test(t)) return '<img src="' + t + '" alt="" style="width:100%;height:100%;object-fit:cover"/>';
@@ -22032,6 +22073,7 @@ document.addEventListener("DOMContentLoaded", function () {
     showPlayer("video");
     if (v) { v.src = watchObjUrl; v.play && v.play().catch(function () {}); }
     appendWatchSysMsg("已导入本地视频：" + (file.name || "视频"));
+    saveWatchSession(); /* zzz8：导入后固化会话（本地 blob 视频仅本次有效，不存 src） */
   }
   function renderWatchPicker() {
     var list = $("watchPickerList");
@@ -22118,6 +22160,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (bv) {
       showPlayer("iframe");
       f.src = "https://player.bilibili.com/player.html?bvid=" + bv[0] + "&autoplay=1&high_quality=1";
+      saveWatchSession(); /* zzz8：导入后固化会话，刷新可恢复 */
       return;
     }
     if (/b23\.tv\//.test(url)) {
@@ -22145,6 +22188,7 @@ document.addEventListener("DOMContentLoaded", function () {
         v.src = url;
       }
       v.play && v.play().catch(function () {});
+      saveWatchSession(); /* zzz8：导入后固化会话，刷新可恢复 */
       return;
     }
     }, { desc: "· 哔哩哔哩：含 BV 号的视频页链接（站内直接播放）\n· mp4/m3u8 视频直链（站内直接播放）\n\n链接仅本次有效，不会保存" });
@@ -22325,20 +22369,15 @@ document.addEventListener("DOMContentLoaded", function () {
     });
     $("watchBackBtn").addEventListener("click", function () {
       if (isFullscreen()) toggleFullscreen();
+      /* zzz8：返回仅切出界面——视频仅暂停保留进度、会话与聊天全部保持（与一起听一致），再进观影原样恢复 */
       var v = $("watchVideo");
-      try {
-        if (v) {
-          v.pause();
-          if (v.__hls) { try { v.__hls.destroy(); } catch (e) {} v.__hls = null; }
-          v.removeAttribute("src");
-          v.load && v.load();
-        }
-      } catch (e) {}
+      try { if (v) v.pause(); } catch (e) {}
       var dk = $("watchDanmakuLayer");
       if (dk) dk.innerHTML = "";
       if (partnerReplyTimer) { clearTimeout(partnerReplyTimer); partnerReplyTimer = null; }
       watchPendingCount = 0;
       hideWatchTyping();
+      saveWatchSession();
       $("watchArea").style.display = "none";
     });
     $("watchImportBtn").addEventListener("click", importVideo);
@@ -22380,6 +22419,9 @@ document.addEventListener("DOMContentLoaded", function () {
       try { localStorage.removeItem("akini_watch_wallpaper"); } catch (e) {}
       applyWatchWallpaper();
     });
+    /* zzz8：三点菜单新增「退出观看」——主动清除观影会话，回到选人页 */
+    var mx = $("watchMenuExit");
+    if (mx) mx.addEventListener("click", function () { closeWatchMenu(); exitWatch(); });
     // 联系人选择器
     var pb = $("watchPickerBackBtn");
     if (pb) pb.addEventListener("click", function () { var pk = $("watchContactPicker"); if (pk) pk.style.display = "none"; });
@@ -22394,6 +22436,7 @@ document.addEventListener("DOMContentLoaded", function () {
       try { if (typeof window.__akiniRefreshChatMeta === "function") window.__akiniRefreshChatMeta(); } catch (e) {}
       var names = watchPartners.map(function (p2) { return p2.name || "联系人"; }).join("\u3001");
       appendWatchSysMsg(names + " 加入了一起观影");
+      saveWatchSession(); /* zzz8：选人确认即固化观影会话 */
       // 不再主动发消息：只有你说话时对方才按回复延迟回应
     });
   }
@@ -22404,7 +22447,34 @@ document.addEventListener("DOMContentLoaded", function () {
         if (typeof window.applyBubbleCss === "function")
           window.applyBubbleCss(localStorage.getItem("akini_bubble_css") || "");
       } catch (e) {}
-      openWatchPicker(); // 先选择一起观影的联系人（支持多选），确认后进入观影页
+      /* zzz8：会话保持（与一起听一致）——存在进行中的观影会话时直接回到观影界面，
+         切出/返回/刷新都不重置；仅三点菜单「退出观看」主动操作才清除会话 */
+      var ss = loadWatchSession();
+      if (ss) {
+        watchPartners = ss.partners.filter(function (p) { return p && p.id; });
+        var wa1 = $("watchArea");
+        if (wa1) wa1.style.display = "flex";
+        applyWatchWallpaper();
+        /* 恢复上次观看的视频（B站嵌入/直链可恢复；本地文件 blob 仅本次有效） */
+        try {
+          var vv = $("watchVideo"), ff = $("watchFrame");
+          var hasLive = (ff && ff.style.display !== "none" && ff.src && ff.src.indexOf("about:blank") !== 0) ||
+                        (vv && vv.style.display !== "none" && !!vv.src);
+          if (!hasLive && ss.video && ss.video.src) {
+            if (ss.video.kind === "iframe") {
+              showPlayer("iframe");
+              ff.src = ss.video.src;
+            } else {
+              showPlayer("video");
+              vv.src = ss.video.src;
+              vv.play && vv.play().catch(function () {});
+            }
+          }
+        } catch (e) {}
+        try { if (typeof window.__akiniRefreshChatMeta === "function") window.__akiniRefreshChatMeta(); } catch (e) {}
+        return;
+      }
+      openWatchPicker(); // 无会话：先选择一起观影的联系人（支持多选），确认后进入观影页
     } catch (e) {
       // 任何异常都不能让观影打不开：兜底直接显示观影区
       var wa = $("watchArea");

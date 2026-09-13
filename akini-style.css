@@ -139,7 +139,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .content-wrapper {
   flex: none;
   width: 100%;
-  max-width: 448px; /* zzz7：恢复 zzb 等比放大满铺上限（390 × 1.15） */
+  max-width: 390px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -567,7 +567,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: translateX(-50%);
   bottom: calc(8px + var(--ak-sab, 0px));
   width: calc(100% - 32px);
-  max-width: 448px;
+  max-width: 390px;
   box-sizing: border-box;
   z-index: 50;
 }
@@ -6789,3 +6789,55 @@ input[type="file"].akini-file-offscreen {
   flex-direction: column;
   gap: 12px;
 }
+
+
+/* ===== 聊天时间戳：严格双方头像正下方水平正中对齐，杜绝左右偏置 ===== */
+.chat-body .msg-row .avatar-col,
+.chat-body .msg-row.me .avatar-col,
+.chat-body .msg-row.other .avatar-col,
+.chat-body .msg-row.ta .avatar-col,
+.chat-body .msg-row.group .avatar-col {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+.chat-body .msg-row .avatar-col .msg-avatar {
+  margin: 0 auto !important;
+}
+.chat-body .msg-row .avatar-col .msg-ts,
+.chat-body .msg-row.me .avatar-col .msg-ts,
+.chat-body .msg-row.other .avatar-col .msg-ts,
+.chat-body .msg-row.ta .avatar-col .msg-ts,
+.chat-body .msg-row.group .avatar-col .msg-ts {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  min-width: 38px !important;
+  margin: 4px auto 0 auto !important;
+  padding: 0 !important;
+  left: auto !important;
+  right: auto !important;
+  transform: none !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  color: #777 !important;
+  box-sizing: border-box !important;
+}
+/* 旧版结构兼容：msg-meta 和直接子级 .msg-ts 同样头像正下方居中 */
+.chat-body .msg-row > .msg-ts,
+.chat-body .msg-row.me > .msg-ts,
+.chat-body .msg-row.other > .msg-ts {
+  width: 38px !important;
+  text-align: center !important;
+  margin: 3px 0 0 0 !important;
+}
+
