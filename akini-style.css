@@ -41,10 +41,6 @@ html {
     text-size-adjust: 100% !important;
     zoom: 1 !important;
   }
-  /* zzw：standalone 添加到主屏幕时恢复显示仿状态栏（用户要求保留仿栏观感），落在系统栏下方 var(--ak-sat) */
-  .fake-statusbar {
-    display: flex !important;
-  }
 }
 body {
   background: #fff;
@@ -202,7 +198,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   z-index: 6;
   pointer-events: none;
   color: #1a1a1a;
-  display: none; /* zzw：浏览器/微信已有真状态栏，仿栏默认隐藏，仅 standalone 恢复显示 */
+  /* zzx：仿栏全模式常驻显示（用户要求恢复顶部状态栏） */
 }
 .fake-statusbar .fs-time {
   font-size: 15px;
@@ -6576,14 +6572,16 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
    美化设计靠它把内部弧带装饰裁剪成胶囊形；强制 visible 会让装饰溢出上下边缘形成隔断）。
    裁不裁完全交给美化 CSS 自己决定；祖先容器保持 overflow:visible 防止外部裁切。 */
 
-/* 观影表情包消息：裸图无气泡（防美化样式覆写，与微信 sticker-bubble 一致） */
-#watchChatBody .bubble.sticker-bubble {
+/* 观影/陪伴表情包消息：裸图无气泡（防美化样式覆写，与微信 sticker-bubble 一致） */
+#watchChatBody .bubble.sticker-bubble,
+#companionMsgs .bubble.sticker-bubble {
   background: transparent !important;
   padding: 0 !important;
   box-shadow: none !important;
   border: none !important;
 }
-#watchChatBody .bubble.sticker-bubble img {
+#watchChatBody .bubble.sticker-bubble img,
+#companionMsgs .bubble.sticker-bubble img {
   max-width: 120px;
   max-height: 120px;
   border-radius: 8px;
@@ -6697,12 +6695,65 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 /* zzc：加号菜单固定两行三列（项不拉伸，58px 定宽，右靠对齐） */
 .plus-menu.show .plus-menu-item { flex: 0 0 58px !important; width: 58px !important; }
 
-/* ===== zzw 陪伴页 ===== */
-.akcp-ring-svg{position:absolute;left:50%;top:50%;width:290px;height:130px;transform:translate(-50%,-50%);pointer-events:none;overflow:visible}
-.akcp-ring-svg ellipse{animation:akcpDashFlow 2.8s linear infinite;filter:drop-shadow(0 0 5px rgba(255,177,199,.55))}
-@keyframes akcpDashFlow{to{stroke-dashoffset:-88}}
+/* ===== zzx 陪伴页 ===== */
+.akcp-halo{position:absolute;inset:-8px;border-radius:50%;background:rgba(255,170,200,.16);border:2px solid rgba(255,150,190,.45);pointer-events:none;animation:akcpHalo 2.4s ease-in-out infinite}
+.akcp-halo.d2{animation-delay:1.2s}
+@keyframes akcpHalo{0%,100%{transform:scale(1);opacity:.9}50%{transform:scale(1.09);opacity:.5}}
 #companionMsgs{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 36px);mask-image:linear-gradient(to bottom,transparent 0,#000 36px)}
-.akcp-bubble{max-width:76%;padding:9px 13px;border-radius:16px;font-size:15px;line-height:1.5;word-break:break-all;width:fit-content}
+/* zzy：陪伴气泡完全对齐观影——复用全局 .chat-body .msg-row .bubble 体系（默认样式+美化CSS接管），
+   表情包走 sticker-bubble 裸图；本页不再单独定义气泡视觉 */
+.akcp-typing{align-self:flex-start;background:rgba(255,255,255,.95);border-radius:16px;border-bottom-left-radius:4px;padding:11px 14px;display:flex;gap:4px;align-items:center;width:fit-content;box-shadow:0 1px 4px rgba(0,0,0,.06)}
 /* ===== zzw 阅读器左右翻页 ===== */
 #novelReaderContent.paged{overflow-x:auto;overflow-y:hidden;column-gap:40px;height:100%}
 #novelReaderContent.paged p{break-inside:avoid}
+
+/* ===== zzz: file input 跨机型兼容修复 ===== */
+/* display:none 的 file input 在部分 iOS/Android WebView 上 JS .click() 无效；
+   统一替换为不可见但已渲染的离屏定位，确保所有机型可触发文件选择器 */
+input[type="file"].akini-file-offscreen {
+  display: block !important;
+  position: absolute !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0.01 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* ===== zzz: 引用表情包缩略图 ===== */
+.quote-bubble .quote-sticker-thumb {
+  max-width: 24px !important;
+  max-height: 24px !important;
+  border-radius: 4px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  object-fit: cover !important;
+  margin-left: 4px !important;
+}
+
+/* ===== zzz: 陪伴历史弹层 ===== */
+#companionHistoryOverlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 1000002;
+  align-items: flex-end;
+}
+#companionHistoryPanel {
+  width: 100%;
+  max-height: 70vh;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}

@@ -74,9 +74,9 @@
     list.innerHTML = cs.map(function (c) {
       var on = _companionSel === c.id;
       return '<div class="akcp-item" data-cid="' + esc(c.id) + '" style="display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid #f0f0f0;cursor:pointer;-webkit-tap-highlight-color:transparent">'
+        + '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (on ? '#1a1a1a' : '#ddd') + ';background:' + (on ? '#1a1a1a' : '#fff') + ';color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (on ? '\u2713' : '') + '</div>'
         + '<div style="width:44px;height:44px;border-radius:50%;background:#e8e8e8;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">' + avatarInner(c.avatar) + '</div>'
         + '<div style="flex:1;min-width:0;font-size:16px;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.name || '未命名') + '</div>'
-        + '<div class="akcp-check" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;border:2px solid ' + (on ? '#07c160' : '#ddd') + ';background:' + (on ? '#07c160' : 'transparent') + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700">' + (on ? '✓' : '') + '</div>'
         + '</div>';
     }).join('');
     Array.prototype.forEach.call(list.querySelectorAll('.akcp-item'), function (el) {
@@ -111,13 +111,16 @@
   function applyCompanionBg() {
     var layer = $('companionBgLayer'), dim = $('companionBgDim');
     if (!layer || !dim) return;
+    var app = $('app-companion');
     if (isImgSrc(_companionBg)) {
       layer.style.backgroundImage = 'url(' + _companionBg + ')';
       layer.style.display = 'block';
       dim.style.display = 'block'; /* 更换背景图后整体带一层浅黑色 */
+      if (app) app.classList.add('hasBg'); /* 气泡切自定义背景适配样式 */
     } else {
       layer.style.display = 'none';
       dim.style.display = 'none';
+      if (app) app.classList.remove('hasBg'); /* 默认背景用默认气泡 */
     }
   }
 
@@ -130,17 +133,86 @@
       box.innerHTML = '<div style="text-align:center;color:#bbb;font-size:13px;padding:26px 0 0;line-height:1.8">陪伴开始啦<br>在下面发条消息给对方吧~</div>';
       return;
     }
-    box.innerHTML = msgs.map(function (m) {
-      if (m.side === 'me') {
-        return '<div class="akcp-bubble" style="align-self:flex-end;background:#1a1a1a;color:#fff;border-bottom-right-radius:4px">' + esc(m.text) + '</div>';
-      }
-      return '<div class="akcp-bubble" style="align-self:flex-start;background:rgba(255,255,255,.95);color:#333;border-bottom-left-radius:4px;box-shadow:0 1px 4px rgba(0,0,0,.06)">' + esc(m.text) + '</div>';
-    }).join('');
+    /* zzz：陪伴气泡不显示头像（用户需求），仅消息内容居中/两侧对齐 */
+    box.innerHTML = '';
+    msgs.forEach(function (m) {
+      var me = m.side === 'me';
+      var row = document.createElement('div');
+      row.className = 'msg-row ' + (me ? 'me' : 'other');
+      row.setAttribute('data-ts', String(m.ts || Date.now()));
+      row.style.paddingLeft = '0';
+      row.style.paddingRight = '0';
+      var bubbleHtml = m.img
+        ? '<div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;border:none;"><img src="' + esc(m.img) + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/></div>'
+        : '<div class="bubble">' + esc(m.text || '') + '</div>';
+      row.innerHTML = '<div class="msg-content-line">' + bubbleHtml + '</div>';
+      box.appendChild(row);
+      try { if (typeof window.__akiniProcessMsgMeta === 'function') window.__akiniProcessMsgMeta(row); } catch (e) {}
+    });
     if (scrollBottom !== false) box.scrollTop = box.scrollHeight;
   }
 
+  /* zzz：陪伴历史存储 key */
+  var COMPANION_HISTORY_KEY = 'akini_companion_history';
+
+  function companionHistory() {
+    try { return JSON.parse(lsGet(COMPANION_HISTORY_KEY, '[]')) || []; } catch (e) { return []; }
+  }
+  function saveCompanionHistory(arr) { lsSet(COMPANION_HISTORY_KEY, JSON.stringify(arr)); }
+
+  function pushCompanionHistory(st) {
+    /* st: { cid, ts, msgs } → 记录对象名/时长/消息条数 */
+    if (!st || !st.cid) return;
+    var c = contactById(st.cid);
+    var name = c ? (c.name || '未命名') : '对方';
+    var durMs = Date.now() - (st.ts || Date.now());
+    var msgCount = (st.msgs || []).length;
+    var arr = companionHistory();
+    arr.unshift({
+      cid: st.cid,
+      name: name,
+      avatar: c ? (c.avatar || '') : '',
+      duration: durMs,
+      msgCount: msgCount,
+      startTs: st.ts,
+      endTs: Date.now()
+    });
+    /* 最多保留 100 条 */
+    if (arr.length > 100) arr.length = 100;
+    saveCompanionHistory(arr);
+  }
+
+  function renderCompanionHistory() {
+    var list = $('companionHistoryList');
+    if (!list) return;
+    var arr = companionHistory();
+    if (!arr.length) {
+      list.innerHTML = '<div style="text-align:center;color:#bbb;font-size:14px;padding:60px 0;line-height:1.8">暂无陪伴历史</div>';
+      return;
+    }
+    list.innerHTML = arr.map(function (h) {
+      var dur = fmtDur(h.duration || 0);
+      var d = h.startTs ? new Date(h.startTs) : null;
+      var dateStr = d ? (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) : '';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid #f0f0f0">'
+        + '<div style="width:44px;height:44px;border-radius:50%;background:#e8e8e8;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">' + avatarInner(h.avatar) + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        + '<div style="font-size:15px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(h.name) + '</div>'
+        + '<div style="font-size:12px;color:#999;margin-top:2px">' + esc(dateStr) + '</div>'
+        + '</div>'
+        + '<div style="text-align:right;flex-shrink:0">'
+        + '<div style="font-size:13px;color:#666">' + dur + '</div>'
+        + '<div style="font-size:12px;color:#999;margin-top:2px">' + (h.msgCount || 0) + ' 条聊天记录</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
   function startCompanion(cid) {
-    var st = { cid: cid, ts: Date.now(), msgs: [] };
+    /* zzz：距离只在开启陪伴时随机生成一次（0-1000），随会话固化保存；
+       退出陪伴后下次开启才重新随机；计时每次从 0 开始（不累计） */
+    /* zzz2：距离 0-100 米，保留一位小数 */
+    var st = { cid: cid, ts: Date.now(), msgs: [], dist: Math.round(Math.random() * 1000) / 10 };
     saveCompanionState(st);
     enterCompanionMain(st);
   }
@@ -152,8 +224,15 @@
     var myA = $('companionMyAvatar'), taA = $('companionTaAvatar');
     if (myA) myA.innerHTML = avatarInner(myAvatar());
     if (taA) taA.innerHTML = avatarInner(ava);
-    var nn = $('companionNames');
-    if (nn) nn.textContent = (lsGet('akini_my_name', '我') || '我') + ' ❤ ' + name;
+    /* zzy：距离读取本轮陪伴固化的 dist（开启时生成）；旧数据无 dist 时补一次并保存，之后不再变 */
+    var dd = $('companionDistance');
+    if (dd) {
+      if (typeof st.dist !== 'number' || isNaN(st.dist)) {
+        st.dist = Math.round(Math.random() * 1000) / 10;
+        saveCompanionState(st);
+      }
+      dd.textContent = 'TA距离你' + st.dist.toFixed(1) + '米';
+    }
     applyCompanionBg();
     renderCompanionMsgs(false);
     showCompanionView('main');
@@ -169,6 +248,9 @@
   }
 
   function endCompanion() {
+    /* zzz：退出前归档陪伴历史（对象/时长/消息条数），再清空状态 */
+    var st = companionState();
+    if (st && st.cid) pushCompanionHistory(st);
     /* 主程序重写了 localStorage.removeItem（失效），写 'null' 墓碑清空陪伴状态 */
     lsSet(COMPANION_KEY, 'null');
     if (_companionTimer) { clearInterval(_companionTimer); _companionTimer = null; }
@@ -178,21 +260,80 @@
     renderCompanionPicker();
   }
 
-  function sendCompanionMsg() {
-    var input = $('companionMsgInput');
-    var v = (input && input.value || '').trim();
-    if (!v) return;
-    var st = companionState();
-    if (!st) return;
-    st.msgs = st.msgs || [];
-    st.msgs.push({ side: 'me', text: v, ts: Date.now() });
-    saveCompanionState(st);
-    if (input) input.value = '';
-    renderCompanionMsgs(true);
-    /* TA 回复：从字卡库抽取，零兜底（抽不到则不回复） */
+  function myStickerPool() {
+    /* 我给自己添加的表情包：字卡库-表情包 tab 主集合 akini_stickers */
+    var arr = [];
+    try {
+      arr = (window.__wbRead ? window.__wbRead('akini_stickers', []) : JSON.parse(lsGet('akini_stickers', '[]'))) || [];
+    } catch (e) {}
+    if (!Array.isArray(arr)) arr = [];
+    var out = [];
+    arr.forEach(function (it) {
+      var s2 = '';
+      if (typeof it === 'string') s2 = it;
+      else if (it && typeof it.s === 'string') s2 = it.s;
+      var blocked = it && typeof it === 'object' && (it.b === 1 || it.b === true || it.b === '1');
+      if (!blocked && /^data:image\//.test(s2)) out.push(s2);
+    });
+    return out;
+  }
+  function companionStickerPool(cid) {
+    /* 该联系人专属表情包（与观影 watchStickerPool 同数据源 getContactStickersSync） */
+    var out = [];
+    try {
+      var own = typeof window.getContactStickersSync === 'function' ? window.getContactStickersSync(cid) : [];
+      (Array.isArray(own) ? own : []).forEach(function (it) {
+        var s2 = '';
+        if (typeof it === 'string') s2 = it;
+        else if (it && typeof it.s === 'string') s2 = it.s;
+        var blocked = it && typeof it === 'object' && (it.b === 1 || it.b === true || it.b === '1');
+        if (!blocked && /^data:image\//.test(s2)) out.push(s2);
+      });
+    } catch (e) {}
+    return out;
+  }
+  function showCompanionTyping() {
+    /* 微信同款正在输入：消息区左下角、无头像、仅三点气泡 */
+    var box = $('companionMsgs');
+    if (!box || $('companionTyping')) return;
+    var t = document.createElement('div');
+    t.id = 'companionTyping';
+    t.className = 'akcp-typing';
+    t.innerHTML = '<span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span>';
+    box.appendChild(t);
+    box.scrollTop = box.scrollHeight;
+  }
+  function hideCompanionTyping() {
+    var t = $('companionTyping');
+    if (t) t.remove();
+  }
+  function scheduleCompanionReply(cid) {
+    /* 回复节奏照搬微信/观影：设置页回复延迟范围（默认 2~5s），回复前 1.1s 左下角出现正在输入气泡 */
+    var dMin = parseFloat(lsGet('akini_num_replyDelayMin', '2'));
+    var dMax = parseFloat(lsGet('akini_num_replyDelayMax', '5'));
+    if (!(dMin >= 0)) dMin = 2;
+    if (!(dMax >= dMin)) dMax = Math.max(dMin, 5);
+    var delayMs = 1000 * (dMin + Math.random() * (dMax - dMin));
+    setTimeout(function () { if (companionState()) showCompanionTyping(); }, Math.max(0, delayMs - 1100));
     setTimeout(function () {
+      hideCompanionTyping();
       var cur = companionState();
       if (!cur) return;
+      /* 表情包：概率与微信聊天一致（contactEmojiToggle 开关 + AKR.getProb('emoji')），仅限该联系人专属收藏，裸图无气泡 */
+      var stkOn = false;
+      try { stkOn = localStorage.getItem('akini_toggle_contactEmojiToggle') === '1'; } catch (e) {}
+      var stkProb = (stkOn && window.AKR && typeof window.AKR.getProb === 'function') ? window.AKR.getProb('emoji') : 0;
+      if (stkProb > 0 && Math.random() < stkProb) {
+        var pool = companionStickerPool(cur.cid);
+        if (pool.length) {
+          cur.msgs = cur.msgs || [];
+          cur.msgs.push({ side: 'ta', img: pool[Math.floor(Math.random() * pool.length)], ts: Date.now() });
+          saveCompanionState(cur);
+          renderCompanionMsgs(true);
+          return;
+        }
+      }
+      /* 文本回复：从该联系人字卡库抽取，零兜底（抽不到则不回复） */
       var t = '';
       try { t = window.pickWordCards ? window.pickWordCards(1, cur.cid) : ''; } catch (e) {}
       t = (t || '').split('\n')[0].trim();
@@ -201,13 +342,25 @@
       cur.msgs.push({ side: 'ta', text: t, ts: Date.now() });
       saveCompanionState(cur);
       renderCompanionMsgs(true);
-    }, 2000 + Math.random() * 3000);
+    }, delayMs);
+  }
+  function sendCompanionMsg(imgUrl) {
+    var st = companionState();
+    if (!st) return;
+    var input = $('companionMsgInput');
+    var v = imgUrl ? '' : ((input && input.value || '').trim());
+    if (!imgUrl && !v) return;
+    st.msgs = st.msgs || [];
+    st.msgs.push(imgUrl ? { side: 'me', img: imgUrl, ts: Date.now() } : { side: 'me', text: v, ts: Date.now() });
+    saveCompanionState(st);
+    if (input) input.value = '';
+    renderCompanionMsgs(true);
+    scheduleCompanionReply(st.cid);
   }
 
   window.__openCompanion = function () {
     idbGet(COMPANION_BG_KEY, function (v) { _companionBg = v || ''; applyCompanionBg(); });
-    var st = companionState();
-    if (st && st.cid) { enterCompanionMain(st); return; }
+    /* zzz：陪伴时间不累计，每次进入选人页重新开始陪伴 */
     _companionSel = null;
     showCompanionView('picker');
     renderCompanionPicker();
@@ -216,6 +369,9 @@
   function bindCompanion() {
     var back1 = $('companionBackBtn'), back2 = $('companionMainBackBtn');
     var confirm = $('companionConfirmBtn');
+    var histBtn = $('companionHistoryBtn');
+    var histClose = $('companionHistoryClose');
+    var histOverlay = $('companionHistoryOverlay');
     var menuBtn = $('companionMenuBtn');
     var menuCancel = $('companionMenuCancel');
     var menuSheet = $('companionMenuSheet');
@@ -230,6 +386,16 @@
 
     if (back1) back1.addEventListener('click', goHome);
     if (back2) back2.addEventListener('click', goHome);
+    if (histBtn) histBtn.addEventListener('click', function () {
+      renderCompanionHistory();
+      openSheet('companionHistoryOverlay');
+    });
+    if (histClose) histClose.addEventListener('click', function () {
+      closeSheet('companionHistoryOverlay');
+    });
+    if (histOverlay) histOverlay.addEventListener('click', function (e) {
+      if (e.target === histOverlay) closeSheet('companionHistoryOverlay');
+    });
     if (confirm) confirm.addEventListener('click', function () {
       if (!_companionSel) return;
       startCompanion(_companionSel);
@@ -269,17 +435,23 @@
     });
 
     if (emojiBtn) emojiBtn.addEventListener('click', function () {
-      if (emojiGrid && !emojiGrid.children.length) {
-        emojiGrid.innerHTML = EMOJIS.map(function (e) {
-          return '<button type="button" class="akcp-emoji" style="background:0 0;border:none;font-size:26px;padding:6px 0;cursor:pointer;touch-action:manipulation">' + e + '</button>';
-        }).join('');
-        Array.prototype.forEach.call(emojiGrid.querySelectorAll('.akcp-emoji'), function (el) {
-          el.addEventListener('click', function () {
-            var inp = $('companionMsgInput');
-            if (inp) { inp.value = (inp.value || '') + el.textContent; inp.focus(); }
-            closeSheet('companionEmojiSheet');
+      /* zzx：表情面板 = 我给自己添加的表情包（字卡库-表情包 tab） */
+      if (emojiGrid) {
+        var pool = myStickerPool();
+        if (pool.length) {
+          emojiGrid.innerHTML = pool.map(function (s2, i) {
+            return '<button type="button" class="akcp-stk" data-i="' + i + '" style="background:0 0;border:none;padding:4px;cursor:pointer;touch-action:manipulation"><img src="' + esc(s2) + '" style="width:62px;height:62px;object-fit:contain;display:block;pointer-events:none" alt="表情包"></button>';
+          }).join('');
+          Array.prototype.forEach.call(emojiGrid.querySelectorAll('.akcp-stk'), function (el) {
+            el.addEventListener('click', function () {
+              var s2 = pool[parseInt(el.getAttribute('data-i'), 10)];
+              if (s2) sendCompanionMsg(s2);
+              closeSheet('companionEmojiSheet');
+            });
           });
-        });
+        } else {
+          emojiGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#999;font-size:13px;padding:34px 0;line-height:1.9">还没有表情包<br>去字卡库-表情包里添加吧</div>';
+        }
       }
       openSheet('companionEmojiSheet');
     });
@@ -448,9 +620,9 @@
     list.innerHTML = cs.map(function (c) {
       var on = _readerContact === c.id;
       return '<div class="aknv-item" data-cid="' + esc(c.id) + '" style="display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid #f0f0f0;cursor:pointer;-webkit-tap-highlight-color:transparent">'
+        + '<div style="width:22px;height:22px;border-radius:50%;border:2px solid ' + (on ? '#1a1a1a' : '#ddd') + ';background:' + (on ? '#1a1a1a' : '#fff') + ';color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (on ? '\u2713' : '') + '</div>'
         + '<div style="width:40px;height:40px;border-radius:50%;background:#e8e8e8;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center">' + avatarInner(c.avatar) + '</div>'
         + '<div style="flex:1;min-width:0;font-size:15px;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.name || '未命名') + '</div>'
-        + '<div style="width:20px;height:20px;border-radius:50%;flex-shrink:0;border:2px solid ' + (on ? '#07c160' : '#ddd') + ';background:' + (on ? '#07c160' : 'transparent') + ';display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:700">' + (on ? '✓' : '') + '</div>'
         + '</div>';
     }).join('');
     Array.prototype.forEach.call(list.querySelectorAll('.aknv-item'), function (el) {
