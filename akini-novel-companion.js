@@ -683,66 +683,162 @@
   }
 
   /* ---------- 翻页（左右）模式 ---------- */
+  var _pagedPages = [];
+  var _pagedIdx = 0;
+
   function pageWidth() {
     var content = $('novelReaderContent');
     return content ? content.clientWidth : 1;
+  }
+
+  function pageHeight() {
+    var content = $('novelReaderContent');
+    return content ? content.clientHeight : 1;
+  }
+
+  /* 视口真实分页算法：逐段渲染到隐藏测量容器，溢出则分页 */
+  function _computePages() {
+    if (!_readerParas.length) { _pagedPages = [[]]; return; }
+    var content = $('novelReaderContent');
+    if (!content) { _pagedPages = [[]]; return; }
+    
+    // 创建测量容器，完全继承当前正文样式
+    var meas = document.createElement('div');
+    meas.style.cssText = 'position:absolute;top:-9999px;left:-9999px;width:' + (pageWidth() - 40) + 'px;visibility:hidden;box-sizing:content-box;';
+    var s = readerSettings();
+    meas.style.fontSize = s.fontSize + 'px';
+    meas.style.lineHeight = s.lineHeight;
+    meas.style.color = s.textColor;
+    meas.style.background = 'transparent';
+    document.body.appendChild(meas);
+
+    var maxH = pageHeight() - 40; // 减去上下 padding
+    var pages = [];
+    var currentPageParas = [];
+    var currentH = 0;
+    var pStyle = 'margin:0 0 1em;text-indent:2em;word-break:break-all;';
+
+    for (var i = 0; i < _readerParas.length; i++) {
+      var para = _readerParas[i];
+      meas.innerHTML = '<p style="' + pStyle + '">' + esc(para) + '</p>';
+      var h = meas.firstChild.getBoundingClientRect().height;
+      if (h > maxH) {
+        // 单段超过一页：按字符拆分
+        var chars = para.split('');
+        var chunk = '';
+        for (var j = 0; j < chars.length; j++) {
+          chunk += chars[j];
+          meas.innerHTML = '<p style="' + pStyle + '">' + esc(chunk) + '</p>';
+          if (meas.firstChild.getBoundingClientRect().height > maxH) {
+            chunk = chunk.slice(0, -1);
+            if (currentH + meas.firstChild.getBoundingClientRect().height > maxH && currentPageParas.length) {
+              pages.push(currentPageParas);
+              currentPageParas = [];
+              currentH = 0;
+            }
+            currentPageParas.push(chunk);
+            currentH += meas.firstChild.getBoundingClientRect().height;
+            chunk = chars[j];
+          }
+        }
+        if (chunk) {
+          meas.innerHTML = '<p style="' + pStyle + '">' + esc(chunk) + '</p>';
+          if (currentH + meas.firstChild.getBoundingClientRect().height > maxH && currentPageParas.length) {
+            pages.push(currentPageParas);
+            currentPageParas = [];
+            currentH = 0;
+          }
+          currentPageParas.push(chunk);
+          currentH += meas.firstChild.getBoundingClientRect().height;
+        }
+      } else {
+        if (currentH + h > maxH && currentPageParas.length) {
+          pages.push(currentPageParas);
+          currentPageParas = [];
+          currentH = 0;
+        }
+        currentPageParas.push(para);
+        currentH += h;
+      }
+    }
+    if (currentPageParas.length) pages.push(currentPageParas);
+    if (!pages.length) pages.push([]);
+    _pagedPages = pages;
+    document.body.removeChild(meas);
+  }
+
+  function _renderPaged() {
+    var content = $('novelReaderContent');
+    var ind = $('novelPageIndicator');
+    if (!content || !ind) return;
+    content.innerHTML = '';
+    content.style.overflowY = 'hidden';
+    content.style.overflowX = 'hidden';
+    
+    var pageParas = _pagedPages[_pagedIdx] || [];
+    var html = '';
+    for (var i = 0; i < pageParas.length; i++) {
+      html += '<p style="margin:0 0 1em;text-indent:2em;word-break:break-all">' + esc(pageParas[i]) + '</p>';
+    }
+    content.innerHTML = html;
+    ind.textContent = (_pagedIdx + 1) + '/' + _pagedPages.length;
+    ind.style.display = 'block';
+    
+    // 滚动到顶部，模拟真实翻页
+    content.scrollTop = 0;
   }
 
   function enterPageMode() {
     var content = $('novelReaderContent');
     if (!content) return;
     content.classList.add('paged');
-    content.style.columnWidth = Math.max(1, pageWidth() - 40) + 'px'; /* 左右 padding 各20，列宽=页宽-gap */
-    content.scrollLeft = 0;
+    _computePages();
+    _renderPaged();
   }
 
   function exitPageMode() {
     var content = $('novelReaderContent');
     if (!content) return;
     content.classList.remove('paged');
-    content.style.columnWidth = '';
+    content.style.overflowY = 'auto';
+    content.style.overflowX = 'hidden';
   }
 
   function updatePageIndicator() {
-    var content = $('novelReaderContent');
     var ind = $('novelPageIndicator');
-    if (!content || !ind) return;
+    if (!ind) return;
     if (flipMode() !== 'page') { ind.style.display = 'none'; return; }
-    var pw = pageWidth();
-    var total = Math.max(1, Math.round(content.scrollWidth / pw));
-    var cur = Math.min(total, Math.round(content.scrollLeft / pw) + 1);
-    ind.textContent = cur + '/' + total;
+    ind.textContent = (_pagedIdx + 1) + '/' + _pagedPages.length;
     ind.style.display = 'block';
   }
 
-  function snapPage() {
-    var content = $('novelReaderContent');
-    if (!content || flipMode() !== 'page') return;
-    var pw = pageWidth();
-    var target = Math.round(content.scrollLeft / pw) * pw;
-    if (Math.abs(content.scrollLeft - target) > 2) {
-      content.scrollTo({ left: target, behavior: 'smooth' });
+  function nextPage() {
+    if (_pagedIdx < _pagedPages.length - 1) {
+      _pagedIdx++;
+      _renderPaged();
+      savePageProgress();
+    }
+  }
+
+  function prevPage() {
+    if (_pagedIdx > 0) {
+      _pagedIdx--;
+      _renderPaged();
+      savePageProgress();
     }
   }
 
   function savePageProgress() {
     if (!_curBook) return;
-    var content = $('novelReaderContent');
-    if (!content) return;
-    var max = content.scrollWidth - pageWidth();
-    var frac = max > 0 ? content.scrollLeft / max : 0;
-    lsSet(PAGEPROG_PREFIX + _curBook.id, String(Math.min(1, Math.max(0, frac))));
+    lsSet(PAGEPROG_PREFIX + _curBook.id, String(_pagedIdx));
   }
 
   function restorePageProgress() {
     var content = $('novelReaderContent');
     if (!content || !_curBook) return;
-    var frac = parseFloat(lsGet(PAGEPROG_PREFIX + _curBook.id, '0')) || 0;
-    if (frac > 0) {
-      var max = content.scrollWidth - pageWidth();
-      content.scrollLeft = Math.round(frac * max / pageWidth()) * pageWidth();
-    }
-    updatePageIndicator();
+    var savedIdx = parseInt(lsGet(PAGEPROG_PREFIX + _curBook.id, '0'), 10) || 0;
+    _pagedIdx = Math.min(savedIdx, Math.max(0, _pagedPages.length - 1));
+    _renderPaged();
   }
 
   /* ---------- 打开阅读页 ---------- */
@@ -765,17 +861,8 @@
       _readerIdx = 0;
       if (content) content.innerHTML = '';
       if (flipMode() === 'page') {
-        /* 翻页模式需全文渲染（CSS 多列分页），分段渲染防卡顿 */
         enterPageMode();
-        var renderAll = function () {
-          if (_readerIdx < _readerParas.length) {
-            renderMoreParas();
-            requestAnimationFrame(renderAll);
-          } else {
-            requestAnimationFrame(function () { restorePageProgress(); });
-          }
-        };
-        renderAll();
+        restorePageProgress();
       } else {
         exitPageMode();
         renderMoreParas();
@@ -802,7 +889,7 @@
     for (var i = _readerIdx; i < end; i++) {
       html += '<p style="margin:0 0 1em;text-indent:2em;word-break:break-all">' + esc(_readerParas[i]) + '</p>';
     }
-    if (end >= _readerParas.length && flipMode() !== 'page') html += '<div id="novelProgressMarker" style="text-align:center;color:#bbb;font-size:12px;padding:24px 0">— 全书完 —</div>';
+    if (end >= _readerParas.length) html += '<div id="novelProgressMarker" style="text-align:center;color:#bbb;font-size:12px;padding:24px 0">— 全书完 —</div>';
     var marker = $('novelProgressMarker');
     if (marker) marker.remove();
     var wrap = document.createElement('div');
@@ -873,6 +960,35 @@
       s.fontSize = Math.min(28, (parseInt(s.fontSize, 10) || 18) + 1);
       saveReaderSettings(s); applyReaderSettings(); updatePageIndicator();
     });
+
+    /* 阅读区点击左右翻页 */
+    if (content) {
+      content.addEventListener('click', function (e) {
+        if (flipMode() !== 'page') return;
+        var rect = content.getBoundingClientRect();
+        var x = e.clientX - rect.left;
+        if (x > rect.width * 0.7) { nextPage(); e.preventDefault(); e.stopPropagation(); return; }
+        if (x < rect.width * 0.3) { prevPage(); e.preventDefault(); e.stopPropagation(); return; }
+      });
+      var _touchStartX = 0, _touchStartY = 0;
+      content.addEventListener('touchstart', function (e) {
+        if (flipMode() !== 'page') return;
+        if (e.touches && e.touches.length) {
+          _touchStartX = e.touches[0].clientX;
+          _touchStartY = e.touches[0].clientY;
+        }
+      }, { passive: true });
+      content.addEventListener('touchend', function (e) {
+        if (flipMode() !== 'page') return;
+        if (e.changedTouches && e.changedTouches.length) {
+          var dx = e.changedTouches[0].clientX - _touchStartX;
+          var dy = e.changedTouches[0].clientY - _touchStartY;
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) nextPage(); else prevPage();
+          }
+        }
+      }, { passive: true });
+    }
     if (bgRow) Array.prototype.forEach.call(bgRow.children, function (el) {
       el.addEventListener('click', function () {
         var s = readerSettings();
@@ -917,19 +1033,9 @@
       saveReaderSettings(s); applyReaderSettings();
       if (_curBook) {
         saveProgress();
-        var content2 = $('novelReaderContent');
-        if (content2) { content2.innerHTML = ''; content2.scrollLeft = 0; }
         _readerIdx = 0;
         enterPageMode();
-        var renderAll = function () {
-          if (_readerIdx < _readerParas.length) {
-            renderMoreParas();
-            requestAnimationFrame(renderAll);
-          } else {
-            requestAnimationFrame(function () { updatePageIndicator(); });
-          }
-        };
-        renderAll();
+        restorePageProgress();
       }
     });
 
@@ -996,7 +1102,6 @@
         if (st) clearTimeout(st);
         st = setTimeout(function () {
           if (flipMode() === 'page') {
-            snapPage();
             updatePageIndicator();
             savePageProgress();
           } else {

@@ -15340,6 +15340,7 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     function _n(t) {
       if (!dn) return;
+      const e = "sent" === t ? "akini_mail_sent" : "akini_mail_received";
       /* 数据门：boot 恢复未完成时最多等 3 秒，杜绝"信件消失需重进" */
       if (!window._akiniDataRestored) {
         if (!_n._waitTimer) {
@@ -15355,17 +15356,23 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           }, 200);
         }
+        /* 数据门等待期间，先静默尝试从本地缓存渲染一次已有数据，防止界面空白 */
+        if (_mailRawCache[t] == null) {
+          var cached = localStorage.getItem(e);
+          if (cached) {
+            _mailRawCache[t] = cached;
+            _renderMailList(t, cached);
+          }
+        }
         return;
       }
-      const e = "sent" === t ? "akini_mail_sent" : "akini_mail_received";
       function loadRaw(v) {
         try {
           var arr = JSON.parse(v || "[]");
-          if (Array.isArray(arr) && arr.length === 0) return false;
+          return Array.isArray(arr);
         } catch (e) {
           return false;
         }
-        return true;
       }
       /* 缓存命中：立即同步渲染，切换秒开（milk 式单次渲染） */
       if (_mailRawCache[t] != null) {
@@ -15697,25 +15704,27 @@ document.addEventListener("DOMContentLoaded", function () {
     function saveMailSent(t) {
       var e = JSON.stringify(t || []);
       _mailRawCache.sent = e;
+      if (dn) dn.__mailSig = null;
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_mail_sent", e);
-      } else {
-        try { localStorage.setItem("akini_mail_sent", e); } catch (t) {}
-        window._idbStore && window._idbStore.set &&
-          (window._idbStore.set("akini_mail_sent", e),
-          window._idbStore.set("akini_mail_sent_backup", e));
+      }
+      try { localStorage.setItem("akini_mail_sent", e); } catch (t) {}
+      if (window._idbStore && window._idbStore.set) {
+        window._idbStore.set("akini_mail_sent", e);
+        window._idbStore.set("akini_mail_sent_backup", e);
       }
     }
     function saveMailReceived(t) {
       var e = JSON.stringify(t || []);
       _mailRawCache.received = e;
+      if (dn) dn.__mailSig = null;
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_mail_received", e);
-      } else {
-        try { localStorage.setItem("akini_mail_received", e); } catch (t) {}
-        window._idbStore && window._idbStore.set &&
-          (window._idbStore.set("akini_mail_received", e),
-          window._idbStore.set("akini_mail_received_backup", e));
+      }
+      try { localStorage.setItem("akini_mail_received", e); } catch (t) {}
+      if (window._idbStore && window._idbStore.set) {
+        window._idbStore.set("akini_mail_received", e);
+        window._idbStore.set("akini_mail_received_backup", e);
       }
     }
     window.__akiniBootStep = "dom-ready:mail";
@@ -20893,6 +20902,25 @@ document.addEventListener("DOMContentLoaded", function () {
                 ),
                   pt("音颞可播放"));
               }),
+              u.addEventListener("waiting", function () {
+                pt("正在缓冲音频…");
+              }),
+              u.addEventListener("stalled", function () {
+                pt("网络波动，正在缓冲…");
+                if (u && !u.paused) {
+                  setTimeout(function() {
+                    try {
+                      if (u && u.readyState < 3 && !u.paused) {
+                        u.currentTime = u.currentTime;
+                        u.play().catch(function(){});
+                      }
+                    } catch(e) {}
+                  }, 2500);
+                }
+              }),
+              u.addEventListener("playing", function () {
+                pt("");
+              }),
               u.addEventListener(
                 "error",
                 function (i) {
@@ -21044,7 +21072,13 @@ document.addEventListener("DOMContentLoaded", function () {
           }
           // 统一升级为 https，避免混合内容被浏览器拦截
           if (/^http:\/\//i.test(e)) e = "https://" + e.slice(7);
-          (u.src !== e && ((u.src = e), u.load()), ht());
+          if (u.src !== e) {
+            u.pause();
+            u.src = e;
+            u.preload = "auto";
+            u.load();
+          }
+          ht();
         } else mt();
       }
       function ht(t) {
