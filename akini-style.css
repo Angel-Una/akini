@@ -6719,13 +6719,12 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 /* ===== zzx 陪伴页 ===== */
 /* 陪伴头像心跳环：模仿真实心跳节奏（咚-咚...停顿），粉色光晕脉动 */
 /* zzz7：陪伴头像波动改为多个同心小圆圈——由内向外从深到浅，小幅扩散波动，精致克制 */
-/* zzzc：贴着头像外缘的一圈线条向外波动扩散（两圈错相位持续不断），非心跳缩放 */
-.akcp-halo{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(255,130,180,.9);pointer-events:none;opacity:0;transform-origin:center;animation:akcpWave 2.4s linear infinite}
-.akcp-halo.d2{animation-delay:1.2s}
+/* zzzd：细环紧紧贴在头像外缘一圈，原地固定波动（轻微脉动），绝不向外扩散 */
+.akcp-halo{position:absolute;inset:-2px;border-radius:50%;border:1.5px solid rgba(255,130,180,.9);pointer-events:none;transform-origin:center;animation:akcpWave 1.6s ease-in-out infinite}
+.akcp-halo.d2{animation-delay:.8s}
 @keyframes akcpWave{
-  0%{transform:scale(1);opacity:.85}
-  60%{opacity:.45}
-  100%{transform:scale(1.5);opacity:0}
+  0%,100%{transform:scale(1);opacity:.55}
+  50%{transform:scale(1.06);opacity:1}
 }
 #companionMsgs{-webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 36px);mask-image:linear-gradient(to bottom,transparent 0,#000 36px)}
 /* zzy：陪伴气泡完全对齐观影——复用全局 .chat-body .msg-row .bubble 体系（默认样式+美化CSS接管），

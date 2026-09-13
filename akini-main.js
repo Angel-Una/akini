@@ -8317,6 +8317,20 @@ document.addEventListener("DOMContentLoaded", function () {
           (this.value = ""));
       });
     /* iCity 我的主页/编辑页 头像直接更换（icityMyAvatarInput 可能存在多个） */
+    /* zzzd：个人设置弹窗「头像与全局同步」方块点击转发——其 label 无 for/无内嵌 input，原生点击无反应，此前该入口完全失效 */
+    (function () {
+      var ab = document.getElementById("icityEditMyAvatarBtn");
+      ab &&
+        ab.addEventListener("click", function (t) {
+          try {
+            var inp = document.querySelector('input[type="file"]#icityMyAvatarInput');
+            if (inp && t.target !== inp) {
+              t.preventDefault();
+              inp.click();
+            }
+          } catch (e) {}
+        });
+    })();
     document
       .querySelectorAll('input[type="file"]#icityMyAvatarInput')
       .forEach(function (input) {
@@ -8332,6 +8346,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   (Y.style.pointerEvents = "none")),
                 "function" == typeof window._renderIcity &&
                   window._renderIcity());
+              /* zzzd：换头像成功反馈 */
+              try {
+                var tip = document.createElement("div");
+                tip.textContent = "头像已更新";
+                tip.style.cssText = "position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 22px;border-radius:20px;font-size:14px;z-index:2147483646;pointer-events:none";
+                document.body.appendChild(tip);
+                setTimeout(function () { tip.remove(); }, 1500);
+              } catch (e) {}
             }),
             (this.value = ""));
         });
@@ -15124,14 +15146,20 @@ document.addEventListener("DOMContentLoaded", function () {
               var e = new FileReader();
               ((e.onload = function (t) {
                 try { (window._icityBgCache = window._icityBgCache || {})[b] = t.target.result; } catch (t) {} /* zzzc：内存缓存最新图，渲染优先于异步存储，消除真机 IDB 写读竞态 */
+                /* zzzd：同步写入内存镜像——D() 读取第一优先级即内存，写不同步会导致重开弹窗/重渲染读到旧图 */
+                try { window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet(b, t.target.result); } catch (t) {}
                 _idbStore.set(b, t.target.result, function () {
                   try {
                     localStorage.removeItem(b);
                   } catch (t) {}
+                  /* zzzd 关键修复：上面的 localStorage.removeItem 被 storage-safe 劫持时会连带 memRemove 把刚写入的内存镜像删掉，
+                     导致后续 D() 读取走 IDB 异步、真机竞态下回退旧图——必须在 removeItem 之后重新写入内存镜像作为最终态 */
+                  try { window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet(b, t.target.result); } catch (t) {}
+                  try { (window._icityBgCache = window._icityBgCache || {})[b] = t.target.result; } catch (t) {}
                   /* zzza：持久化完成后给出明确反馈，避免用户感知"没反应" */
                   try {
                     var tip = document.createElement("div");
-                    tip.textContent = "背景图已更新";
+                    tip.textContent = b.indexOf("avatar") >= 0 ? "头像已更新" : "背景图已更新"; /* zzzd：按图片类型区分文案 */
                     tip.style.cssText = "position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 22px;border-radius:20px;font-size:14px;z-index:2147483646;pointer-events:none";
                     document.body.appendChild(tip);
                     setTimeout(function () { tip.remove(); }, 1500);
@@ -15180,18 +15208,39 @@ document.addEventListener("DOMContentLoaded", function () {
             var e = new FileReader();
             ((e.onload = function (t) {
               var e = "akini_icity_ta_bg_" + window._icityEditContactId;
+              try { (window._icityBgCache = window._icityBgCache || {})[e] = t.target.result; } catch (t) {} /* zzzd */
+              try { window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet(e, t.target.result); } catch (t) {} /* zzzd：内存镜像同步 */
               _idbStore.set(e, t.target.result);
               var n = document.getElementById("icityEditTaBgPreview");
               n &&
                 ((n.style.backgroundImage = "url(" + t.target.result + ")"),
                 (n.style.backgroundSize = "cover"));
+              /* zzzd：换图成功反馈 */
+              try {
+                var tip = document.createElement("div");
+                tip.textContent = "背景图已更新";
+                tip.style.cssText = "position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 22px;border-radius:20px;font-size:14px;z-index:2147483646;pointer-events:none";
+                document.body.appendChild(tip);
+                setTimeout(function () { tip.remove(); }, 1500);
+              } catch (e) {}
             }),
               e.readAsDataURL(t));
           }
         });
       var P = document.getElementById("icityEditTaAvatarBtn"),
         H = document.getElementById("icityTaAvatarInput");
+      /* zzzd：TA 头像方块点击转发到 file input（弹窗内 label 未关联 input，原生点击无反应） */
       (P &&
+        H &&
+        P.addEventListener("click", function (t) {
+          try {
+            if (t.target !== H) {
+              t.preventDefault();
+              H.click();
+            }
+          } catch (e) {}
+        }),
+        P &&
         H &&
         H.addEventListener("change", function () {
           var t = this.files[0];
@@ -15221,6 +15270,14 @@ document.addEventListener("DOMContentLoaded", function () {
                   window._renderIcity && window._renderIcity(),
                   "function" == typeof window._renderIcityContactProfiles &&
                     window._renderIcityContactProfiles());
+                /* zzzd：换 TA 头像成功反馈 */
+                try {
+                  var tip = document.createElement("div");
+                  tip.textContent = "头像已更新";
+                  tip.style.cssText = "position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);background:rgba(0,0,0,.75);color:#fff;padding:10px 22px;border-radius:20px;font-size:14px;z-index:2147483646;pointer-events:none";
+                  document.body.appendChild(tip);
+                  setTimeout(function () { tip.remove(); }, 1500);
+                } catch (e) {}
               }
             });
         }),
