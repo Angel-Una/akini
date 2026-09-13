@@ -167,7 +167,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .anniv-preview-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 14px;
   width: 100%;
   box-sizing: border-box;
   padding: 0 14px;
@@ -215,10 +215,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }/* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
-.fit-gap-lg { margin-top: 9px; }.fit-gap { margin-top: 7px; }.fit-bottom { margin-top: auto; }.apps-grid {
+.fit-gap-lg { margin-top: 7px; }.fit-gap { margin-top: 6px; }.fit-bottom { margin-top: auto; }.apps-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 6px 4px;
+  gap: 12px 4px;
   padding: 2px 6px;
   box-sizing: border-box;
   width: 100%;
@@ -230,8 +230,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 /* 图标放大 32→40，更显大 */
 .app-item .icon-wrap {
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
 }.top-card {
   margin: 0;
   background: #ffffff;
@@ -245,7 +245,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: relative;
 }.top-card .cover-img {
   width: 100%;
-  height: 96px;
+  height: 160px;
   border-radius: 22px;
   background: transparent;
   background-size: cover !important;
@@ -446,7 +446,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transform: translateX(0) !important;
 }
 .right-card .label {
-  font-size: 14px;
+  font-size: 15px;
   color: #2a2a2a;
   margin-bottom: 3px;
   z-index: 2;
@@ -454,7 +454,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
 }
 .right-card .number {
-  font-size: 36px;
+  font-size: 44px;
   font-weight: 300;
   color: #2a2a2a;
   line-height: 1;
@@ -475,7 +475,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 10px;
   position: relative;
   margin-left: 0;
 }
@@ -489,6 +489,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 
 .preview-row:first-child .preview-bubble {
+  padding: 4px 10px;
   margin-right: 0; /* 外侧不留 margin：206px 行宽内确保 8 个汉字完整显示 */
 }
 .preview-row:nth-child(2) .preview-bubble {
@@ -553,7 +554,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .bottom-btn-container {
   background: #ffffff;
   border-radius: 28px;
-  padding: 4px 10px;
+  padding: 6px 10px;
   display: flex;
   gap: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
@@ -2578,7 +2579,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   display: none;
   position: absolute;
   bottom: calc(100% + 6px);
-  right: 12px;
+  right: 10px;
   background: #fff;
   border-radius: 18px;
   padding: 14px 16px;
@@ -5088,8 +5089,8 @@ button.back-btn[type="button"] {
   }
 }
 .music-player-disc {
-  width: 72px;
-  height: 72px;
+  width: 96px;
+  height: 96px;
   flex-shrink: 0;
   border-radius: 50%;
   background: #0c0c0e;
@@ -6648,7 +6649,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 #watchInputBar input { min-width: 0; }
 
 /* zzc：加号菜单固定两行三列（项不拉伸，58px 定宽，右靠对齐） */
-.plus-menu.show .plus-menu-item { flex: 0 0 58px !important; width: 58px !important; }
+.plus-menu.show .plus-menu-item { width: 100% !important; flex: none !important; }
 
 /* ===== zzx 陪伴页 ===== */
 /* 陪伴头像心跳环：模仿真实心跳节奏（咚-咚...停顿），粉色光晕脉动 */

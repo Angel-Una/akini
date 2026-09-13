@@ -562,22 +562,16 @@
   }
 
   /* ---------- 导入 txt ---------- */
-  function decodeText(file, cb) {
-    var fr = new FileReader();
-    fr.onload = function () {
-      var buf = fr.result;
-      var txt = '';
-      try { txt = new TextDecoder('utf-8', { fatal: false }).decode(buf); } catch (e) { txt = ''; }
-      /* 乱码探测：utf-8 解码出大量替换符(U+FFFD)则按 GB18030 重解 */
-      var bad = txt.split('\uFFFD').length - 1;
-      if (bad > Math.max(8, txt.length * 0.01)) {
-        try { txt = new TextDecoder('gb18030').decode(buf); }
-        catch (e1) { try { txt = new TextDecoder('gbk').decode(buf); } catch (e2) {} }
-      }
-      cb(txt);
-    };
-    fr.onerror = function () { cb(''); };
-    fr.readAsArrayBuffer(file);
+  function decodeText(buf) {
+    /* zzzk 根治乱码：先按 UTF-8 严格解码（带 BOM 去头），任何非法字节才回退 GB18030 */
+    var u8 = new Uint8Array(buf);
+    if (u8.length >= 3 && u8[0] === 0xEF && u8[1] === 0xBB && u8[2] === 0xBF) u8 = u8.subarray(3);
+    if (u8.length >= 2 && ((u8[0] === 0xFF && u8[1] === 0xFE) || (u8[0] === 0xFE && u8[1] === 0xFF))) {
+      try { return new TextDecoder('utf-16').decode(u8); } catch (e0) {}
+    }
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) {}
+    try { return new TextDecoder('gb18030').decode(u8); } catch (e2) {}
+    try { return new TextDecoder('utf-8').decode(u8); } catch (e3) { return ''; }
   }
 
   function importNovel(file) {
@@ -1189,7 +1183,7 @@
       var mk = document.createElement('span');
       mk.className = 'aknv-cmmark';
       mk.setAttribute('data-pidx', String(pidx));
-      mk.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;border:1.5px solid #b08a4f;color:#b08a4f;border-radius:999px;font-size:11px;padding:0 4px;margin-left:4px;vertical-align:2px;cursor:pointer;box-sizing:border-box;background:rgba(255,255,255,.6)';
+      mk.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1.5px solid #b08a4f;color:#b08a4f;border-radius:50%;font-size:' + (total > 9 ? '9px' : '11px') + ';padding:0;margin-left:4px;vertical-align:-3px;cursor:pointer;box-sizing:border-box;background:rgba(255,255,255,.6);flex-shrink:0';
       mk.textContent = String(total);
       mk.addEventListener('click', function (e) {
         e.stopPropagation();
@@ -1228,8 +1222,8 @@
 
     var view = document.createElement('div');
     view.id = 'aknvCmView';
-    view.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000012;align-items:flex-end';
-    view.innerHTML = '<div style="width:100%;max-height:76vh;background:#fff;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden">'
+    view.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000012;align-items:center;justify-content:center';
+    view.innerHTML = '<div style="width:88%;max-width:360px;max-height:70vh;background:#fff;border-radius:18px;display:flex;flex-direction:column;overflow:hidden">'
       + '<div style="display:flex;align-items:center;padding:14px 16px 10px;flex-shrink:0">'
       + '<span style="flex:1;font-size:16px;font-weight:700;color:#1a1a1a">段评</span>'
       + '<button id="aknvCmMoreBtn" type="button" style="background:none;border:none;font-size:20px;color:#666;cursor:pointer;padding:2px 8px">⋯</button>'
@@ -1548,6 +1542,80 @@
     setTimeout(bindZzzj, 400);
   }
 
+
+  /* ---------- zzzk：陪伴头像光环颜色自定义（色相/浓度滑块） ---------- */
+  function applyHaloColor() {
+    var h = parseInt(lsGet('akini_halo_hue', '335'), 10) || 0;
+    var s = parseInt(lsGet('akini_halo_sat', '100'), 10);
+    if (isNaN(s)) s = 100;
+    var st = document.getElementById('akiniHaloStyle');
+    if (!st) { st = document.createElement('style'); st.id = 'akiniHaloStyle'; document.head.appendChild(st); }
+    var c1 = 'hsla(' + h + ',' + s + '%,78%,.5)';
+    var c2a = 'hsla(' + h + ',' + s + '%,75%,.38)';
+    var c2b = 'hsla(' + h + ',' + s + '%,75%,.12)';
+    var c3a = 'hsla(' + h + ',' + s + '%,72%,.95)';
+    var c3b = 'hsla(' + h + ',' + Math.max(40, s - 20) + '%,85%,.95)';
+    st.textContent = '.akcp-halo{border-color:' + c1 + '!important}'
+      + '.akcp-halo::before{background:radial-gradient(circle,' + c2a + ' 52%,' + c2b + ' 66%,hsla(' + h + ',' + s + '%,75%,0) 74%)!important}'
+      + '.akcp-halo::after{background:conic-gradient(from 0deg,hsla(' + h + ',' + s + '%,72%,0) 0deg,' + c3a + ' 48deg,' + c3b + ' 70deg,hsla(' + h + ',' + s + '%,72%,0) 115deg)!important}';
+  }
+  function ensureHaloDom() {
+    if ($('akiniHaloModal')) return;
+    var m = document.createElement('div');
+    m.id = 'akiniHaloModal';
+    m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000020;align-items:center;justify-content:center';
+    m.innerHTML = '<div style="width:86%;max-width:320px;background:#fff;border-radius:16px;padding:18px 16px 14px;box-sizing:border-box">'
+      + '<div style="font-size:16px;font-weight:700;color:#1a1a1a;text-align:center;margin-bottom:14px">更改头像光环颜色</div>'
+      + '<div style="display:flex;justify-content:center;margin-bottom:14px"><div id="akiniHaloPreview" style="width:64px;height:64px;border-radius:50%;background:#eee;position:relative"><div class="akcp-halo" style="position:absolute;inset:-2px"></div></div></div>'
+      + '<div style="font-size:13px;color:#666;margin-bottom:4px">色相</div>'
+      + '<input id="akiniHaloHue" type="range" min="0" max="360" value="335" style="width:100%;accent-color:#e0608a"/>'
+      + '<div style="font-size:13px;color:#666;margin:10px 0 4px">浓度</div>'
+      + '<input id="akiniHaloSat" type="range" min="0" max="100" value="100" style="width:100%;accent-color:#e0608a"/>'
+      + '<div style="display:flex;gap:10px;margin-top:16px"><button id="akiniHaloCancel" type="button" style="flex:1;height:42px;border-radius:10px;border:1px solid #e0e0e0;background:#f8f8f8;color:#555;font-size:15px;cursor:pointer">取消</button><button id="akiniHaloOk" type="button" style="flex:1;height:42px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">保存</button></div>'
+      + '</div>';
+    document.body.appendChild(m);
+    var upd = function () {
+      var h = $('akiniHaloHue').value, s = $('akiniHaloSat').value;
+      var pv = $('akiniHaloPreview').querySelector('.akcp-halo');
+      if (pv) {
+        pv.style.borderColor = 'hsla(' + h + ',' + s + '%,78%,.5)';
+      }
+      /* 实时整体预览：临时写局部 style 规则作用预览 */
+      var st = document.getElementById('akiniHaloPrevStyle');
+      if (!st) { st = document.createElement('style'); st.id = 'akiniHaloPrevStyle'; document.head.appendChild(st); }
+      st.textContent = '#akiniHaloPreview .akcp-halo::before{background:radial-gradient(circle,hsla(' + h + ',' + s + '%,75%,.38) 52%,hsla(' + h + ',' + s + '%,75%,.12) 66%,hsla(' + h + ',' + s + '%,75%,0) 74%)!important}'
+        + '#akiniHaloPreview .akcp-halo::after{background:conic-gradient(from 0deg,hsla(' + h + ',' + s + '%,72%,0) 0deg,hsla(' + h + ',' + s + '%,72%,.95) 48deg,hsla(' + h + ',' + Math.max(40, s - 20) + '%,85%,.95) 70deg,hsla(' + h + ',' + s + '%,72%,0) 115deg)!important}';
+    };
+    $('akiniHaloHue').addEventListener('input', upd);
+    $('akiniHaloSat').addEventListener('input', upd);
+    $('akiniHaloCancel').addEventListener('click', function () { m.style.display = 'none'; });
+    m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
+    $('akiniHaloOk').addEventListener('click', function () {
+      lsSet('akini_halo_hue', $('akiniHaloHue').value);
+      lsSet('akini_halo_sat', $('akiniHaloSat').value);
+      applyHaloColor();
+      m.style.display = 'none';
+    });
+  }
+  function bindHaloMenu() {
+    var btn = $('companionActHalo');
+    if (!btn || btn._haloBound) return;
+    btn._haloBound = true;
+    btn.addEventListener('click', function () {
+      closeSheet('companionMenuSheet');
+      ensureHaloDom();
+      $('akiniHaloHue').value = lsGet('akini_halo_hue', '335');
+      $('akiniHaloSat').value = lsGet('akini_halo_sat', '100');
+      $('akiniHaloHue').dispatchEvent(new Event('input'));
+      $('akiniHaloModal').style.display = 'flex';
+    });
+  }
+  applyHaloColor();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { setTimeout(bindHaloMenu, 450); });
+  } else {
+    setTimeout(bindHaloMenu, 450);
+  }
     document.addEventListener('DOMContentLoaded', boot);
   } else {
     boot();
