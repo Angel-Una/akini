@@ -5105,61 +5105,53 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         } catch (t) {}
       }
-      if (i && !a)
-        return (
-          _idbStore.set(t, e, function () {
-            // IDB 写成功后清除 localStorage 残留旧值：D() 优先读 localStorage，
-            // 历史路径（备份恢复/set降级）写入的旧背景会遮蔽新值导致更换不生效
-            _idbStore.get(t, function (v) {
-              if (v === e) {
-                try { localStorage.removeItem(t); } catch (x) {}
-              }
-              n && n(!0);
-            });
-          }),
-          !0
-        );
+      // 写入内存缓存，确保同步读立即可见
       try {
-        return (
-          localStorage.setItem(t, e),
-          _idbStore.set(t, e),
-          n && n(!0),
-          !0
-        );
-      } catch (i) {
-        if (a) {
-          B();
+        if (window.akiniStore && window.akiniStore.memorySet) {
+          window.akiniStore.memorySet(t, e);
+        }
+      } catch (errM) {}
+
+      // 无论头像还是背景图，统一双写：同步写 localStorage（若空间充足）+ 异步写 _idbStore（localforage 持久化）
+      try {
+        localStorage.setItem(t, e);
+      } catch (errLs) {
+        // localStorage 配额满时，若为非头像大键，安全移除 LS 中的陈旧旧值（绕过 AkiniPersist 拦截）
+        if (i && !a) {
           try {
-            return (
-              localStorage.setItem(t, e),
-              _idbStore.set(t, e),
-              n && n(!0),
-              !0
-            );
-          } catch (t) {}
+            window._akiniAllowRemove = true;
+            localStorage.removeItem(t);
+            window._akiniAllowRemove = false;
+          } catch (x) { window._akiniAllowRemove = false; }
         }
-        try {
-          _idbStore.set(t, e, n);
-        } catch (t) {
-          n && n(!1);
-        }
+      }
+
+      // localforage 持久化写入
+      try {
+        _idbStore.set(t, e, function () {
+          n && n(!0);
+        });
+        return !0;
+      } catch (errIdb) {
+        n && n(!1);
         return !1;
       }
     }
     function D(t, e) {
-      // 优先读内存镜像（写入立即可见，不受 IDB 防抖落盘时序影响），再 localStorage，最后 IDB 兜底
+      // 优先顺序：内存镜像（最即时）→ localforage IDB（主存储/大图最新权威）→ localStorage（兜底）
       try {
         if (window.akiniStore && window.akiniStore.memoryGet) {
           var mv = window.akiniStore.memoryGet(t);
           if (mv != null && mv !== "") return e(mv);
         }
       } catch (e0) {}
-      var n = localStorage.getItem(t);
-      n
-        ? e(n)
-        : _idbStore.get(t, function (t) {
-            e(t || "");
-          });
+      _idbStore.get(t, function (idbVal) {
+        if (idbVal != null && idbVal !== "") {
+          return e(idbVal);
+        }
+        var n = localStorage.getItem(t);
+        e(n || "");
+      });
     }
     function N(t, e) {
       if (t) {
