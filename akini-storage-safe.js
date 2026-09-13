@@ -223,13 +223,13 @@
           if (i >= targets.length) {
             if (!_restored) {
               _restored = true;
-              // 启动期暂缓的写入落盘：仅补写 IndexedDB 中没有真实数据的键；
-              // 已被对账覆盖的键保持 IndexedDB 真实数据，启动默认值直接丢弃
+              // 启动期暂缓的写入落盘：强制写回 IndexedDB，确保用户数据落盘
               try {
                 Object.keys(_preRestorePending).forEach(function (k) {
-                  if (_reconciledKeys[k]) return;
                   var pv = _preRestorePending[k];
-                  if (pv != null) queueIdbWrite(k, pv);
+                  if (pv != null && pv !== '') {
+                    queueIdbWrite(k, pv);
+                  }
                 });
               } catch (e) {}
               _preRestorePending = {};
@@ -259,8 +259,20 @@
                     return;
                   }
                   var big = isBigVal(v);
-                  var preRestore = !_restored && _preRestorePending.hasOwnProperty(k);
-                  if (ls != null && ls !== '' && !_lsDirty[k] && !preRestore) {
+                  // 彻底修复刷新数据丢失 bug：localStorage 中的非空有效数据具有最高权威，
+                  // 绝不能被陈旧的 IDB 镜像覆盖！如果用户在恢复前写入了新数据（preRestore），
+                  // 更应该以用户的新写入为准，并将其排队写入 IDB。
+                  if (preRestore) {
+                    var pendingVal = _preRestorePending[k];
+                    if (pendingVal != null && pendingVal !== '') {
+                      memSet(k, pendingVal);
+                      lsSet(k, pendingVal);
+                      queueIdbWrite(k, pendingVal);
+                      if (--pending === 0) setTimeout(nextBatch, 25);
+                      return;
+                    }
+                  }
+                  if (ls != null && ls !== '' && !_lsDirty[k]) {
                     if (big && _bigMemUsed + ls.length > BIG_MEM_BUDGET) {
                       window.__akiniDeferredKeys[k] = 1; // 超预算：不驻留，按需水合
                     } else {
