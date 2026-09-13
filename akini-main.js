@@ -1,4 +1,8 @@
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
+/* zzzg：表情包引用崩溃根治——esc/rt 全局兜底。引用表情包的引用条与气泡缩略图 4 处调用点（ctxQuote 13019、回复渲染 3460/3559/4344）所在闭包缺失局部定义，裸调用抛 ReferenceError 导致整个引用流程静默死亡 */
+if (typeof window.esc !== 'function') { window.esc = function (s) { return String(s == null ? '' : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }; }
+if (typeof window.rt !== 'function') { window.rt = window.esc; }
+
 /* ===== mochi 式媒体池：聊天图片 base64 抽离为 hash 引用，HTML 字符串只存占位 =====
    根治内存爆炸：老数据打开会话保存时自动瘦身迁移，新数据发送时直接入池 */
 window.__akiniMedia = (function () {
