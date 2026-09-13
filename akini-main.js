@@ -13185,6 +13185,8 @@ document.addEventListener("DOMContentLoaded", function () {
           s && (s.textContent = "@" + o),
           d && (d.textContent = u),
           D("akini_icity_my_bg", function (t) {
+            var c = window._icityBgCache && window._icityBgCache.akini_icity_my_bg;
+            if (c) t = c; /* zzzc：内存最新图优先，避免 IDB 写读竞态回退旧图 */
             var e = document.getElementById("icityMyBgArea");
             e &&
               (t
@@ -13196,6 +13198,8 @@ document.addEventListener("DOMContentLoaded", function () {
                     "linear-gradient(135deg,#fdfbf7 0%,#f5efe6 40%,#e8dfd3 75%,#dcd0bf 100%)")));
           }),
           D("akini_icity_ta_bg", function (t) {
+            var c2 = window._icityBgCache && window._icityBgCache.akini_icity_ta_bg;
+            if (c2) t = c2; /* zzzc：内存最新图优先 */
             var e = document.querySelector(".icity-ta-bg-div");
             if (!e) return;
             if (!t) {
@@ -15119,6 +15123,7 @@ document.addEventListener("DOMContentLoaded", function () {
             if (t) {
               var e = new FileReader();
               ((e.onload = function (t) {
+                try { (window._icityBgCache = window._icityBgCache || {})[b] = t.target.result; } catch (t) {} /* zzzc：内存缓存最新图，渲染优先于异步存储，消除真机 IDB 写读竞态 */
                 _idbStore.set(b, t.target.result, function () {
                   try {
                     localStorage.removeItem(b);
