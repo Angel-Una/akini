@@ -6573,7 +6573,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
 .akini-safe-mode .fit-inner { transform: none !important; }
 .akini-safe-mode .fit-mod { height: auto !important; margin-top: 8px !important; }
 .akini-safe-mode .content-wrapper { height: auto !important; margin-top: 44px !important; justify-content: flex-start !important; }
-.akini-safe-mode .phone-frame { overflow-y: auto !important; position: absolute !important; }
+.akini-safe-mode .phone-frame { overflow: hidden !important; } /* zzzv：安全模式下首页也绝不滚动——用户明确要求首页固定不可滑动；极矮屏由 home-fit 整体缩放兜底 */
 .akini-safe-mode .fake-statusbar { display: none !important; }
 
 /* ===== 深度安全模式（连续崩溃≥4次）：最大幅度减负保数据 ===== */
