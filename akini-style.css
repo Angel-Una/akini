@@ -5545,8 +5545,8 @@ button.back-btn[type="button"] {
 .beautify-header,
 .icity-header,
 .create-group-header {
-  padding-top: max(12px, var(--ak-sat, 12px)) !important;
-  min-height: 56px !important;
+  padding-top: calc(var(--ak-sat, 0px) + 8px) !important;
+  min-height: calc(48px + var(--ak-sat, 0px)) !important;
 }
 
 /* 导入入口和菜单按钮始终可见，避免登录后消失 */
