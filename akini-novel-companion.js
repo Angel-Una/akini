@@ -1183,7 +1183,8 @@
       var mk = document.createElement('span');
       mk.className = 'aknv-cmmark';
       mk.setAttribute('data-pidx', String(pidx));
-      mk.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1.5px solid #b08a4f;color:#b08a4f;border-radius:50%;font-size:' + (total > 9 ? '9px' : '11px') + ';padding:0;margin-left:4px;vertical-align:-3px;cursor:pointer;box-sizing:border-box;background:rgba(255,255,255,.6);flex-shrink:0';
+      /* zzzn：小圆圈+数字居中圈内，防全局样式覆盖（min/max-width + flex:0 0 固定 + line-height:1） */
+      mk.style.cssText = 'display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;min-width:18px;max-width:18px;flex:0 0 18px;border:1.5px solid #b08a4f;color:#b08a4f;border-radius:50%;font-size:' + (total > 9 ? '8px' : '10px') + ';line-height:1;font-weight:600;font-style:normal;text-align:center;text-indent:0;letter-spacing:0;padding:0;margin-left:3px;vertical-align:middle;cursor:pointer;box-sizing:border-box;background:rgba(255,255,255,.75)';
       mk.textContent = String(total);
       mk.addEventListener('click', function (e) {
         e.stopPropagation();
