@@ -2090,15 +2090,37 @@ document.addEventListener("DOMContentLoaded", function () {
         return (sessCache =
           "object" == typeof t && null !== t ? t : {}), sessCache;
       }
+      /* zzzt 性能：持久化 sessions 时剔除 messagesHTML 大字段。
+         messagesHTML 由 C() 独立持久化到 akini_chat_history_*，sessions 只需元数据；
+         原来每次保存都把全部会话的 messagesHTML 一起 JSON.stringify（聊天多了达数十MB），是卡死主线程的最大元凶 */
+      function _slimSess(t) {
+        var o = {};
+        try {
+          for (var k2 in (t || {})) {
+            if (!Object.prototype.hasOwnProperty.call(t, k2)) continue;
+            var s = t[k2];
+            if (!s || typeof s !== "object") { o[k2] = s; continue; }
+            var row = {};
+            for (var f in s) {
+              if (!Object.prototype.hasOwnProperty.call(s, f) || f === "messagesHTML") continue;
+              row[f] = s[f];
+            }
+            o[k2] = row;
+          }
+        } catch (e) { return t; }
+        return o;
+      }
+      window.__akiniSlimSessions = _slimSess;
       function _(t) {
         sessCache = t || {};
-        // 同步 sessionStorage 应急备份
-        try { sessionStorage.setItem("akini_chat_sessions_emergency", JSON.stringify(t || {})); } catch (_e) {}
+        var slim = _slimSess(sessCache);
+        // 同步 sessionStorage 应急备份（轻量副本，仅元数据）
+        try { sessionStorage.setItem("akini_chat_sessions_emergency", JSON.stringify(slim)); } catch (_e) {}
         if (window.akiniStore && window.akiniStore.setJson) {
-          window.akiniStore.setJson(n, t || {});
+          window.akiniStore.setJson(n, slim);
         } else {
-          try { localStorage.setItem(n, JSON.stringify(t)); } catch (t) { console.warn("saveSessions localStorage error:", t); }
-          c(n, t);
+          try { localStorage.setItem(n, JSON.stringify(slim)); } catch (t) { console.warn("saveSessions localStorage error:", t); }
+          c(n, slim);
         }
       }
       function b(t) {
@@ -5663,7 +5685,9 @@ document.addEventListener("DOMContentLoaded", function () {
           if (window.akiniContacts && window.akiniContacts.getSessions) {
             var sessions = window.akiniContacts.getSessions();
             if (sessions && typeof sessions === "object" && Object.keys(sessions).length > 0) {
-              sessionStorage.setItem("akini_chat_sessions_emergency", JSON.stringify(sessions));
+              /* zzzt 性能：应急备份写轻量副本（剔除 messagesHTML），避免 pagehide 时序列化数十MB */
+              var _slim = (typeof window.__akiniSlimSessions === "function") ? window.__akiniSlimSessions(sessions) : sessions;
+              sessionStorage.setItem("akini_chat_sessions_emergency", JSON.stringify(_slim));
             }
           }
         } catch (e) {}
@@ -6752,7 +6776,94 @@ document.addEventListener("DOMContentLoaded", function () {
       try { if (typeof window.renderChatList === 'function') window.renderChatList(); } catch (e) {}
       try { if (typeof window._renderIcity === 'function') window._renderIcity(); } catch (e) {}
       try { if (typeof window.updatePreview === 'function') window.updatePreview(); } catch (e) {}
+      try { if (typeof window.__akiniFixHistoryAvatars === 'function') window.__akiniFixHistoryAvatars(); } catch (e) {}
     };
+
+    /* ===== 历史消息默认头像修正器 =====
+     * 数据恢复（IDB/云端）完成后，把消息记录里因启动竞态固化的线条默认头像替换回真实头像。
+     * 线条默认头像特征：img src 以 data:image/svg 开头（用户上传头像均为 data:image/png|jpeg|webp 或 http）。
+     */
+    function __akiniIsLineAvatarSrc(src) {
+      return !!(src && typeof src === "string" && src.indexOf("data:image/svg") === 0);
+    }
+    function __akiniExtractImgSrc(html) {
+      if (!html || typeof html !== "string") return "";
+      var m = html.match(/src="([^"]*)"/);
+      return m && m[1] ? m[1] : "";
+    }
+    window.__akiniFixHistoryAvatars = function () {
+      try {
+        if (!window.akiniContacts || !window.akiniContacts.getSessions) return;
+        // 我的真实头像：若当前仍取到默认线条头像，说明数据未就绪，本轮跳过
+        var mySrc = "";
+        try { mySrc = __akiniExtractImgSrc(window.getMyAvatar ? window.getMyAvatar() : ""); } catch (e) {}
+        var myOk = mySrc && !__akiniIsLineAvatarSrc(mySrc) ? mySrc : "";
+        // 联系人真实头像表（按名字索引：群聊 other 行用 data-sender-name 定位成员）
+        var contactAv = {};
+        try {
+          var cs = window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+          cs.forEach(function (c) {
+            if (!c || !c.name) return;
+            var av = "";
+            if (c.avatar && /^(data:|https?:|blob:)/.test(String(c.avatar))) av = String(c.avatar);
+            if (av && !__akiniIsLineAvatarSrc(av)) contactAv[String(c.name)] = av;
+          });
+        } catch (e) {}
+        // 对方头像兜底（单聊无 data-sender-name 时使用）
+        var taSrc = "";
+        try { taSrc = __akiniExtractImgSrc(window.getTaAvatar ? window.getTaAvatar() : ""); } catch (e) {}
+        if (taSrc && __akiniIsLineAvatarSrc(taSrc)) taSrc = "";
+        if (!myOk && !Object.keys(contactAv).length && !taSrc) return;
+        var sessions = window.akiniContacts.getSessions() || {};
+        Object.keys(sessions).forEach(function (cid) {
+          var sess = sessions[cid];
+          var html = sess && sess.messagesHTML;
+          if (!html || html.indexOf("data:image/svg") < 0) return; // 无默认头像，快速跳过
+          // 群聊会话不允许用对方头像兜底（成员头像张冠李戴），单聊允许
+          var isGroup = false;
+          try { var tgt = window.akiniContacts.getChatTarget(cid); isGroup = !!(tgt && tgt.type === "group"); } catch (e) {}
+          try {
+            var doc = new DOMParser().parseFromString(html, "text/html");
+            var changed = false;
+            if (myOk) {
+              doc.querySelectorAll('.msg-row.me .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
+                img.setAttribute("src", myOk);
+                changed = true;
+              });
+            }
+            doc.querySelectorAll('.msg-row.other .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
+              var box = img.closest ? img.closest(".msg-avatar") : null;
+              var name = box ? (box.getAttribute("data-sender-name") || "") : "";
+              var real = (name && contactAv[name]) || (!isGroup ? taSrc : "") || "";
+              if (real) { img.setAttribute("src", real); changed = true; }
+            });
+            if (changed) {
+              window.akiniContacts.updateSession(cid, { messagesHTML: doc.body.innerHTML });
+            }
+          } catch (e) {}
+        });
+        // 当前打开的聊天页 DOM 同步修正（无需等待下次进入会话）
+        var cb = document.getElementById("chatBody");
+        if (cb) {
+          if (myOk) {
+            cb.querySelectorAll('.msg-row.me .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
+              img.setAttribute("src", myOk);
+            });
+          }
+          cb.querySelectorAll('.msg-row.other .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
+            var box = img.closest ? img.closest(".msg-avatar") : null;
+            var name = box ? (box.getAttribute("data-sender-name") || "") : "";
+            var real = (name && contactAv[name]) || (!name && taSrc) || "";
+            if (real) img.setAttribute("src", real);
+          });
+        }
+      } catch (e) {}
+    };
+    // 兜底：启动 12 秒后再修一次（覆盖云端恢复晚于 IDB 恢复完成的场景）
+    setTimeout(function () {
+      try { window.__akiniFixHistoryAvatars(); } catch (e) {}
+    }, 12000);
+
     ((window._restoringData = !0),
       // 安全兜底：无论异步恢复链是否正常回调，最多 6 秒后强制打开恢复门，
       // 防止 tryRestoreFromBackup 异常导致 _restoringData 永久卡住、数据无法读写
@@ -9516,14 +9627,32 @@ document.addEventListener("DOMContentLoaded", function () {
                       });
                     } catch (e) {}
                   }
+                  /* zzzt：新版按联系人独立分组恢复（各回各家） */
+                  if (sel.sticker !== false && x.customStickerGroupsByRole && typeof x.customStickerGroupsByRole === "object") {
+                    try {
+                      Object.keys(x.customStickerGroupsByRole).forEach(function (rn) {
+                        var entry = x.customStickerGroupsByRole[rn];
+                        var oc = entry && entry.cid ? String(entry.cid) : "me";
+                        var groups = (entry && Array.isArray(entry.groups)) ? entry.groups : [];
+                        if (!groups.length) return;
+                        var cur = window.__wbRead("akini_stk_groups_" + oc, []) || [];
+                        groups.forEach(function (g2) {
+                          if (!g2 || !g2.id) return;
+                          if (!cur.some(function (z) { return String(z.id) === String(g2.id); })) cur.push({ id: g2.id, name: g2.name || "分组" });
+                        });
+                        window.__wbWrite && window.__wbWrite("akini_stk_groups_" + oc, cur);
+                      });
+                    } catch (e) {}
+                  }
+                  /* 旧版全局分组：归入"我"的独立分组（全局 key 已不再被读取） */
                   if (sel.sticker !== false && Array.isArray(x.customStickerGroups) && x.customStickerGroups.length) {
                     try {
-                      var _sg = window.__wbRead("akini_stk_groups", []) || [];
+                      var _sg = window.__wbRead("akini_stk_groups_me", []) || [];
                       x.customStickerGroups.forEach(function (g2) {
                         if (!g2 || !g2.id) return;
                         if (!_sg.some(function (z) { return String(z.id) === String(g2.id); })) _sg.push({ id: g2.id, name: g2.name || "分组" });
                       });
-                      window.__wbWrite && window.__wbWrite("akini_stk_groups", _sg);
+                      window.__wbWrite && window.__wbWrite("akini_stk_groups_me", _sg);
                     } catch (e) {}
                   }
                   if (sel.other && 0 === v && 0 === h) {
@@ -10203,6 +10332,15 @@ document.addEventListener("DOMContentLoaded", function () {
               data.customStickersByRole = byRole;
               data.modules.push("stickers");
             }
+            /* zzzt：表情包分组按联系人独立导出（含分组归属 cid），导入时各回各家 */
+            try {
+              var stkGsByRole = {};
+              _ppl.forEach(function (cid) {
+                var g = (typeof window.__akiniStkGroupsOf === "function") ? window.__akiniStkGroupsOf(cid) : [];
+                if (g && g.length) stkGsByRole[_roleOf(cid)] = { cid: String(cid), groups: g };
+              });
+              if (Object.keys(stkGsByRole).length) data.customStickerGroupsByRole = stkGsByRole;
+            } catch (e3) {}
             if (stkGs.length) { data.customStickerGroups = stkGs; }
           }
           return data;
@@ -22950,6 +23088,8 @@ window.__akiniNowTs = function () {
     return [];
   }
   function _stkWrite(cid, arr) {
+    /* zzzt：同步刷新 getContactStickersSync 的 __csCache，保证添加/删除后聊天/观影/陪伴立即读到最新 */
+    try { window.__csCache = window.__csCache || {}; window.__csCache['akini_stickers_' + cid] = arr; } catch (e0) {}
     /* 优先走 akiniStore（超 200KB 自动分流内存+IndexedDB，不再受 localStorage 5MB 上限限制，表情包随便加） */
     if (window.akiniStore && window.akiniStore.setJson) {
       try { window.akiniStore.setJson(_stkKey(cid), arr); return; } catch (e) {}
@@ -22960,19 +23100,53 @@ window.__akiniNowTs = function () {
     }
   }
   /* ---- 表情包独立分组（与主字卡/emoji/拍一拍平级的独立模块，分组互不影响） ---- */
-  function _stkGRead() {
+  /* zzzt：分组按联系人完全独立——每个联系人（含"我"）各自一套分组，存 akini_stk_groups_<cid>；
+     旧的全局 akini_stk_groups 仅在首次访问时迁移拷贝，之后各联系人独立演化 */
+  function _stkGKey(cid) { return 'akini_stk_groups_' + (cid || _getCid()); }
+  function _stkGRead(cid) {
+    cid = cid || _getCid();
     try {
-      var g = JSON.parse(localStorage.getItem('akini_stk_groups') || '[]');
-      if (Array.isArray(g)) return g.filter(function (x) { return x && x.name; });
+      var raw = null;
+      try { raw = localStorage.getItem(_stkGKey(cid)); } catch (e0) {}
+      if (raw != null) {
+        var g = JSON.parse(raw);
+        if (Array.isArray(g)) return g.filter(function (x) { return x && x.name; });
+      }
+      var legacy = JSON.parse(localStorage.getItem('akini_stk_groups') || '[]');
+      if (Array.isArray(legacy) && legacy.length) {
+        var arr = legacy.filter(function (x) { return x && x.name; });
+        try { localStorage.setItem(_stkGKey(cid), JSON.stringify(arr)); } catch (e2) {}
+        return arr;
+      }
     } catch (e) {}
     return [];
   }
-  function _stkGWrite(arr) { try { localStorage.setItem('akini_stk_groups', JSON.stringify(arr)); } catch (e) {} }
+  function _stkGWrite(arr, cid) { try { localStorage.setItem(_stkGKey(cid || _getCid()), JSON.stringify(arr)); } catch (e) {} }
   function _stkGName(gid) {
     var g = _stkGRead();
     for (var i = 0; i < g.length; i++) if (String(g[i].id) === String(gid)) return g[i].name;
     return '';
   }
+  /* zzzt：读取指定联系人分组（导出用，不切换当前 cid）；首次访问触发旧全局分组迁移拷贝 */
+  window.__akiniStkGroupsOf = function (cid) {
+    try {
+      var raw = localStorage.getItem('akini_stk_groups_' + cid);
+      if (raw == null) {
+        raw = localStorage.getItem('akini_stk_groups') || '[]';
+        var legacy = JSON.parse(raw || '[]');
+        var arr = Array.isArray(legacy) ? legacy.filter(function (x) { return x && x.name; }) : [];
+        if (arr.length) { try { localStorage.setItem('akini_stk_groups_' + cid, JSON.stringify(arr)); } catch (e2) {} }
+        return arr;
+      }
+      var g = JSON.parse(raw || '[]');
+      return Array.isArray(g) ? g.filter(function (x) { return x && x.name; }) : [];
+    } catch (e) { return []; }
+  };
+  /* zzzt：写入指定联系人分组（导入恢复用） */
+  window.__akiniStkGroupsWrite = function (cid, arr) {
+    if (!cid || !Array.isArray(arr)) return;
+    try { localStorage.setItem('akini_stk_groups_' + cid, JSON.stringify(arr)); } catch (e) {}
+  };
   function _stkAllCids() {
     var ids = ['me'];
     try {
@@ -23813,7 +23987,9 @@ window.__akiniNowTs = function () {
     }
     var h = '';
     arr.forEach(function (it, i) {
-      h += '<div class="stk-pick-item" data-idx="' + i + '" style="aspect-ratio:1/1;background:#f7f7f7;border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;"><img src="' + it.s + '" style="width:100%;height:100%;object-fit:contain;" alt=""/></div>';
+      /* zzzt：弃用 aspect-ratio（旧 Android WebView 不支持会导致 item 高度塌陷、图片全部堆叠），
+         改用 padding-bottom:100% 方形兼容写法 */
+      h += '<div class="stk-pick-item" data-idx="' + i + '" style="width:100%;height:0;padding-bottom:100%;background:#f7f7f7;border-radius:10px;overflow:hidden;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent;"><img src="' + it.s + '" style="position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;" alt=""/></div>';
     });
     g.innerHTML = h || '<div style="grid-column:1/-1;text-align:center;color:#bbb;font-size:13px;padding:36px 0;">还没有表情包，去「字卡库 → 表情包」添加</div>';
     g.querySelectorAll('.stk-pick-item').forEach(function (el) {
@@ -23823,6 +23999,12 @@ window.__akiniNowTs = function () {
         if (it && _pickCb) _pickCb(it.s);
       });
     });
+    /* zzzt：观影全屏时面板移到全屏元素内（Fullscreen API 下 body 级 fixed 元素不可见/布局异常） */
+    try {
+      var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fsEl && p.parentElement !== fsEl) { p.__origParent = p.parentElement; fsEl.appendChild(p); }
+      else if (!fsEl && p.__origParent && p.parentElement !== p.__origParent) { p.__origParent.appendChild(p); }
+    } catch (e) {}
     p.style.display = 'flex';
   };
   function _bindPickPanel() {
