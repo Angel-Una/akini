@@ -17659,7 +17659,9 @@ document.addEventListener("DOMContentLoaded", function () {
                   (t &&
                     (t.classList.remove("on"),
                     localStorage.setItem("akini_toggle_pushNotifyToggle", "0")),
-                    alert("通知权限已被拒绝，请在浏览器设置中手动开启"));
+                    alert(/iP(hone|ad|od)/.test(navigator.userAgent || "")
+                      ? "通知权限之前被拒绝了。请打开 iPhone「设置 → 通知」，找到 Akini 后打开「允许通知」，再回来开启本开关"
+                      : "通知权限已被拒绝，请在浏览器地址栏左侧锁形图标 → 网站设置 → 通知中改为「允许」后重试"));
                 } else {
                   // 已授权：同样确保保活开启
                   try {
@@ -22083,10 +22085,31 @@ document.addEventListener("DOMContentLoaded", function () {
         try { new Notification("Akini · 测试推送", opts); } catch (e) { alert("通知发送失败：" + e.message); }
       };
       if (Notification.permission === "granted") { send(); return; }
-      Notification.requestPermission().then(function (p) {
+      if (Notification.permission === "denied") {
+        /* zzzb：被拒绝后系统不再弹授权框，必须引导用户去系统设置手动开 */
+        var _iosD = /iP(hone|ad|od)/.test(navigator.userAgent || "");
+        alert(_iosD
+          ? "通知权限之前被拒绝了。请打开 iPhone「设置 → 通知」，找到 Akini（主屏幕图标那个），打开「允许通知」，再回来测试"
+          : "通知权限已被拒绝，请在浏览器地址栏左侧的锁形图标 → 网站设置 → 通知中改为「允许」后再测试");
+        return;
+      }
+      /* zzzb：iOS PWA 偶发 requestPermission 回调不返回，加 6s 超时兜底再读一次权限 */
+      var _done = false;
+      var _onPerm = function (p) {
+        if (_done) return; _done = true;
         if (p === "granted") send();
-        else alert("请先允许通知权限后再测试");
-      });
+        else {
+          var _ios2 = /iP(hone|ad|od)/.test(navigator.userAgent || "");
+          alert(_ios2
+            ? "未获得通知权限。如果没有弹出系统授权框：请确认 iOS ≥ 16.4，并且是从主屏幕图标（不是浏览器标签页）打开的 Akini；已拒绝过的话请到「设置 → 通知 → Akini」里手动开启"
+            : "请先允许通知权限后再测试");
+        }
+      };
+      try {
+        var _pr = Notification.requestPermission(function (p) { _onPerm(p); });
+        if (_pr && _pr.then) _pr.then(_onPerm);
+      } catch (e) { _onPerm(Notification.permission); }
+      setTimeout(function () { if (!_done) _onPerm(Notification.permission); }, 6000);
     });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindTestPush);

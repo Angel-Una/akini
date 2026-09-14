@@ -319,13 +319,14 @@
     if (t) t.remove();
   }
   function scheduleCompanionReply(cid) {
-    /* 回复节奏照搬微信/观影：设置页回复延迟范围（默认 2~5s），回复前 1.1s 左下角出现正在输入气泡 */
+    /* 回复节奏照搬微信/观影：设置页回复延迟范围（默认 2~5s）
+       zzzb：输入动态改为发消息后 ~0.4s 立即出现（微信真实体验是秒出），回复仍按延迟范围送达 */
     var dMin = parseFloat(lsGet('akini_num_replyDelayMin', '2'));
     var dMax = parseFloat(lsGet('akini_num_replyDelayMax', '5'));
     if (!(dMin >= 0)) dMin = 2;
     if (!(dMax >= dMin)) dMax = Math.max(dMin, 5);
     var delayMs = 1000 * (dMin + Math.random() * (dMax - dMin));
-    setTimeout(function () { if (companionState()) showCompanionTyping(); }, Math.max(0, delayMs - 1100));
+    setTimeout(function () { if (companionState()) showCompanionTyping(); }, 400);
     setTimeout(function () {
       hideCompanionTyping();
       var cur = companionState();
