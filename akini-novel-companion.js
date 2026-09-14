@@ -504,8 +504,18 @@
   function loadBooks(cb) {
     if (_booksLoaded) { cb(); return; }
     idbGet(BOOKS_KEY, function (v) {
-      try { _books = v ? JSON.parse(v) : []; } catch (e) { _books = []; }
-      if (!Array.isArray(_books)) _books = [];
+      try {
+        var stored = v ? JSON.parse(v) : [];
+        if (!Array.isArray(stored)) stored = [];
+        /* zzzx：异步读回的是导入前的旧快照，而内存里可能已有刚 push 的新书——
+           合并去重而不是直接覆盖，防止"首次导入后书架空白、重启才出现" */
+        if (_books && _books.length) {
+          var seen = {};
+          stored.forEach(function (b) { if (b && b.id) seen[b.id] = 1; });
+          _books.forEach(function (b) { if (b && b.id && !seen[b.id]) stored.push(b); });
+        }
+        _books = stored;
+      } catch (e) { if (!Array.isArray(_books)) _books = []; }
       _booksLoaded = true;
       cb();
     });
@@ -579,13 +589,28 @@
     if (u8.length >= 2 && ((u8[0] === 0xFF && u8[1] === 0xFE) || (u8[0] === 0xFE && u8[1] === 0xFF))) {
       try { return new TextDecoder('utf-16').decode(u8); } catch (e0) {}
     }
-    try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) {}
-    try { return new TextDecoder('gb18030').decode(u8); } catch (e2) {}
-    try { return new TextDecoder('utf-8').decode(u8); } catch (e3) { return ''; }
+    /* zzzx：分块流式解码——大文件一次性 decode 会在低端机产生巨大内存峰值导致页面卡死/崩溃，
+       按 4MB 分块 stream 解码，多字节字符跨块由 TextDecoder 自动处理 */
+    function streamDecode(u8d, enc, fatal) {
+      var dec = fatal ? new TextDecoder(enc, { fatal: true }) : new TextDecoder(enc);
+      var CH = 4 * 1024 * 1024, out = '';
+      for (var i = 0; i < u8d.length; i += CH) {
+        out += dec.decode(u8d.subarray(i, Math.min(i + CH, u8d.length)), { stream: true });
+      }
+      return out + dec.decode();
+    }
+    try { return streamDecode(u8, 'utf-8', true); } catch (e) {}
+    try { return streamDecode(u8, 'gb18030', false); } catch (e2) {}
+    try { return streamDecode(u8, 'utf-8', false); } catch (e3) { return ''; }
   }
 
   function importNovel(file) {
     if (!file) return;
+    /* zzzx：超大文件护栏——超过 120MB 的 txt 在手机上必然内存崩溃，直接拒绝并明确提示，绝不卡崩 */
+    if (file.size > 120 * 1024 * 1024) {
+      alert('文件过大（' + Math.round(file.size / 1048576) + 'MB），超过 120MB 无法导入\n请把小说拆分成多个小文件后分别导入');
+      return;
+    }
     /* zzzu 修复：decodeText 是同步函数(只吃 ArrayBuffer)，之前误按"异步回调"传 File 对象，
        回调永远不会执行 → 用户点了导入毫无反应。改用 FileReader 读 ArrayBuffer 后同步解码 */
     var fr = new FileReader();

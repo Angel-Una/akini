@@ -441,7 +441,14 @@
       return;
     }
     try {
-      var text = new TextDecoder("utf-8", { fatal: false }).decode(ab);
+      /* zzzx：分块流式解码，避免大备份文件一次性 decode 内存峰值卡崩 */
+      var u8 = new Uint8Array(ab);
+      var dec = new TextDecoder("utf-8");
+      var CH = 4 * 1024 * 1024, text = "";
+      for (var i = 0; i < u8.length; i += CH) {
+        text += dec.decode(u8.subarray(i, Math.min(i + CH, u8.length)), { stream: true });
+      }
+      text += dec.decode();
       if (text.length && text.charCodeAt(0) === 0xfeff) text = text.slice(1);
       done(JSON.parse(text));
     } catch (e) {
@@ -600,17 +607,25 @@
         if (pending === 0) finishOk();
       }
 
+      /* zzzx：分批写入（每批 25 键 + setTimeout 让出主线程），
+         大备份导入时页面保持响应，不再假死/被系统误杀 */
+      var _wkeys = [];
       for (var key in lsRaw) {
-        if (!Object.prototype.hasOwnProperty.call(lsRaw, key)) continue;
-        var v = processLocalStorageValueForImport(lsRaw[key], mediaStore);
-        tryWrite(key, v);
+        if (Object.prototype.hasOwnProperty.call(lsRaw, key)) _wkeys.push([lsRaw, key]);
       }
       for (var k2 in idbRaw) {
-        if (!Object.prototype.hasOwnProperty.call(idbRaw, k2)) continue;
-        var v2 = processLocalStorageValueForImport(idbRaw[k2], mediaStore);
-        tryWrite(k2, v2);
+        if (Object.prototype.hasOwnProperty.call(idbRaw, k2)) _wkeys.push([idbRaw, k2]);
       }
-      if (pending === 0) finishOk();
+      var _wi = 0;
+      (function step() {
+        var end = Math.min(_wi + 25, _wkeys.length);
+        for (; _wi < end; _wi++) {
+          var src = _wkeys[_wi][0], kk = _wkeys[_wi][1];
+          tryWrite(kk, processLocalStorageValueForImport(src[kk], mediaStore));
+        }
+        if (_wi < _wkeys.length) { setTimeout(step, 0); return; }
+        if (pending === 0) finishOk();
+      })();
     }
 
     // 清空旧数据（localStorage + sessionStorage + IndexedDB 三层全清，防止旧数据混入）

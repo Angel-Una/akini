@@ -145,6 +145,7 @@
             _lastBackupSig = sig;
             _cloudKeyCount = Math.max(_cloudKeyCount, keys.length);
             try { localStorage.setItem("akini_cloud_backup_at", String(Date.now())); } catch (e) {}
+            backupBlobs(); // zzzx：顺带备份小说正文等大体积 IDB 内容
           } else {
             console.warn("[云备份] 备份失败 HTTP " + r.status);
           }
@@ -153,6 +154,85 @@
     };
     if (immediate) run();
     else _backupTimer = setTimeout(run, 3000);
+  }
+
+  /* ==================== zzzx 大体积内容云端保险 ====================
+   * 小说正文等存在 IndexedDB 的大文本不在主 payload（4.5MB 上限）内，
+   * iOS/Safari 清理 IndexedDB 后会永久丢失 → 逐键独立行备份到 akini_cloud_blobs 表。
+   * 只补本地缺失、绝不覆盖；单条 >3MB 跳过。
+   */
+  var BLOB_TABLE = "akini_cloud_blobs";
+  var BLOB_RE = /^akini_novel_content_/;
+  var BLOB_MAX = 3 * 1024 * 1024;
+  var _blobCache = {}; // key -> 本地内容长度（变化才上传，避免重复流量）
+
+  function backupBlobs() {
+    try {
+      if (window.__akiniWiping) return;
+      if (!window._idbStore || !window._idbStore.keys || !window._idbStore.get) return;
+      window._idbStore.keys(function (ks) {
+        if (!ks || !ks.length) return;
+        var targets = [];
+        for (var i = 0; i < ks.length; i++) {
+          if (BLOB_RE.test(ks[i])) targets.push(ks[i]);
+        }
+        if (!targets.length) return;
+        var idx = 0;
+        (function next() {
+          if (idx >= targets.length) return;
+          var k = targets[idx++];
+          window._idbStore.get(k, function (v) {
+            try {
+              if (typeof v === "string" && v.length > 0 && v.length <= BLOB_MAX && _blobCache[k] !== v.length) {
+                _blobCache[k] = v.length;
+                fetch(SUPA_URL + "/rest/v1/" + BLOB_TABLE, {
+                  method: "POST",
+                  headers: {
+                    apikey: SUPA_KEY,
+                    Authorization: "Bearer " + SUPA_KEY,
+                    "Content-Type": "application/json",
+                    Prefer: "resolution=merge-duplicates,return=minimal",
+                  },
+                  body: JSON.stringify({ device_id: DEVICE_ID, key: k, value: v, updated_at: new Date().toISOString() }),
+                }).catch(function () { delete _blobCache[k]; }); // 失败下次重传
+              }
+            } catch (e) {}
+            setTimeout(next, 300); // 逐本间隔上传，避免突发
+          });
+        })();
+      });
+    } catch (e) {}
+  }
+
+  function restoreBlobs() {
+    try {
+      if (!window._idbStore || !window._idbStore.get || !window._idbStore.set) return;
+      fetch(SUPA_URL + "/rest/v1/" + BLOB_TABLE + "?device_id=eq." + encodeURIComponent(DEVICE_ID) + "&select=key,value", {
+        headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SUPA_KEY },
+      }).then(function (r) { return r.ok ? r.json() : []; })
+        .then(function (rows) {
+          if (!rows || !rows.length) return;
+          var idx = 0, restored = 0;
+          (function next() {
+            if (idx >= rows.length) {
+              if (restored > 0) console.warn("[云备份] 已从云端恢复 " + restored + " 项小说内容");
+              return;
+            }
+            var row = rows[idx++];
+            if (!row || !row.key || typeof row.value !== "string" || !row.value) { next(); return; }
+            // 只补本地缺失的内容，绝不覆盖本地已有
+            window._idbStore.get(row.key, function (local) {
+              if (local === null || local === undefined || local === "") {
+                window._idbStore.set(row.key, row.value, function () { restored++; setTimeout(next, 100); });
+              } else {
+                _blobCache[row.key] = (typeof local === "string") ? local.length : 0;
+                setTimeout(next, 30);
+              }
+            });
+          })();
+        })
+        .catch(function () {});
+    } catch (e) {}
   }
 
   // ---- 启动恢复：只补本地缺失的 key，绝不覆盖本地已有数据 ----
@@ -172,6 +252,7 @@
       }).then(function (rows) {
         if (!rows) return;
         _restoreDone = true;
+        restoreBlobs(); // zzzx：云端状态确认后，补回本地缺失的小说正文等大内容
         if (!rows.length || !rows[0].payload) { backup(); return; }
         var cloud = null;
         try { cloud = JSON.parse(rows[0].payload); } catch (e) { return; }
@@ -223,8 +304,8 @@
   });
   window.addEventListener("pagehide", function () { backup(true); });
   window.addEventListener("beforeunload", function () { backup(true); });
-  // 每 150 秒周期检测（有变化才上传；切后台时仍有即时备份）
-  setInterval(function () { backup(false); }, 150000);
+  // 每 60 秒周期检测（有变化才上传；切后台/关闭页面前仍有即时备份）
+  setInterval(function () { backup(false); }, 60000);
   // 启动：立即发起恢复（不再延迟，尽早兜底），30 秒后开始周期备份
   restore();
   setTimeout(function () { backup(false); }, 30000);
@@ -232,6 +313,14 @@
   // ---- 清除云端备份：清除数据时调用，保证云端同样归0 ----
   function wipeCloud() {
     try {
+      // zzzx：同步清空大体积内容表
+      try {
+        fetch(SUPA_URL + "/rest/v1/" + BLOB_TABLE + "?device_id=eq." + encodeURIComponent(DEVICE_ID), {
+          method: "DELETE",
+          headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SUPA_KEY },
+          keepalive: true,
+        }).catch(function () {});
+      } catch (e0) {}
       return fetch(SUPA_URL + "/rest/v1/" + TABLE + "?device_id=eq." + encodeURIComponent(DEVICE_ID), {
         method: "DELETE",
         headers: { apikey: SUPA_KEY, Authorization: "Bearer " + SUPA_KEY },

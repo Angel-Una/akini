@@ -8165,7 +8165,8 @@ document.addEventListener("DOMContentLoaded", function () {
           (t.type = "file"),
           (t.accept = "image/*"),
           (t.multiple = !0),
-          (t.style.display = "none"),
+          /* zzzx：display:none 的 input 在部分机型 click() 被静默拒绝，改用离屏类（视口内 2px 透明） */
+          t.classList.add("akini-file-offscreen"),
           (t.id = "fileInputImageSend"),
           document.body.appendChild(t),
           t
@@ -9779,6 +9780,10 @@ document.addEventListener("DOMContentLoaded", function () {
             if (!i) return;
             const fr = new FileReader();
             ((fr.onload = function (i2) {
+              /* zzzx：大文件解析前先弹进度提示并 setTimeout 让出一帧渲染，
+                 避免主线程长时间解析时用户误以为卡死/闪退 */
+              try { window.__akiniCenterModal && window.__akiniCenterModal("字卡导入", "正在解析文件，请稍候…"); } catch (e0) {}
+              setTimeout(function () {
               try {
                 const p = (i2.target.result || "").trim();
                 if (!p) return void (window.__akiniCenterModal && window.__akiniCenterModal("导入失败", "文件内容为空"));
@@ -9824,6 +9829,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   ? window.__akiniCenterModal("导入失败", "导入失败：" + D.message)
                   : alert("导入失败：" + D.message);
               }
+              }, 80);
             }),
               fr.readAsText(i, "UTF-8"),
               (this.value = ""));
@@ -23614,7 +23620,8 @@ window.__akiniNowTs = function () {
     var input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,.txt';
-    input.style.display = 'none';
+    /* zzzx：display:none 的 input 在部分机型 click() 被静默拒绝，改为视口内 2px 透明点 */
+    input.style.cssText = 'position:fixed;right:0;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none;z-index:1';
     document.body.appendChild(input);
     input.addEventListener('change', function () {
       var f = input.files && input.files[0];

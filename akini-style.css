@@ -6648,18 +6648,22 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 /* display:none 的 file input 在部分 iOS/Android WebView 上 JS .click() 无效；
    统一替换为不可见但已渲染的离屏定位，确保所有机型可触发文件选择器 */
 input[type="file"].akini-file-offscreen {
+  /* zzzx：移出视口(-9999px)的 input 在部分 Android WebView/夸克/UC/旧 iOS 上 JS .click() 会被静默拒绝，
+     改为固定在视口内右下角的 2px 透明点——保持已渲染且在视口内，所有机型都能唤起文件选择器 */
   display: block !important;
-  position: absolute !important;
-  top: -9999px !important;
-  left: -9999px !important;
-  width: 1px !important;
-  height: 1px !important;
+  position: fixed !important;
+  top: auto !important;
+  left: auto !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 2px !important;
+  height: 2px !important;
   opacity: 0.01 !important;
   pointer-events: none !important;
   overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
   border: 0 !important;
   padding: 0 !important;
+  z-index: 1 !important;
   margin: 0 !important;
 }
 

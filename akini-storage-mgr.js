@@ -18,7 +18,7 @@
         '<div class="ak-btn-col">' +
           '<button class="ak-stor-btn primary" id="akStorExport" type="button">导出备份</button>' +
           '<button class="ak-stor-btn" id="akStorImport" type="button">导入备份</button>' +
-          '<input type="file" id="akStorImportFile" accept=".zip,.json" style="display:none">' +
+          '<input type="file" id="akStorImportFile" accept=".zip,.json" class="akini-file-offscreen">' +
         "</div>" +
       "</div>" +
 
