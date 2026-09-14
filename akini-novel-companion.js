@@ -1303,7 +1303,7 @@
       if (!c) return;
       var t = '';
       try { t = window.pickWordCards ? window.pickWordCards(1, cid) : ''; } catch (e) {}
-      t = cmStripEmoji((t || '').split('\n')[0]);
+      t = (t || '').split('\n')[0]; /* zzzl：联系人回复段评保留字卡主字卡和emoji模块，仅排除表情包图片(pickWordCards已过滤pat) */
       if (!t) return;
       cur.list.push({ who: cid, name: c.name || '联系人', avatar: c.avatar || '', text: t, ts: Date.now() });
       cur.replied = true;
