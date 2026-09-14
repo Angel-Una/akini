@@ -917,13 +917,12 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: calc(0px + var(--ak-sat, 0px)) 12px 4px;
-  /* iOS Safari 崩溃修复：position:fixed + backdrop-filter 会在切换 App 时崩溃渲染进程，改用不透明背景 */
+  padding: 0 12px !important;
   background: rgba(255, 255, 255, 0.97);
   border-bottom: 1px solid #e8e8e8;
-  z-index: 100;
-  height: calc(50px + var(--ak-sat, 0px));
-  position: fixed;
+  z-index: 1000 !important;
+  height: 50px !important;
+  position: fixed !important;
   top: 0;
   left: 0;
   right: 0;
@@ -1451,7 +1450,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body {
   flex: 1;
   overflow-y: auto;
-  padding: calc(64px + var(--ak-sat, 0px)) 14px 34px;
+  padding: 60px 14px 34px !important;
   transition: background 0.3s;
   background-size: cover;
   background-position: center;
@@ -3134,7 +3133,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   padding: 60px 16px 16px;
   overflow-y: auto;
   background: #f9f9f9;
-  padding-top: calc(60px + var(--ak-sat, 0px)) !important;
+  padding-top: 60px !important;
 }
 .mail-tab {
   flex: 1;
@@ -4531,7 +4530,7 @@ select {
 }
 .friends-header .back-btn {
   position: fixed !important;
-  top: calc(12px + var(--ak-sat, 0px)) !important;
+  top: 12px !important;
   left: 12px !important;
   z-index: 1000 !important;
   background: rgba(255, 255, 255, 0.8) !important;
@@ -5507,14 +5506,18 @@ button.back-btn[type="button"] {
 }
 #app-create-group .create-group-body,
 #app-create-group.create-group-wrapper .create-group-body {
-  padding-top: calc(16px + max(12px, var(--ak-sat, 12px)) + 44px) !important;
+  padding-top: 60px !important;
 }
 .settings-header,
 .beautify-header,
 .icity-header,
 .create-group-header {
-  padding-top: calc(var(--ak-sat, 0px) + 8px) !important;
-  min-height: calc(48px + var(--ak-sat, 0px)) !important;
+  padding: 0 16px !important;
+  height: 50px !important;
+  min-height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
 }
 
 /* 导入入口和菜单按钮始终可见，避免登录后消失 */
