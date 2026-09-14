@@ -181,40 +181,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   min-width: 0;
   margin-left: 0;
 }
-/* 模拟状态栏：左时间 右信号+WiFi+电量（iOS 风格，覆盖在安全区内） */
-/* zzv：top 改为 var(--ak-sat)，微信等全屏 webview 下仿栏落在系统状态栏下方，不再压封面卡 */
-.fake-statusbar {
-  position: relative;
-  flex-shrink: 0;
-  width: 100%;
-  height: 44px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 20px 0 24px;
-  box-sizing: border-box;
-  z-index: 6;
-  pointer-events: none;
-  color: #1a1a1a;
-  /* zzx：仿栏全模式常驻显示（用户要求恢复顶部状态栏） */
-}
-.fake-statusbar .fs-time {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  font-variant-numeric: tabular-nums;
-}
-.fake-statusbar .fs-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.fake-statusbar svg { display: block; }
-.fake-statusbar .fs-batt-pct {
-  font-size: 12px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}/* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
+/* zzzp：仿状态栏已整体移除——PWA 桌面模式下与系统真状态栏重复（双状态栏），浏览器模式下也无存在必要，用户要求删除 */
+/* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
 .fit-gap-lg { margin-top: 14px; }.fit-gap { margin-top: 10px; }.fit-bottom { margin-top: auto; }.apps-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
