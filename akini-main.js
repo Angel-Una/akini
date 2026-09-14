@@ -461,6 +461,8 @@ document.addEventListener("DOMContentLoaded", function () {
     // === 健壮的导航按钮绑定（确保点击可用）===
     function __navOpenApp(t) {
       try {
+        /* zzzy：打开朋友圈/iCity 即把互动消息标记已读，角标不再重进复显 */
+        try { if (window.__akiniMarkNotifsRead) window.__akiniMarkNotifsRead(t); } catch (e0) {}
         if (window.navTo) {
           window.navTo(t);
           return;
@@ -17614,7 +17616,18 @@ document.addEventListener("DOMContentLoaded", function () {
         document
           .getElementById("pushNotifyToggle")
           .addEventListener("click", function () {
-            if (this.classList.contains("on"))
+            if (this.classList.contains("on")) {
+              /* zzzy：明确告知不支持系统通知的环境，避免“开了没反应” */
+              var _isIOS = /iP(hone|ad|od)/.test(navigator.userAgent || "");
+              var _standalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || window.navigator.standalone === true;
+              if (!("Notification" in window) || (_isIOS && !_standalone)) {
+                var _tg0 = document.getElementById("pushNotifyToggle");
+                if (_tg0) { _tg0.classList.remove("on"); localStorage.setItem("akini_toggle_pushNotifyToggle", "0"); }
+                alert(_isIOS
+                  ? "iPhone 需要先把本站「添加到主屏幕」，再从桌面图标打开后才能开启系统通知（Safari 分享菜单 → 添加到主屏幕）"
+                  : "当前浏览器不支持系统通知（微信内置浏览器不可用），请用系统浏览器（如 Chrome/Safari）打开本站后再开启");
+                return;
+              }
               if ("Notification" in window) {
                 if ("default" === Notification.permission)
                   Notification.requestPermission().then(function (t) {
@@ -17661,6 +17674,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   } catch (e) {}
                 }
               } else alert("此浏览器不支持通知功能");
+            }
           }));
       // ===== 静音循环音频保活（milk 音频源 + mochi 指数退避补播）=====
       // iOS/微信里 WakeLock 在后台基本无效，只有"正在播放音频"的页面系统才不会冻结回收
@@ -22745,11 +22759,37 @@ document.addEventListener("DOMContentLoaded", function () {
     return app === "icity" ? "akini_icity_notifications" : "akini_friends_notifications";
   }
   function _getNotifs(app) {
-    try { return JSON.parse(localStorage.getItem(_nk(app)) || "[]"); } catch (e) { return []; }
+    try {
+      var raw = localStorage.getItem(_nk(app));
+      if (raw === null || raw === undefined) {
+        /* zzzy：LS 主键丢失时从备份键恢复，避免已读状态丢失导致角标重进复显 */
+        raw = localStorage.getItem(_nk(app) + "_backup");
+      }
+      return JSON.parse(raw || "[]");
+    } catch (e) { return []; }
   }
   function _saveNotifs(app, list) {
-    try { localStorage.setItem(_nk(app), JSON.stringify(list)); } catch (e) {}
+    try {
+      var s = JSON.stringify(list);
+      localStorage.setItem(_nk(app), s);
+      /* zzzy：双写备份键，iOS/微信偶发清键时仍有兜底 */
+      try { localStorage.setItem(_nk(app) + "_backup", s); } catch (e2) {}
+    } catch (e) {}
   }
+  /* zzzy：进入朋友圈/iCity 即视为已读——角标看过一次后重进不再复显 */
+  window.__akiniMarkNotifsRead = function (app) {
+    try {
+      if (app !== "friends" && app !== "icity") return;
+      var raw = _getNotifs(app), changed = false;
+      for (var i = 0; i < raw.length; i++) {
+        if (!raw[i].read) { raw[i].read = true; changed = true; }
+      }
+      if (changed) {
+        _saveNotifs(app, raw);
+        if (window.__updateHomeBadges) window.__updateHomeBadges();
+      }
+    } catch (e) {}
+  };
   function _ensureBadge(btnId) {
     var btn = document.getElementById(btnId);
     if (!btn) return null;

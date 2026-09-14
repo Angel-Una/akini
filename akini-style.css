@@ -2544,41 +2544,42 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }.plus-menu {
   display: none;
   position: absolute;
-  bottom: calc(100% + 6px);
-  right: 12px;
+  bottom: calc(100% + 4px);
+  right: 4px;
   background: #fff;
-  border-radius: 18px;
-  padding: 14px 16px;
+  border-radius: 14px;
+  padding: 6px;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
   z-index: 100;
-  gap: 8px;
+  gap: 2px;
 }.plus-menu.show {
   display: grid;
   grid-template-columns: repeat(3, max-content);
-  justify-content: space-between;
+  justify-content: end;
   min-width: 0;
-  width: min(236px, calc(100vw - 40px));
+  width: max-content;
+  max-width: calc(100vw - 16px);
 }.plus-menu-item {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  padding: 10px 6px;
-  border-radius: 14px;
+  padding: 6px 5px;
+  border-radius: 10px;
   transition: background 0.15s;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
 }.plus-menu-item {
-  padding: 8px 4px;
+  padding: 6px 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .plus-menu-item:active {
   background: #f2f2f2;
@@ -2597,8 +2598,8 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   stroke: #000 !important;
   fill: none;
 }.plus-menu-item .icon-circle {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   border: 2px solid #000;
   border-radius: 50%;
   display: flex;

@@ -129,6 +129,9 @@
         if (!immediate && sig === _lastBackupSig) return; // 无变化不传
         var payload = shrink(data);
         _backingUp = true;
+        var bodyStr = JSON.stringify({ device_id: DEVICE_ID, payload: payload, updated_at: new Date().toISOString() });
+        /* zzzy：keepalive 请求体上限约 64KB，超限的即时备份改用普通 fetch（尽力送达），避免每次都静默失败 */
+        var useKeepalive = !!immediate && bodyStr.length < 60000;
         fetch(SUPA_URL + "/rest/v1/" + TABLE, {
           method: "POST",
           headers: {
@@ -137,8 +140,8 @@
             "Content-Type": "application/json",
             Prefer: "resolution=merge-duplicates",
           },
-          body: JSON.stringify({ device_id: DEVICE_ID, payload: payload, updated_at: new Date().toISOString() }),
-          keepalive: !!immediate,
+          body: bodyStr,
+          keepalive: useKeepalive,
         }).then(function (r) {
           _backingUp = false;
           if (r.ok) {
@@ -304,8 +307,9 @@
   });
   window.addEventListener("pagehide", function () { backup(true); });
   window.addEventListener("beforeunload", function () { backup(true); });
-  // 每 60 秒周期检测（有变化才上传；切后台/关闭页面前仍有即时备份）
-  setInterval(function () { backup(false); }, 60000);
+  // 每 150 秒周期检测（有变化才上传；切后台/关闭页面前仍有即时备份）
+  // zzzy：60s 全量 collectAll+stringify 是主线程卡顿/掉帧大户，恢复 150s；后台时 backup(false) 内部已跳过
+  setInterval(function () { backup(false); }, 150000);
   // 启动：立即发起恢复（不再延迟，尽早兜底），30 秒后开始周期备份
   restore();
   setTimeout(function () { backup(false); }, 30000);
