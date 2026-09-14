@@ -287,7 +287,7 @@ window.AKR = (function () {
     quote: 0.3,
     taTransfer: 0.08,
     groupTransferMe: 0.08,
-    noReply: 0.2,
+    noReply: 0.1,
     sticker: 0.2,
     incomingCall: 0.03,
     groupCall: 0.03,
