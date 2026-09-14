@@ -170,7 +170,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   gap: 14px;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 14px;
+  padding: 0 6px;
 }
 .anniv-preview-row .right-card {
   margin-left: 0;
@@ -219,7 +219,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 12px 4px;
-  padding: 2px 6px;
+  padding: 2px 2px;
   box-sizing: border-box;
   width: 100%;
 }
@@ -237,7 +237,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
-  padding: 0 10px 12px;
+  padding: 0 4px 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2584,13 +2584,13 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   padding: 14px 16px;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
   z-index: 100;
-  gap: 14px;
-  min-width: 260px;
+  gap: 8px;
 }.plus-menu.show {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, max-content);
+  justify-content: space-between;
   min-width: 0;
-  width: min(300px, calc(100vw - 32px));
+  width: min(236px, calc(100vw - 40px));
 }.plus-menu-item {
   flex: 1;
   display: flex;

@@ -1,3 +1,4 @@
+function escapeHtmlSafe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
 /* zzzg：表情包引用崩溃根治——esc/rt 全局兜底。引用表情包的引用条与气泡缩略图 4 处调用点（ctxQuote 13019、回复渲染 3460/3559/4344）所在闭包缺失局部定义，裸调用抛 ReferenceError 导致整个引用流程静默死亡 */
 if (typeof window.esc !== 'function') { window.esc = function (s) { return String(s == null ? '' : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }; }
@@ -15688,9 +15689,30 @@ document.addEventListener("DOMContentLoaded", function () {
                                 });
                             }
                           })()
-                        : (c.textContent = (t.content || "")
-                            .replace(/[\u2261\u2630\u2631\u2632\u2633]/g, "")
-                            .trim())));
+                        : (function(){
+                          var raw = (t.content || "").replace(/[≡☰☱☲☳]/g, "").trim();
+                          var MAX_LETTER_LEN = 120; // 超过 120 字截断显示 …展开
+                          if (raw.length > MAX_LETTER_LEN) {
+                            var shortText = raw.slice(0, MAX_LETTER_LEN) + "…";
+                            var uid = "mailFull_" + Date.now();
+                            c.innerHTML = '<span id="' + uid + '_t" style="white-space:pre-wrap;word-break:break-word;">' + escapeHtmlSafe(shortText) + '</span>'
+                              + '<button type="button" id="' + uid + '_btn" style="margin-left:6px;background:transparent;border:none;color:#4f7cff;font-size:14px;cursor:pointer;padding:0;font-weight:600;display:inline-block;">展开</button>';
+                            var btn = document.getElementById(uid + "_btn");
+                            btn && btn.addEventListener("click", function(e){
+                              e.stopPropagation();
+                              var isExp = this.getAttribute("data-expanded") === "true";
+                              var txt = document.getElementById(uid + "_t");
+                              this.setAttribute("data-expanded", !isExp);
+                              if (txt) txt.textContent = isExp ? shortText : raw;
+                              this.textContent = isExp ? "展开" : "收起";
+                            });
+                          } else {
+                            c.textContent = raw;
+                          }
+                          // 阻止信卡内滚动冒泡带动整张信卡/弹窗
+                          c.onwheel = function(e){ e.stopPropagation(); };
+                          c.ontouchmove = function(e){ e.stopPropagation(); };
+                        })()));
                   var l = document.getElementById("mailDetailReplyArea");
                   if (
                     (l ||

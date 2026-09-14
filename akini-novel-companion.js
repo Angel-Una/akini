@@ -1212,7 +1212,7 @@
     add.innerHTML = '<div style="width:86%;max-width:340px;background:#fff;border-radius:14px;padding:16px;box-sizing:border-box">'
       + '<div style="font-size:16px;font-weight:700;color:#1a1a1a;margin-bottom:8px">添加段评</div>'
       + '<div id="aknvCmAddQuote" style="font-size:13px;color:#888;background:#f6f6f6;border-radius:8px;padding:8px 10px;margin-bottom:10px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all"></div>'
-      + '<textarea id="aknvCmAddInput" rows="3" maxlength="200" placeholder="写下你的段评（仅文字）" style="width:100%;box-sizing:border-box;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;font-size:15px;outline:0;resize:none;color:#1a1a1a;font-family:inherit"></textarea>'
+      + '<textarea id="aknvCmAddInput" rows="3" maxlength="200" placeholder="写下你的段评" style="width:100%;box-sizing:border-box;border:1px solid #e0e0e0;border-radius:10px;padding:10px 12px;font-size:15px;outline:0;resize:none;color:#1a1a1a;font-family:inherit"></textarea>'
       + '<div style="display:flex;gap:10px;margin-top:12px"><button id="aknvCmAddCancel" type="button" style="flex:1;height:42px;border-radius:10px;border:1px solid #e0e0e0;background:#f8f8f8;color:#555;font-size:15px;cursor:pointer">取消</button><button id="aknvCmAddOk" type="button" style="flex:1;height:42px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">保存</button></div>'
       + '</div>';
     document.body.appendChild(add);
@@ -1235,7 +1235,7 @@
       + '<div id="aknvCmViewQuote" style="margin:0 16px 10px;font-size:13px;color:#888;background:#f6f6f6;border-radius:8px;padding:8px 10px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-all;flex-shrink:0"></div>'
       + '<div id="aknvCmViewList" style="flex:1;overflow-y:auto;padding:0 16px;min-height:80px"></div>'
       + '<div style="display:flex;gap:8px;padding:10px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid #f0f0f0;flex-shrink:0">'
-      + '<input id="aknvCmViewInput" maxlength="200" placeholder="写段评（仅文字）" style="flex:1;min-width:0;height:40px;border:1px solid #e0e0e0;border-radius:20px;padding:0 14px;font-size:14px;outline:0;color:#1a1a1a"/>'
+      + '<input id="aknvCmViewInput" maxlength="200" placeholder="写段评" style="flex:1;min-width:0;height:40px;border:1px solid #e0e0e0;border-radius:20px;padding:0 14px;font-size:14px;outline:0;color:#1a1a1a"/>'
       + '<button id="aknvCmViewSend" type="button" style="height:40px;padding:0 18px;border:none;border-radius:20px;background:#1a1a1a;color:#fff;font-size:14px;cursor:pointer;flex-shrink:0">发送</button></div>'
       + '</div>';
     document.body.appendChild(view);

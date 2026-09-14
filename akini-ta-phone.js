@@ -66,15 +66,17 @@
 
   function avatarHtml(c, size) {
     size = size || 48;
-    var av = (c && c.avatar) || '👤';
-    if (window.__akiniIsDefAv && window.__akiniIsDefAv(av) && window.__akiniLineAvatarImg) {
+    var av = (c && c.avatar) || '';
+    var style = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f0f0f0;flex-shrink:0;';
+    /* zzzl：默认/未设头像一律用线条人像 SVG（不再用 emoji） */
+    var isDef = !av || av === '👤' || (window.__akiniIsDefAv && window.__akiniIsDefAv(av));
+    if (isDef && window.__akiniLineAvatarImg) {
       return '<div style="' + style + '">' + window.__akiniLineAvatarImg() + '</div>';
     }
-    var style = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f0f0f0;';
     if (typeof av === 'string' && av.indexOf('data:') === 0) {
       return '<div style="' + style + '"><img src="' + av + '" style="width:100%;height:100%;object-fit:cover;" alt="头像"/></div>';
     }
-    return '<div style="' + style + '"><span style="font-size:' + Math.round(size * 0.55) + 'px;">' + escapeHtml(av) + '</span></div>';
+    return '<div style="' + style + '"><span style="font-size:' + Math.round(size * 0.55) + 'px;">' + escapeHtml(av || '👤') + '</span></div>';
   }
 
   /* ============ 收藏存储（按联系人维度） ============ */
