@@ -19038,14 +19038,18 @@ document.addEventListener("DOMContentLoaded", function () {
             var isCurrent = pos === 2;
             var text = idx >= 0 && idx < b.length ? b[idx].text : "";
             var d = Math.abs(pos - 2);
-            var fs = isCurrent ? "16px" : d === 1 ? "13px" : "12px";
+            /* 网易云质感五行渐变：最上最下极浅渐显，中间高亮发光 */
+            var fs = isCurrent ? "17px" : d === 1 ? "14px" : "12.5px";
             var col = isCurrent
               ? "#ffffff"
               : d === 1
-                ? "rgba(255,255,255,0.65)"
-                : "rgba(255,255,255,0.3)";
+                ? "rgba(255,255,255,0.60)"
+                : "rgba(255,255,255,0.22)";
             var fw = isCurrent ? "600" : "400";
-            var op = isCurrent ? "1" : d === 1 ? "0.65" : "0.35";
+            var op = isCurrent ? "1" : d === 1 ? "0.55" : "0.18";
+            var shadow = isCurrent
+              ? "text-shadow:0 0 16px rgba(255,255,255,0.45);"
+              : "";
             html +=
               '<div class="lyric-line' +
               (isCurrent ? " active" : "") +
@@ -19059,7 +19063,9 @@ document.addEventListener("DOMContentLoaded", function () {
               LH +
               "px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;opacity:" +
               op +
-              ';transition:color 0.2s,font-size 0.2s,opacity 0.2s;">' +
+              ";" +
+              shadow +
+              'transition:color 0.25s ease,font-size 0.25s ease,opacity 0.25s ease,text-shadow 0.25s ease;">' +
               J(text || " ") +
               "</div>";
           });
@@ -20430,23 +20436,36 @@ document.addEventListener("DOMContentLoaded", function () {
                   );
                 var i = t.target.closest("[data-idx]");
                 if (i) {
-                  var a = parseInt(i.getAttribute("data-idx"), 10),
-                    o = c[a];
-                  // 立即更新 UI（唱片/歌名/歌手），不等待网络请求，避免切歌时卡在上一首
+                  var a = parseInt(i.getAttribute("data-idx"), 10);
+                  if (isNaN(a) || a < 0 || a >= c.length) return;
                   l = a;
+                  __akiniManualPlay = true;
+                  try {
+                    localStorage.setItem("akini_music_index", String(l));
+                  } catch (t) {}
+                  try {
+                    localStorage.setItem("akini_music_current_time", "0");
+                  } catch (t) {}
+                  w = 0;
+                  // 立即清理旧音频，切歌瞬间停止上一首，杜绝声音与信息卡在上一首
+                  if (u) {
+                    try {
+                      u.pause();
+                      u.removeAttribute("src");
+                      u.load();
+                    } catch (t) {}
+                  }
+                  (E = null), (S = 0), (A = null);
+                  // 立即更新全部 UI（唱片封面/歌名/歌手名），零延迟
                   updateTrackUI();
-                  o && o.id && !kt(o)
-                    ? (_t(),
-                      wt(o, !1)
-                        .then(function () {
-                          It();
-                          Ht();
-                        })
-                        .catch(function () {
-                          It();
-                          Ht();
-                        }))
-                    : (It(), Ht());
+                  // 立即更新播放列表中“播放中”高亮标记
+                  Bt();
+                  // 音频上下文就绪
+                  _t();
+                  // 直接调用 It 触发新歌播放与歌词加载，内部会统一调度
+                  It();
+                  // 立即关闭列表弹窗，保证点击流畅不卡顿
+                  Ht();
                 }
               }
               e.playlistContainer.addEventListener("click", function (t) {
@@ -21077,6 +21096,8 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch (t) {}
         }
         (E = null), (S = 0), (A = null);
+        updateTrackUI();
+        Bt();
         It();
       }
       function St(next) {
@@ -21446,24 +21467,42 @@ document.addEventListener("DOMContentLoaded", function () {
           ? 0
           : (e > 6e4 && (e /= 1e3), Math.floor(e));
       }
+      var DEFAULT_TRACK_COVER =
+        'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="%23222228"/><circle cx="100" cy="100" r="70" fill="%23111114" stroke="%23333338" stroke-width="2"/><circle cx="100" cy="100" r="50" fill="%2318181c"/><circle cx="100" cy="100" r="28" fill="%23e60026"/><circle cx="100" cy="100" r="8" fill="%23fff"/></svg>';
       function updateTrackUI() {
         var n = c[l];
         if (!n) {
           if (e.songName) e.songName.textContent = "一起听";
           if (e.artist) e.artist.textContent = "点击右上角导入歌单";
+          if (e.cover) e.cover.src = DEFAULT_TRACK_COVER;
           if (e.vipHint) e.vipHint.style.display = "none";
           return;
         }
-        if (e.songName) e.songName.textContent = n.title || "未知歌曲";
-        if (e.artist) e.artist.textContent = n.artist || "未知歌手";
-        var i =
-          n.cover ||
-          "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+        var trackTitle = n.title || "未知歌曲";
+        var trackArtist = n.artist || "未知歌手";
+        if (e.songName) {
+          e.songName.textContent = trackTitle;
+          e.songName.setAttribute("data-raw", trackTitle);
+        }
+        if (e.artist) {
+          e.artist.textContent = trackArtist;
+          e.artist.setAttribute("data-raw", trackArtist);
+        }
+        var i = n.cover || DEFAULT_TRACK_COVER;
         if (i && !i.startsWith("data:"))
           i = i.replace(/(\?.*)?$/, "?param=500y500");
         if (e.cover) e.cover.src = i;
         // 切歌时先隐藏 VIP 提示，待加载时长后再判断
         if (e.vipHint) e.vipHint.style.display = "none";
+        // 进度与时间即刻归零
+        if (e.progress) e.progress.value = 0;
+        if (e.curTime) e.curTime.textContent = "0:00";
+        // 同步触发滚动文本检查
+        try {
+          if (typeof window.akiniCheckScrollText === "function") {
+            window.akiniCheckScrollText();
+          }
+        } catch (_) {}
       }
       function It() {
         var n = c[l];
