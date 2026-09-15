@@ -127,6 +127,8 @@
             fromId: s.replyFromId || s.toId,
             subtype: "reply",
             originalContent: s.content,
+            read: false,
+            isRead: false,
           });
           saveReceived(recv);
           s.repliedByTa = true;
@@ -246,6 +248,8 @@
           from: c.name,
           fromId: c.id,
           subtype: "letter",
+          read: false,
+          isRead: false,
         });
         saveReceived(recv);
         // 记录本次来信时间，作为下次调度的锚点（跨重启补发依据）

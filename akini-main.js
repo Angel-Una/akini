@@ -15708,9 +15708,76 @@ document.addEventListener("DOMContentLoaded", function () {
                     return '<span style="font-size:12px;color:#888;">' + dateStr + " " + hh + ":" + mm + '</span>';
                   } catch(err) { return d; }
                 }
-                return formatMailDate(e.date || "");
+                var dateHtml = formatMailDate(e.date || "");
+                // 右下角已读未读状态判定：
+                // 1. 联系人的信件/回信（received）：我点开显示已读，未点开显示未读
+                // 2. 我的寄信（sent + 非reply）：联系人回复了显示已读，没回复显示未读
+                // 3. 我的回信（sent + reply）：联系人收到后显示已读，没收到显示未读
+                var isRead = false;
+                if (t === "received") {
+                  isRead = !!(e.read || e.isRead);
+                } else if (e.subtype === "reply") {
+                  // 用户回复联系人的信件：联系人收到后显示已读，没收到显示未读
+                  if (e.delivered || e.receivedByTa || e.repliedByTa) {
+                    isRead = true;
+                  } else if (e.deliverTime) {
+                    isRead = Date.now() >= e.deliverTime;
+                  } else {
+                    var sentTs = e.ts || (e.date ? new Date(e.date).getTime() : 0);
+                    isRead = !sentTs || isNaN(sentTs) || (Date.now() - sentTs >= 15000);
+                  }
+                } else {
+                  // 用户寄信：联系人回复了显示已读，没回复显示未读
+                  if (e.repliedByTa) {
+                    isRead = true;
+                  } else {
+                    try {
+                      var rList = JSON.parse(localStorage.getItem("akini_mail_received") || "[]");
+                      isRead = rList.some(function(item){
+                        return item && item.subtype === "reply" && (
+                          (item.originalContent && item.originalContent === e.content) ||
+                          (e.replyTime && item.ts === e.replyTime)
+                        );
+                      });
+                    } catch(_) { isRead = false; }
+                  }
+                }
+                var statusText = isRead ? "已读" : "未读";
+                var statusStyle = isRead
+                  ? "font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;background:#e5e5e5;color:#666;"
+                  : "font-size:11px;padding:2px 8px;border-radius:6px;font-weight:500;background:#ffebee;color:#c05050;";
+                return '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;">' +
+                  '<div>' + dateHtml + '</div>' +
+                  '<span class="mail-read-badge" style="' + statusStyle + '">' + statusText + '</span>' +
+                  '</div>';
               })()),
             n.addEventListener("click", function () {
+              // 点击打开联系人信件时，即刻标记为已读并持久化
+              if (t === "received" && (!e.read || !e.isRead)) {
+                e.read = true;
+                e.isRead = true;
+                try {
+                  var badge = n.querySelector(".mail-read-badge");
+                  if (badge) {
+                    badge.textContent = "已读";
+                    badge.style.background = "#e5e5e5";
+                    badge.style.color = "#666";
+                  }
+                  var allRecv = i("akini_mail_received", []);
+                  for (var idx = 0; idx < allRecv.length; idx++) {
+                    if (
+                      allRecv[idx].date === e.date &&
+                      allRecv[idx].content === e.content &&
+                      allRecv[idx].from === e.from
+                    ) {
+                      allRecv[idx].read = true;
+                      allRecv[idx].isRead = true;
+                      break;
+                    }
+                  }
+                  saveMailReceived(allRecv);
+                } catch(err) {}
+              }
               Date.now() - An < 500 ||
                 (function (t, e) {
                   var originalLetter = t;
@@ -15886,9 +15953,13 @@ document.addEventListener("DOMContentLoaded", function () {
                           // 回复对方给我的回信则正常预约回信
                           var isActiveLetter = originalLetter.subtype === "active";
                           var willReply = isActiveLetter ? Math.random() < 0.3 : true;
+                          var nowTs = Date.now();
+                          var deliverDelay = 15000;
                           var sentItem = {
                             content: e,
                             date: new Date().toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }),
+                            ts: nowTs,
+                            deliverTime: nowTs + deliverDelay,
                             from: n,
                             to: originalLetter.from,
                             toId: originalLetter.fromId,
@@ -16059,9 +16130,11 @@ document.addEventListener("DOMContentLoaded", function () {
           n = In,
           a = i("akini_mail_sent", []);
         const sentDate = new Date().toLocaleString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false });
+        const nowTs = Date.now();
         (a.push({
           content: t,
           date: sentDate,
+          ts: nowTs,
           from: e,
           to: n.name,
           toId: n.id,
