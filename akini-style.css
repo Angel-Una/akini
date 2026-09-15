@@ -1600,7 +1600,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   background: #fff;
   border-top: 1px solid #e8e8e8;
-  padding-bottom: max(calc(var(--ak-sab, env(safe-area-inset-bottom, 0px)) + 50px), 84px) !important;
+  padding-bottom: max(calc(var(--ak-sab, env(safe-area-inset-bottom, 0px)) + 8px), 42px) !important;
 }
 .chat-list-tab {
   flex: 1;
@@ -1608,9 +1608,29 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 0;
+  padding: 6px 0 2px;
   cursor: pointer;
   position: relative;
+  color: #666;
+}
+.chat-list-tab .chat-list-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 2px;
+  color: #666;
+  transition: color 0.15s ease;
+}
+.chat-list-tab.active .chat-list-tab-icon {
+  color: #07c160;
+}
+.chat-list-tab .chat-list-tab-label {
+  font-size: 11px;
+  line-height: 1.2;
+  color: #666;
+  transition: color 0.15s ease;
 }
 .chat-list-tab.active .chat-list-tab-label {
   color: #07c160;
@@ -1618,8 +1638,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .chat-list-tab .chat-list-tab-badge {
   position: absolute;
-  top: 4px;
-  right: calc(50% - 22px);
+  top: 2px;
+  right: calc(50% - 20px);
   min-width: 16px;
   height: 16px;
   border-radius: 8px;
@@ -2738,7 +2758,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .friends-header .back-btn {
   position: absolute;
-  top: calc(12px + var(--ak-sat, 0px));
+  top: 12px;
   left: 16px;
   z-index: 10;
 }
@@ -4883,7 +4903,7 @@ body.dark-mode .akini-slider-value {
   border-top: 1px solid #f0f0f0;
   font-size: 12px;
   color: #888;
-} /* 固定顶部栏安全区避让：全面屏/灵动岛/添加到桌面 standalone 统一安全下移 */
+} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示 */
 .chat-top-bar,
 .chat-list-header,
 .content-header,
@@ -4891,6 +4911,8 @@ body.dark-mode .akini-slider-value {
 .beautify-header,
 .icity-header,
 .create-group-header,
+.add-contact-header,
+.contact-detail-header,
 #musicContactPicker > div > div:first-child {
   position: fixed !important;
   top: 0;
@@ -4899,37 +4921,34 @@ body.dark-mode .akini-slider-value {
   width: 100%;
   box-sizing: border-box;
   z-index: 1000 !important;
-  padding-top: calc(8px + var(--ak-sat, 0px)) !important;
 }
 
-/* 微信/通讯录顶栏内部返回与添加按钮随安全区垂直对齐 */
-.chat-list-header #chatListBackBtn {
-  top: calc(8px + var(--ak-sat, 0px)) !important;
-}
-.chat-list-header #chatListAddBtn {
-  top: calc(4px + var(--ak-sat, 0px)) !important;
-}
-
-/* 各内容 body 避让固定顶栏（包含状态栏高度，彻底杜绝内容上移撞入灵动岛） */
+/* 各内容 body 避让固定顶栏，恢复原有正常高度，彻底消除多余拉低 */
 .chat-list-body,
-#contactsListBody {
-  padding-top: calc(52px + var(--ak-sat, 0px)) !important;
+#contactsListBody,
+.create-group-body,
+.add-contact-body,
+.contact-detail-body,
+#app-create-group .create-group-body,
+#app-add-contact .add-contact-body,
+#app-contact-detail .contact-detail-body {
+  padding-top: 50px !important;
 }
 .settings-body,
 .beautify-body {
-  padding-top: calc(65px + var(--ak-sat, 0px)) !important; /* v20260830bc: 设置/美化内容再下移 3px */
+  padding-top: 65px !important; /* v20260830bc: 设置/美化内容再下移 3px */
 }
 #icityArea > div:nth-child(2) {
-  padding-top: calc(52px + var(--ak-sat, 0px)) !important;
+  padding-top: 50px !important;
 }
 #musicContactPicker > div {
-  padding-top: calc(54px + var(--ak-sat, 0px)) !important;
+  padding-top: 54px !important;
 }
 .content-body {
-  padding-top: calc(60px + var(--ak-sat, 0px)) !important;
+  padding-top: 60px !important;
 }
 .chat-body {
-  padding-top: calc(56px + var(--ak-sat, 0px)) !important;
+  padding-top: 50px !important;
 }
 
 /* === v20260821d: 彻底禁止界面缩放，防止 iOS 聚焦输入框自动放大且无法还原 === */
@@ -4982,29 +5001,36 @@ a,
   background: #f6f6f6 !important;
   box-sizing: border-box !important;
 }
-.create-group-wrapper {
+.create-group-wrapper,
+.add-contact-wrapper,
+.contact-detail-wrapper {
   display: flex !important;
   flex-direction: column !important;
   height: 100% !important;
   width: 100% !important;
   background: #f6f6f6 !important;
 }
-.create-group-header {
+.create-group-header,
+.add-contact-header,
+.contact-detail-header {
   flex-shrink: 0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  padding: 12px 16px !important;
-  padding-top: max(12px, var(--ak-sat, 12px)) !important;
+  padding: 8px 16px 12px !important;
   background: #fff !important;
   border-bottom: 1px solid #e8e8e8 !important;
-  z-index: 10 !important;
+  z-index: 1000 !important;
+  height: 48px !important;
+  box-sizing: border-box !important;
 }
-.create-group-body {
+.create-group-body,
+.add-contact-body,
+.contact-detail-body {
   flex: 1 !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
-  padding: 16px 16px calc(24px + env(safe-area-inset-bottom, 24px)) !important;
+  padding: 50px 16px calc(24px + env(safe-area-inset-bottom, 24px)) !important;
   box-sizing: border-box !important;
 }
 
@@ -5515,18 +5541,12 @@ button.back-btn[type="button"] {
 }
 .settings-body,
 .beautify-body,
-.icity-body,
-.create-group-body {
+.icity-body {
   padding-top: 66px !important;
-}
-#app-create-group .create-group-body,
-#app-create-group.create-group-wrapper .create-group-body {
-  padding-top: 60px !important;
 }
 .settings-header,
 .beautify-header,
-.icity-header,
-.create-group-header {
+.icity-header {
   padding: 0 16px !important;
   height: 50px !important;
   min-height: 50px !important;

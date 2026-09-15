@@ -7845,6 +7845,8 @@ document.addEventListener("DOMContentLoaded", function () {
         var i = e.querySelector(".chat-list-tab-label");
         (i && (i.style.color = n ? "#07c160" : "#666"),
           i && (i.style.fontWeight = n ? "600" : "400"));
+        var ic = e.querySelector(".chat-list-tab-icon");
+        ic && (ic.style.color = n ? "#07c160" : "#666");
       }),
         e && (e.style.display = "wechat" === t ? "flex" : "none"),
         n && (n.style.display = "contacts" === t ? "flex" : "none"));
