@@ -150,7 +150,7 @@
       var doReload = function () {
         if (reloaded) return;
         reloaded = true;
-        // milk 式：换 URL 整页加载（?reset= 时间戳），bfcache 对 URL 变化不适用，旧页面无法从内存复活
+        // core 式：换 URL 整页加载（?reset= 时间戳），bfcache 对 URL 变化不适用，旧页面无法从内存复活
         try { location.href = location.pathname + "?reset=" + Date.now(); }
         catch (e) { try { location.reload(true); } catch (e2) { location.reload(); } }
       };
@@ -172,7 +172,7 @@
       var finish = function () {
         // 所有 IDB 已删，最后清 localStorage 并立即刷新（顺序不能反，否则快照机制会在间隙写回）
         clearLocal();
-        // milk 式全量归0：清空所有可访问 cookie（含残留的标记/会话 cookie）
+        // core 式全量归0：清空所有可访问 cookie（含残留的标记/会话 cookie）
         try {
           document.cookie.split(";").forEach(function (c) {
             var n = String(c).split("=")[0].trim();
@@ -203,7 +203,7 @@
         ]).then(function () { setTimeout(doReload, 200); });
       };
       var deleteAllIdb = function () {
-        // milk 式：主库已被 _idbStore.clearAll()（= localforage.clear()，同连接清空）处理
+        // core 式：主库已被 _idbStore.clearAll()（= localforage.clear()，同连接清空）处理
         // 全量归0：枚举删除所有 IDB 库；主库虽有活动连接导致删除被 blocked，但数据已被 clearAll 归零，
         // 删除请求随页面卸载消亡，配合保险丝 cookie 下次启动再清一轮，保证无任何残留
         try {

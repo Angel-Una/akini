@@ -992,7 +992,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   min-width: 64px;
   min-height: 40px;
 }
-/* 输入动态悬浮层：参考 milk 逻辑，固定在输入栏上方，不参与消息流，
+/* 输入动态悬浮层：参考 core 逻辑，固定在输入栏上方，不参与消息流，
    因此永远视觉上位于所有消息之下，且不会被 chatBody 重绘清掉（防闪烁） */
 .akini-typing-float {
   position: absolute;
@@ -1791,7 +1791,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   white-space: pre-wrap;
   writing-mode: horizontal-tb;
   line-height: 1.5;
-  /* v20260909za 关键修复：气泡必须是定位容器（与 milk 的 .message 一致），
+  /* v20260909za 关键修复：气泡必须是定位容器（与 core 的 .message 一致），
      否则美化 CSS 的 ::before/::after 翅膀/弧带装饰会锚定到外层 .msg-row（整行宽），
      错位后盖在气泡上下边缘，看起来就像被割断/缺一块 */
   position: relative !important;
@@ -1799,8 +1799,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
      装饰会穿透到聊天背景图下面而消失（看起来不完整）；isolate 保证负层装饰
      只垫在气泡底色之下、页面背景之上，任何美化 CSS 的装饰都完整可见 */
   isolation: isolate !important;
-  /* v20260909zf 核心修复（对齐 milk .message 的 overflow:hidden）：
-     弧带/翅膀类美化装饰是按"被气泡边缘裁掉"设计的——milk 默认 overflow:hidden 把
+  /* v20260909zf 核心修复（对齐 core .message 的 overflow:hidden）：
+     弧带/翅膀类美化装饰是按"被气泡边缘裁掉"设计的——core 默认 overflow:hidden 把
      inset:0 的弧带裁成胶囊形；我们之前气泡没有 overflow 基线（默认 visible），
      弧带原样溢出气泡上下边缘 → 看起来就是被割断。这里给低优先级默认 hidden：
      美化 CSS 自己写了 overflow:visible !important（如外贴翅膀）仍可正常覆盖。 */
@@ -5405,7 +5405,7 @@ button.back-btn[type="button"] {
   color: #888 !important;
   text-shadow: none !important;
 }
-/* 删掉首页中间位置独立滑动：对齐 milk 与 mochi，全部平铺显示 */
+/* 删掉首页中间位置独立滑动：对齐 core 与 standard，全部平铺显示 */
 .middle-row {
   overflow: visible !important;
   -webkit-overflow-scrolling: auto;
@@ -5904,7 +5904,7 @@ html, body {
 }
 
 
-/* ===== 低内存设备减负（防卡顿发烫崩溃，mochi 同款思路） ===== */
+/* ===== 低内存设备减负（防卡顿发烫崩溃，standard 同款思路） ===== */
 /* backdrop-filter 毛玻璃是手机 GPU 发热头号大户，低端机直接关闭（保留底色半透明观感） */
 .low-mem *,
 .low-mem *::before,
@@ -6267,7 +6267,7 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 .wb-word-item, .wb-excl-card-row, .wb-excl-group-row { content-visibility: auto; contain-intrinsic-size: auto 56px; }
 /* v20260909zi 关键修复：content-visibility:auto 附带 paint containment（绘制裁剪），
    iOS Safari 会严格执行——探出气泡上边缘的美化装饰(::before 等)被行盒子水平裁掉，
-   表现为"装饰缺失/被割断"（milk 无此规则故永远完整）。开启美化 CSS 时必须停用，
+   表现为"装饰缺失/被割断"（core 无此规则故永远完整）。开启美化 CSS 时必须停用，
    仅在默认气泡下保留该滚动性能优化 */
 body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-size: auto 48px; }
 .akini-ta-phone-item { content-visibility: auto; contain-intrinsic-size: auto 90px; }
@@ -6400,7 +6400,7 @@ body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-
   border-top: 1px solid #f0f0f0 !important;
 }
 
-/* ===== v20260909k 时间戳照抄 mochi：列宽自适应内容，永不裁切 ===== */
+/* ===== v20260909k 时间戳照抄 standard：列宽自适应内容，永不裁切 ===== */
 .chat-body .msg-row .avatar-col {
   width: 38px !important;
   min-width: 38px;
@@ -6518,7 +6518,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   height: auto !important;
 }
 
-/* v20260909zb: 不再强制 bubble overflow（milk 的 .message 是 overflow:hidden，
+/* v20260909zb: 不再强制 bubble overflow（core 的 .message 是 overflow:hidden，
    美化设计靠它把内部弧带装饰裁剪成胶囊形；强制 visible 会让装饰溢出上下边缘形成隔断）。
    裁不裁完全交给美化 CSS 自己决定；祖先容器保持 overflow:visible 防止外部裁切。 */
 
@@ -6536,7 +6536,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   max-height: 120px;
   border-radius: 8px;
   display: block;
-}/* v20260909zb: 不再强制 bubble overflow（milk 的 .message 是 overflow:hidden，
+}/* v20260909zb: 不再强制 bubble overflow（core 的 .message 是 overflow:hidden，
    美化设计靠它把内部弧带装饰裁剪成胶囊形；强制 visible 会让装饰溢出上下边缘形成隔断）。
    裁不裁完全交给美化 CSS 自己决定；祖先容器保持 overflow:visible 防止外部裁切。 */
 

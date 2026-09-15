@@ -1,5 +1,5 @@
 /**
- * Akini 备份引擎：milk-main 风格 ZIP 导出/导入
+ * Akini 备份引擎：standard-main 风格 ZIP 导出/导入
  * 把 localStorage + IndexedDB 中的数据打包成 ZIP：backup.json + media/* 二进制
  * 避免单文件巨型 JSON 无法解析，导入后再把媒体内联回 data URL。
  */
@@ -460,7 +460,7 @@
     notify("备份导出", "正在生成 JSON 备份文件…", "info");
     buildBackupPayload(function (payload) {
       var dateStr = new Date().toISOString().slice(0, 10);
-      /* milk 同款：直接导出单个 .json 文件（媒体内联在 JSON 内），导入仍兼容旧 ZIP 备份 */
+      /* core 同款：直接导出单个 .json 文件（媒体内联在 JSON 内），导入仍兼容旧 ZIP 备份 */
       fallbackJson(payload, dateStr);
       return;
 
