@@ -19081,7 +19081,7 @@ document.addEventListener("DOMContentLoaded", function () {
               e.playlistInput && (e.playlistInput.value = ""),
               Pt(),
               wt(c[l], !1),
-              pt("已导入 " + c.length + " 首，点击播放按钮开始播放"),
+              pt("已导入 " + c.length + " 首（注：VIP歌曲受版权限制仅能试听片段）"),
               Bt(),
               e.playlistOverlay && (e.playlistOverlay.style.display = "flex"),
               alert(
@@ -22274,6 +22274,54 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bindTestPush);
   else bindTestPush();
+
+  function bindAndroidTutorial() {
+    var link = document.getElementById("openAndroidKeepAliveModalBtn");
+    var modal = document.getElementById("androidKeepAliveModal");
+    var closeBtn = document.getElementById("androidKeepAliveModalClose");
+    var gotItBtn = document.getElementById("androidTutorialGotItBtn");
+    var testBtn = document.getElementById("androidTutorialTestPushBtn");
+
+    if (!modal) return;
+    function openM(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      modal.style.display = "flex";
+    }
+    function closeM(e) {
+      if (e) { e.preventDefault(); e.stopPropagation(); }
+      modal.style.display = "none";
+    }
+
+    if (link && !link._akiniBound) {
+      link._akiniBound = true;
+      link.addEventListener("click", openM);
+    }
+    if (closeBtn && !closeBtn._akiniBound) {
+      closeBtn._akiniBound = true;
+      closeBtn.addEventListener("click", closeM);
+    }
+    if (gotItBtn && !gotItBtn._akiniBound) {
+      gotItBtn._akiniBound = true;
+      gotItBtn.addEventListener("click", closeM);
+    }
+    modal.addEventListener("click", function (e) {
+      if (e.target === modal) closeM(e);
+    });
+
+    if (testBtn && !testBtn._akiniBound) {
+      testBtn._akiniBound = true;
+      testBtn.addEventListener("click", function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        var tp = document.getElementById("testPushBtn");
+        if (tp) tp.click();
+      });
+    }
+  }
+
+  if (document.readyState === "loading")
+    document.addEventListener("DOMContentLoaded", bindAndroidTutorial);
+  else bindAndroidTutorial();
+
 
   /* 一起听界面锁定：app-music 显示时，除播放列表/联系人列表/菜单面板外禁止触摸滑动 */
   document.addEventListener("touchmove", function (ev) {
