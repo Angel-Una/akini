@@ -2084,16 +2084,24 @@ body:not(.bubble-css-on)
   flex-direction: row;
 }
 .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
-  background: rgba(200, 200, 200, 0.35) !important;
-  color: #888 !important;
-  font-size: 12px !important;
-  padding: 3px 10px !important;
-  border-radius: 20px !important;
-  max-width: 90% !important;
+  background-image: none !important;
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #999 !important;
+  font-size: 10px !important;
+  padding: 1px 6px !important;
+  border-radius: 8px !important;
+  max-width: 60% !important;
+  min-width: unset !important;
+  min-height: unset !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
   text-align: center !important;
   box-shadow: none !important;
+  border: none !important;
   font-weight: normal !important;
-  line-height: 1.6 !important;
+  line-height: 1.4 !important;
+  letter-spacing: 0.2px !important;
 }
 .timestamp-row {
   display: flex;
@@ -2756,15 +2764,18 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   position: relative;
   z-index: 1;
 }
+#friendsBody {
+  padding-top: var(--ak-sat) !important;
+}
 .friends-header .back-btn {
   position: absolute;
-  top: 12px;
+  top: calc(12px + var(--ak-sat));
   left: 16px;
   z-index: 10;
 }
 .friends-header .camera-btn {
   position: absolute;
-  top: 16px;
+  top: calc(16px + var(--ak-sat));
   right: 16px;
   background: 0 0;
   border: none;
@@ -2775,7 +2786,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .friends-header .change-bg-btn {
   position: absolute;
-  top: 16px;
+  top: calc(16px + var(--ak-sat));
   right: 60px;
   background: rgba(240, 240, 240, 0.8);
   border: none;
@@ -4923,7 +4934,19 @@ body.dark-mode .akini-slider-value {
   z-index: 1000 !important;
 }
 
-/* 各内容 body 避让固定顶栏，恢复原有正常高度，彻底消除多余拉低 */
+/* 固定顶栏安全区适配：保留原始视觉内边距，仅追加 --ak-sat，避免刘海屏侵入系统状态栏 */
+.chat-top-bar { padding: var(--ak-sat) 12px 0 !important; height: calc(50px + var(--ak-sat)) !important; }
+.chat-list-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; }
+.content-header { padding: calc(16px + var(--ak-sat)) 18px 10px !important; }
+.settings-header { padding: calc(16px + var(--ak-sat)) 18px 16px !important; }
+.beautify-header { padding: calc(16px + var(--ak-sat)) 18px 16px !important; }
+.icity-header { padding: calc(14px + var(--ak-sat)) 16px 14px !important; }
+.create-group-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; height: calc(48px + var(--ak-sat)) !important; }
+.add-contact-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; height: calc(48px + var(--ak-sat)) !important; }
+.contact-detail-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; height: calc(48px + var(--ak-sat)) !important; }
+#musicContactPicker > div > div:first-child { padding: calc(14px + var(--ak-sat)) 12px 14px !important; height: calc(50px + var(--ak-sat)) !important; }
+
+/* 各内容 body 避让固定顶栏：base 高度保持原设计，仅追加安全区，避免非刘海屏被拉低 */
 .chat-list-body,
 #contactsListBody,
 .create-group-body,
@@ -4932,23 +4955,23 @@ body.dark-mode .akini-slider-value {
 #app-create-group .create-group-body,
 #app-add-contact .add-contact-body,
 #app-contact-detail .contact-detail-body {
-  padding-top: 50px !important;
+  padding-top: calc(50px + var(--ak-sat)) !important;
 }
 .settings-body,
 .beautify-body {
-  padding-top: 65px !important; /* v20260830bc: 设置/美化内容再下移 3px */
+  padding-top: calc(65px + var(--ak-sat)) !important;
 }
 #icityArea > div:nth-child(2) {
-  padding-top: 50px !important;
+  padding-top: calc(50px + var(--ak-sat)) !important;
 }
 #musicContactPicker > div {
-  padding-top: 54px !important;
+  padding-top: calc(54px + var(--ak-sat)) !important;
 }
 .content-body {
-  padding-top: 60px !important;
+  padding-top: calc(60px + var(--ak-sat)) !important;
 }
 .chat-body {
-  padding-top: 50px !important;
+  padding-top: calc(50px + var(--ak-sat)) !important;
 }
 
 /* === v20260821d: 彻底禁止界面缩放，防止 iOS 聚焦输入框自动放大且无法还原 === */
@@ -6645,7 +6668,23 @@ body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
 /* 字卡库工具栏：图标聚集靠最右（覆盖旧 4 列均分网格） */
 /* zzc：恢复两行四列布局（用户要求），6241 行规则生效 */
 .wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }
-html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { font-size: 11px !important; padding: 2px 8px !important; line-height: 1.5 !important; }
+html body .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background-image: none !important;
+  background-size: auto !important;
+  font-size: 10px !important;
+  padding: 1px 6px !important;
+  line-height: 1.4 !important;
+  max-width: 60% !important;
+  min-width: unset !important;
+  min-height: unset !important;
+  width: auto !important;
+  height: auto !important;
+  display: inline-block !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  border: none !important;
+  letter-spacing: 0.2px !important;
+}
 /* 输入栏防挤压：保证表情/发送/加号按钮在所有界面完整显示 */
 .chat-input-bar { width: 100%; box-sizing: border-box; }
 .chat-input-bar .input-wrap { min-width: 0; flex: 1 1 0; }
