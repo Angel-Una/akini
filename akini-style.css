@@ -2764,18 +2764,15 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   position: relative;
   z-index: 1;
 }
-#friendsBody {
-  padding-top: var(--ak-sat) !important;
-}
 .friends-header .back-btn {
   position: absolute;
-  top: calc(12px + var(--ak-sat));
+  top: 12px;
   left: 16px;
   z-index: 10;
 }
 .friends-header .camera-btn {
   position: absolute;
-  top: calc(16px + var(--ak-sat));
+  top: 16px;
   right: 16px;
   background: 0 0;
   border: none;
@@ -2786,7 +2783,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .friends-header .change-bg-btn {
   position: absolute;
-  top: calc(16px + var(--ak-sat));
+  top: 16px;
   right: 60px;
   background: rgba(240, 240, 240, 0.8);
   border: none;
@@ -4914,64 +4911,39 @@ body.dark-mode .akini-slider-value {
   border-top: 1px solid #f0f0f0;
   font-size: 12px;
   color: #888;
-} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示 */
-.chat-top-bar,
-.chat-list-header,
-.content-header,
+} /* 顶部栏恢复 relative 文档流：避免某些机型因 fixed top:0 与 body padding-top 下拉造成顶栏上移挤占状态栏或内容异常低垂 */
+.wb-header,
+.icity-header,
 .settings-header,
 .beautify-header,
-.icity-header,
+.content-header,
+.chat-top-bar,
+.friends-header,
+.chat-list-header,
 .create-group-header,
 .add-contact-header,
 .contact-detail-header,
 #musicContactPicker > div > div:first-child {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* 仅在需要常驻顶部的情景使用 fixed，并轻微避让安全区 */
+.chat-top-bar,
+#musicContactPicker > div > div:first-child {
   position: fixed !important;
-  top: 0;
-  left: 0;
-  right: 0;
-  width: 100%;
-  box-sizing: border-box;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
   z-index: 1000 !important;
 }
 
-/* 固定顶栏安全区适配：保留原始视觉内边距，仅追加 --ak-sat，避免刘海屏侵入系统状态栏 */
-.chat-top-bar { padding: var(--ak-sat) 12px 0 !important; height: calc(50px + var(--ak-sat)) !important; }
-.chat-list-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; }
-.content-header { padding: calc(16px + var(--ak-sat)) 18px 10px !important; }
-.settings-header { padding: calc(16px + var(--ak-sat)) 18px 16px !important; }
-.beautify-header { padding: calc(16px + var(--ak-sat)) 18px 16px !important; }
-.icity-header { padding: calc(14px + var(--ak-sat)) 16px 14px !important; }
-.create-group-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; height: calc(48px + var(--ak-sat)) !important; }
-.add-contact-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; height: calc(48px + var(--ak-sat)) !important; }
-.contact-detail-header { padding: calc(8px + var(--ak-sat)) 16px 12px !important; height: calc(48px + var(--ak-sat)) !important; }
-#musicContactPicker > div > div:first-child { padding: calc(14px + var(--ak-sat)) 12px 14px !important; height: calc(50px + var(--ak-sat)) !important; }
-
-/* 各内容 body 避让固定顶栏：base 高度保持原设计，仅追加安全区，避免非刘海屏被拉低 */
-.chat-list-body,
-#contactsListBody,
-.create-group-body,
-.add-contact-body,
-.contact-detail-body,
-#app-create-group .create-group-body,
-#app-add-contact .add-contact-body,
-#app-contact-detail .contact-detail-body {
-  padding-top: calc(50px + var(--ak-sat)) !important;
-}
-.settings-body,
-.beautify-body {
-  padding-top: calc(65px + var(--ak-sat)) !important;
-}
-#icityArea > div:nth-child(2) {
-  padding-top: calc(50px + var(--ak-sat)) !important;
+/* 仅让需要 fixed 的页面 body 避让，其他页面回归原有文档流 */
+.chat-body {
+  padding-top: 50px !important;
 }
 #musicContactPicker > div {
-  padding-top: calc(54px + var(--ak-sat)) !important;
-}
-.content-body {
-  padding-top: calc(60px + var(--ak-sat)) !important;
-}
-.chat-body {
-  padding-top: calc(50px + var(--ak-sat)) !important;
+  padding-top: 54px !important;
 }
 
 /* === v20260821d: 彻底禁止界面缩放，防止 iOS 聚焦输入框自动放大且无法还原 === */
