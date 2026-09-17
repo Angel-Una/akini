@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-v20260914zzzr';
+const CACHE_NAME = 'akini-cache-v20260917zzzn';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -58,21 +58,7 @@ self.addEventListener('fetch', function(event) {
   );
 });
 
-self.addEventListener('message', function(event) {
-  var d = event && event.data;
-  if (d && d.type === 'GET_CACHE_NAME') {
-    var reply = { type: 'CACHE_NAME', name: CACHE_NAME };
-    try {
-      if (event.source && event.source.postMessage) {
-        event.source.postMessage(reply);
-      } else if (self.clients && self.clients.matchAll) {
-        self.clients.matchAll({ includeUncontrolled: true, type: 'window' }).then(function(clients) {
-          clients.forEach(function(c) { c.postMessage(reply); });
-        });
-      }
-    } catch (e) {}
-  }
-});
+/* zzzl：页面端已删除版本校验强制刷新，GET_CACHE_NAME 监听一并移除 */
 
 self.addEventListener('push', function(event) {
   if (!event.data) return;
@@ -176,12 +162,3 @@ self.addEventListener('notificationclick', function(event) {
   );
 });
 
-self.addEventListener('message', function(event){
-  if(event.data && event.data.type === 'GET_CACHE_NAME'){
-    // 页面端通过 navigator.serviceWorker.addEventListener('message') 接收，需回 {type:'CACHE_NAME', name}
-    try { if (event.source && event.source.postMessage) event.source.postMessage({ type: 'CACHE_NAME', name: CACHE_NAME }); } catch(e){}
-    if(event.ports && event.ports[0]){
-      event.ports[0].postMessage({ type: 'CACHE_NAME', name: CACHE_NAME, cacheName: CACHE_NAME });
-    }
-  }
-});

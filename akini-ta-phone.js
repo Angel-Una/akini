@@ -4,18 +4,18 @@
  * - 打开后首先显示「所有创建过的联系人」网格：头像在上，名字在下
  * - 点击联系人后进入该联系人的桌面，显示三个应用：聊天 / 朋友圈 / iCity
  * - 点击应用后查看 TA 自动收藏的该联系人的对应数据
- * - 收藏逻辑参考 syy ta-phone.js：系统按概率自动收藏用户发过的聊天消息与朋友圈/iCity
+ * - 收藏逻辑参考 compat ta-phone.js：系统按概率自动收藏用户发过的聊天消息与朋友圈/iCity
  * - 数据按联系人维度存储：akini_ta_phone_<contactId> = { chat:[], moments:[], icity:[] }
  */
 (function () {
   'use strict';
 
-  var CHAT_CHANCE = 0.02;           // 聊天实时收藏概率 2%（对齐 syy）
-  var MOMENTS_CHANCE = 0.10;        // 朋友圈实时收藏概率 10%（对齐 syy）
+  var CHAT_CHANCE = 0.02;           // 聊天实时收藏概率 2%（对齐 compat）
+  var MOMENTS_CHANCE = 0.10;        // 朋友圈实时收藏概率 10%（对齐 compat）
   var ICITY_CHANCE = 0.10;          // iCity 实时收藏概率 10%（与朋友圈一致）
   var MUSIC_CHANCE = 0.10;          // 网易云收藏概率 10%（与朋友圈一致）
-  var CHAT_HISTORY_CHANCE = 0.03;   // 历史聊天收藏概率 3%（对齐 syy）
-  var MOMENTS_HISTORY_CHANCE = 0.05;// 历史朋友圈收藏概率 5%（对齐 syy）
+  var CHAT_HISTORY_CHANCE = 0.03;   // 历史聊天收藏概率 3%（对齐 compat）
+  var MOMENTS_HISTORY_CHANCE = 0.05;// 历史朋友圈收藏概率 5%（对齐 compat）
   var ICITY_HISTORY_CHANCE = 0.05;  // 历史 iCity 收藏概率 5%（与朋友圈一致）
   var MUSIC_HISTORY_CHANCE = 0.05;  // 历史网易云收藏概率 5%（与朋友圈一致）
 

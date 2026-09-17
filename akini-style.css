@@ -992,7 +992,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   min-width: 64px;
   min-height: 40px;
 }
-/* 输入动态悬浮层：参考 milk 逻辑，固定在输入栏上方，不参与消息流，
+/* 输入动态悬浮层：参考 core 逻辑，固定在输入栏上方，不参与消息流，
    因此永远视觉上位于所有消息之下，且不会被 chatBody 重绘清掉（防闪烁） */
 .akini-typing-float {
   position: absolute;
@@ -1600,7 +1600,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   background: #fff;
   border-top: 1px solid #e8e8e8;
-  padding-bottom: env(safe-area-inset-bottom, 0);
+  padding-bottom: max(calc(var(--ak-sab, env(safe-area-inset-bottom, 0px)) + 8px), 21px) !important;
 }
 .chat-list-tab {
   flex: 1;
@@ -1608,9 +1608,29 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 0;
+  padding: 6px 0 2px;
   cursor: pointer;
   position: relative;
+  color: #666;
+}
+.chat-list-tab .chat-list-tab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 2px;
+  color: #666;
+  transition: color 0.15s ease;
+}
+.chat-list-tab.active .chat-list-tab-icon {
+  color: #07c160;
+}
+.chat-list-tab .chat-list-tab-label {
+  font-size: 11px;
+  line-height: 1.2;
+  color: #666;
+  transition: color 0.15s ease;
 }
 .chat-list-tab.active .chat-list-tab-label {
   color: #07c160;
@@ -1618,8 +1638,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .chat-list-tab .chat-list-tab-badge {
   position: absolute;
-  top: 4px;
-  right: calc(50% - 22px);
+  top: 2px;
+  right: calc(50% - 20px);
   min-width: 16px;
   height: 16px;
   border-radius: 8px;
@@ -1791,7 +1811,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   white-space: pre-wrap;
   writing-mode: horizontal-tb;
   line-height: 1.5;
-  /* v20260909za 关键修复：气泡必须是定位容器（与 milk 的 .message 一致），
+  /* v20260909za 关键修复：气泡必须是定位容器（与 core 的 .message 一致），
      否则美化 CSS 的 ::before/::after 翅膀/弧带装饰会锚定到外层 .msg-row（整行宽），
      错位后盖在气泡上下边缘，看起来就像被割断/缺一块 */
   position: relative !important;
@@ -1799,8 +1819,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
      装饰会穿透到聊天背景图下面而消失（看起来不完整）；isolate 保证负层装饰
      只垫在气泡底色之下、页面背景之上，任何美化 CSS 的装饰都完整可见 */
   isolation: isolate !important;
-  /* v20260909zf 核心修复（对齐 milk .message 的 overflow:hidden）：
-     弧带/翅膀类美化装饰是按"被气泡边缘裁掉"设计的——milk 默认 overflow:hidden 把
+  /* v20260909zf 核心修复（对齐 core .message 的 overflow:hidden）：
+     弧带/翅膀类美化装饰是按"被气泡边缘裁掉"设计的——core 默认 overflow:hidden 把
      inset:0 的弧带裁成胶囊形；我们之前气泡没有 overflow 基线（默认 visible），
      弧带原样溢出气泡上下边缘 → 看起来就是被割断。这里给低优先级默认 hidden：
      美化 CSS 自己写了 overflow:visible !important（如外贴翅膀）仍可正常覆盖。 */
@@ -2544,41 +2564,42 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }.plus-menu {
   display: none;
   position: absolute;
-  bottom: calc(100% + 6px);
-  right: 12px;
+  bottom: calc(100% + 4px);
+  right: 4px;
   background: #fff;
-  border-radius: 18px;
-  padding: 14px 16px;
+  border-radius: 14px;
+  padding: 6px;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12);
   z-index: 100;
-  gap: 8px;
+  gap: 2px;
 }.plus-menu.show {
   display: grid;
   grid-template-columns: repeat(3, max-content);
-  justify-content: space-between;
+  justify-content: end;
   min-width: 0;
-  width: min(236px, calc(100vw - 40px));
+  width: max-content;
+  max-width: calc(100vw - 16px);
 }.plus-menu-item {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   cursor: pointer;
-  padding: 10px 6px;
-  border-radius: 14px;
+  padding: 6px 5px;
+  border-radius: 10px;
   transition: background 0.15s;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   -webkit-user-select: none;
 }.plus-menu-item {
-  padding: 8px 4px;
+  padding: 6px 5px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 .plus-menu-item:active {
   background: #f2f2f2;
@@ -2597,8 +2618,8 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   stroke: #000 !important;
   fill: none;
 }.plus-menu-item .icon-circle {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   border: 2px solid #000;
   border-radius: 50%;
   display: flex;
@@ -4882,7 +4903,7 @@ body.dark-mode .akini-slider-value {
   border-top: 1px solid #f0f0f0;
   font-size: 12px;
   color: #888;
-} /* 固定顶部栏：除朋友圈外所有页面 */
+} /* 固定顶部栏安全区避让：全面屏/灵动岛/添加到桌面 standalone 统一安全下移 */
 .chat-top-bar,
 .chat-list-header,
 .content-header,
@@ -4898,23 +4919,37 @@ body.dark-mode .akini-slider-value {
   width: 100%;
   box-sizing: border-box;
   z-index: 1000 !important;
+  padding-top: calc(8px + var(--ak-sat, 0px)) !important;
 }
+
+/* 微信/通讯录顶栏内部返回与添加按钮随安全区垂直对齐 */
+.chat-list-header #chatListBackBtn {
+  top: calc(8px + var(--ak-sat, 0px)) !important;
+}
+.chat-list-header #chatListAddBtn {
+  top: calc(4px + var(--ak-sat, 0px)) !important;
+}
+
+/* 各内容 body 避让固定顶栏（包含状态栏高度，彻底杜绝内容上移撞入灵动岛） */
 .chat-list-body,
 #contactsListBody {
-  padding-top: 50px !important;
+  padding-top: calc(52px + var(--ak-sat, 0px)) !important;
 }
 .settings-body,
 .beautify-body {
-  padding-top: 65px !important; /* v20260830bc: 设置/美化内容再下移 3px */
+  padding-top: calc(65px + var(--ak-sat, 0px)) !important; /* v20260830bc: 设置/美化内容再下移 3px */
 }
 #icityArea > div:nth-child(2) {
-  padding-top: 50px !important;
+  padding-top: calc(52px + var(--ak-sat, 0px)) !important;
 }
 #musicContactPicker > div {
-  padding-top: 54px !important;
+  padding-top: calc(54px + var(--ak-sat, 0px)) !important;
 }
 .content-body {
-  padding-top: 60px !important;
+  padding-top: calc(60px + var(--ak-sat, 0px)) !important;
+}
+.chat-body {
+  padding-top: calc(56px + var(--ak-sat, 0px)) !important;
 }
 
 /* === v20260821d: 彻底禁止界面缩放，防止 iOS 聚焦输入框自动放大且无法还原 === */
@@ -5404,7 +5439,7 @@ button.back-btn[type="button"] {
   color: #888 !important;
   text-shadow: none !important;
 }
-/* 删掉首页中间位置独立滑动：对齐 milk 与 mochi，全部平铺显示 */
+/* 删掉首页中间位置独立滑动：对齐 core 与 standard，全部平铺显示 */
 .middle-row {
   overflow: visible !important;
   -webkit-overflow-scrolling: auto;
@@ -5903,7 +5938,7 @@ html, body {
 }
 
 
-/* ===== 低内存设备减负（防卡顿发烫崩溃，mochi 同款思路） ===== */
+/* ===== 低内存设备减负（防卡顿发烫崩溃，standard 同款思路） ===== */
 /* backdrop-filter 毛玻璃是手机 GPU 发热头号大户，低端机直接关闭（保留底色半透明观感） */
 .low-mem *,
 .low-mem *::before,
@@ -6266,7 +6301,7 @@ body.dark-mode .ak-stor-btn.primary { background: #f0f0f0; border-color: #f0f0f0
 .wb-word-item, .wb-excl-card-row, .wb-excl-group-row { content-visibility: auto; contain-intrinsic-size: auto 56px; }
 /* v20260909zi 关键修复：content-visibility:auto 附带 paint containment（绘制裁剪），
    iOS Safari 会严格执行——探出气泡上边缘的美化装饰(::before 等)被行盒子水平裁掉，
-   表现为"装饰缺失/被割断"（milk 无此规则故永远完整）。开启美化 CSS 时必须停用，
+   表现为"装饰缺失/被割断"（core 无此规则故永远完整）。开启美化 CSS 时必须停用，
    仅在默认气泡下保留该滚动性能优化 */
 body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-size: auto 48px; }
 .akini-ta-phone-item { content-visibility: auto; contain-intrinsic-size: auto 90px; }
@@ -6399,7 +6434,7 @@ body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-
   border-top: 1px solid #f0f0f0 !important;
 }
 
-/* ===== v20260909k 时间戳照抄 mochi：列宽自适应内容，永不裁切 ===== */
+/* ===== v20260909k 时间戳照抄 standard：列宽自适应内容，永不裁切 ===== */
 .chat-body .msg-row .avatar-col {
   width: 38px !important;
   min-width: 38px;
@@ -6517,7 +6552,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   height: auto !important;
 }
 
-/* v20260909zb: 不再强制 bubble overflow（milk 的 .message 是 overflow:hidden，
+/* v20260909zb: 不再强制 bubble overflow（core 的 .message 是 overflow:hidden，
    美化设计靠它把内部弧带装饰裁剪成胶囊形；强制 visible 会让装饰溢出上下边缘形成隔断）。
    裁不裁完全交给美化 CSS 自己决定；祖先容器保持 overflow:visible 防止外部裁切。 */
 
@@ -6535,7 +6570,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   max-height: 120px;
   border-radius: 8px;
   display: block;
-}/* v20260909zb: 不再强制 bubble overflow（milk 的 .message 是 overflow:hidden，
+}/* v20260909zb: 不再强制 bubble overflow（core 的 .message 是 overflow:hidden，
    美化设计靠它把内部弧带装饰裁剪成胶囊形；强制 visible 会让装饰溢出上下边缘形成隔断）。
    裁不裁完全交给美化 CSS 自己决定；祖先容器保持 overflow:visible 防止外部裁切。 */
 
@@ -6573,7 +6608,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
 .akini-safe-mode .fit-inner { transform: none !important; }
 .akini-safe-mode .fit-mod { height: auto !important; margin-top: 8px !important; }
 .akini-safe-mode .content-wrapper { height: auto !important; margin-top: 44px !important; justify-content: flex-start !important; }
-.akini-safe-mode .phone-frame { overflow-y: auto !important; position: absolute !important; }
+.akini-safe-mode .phone-frame { overflow: hidden !important; } /* zzzv：安全模式下首页也绝不滚动——用户明确要求首页固定不可滑动；极矮屏由 home-fit 整体缩放兜底 */
 .akini-safe-mode .fake-statusbar { display: none !important; }
 
 /* ===== 深度安全模式（连续崩溃≥4次）：最大幅度减负保数据 ===== */
@@ -6648,18 +6683,22 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 /* display:none 的 file input 在部分 iOS/Android WebView 上 JS .click() 无效；
    统一替换为不可见但已渲染的离屏定位，确保所有机型可触发文件选择器 */
 input[type="file"].akini-file-offscreen {
+  /* zzzx：移出视口(-9999px)的 input 在部分 Android WebView/夸克/UC/旧 iOS 上 JS .click() 会被静默拒绝，
+     改为固定在视口内右下角的 2px 透明点——保持已渲染且在视口内，所有机型都能唤起文件选择器 */
   display: block !important;
-  position: absolute !important;
-  top: -9999px !important;
-  left: -9999px !important;
-  width: 1px !important;
-  height: 1px !important;
+  position: fixed !important;
+  top: auto !important;
+  left: auto !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 2px !important;
+  height: 2px !important;
   opacity: 0.01 !important;
   pointer-events: none !important;
   overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
   border: 0 !important;
   padding: 0 !important;
+  z-index: 1 !important;
   margin: 0 !important;
 }
 
@@ -6749,3 +6788,124 @@ input[type="file"].akini-file-offscreen {
   margin: 3px 0 0 0 !important;
 }
 
+
+
+/* ====== 安卓通知与防冻结保活弹窗 ====== */
+.ak-android-modal-card {
+  width: min(390px, 94vw);
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 20px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  animation: akAndroidModalIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes akAndroidModalIn {
+  from { opacity: 0; transform: scale(0.92) translateY(12px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.ak-android-modal-header {
+  padding: 16px 18px 12px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #ebebeb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.ak-android-modal-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1a1a1a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ak-android-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #999;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.ak-android-modal-body {
+  padding: 16px 18px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #333;
+}
+.ak-android-step {
+  background: #f7f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+}
+.ak-android-step-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #07c160;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ak-android-step-desc {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.55;
+}
+.ak-android-highlight {
+  color: #d97706;
+  font-weight: 600;
+}
+.ak-android-modal-footer {
+  padding: 12px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: #f8f9fa;
+  border-top: 1px solid #ebebeb;
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.ak-android-btn-secondary {
+  flex: 1;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  color: #606266;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ak-android-btn-primary {
+  flex: 1.2;
+  height: 42px;
+  border-radius: 10px;
+  border: none;
+  background: #07c160;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ====== zzzk：微信聊天界面系统消息底图恢复小巧胶囊（横竖屏/美化CSS开关全场景生效） ====== */
+/* zzzi 引入的 akini-bubble-force 内联样式 border-radius:999px!important 让系统提示恢复成大胶囊，
+   此处以 html body 前缀 + 更长选择器压过内联块中同优先级规则，仅作用于系统行，不影响普通消息气泡 */
+html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  font-size: 11px !important;
+  padding: 2px 10px !important;
+  line-height: 1.5 !important;
+  border-radius: 16px !important;
+  max-width: 86% !important;
+  background: rgba(200, 200, 200, 0.35) !important;
+  box-shadow: none !important;
+}

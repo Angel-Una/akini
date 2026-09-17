@@ -59,7 +59,7 @@
     }
   }
 
-  // 生成随机来信内容（syy envelope 式合成：字卡库随机 5-12 句，句号连接成段，
+  // 生成随机来信内容（compat envelope 式合成：字卡库随机 5-12 句，句号连接成段，
   // 并在随机 1-3 个句号后插入换行，形成信件排版）
   function genLetter(count) {
     count = parseInt(count, 10);
@@ -87,7 +87,7 @@
     return content.trim();
   }
 
-  // syy 照搬：回信内容生成（8~12 句，每句随机标点 20%「！」/20%「...」/其余「。」）
+  // compat 照搬：回信内容生成（8~12 句，每句随机标点 20%「！」/20%「...」/其余「。」）
   function genReplyText() {
     if (!window.pickWordCards) return "";
     var count = Math.floor(Math.random() * 5) + 8;
@@ -127,6 +127,8 @@
             fromId: s.replyFromId || s.toId,
             subtype: "reply",
             originalContent: s.content,
+            read: false,
+            isRead: false,
           });
           saveReceived(recv);
           s.repliedByTa = true;
@@ -164,7 +166,7 @@
     }
   }
 
-  // ========== 主动来信定时器（syy envelopeAutoSend 模式） ==========
+  // ========== 主动来信定时器（compat envelopeAutoSend 模式） ==========
   var autoTimer = null;
   function manageAutoSendTimer(forceReset) {
     if (autoTimer) clearTimeout(autoTimer);
@@ -195,7 +197,7 @@
       try { localStorage.removeItem("akini_next_mailAutoSend"); } catch (e) {}
       delay = minMs + Math.random() * Math.max(0, maxMs - minMs);
     } else if (lastSent > 0 && now0 - lastSent >= minMs) {
-      // syy 式实体化：离线错过立即补发，进应用 1.5~3.5s 内送达
+      // compat 式实体化：离线错过立即补发，进应用 1.5~3.5s 内送达
       delay = 1500 + Math.floor(Math.random() * 2000);
     } else {
       // 跨重启续跑：已有未到期计划按剩余时间继续；已过期则尽快补发
@@ -246,6 +248,8 @@
           from: c.name,
           fromId: c.id,
           subtype: "letter",
+          read: false,
+          isRead: false,
         });
         saveReceived(recv);
         // 记录本次来信时间，作为下次调度的锚点（跨重启补发依据）
@@ -319,5 +323,5 @@
   // 周期性更新活跃时间（应用在前台时）
   setInterval(markActive, 60000);
 
-  console.log("[akini-mail-engine] 信箱离线回信/主动来信引擎已加载（syy envelope 模式）");
+  console.log("[akini-mail-engine] 信箱离线回信/主动来信引擎已加载（compat envelope 模式）");
 })();
