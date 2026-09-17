@@ -148,7 +148,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   box-sizing: border-box;
   padding-top: 0;
 }
-/* zzzp：安全区避让仅在 PWA standalone 生效；浏览器模式由浏览器 UI 自行避让，
+/* zzzq：安全区避让仅在 PWA standalone 生效；浏览器模式由浏览器 UI 自行避让，
    再叠 env() 会造成双重避让 → 首页被下拉出大片空白 */
 @media (display-mode: standalone) {
   #homeArea { padding-top: var(--ak-sat, 0px); }
@@ -200,7 +200,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   min-width: 0;
   margin-left: 0;
 }
-/* zzzp：仿状态栏已整体移除——PWA 桌面模式下与系统真状态栏重复（双状态栏），浏览器模式下也无存在必要，用户要求删除 */
+/* zzzq：仿状态栏已整体移除——PWA 桌面模式下与系统真状态栏重复（双状态栏），浏览器模式下也无存在必要，用户要求删除 */
 /* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
 .fit-gap-lg { margin-top: 14px; }.fit-gap { margin-top: 10px; }.fit-bottom { margin-top: auto; }.apps-grid {
   display: grid;
@@ -4923,7 +4923,7 @@ body.dark-mode .akini-slider-value {
   border-top: 1px solid #f0f0f0;
   font-size: 12px;
   color: #888;
-} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示；zzzp 增加安全区避让，避免顶栏挤占状态栏 */
+} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示；zzzq 增加安全区避让，避免顶栏挤占状态栏 */
 .chat-top-bar,
 .chat-list-header,
 .content-header,
