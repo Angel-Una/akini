@@ -262,29 +262,19 @@
   }
 
   function myStickerPool() {
-    /* zzzt 修复：我给自己添加的表情包在 akini_stickers_me（与字卡库表情包 tab 同一数据源）。
-       用 getContactStickersSync('me')（与观影/聊天同一直读 localStorage 的通道），
-       不用 __wbRead——其内存缓存可能滞后于最新写入导致读取为空；无后缀旧数据并入兼容 */
-    /* zzzt 修复：直读 localStorage（与字卡库 _stkRead 同通道）——
-       getContactStickersSync 有 __csCache 内存缓存可能陈旧，__wbRead 走 akiniStore 缓存层也可能滞后，
-       都会让"我"刚添加的表情包读不出来；无后缀旧数据并入兼容 */
+    /* 我给自己添加的表情包：字卡库-表情包 tab 主集合 akini_stickers */
     var arr = [];
     try {
-      arr = JSON.parse(lsGet('akini_stickers_me', '[]')) || [];
+      arr = (window.__wbRead ? window.__wbRead('akini_stickers', []) : JSON.parse(lsGet('akini_stickers', '[]'))) || [];
     } catch (e) {}
     if (!Array.isArray(arr)) arr = [];
-    try {
-      var legacy = JSON.parse(lsGet('akini_stickers', '[]')) || [];
-      if (Array.isArray(legacy) && legacy.length) arr = arr.concat(legacy);
-    } catch (e) {}
-    var out = [], seen = {};
+    var out = [];
     arr.forEach(function (it) {
       var s2 = '';
       if (typeof it === 'string') s2 = it;
       else if (it && typeof it.s === 'string') s2 = it.s;
       var blocked = it && typeof it === 'object' && (it.b === 1 || it.b === true || it.b === '1');
-      /* zzzt：去重 key 用完整 dataURL——slice(0,64) 前缀撞车会误杀同规格图片 */
-      if (!blocked && /^data:image\//.test(s2) && !seen[s2]) { seen[s2] = 1; out.push(s2); }
+      if (!blocked && /^data:image\//.test(s2)) out.push(s2);
     });
     return out;
   }
@@ -319,14 +309,13 @@
     if (t) t.remove();
   }
   function scheduleCompanionReply(cid) {
-    /* 回复节奏照搬微信/观影：设置页回复延迟范围（默认 2~5s）
-       zzzb：输入动态改为发消息后 ~0.4s 立即出现（微信真实体验是秒出），回复仍按延迟范围送达 */
+    /* 回复节奏照搬微信/观影：设置页回复延迟范围（默认 2~5s），回复前 1.1s 左下角出现正在输入气泡 */
     var dMin = parseFloat(lsGet('akini_num_replyDelayMin', '2'));
     var dMax = parseFloat(lsGet('akini_num_replyDelayMax', '5'));
     if (!(dMin >= 0)) dMin = 2;
     if (!(dMax >= dMin)) dMax = Math.max(dMin, 5);
     var delayMs = 1000 * (dMin + Math.random() * (dMax - dMin));
-    setTimeout(function () { if (companionState()) showCompanionTyping(); }, 400);
+    setTimeout(function () { if (companionState()) showCompanionTyping(); }, Math.max(0, delayMs - 1100));
     setTimeout(function () {
       hideCompanionTyping();
       var cur = companionState();
@@ -505,18 +494,8 @@
   function loadBooks(cb) {
     if (_booksLoaded) { cb(); return; }
     idbGet(BOOKS_KEY, function (v) {
-      try {
-        var stored = v ? JSON.parse(v) : [];
-        if (!Array.isArray(stored)) stored = [];
-        /* zzzx：异步读回的是导入前的旧快照，而内存里可能已有刚 push 的新书——
-           合并去重而不是直接覆盖，防止"首次导入后书架空白、重启才出现" */
-        if (_books && _books.length) {
-          var seen = {};
-          stored.forEach(function (b) { if (b && b.id) seen[b.id] = 1; });
-          _books.forEach(function (b) { if (b && b.id && !seen[b.id]) stored.push(b); });
-        }
-        _books = stored;
-      } catch (e) { if (!Array.isArray(_books)) _books = []; }
+      try { _books = v ? JSON.parse(v) : []; } catch (e) { _books = []; }
+      if (!Array.isArray(_books)) _books = [];
       _booksLoaded = true;
       cb();
     });
@@ -590,47 +569,24 @@
     if (u8.length >= 2 && ((u8[0] === 0xFF && u8[1] === 0xFE) || (u8[0] === 0xFE && u8[1] === 0xFF))) {
       try { return new TextDecoder('utf-16').decode(u8); } catch (e0) {}
     }
-    /* zzzx：分块流式解码——大文件一次性 decode 会在低端机产生巨大内存峰值导致页面卡死/崩溃，
-       按 4MB 分块 stream 解码，多字节字符跨块由 TextDecoder 自动处理 */
-    function streamDecode(u8d, enc, fatal) {
-      var dec = fatal ? new TextDecoder(enc, { fatal: true }) : new TextDecoder(enc);
-      var CH = 4 * 1024 * 1024, out = '';
-      for (var i = 0; i < u8d.length; i += CH) {
-        out += dec.decode(u8d.subarray(i, Math.min(i + CH, u8d.length)), { stream: true });
-      }
-      return out + dec.decode();
-    }
-    try { return streamDecode(u8, 'utf-8', true); } catch (e) {}
-    try { return streamDecode(u8, 'gb18030', false); } catch (e2) {}
-    try { return streamDecode(u8, 'utf-8', false); } catch (e3) { return ''; }
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(u8); } catch (e) {}
+    try { return new TextDecoder('gb18030').decode(u8); } catch (e2) {}
+    try { return new TextDecoder('utf-8').decode(u8); } catch (e3) { return ''; }
   }
 
   function importNovel(file) {
     if (!file) return;
-    /* zzzx：超大文件护栏——超过 120MB 的 txt 在手机上必然内存崩溃，直接拒绝并明确提示，绝不卡崩 */
-    if (file.size > 120 * 1024 * 1024) {
-      alert('文件过大（' + Math.round(file.size / 1048576) + 'MB），超过 120MB 无法导入\n请把小说拆分成多个小文件后分别导入');
-      return;
-    }
-    /* zzzu 修复：decodeText 是同步函数(只吃 ArrayBuffer)，之前误按"异步回调"传 File 对象，
-       回调永远不会执行 → 用户点了导入毫无反应。改用 FileReader 读 ArrayBuffer 后同步解码 */
-    var fr = new FileReader();
-    fr.onload = function () {
-      try {
-        var txt = decodeText(fr.result) || '';
-        txt = txt.replace(/^﻿/, '').trim();
-        if (!txt) { alert('导入失败：文件内容为空或无法识别'); return; }
-        var title = (file.name || '未命名').replace(/\.[^.]+$/, '') || '未命名';
-        var id = 'nv' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
-        var book = { id: id, title: title, cover: '', fileName: file.name, addedAt: Date.now() };
-        _books.push(book);
-        saveBooks();
-        idbSet(CONTENT_PREFIX + id, txt);
-        window.__renderNovelShelf();
-      } catch (e) { alert('导入失败：' + (e && e.message ? e.message : '文件解析出错')); }
-    };
-    fr.onerror = function () { alert('导入失败：文件读取失败'); };
-    fr.readAsArrayBuffer(file);
+    decodeText(file, function (txt) {
+      txt = (txt || '').replace(/^﻿/, '').trim();
+      if (!txt) { alert('导入失败：文件内容为空或无法识别'); return; }
+      var title = (file.name || '未命名').replace(/\.[^.]+$/, '') || '未命名';
+      var id = 'nv' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36);
+      var book = { id: id, title: title, cover: '', fileName: file.name, addedAt: Date.now() };
+      _books.push(book);
+      saveBooks();
+      idbSet(CONTENT_PREFIX + id, txt);
+      window.__renderNovelShelf();
+    });
   }
 
   /* ---------- 封面/背景图压缩 ---------- */
@@ -927,42 +883,16 @@
       } else {
         exitPageMode();
         renderMoreParas();
-        /* zzzt：打开一律从文章开头开始，不再跳到中间；
-           有历史进度时浮出"继续上次阅读"胶囊，点击才跳到上次段落开头 */
-        if (content) content.scrollTop = 0;
         var prog = parseInt(lsGet(PROGRESS_PREFIX + _curBook.id, '0'), 10) || 0;
-        if (content && prog > 5 && prog < _readerParas.length - 1) showResumeTip(prog);
+        if (content && prog > 0) {
+          var targetIdx = Math.min(_readerParas.length, Math.round(prog));
+          while (_readerIdx < targetIdx) renderMoreParas();
+          requestAnimationFrame(function () {
+            content.scrollTop = Math.max(0, content.scrollHeight - content.clientHeight);
+          });
+        }
       }
     });
-  }
-
-  /* zzzt：继续上次阅读浮动胶囊（8 秒自动消失，滚动后消失） */
-  function showResumeTip(prog) {
-    var content = $('novelReaderContent');
-    if (!content || !content.parentElement) return;
-    var old = $('novelResumeTip');
-    if (old) old.remove();
-    var host = content.parentElement;
-    var hs = window.getComputedStyle(host).position;
-    if (hs === 'static') host.style.position = 'relative';
-    var tip = document.createElement('button');
-    tip.id = 'novelResumeTip';
-    tip.type = 'button';
-    tip.textContent = '继续上次阅读 · 第' + prog + '段';
-    tip.style.cssText = 'position:absolute;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:30;background:rgba(26,26,26,.88);color:#fff;font-size:13px;padding:9px 16px;border:none;border-radius:20px;box-shadow:0 4px 14px rgba(0,0,0,.25);cursor:pointer;touch-action:manipulation;white-space:nowrap';
-    tip.addEventListener('click', function () {
-      var target = Math.min(_readerParas.length, Math.round(prog));
-      while (_readerIdx < target) renderMoreParas();
-      requestAnimationFrame(function () {
-        var el = content.querySelector('[data-pidx="' + Math.max(0, target - 1) + '"]');
-        if (el) content.scrollTop = Math.max(0, el.getBoundingClientRect().top - content.getBoundingClientRect().top + content.scrollTop - 12);
-      });
-      tip.remove();
-    });
-    host.appendChild(tip);
-    var kill = function () { try { tip.remove(); } catch (e) {} };
-    setTimeout(kill, 8000);
-    content.addEventListener('scroll', kill, { once: true, passive: true });
   }
 
   function renderMoreParas() {
@@ -1500,24 +1430,10 @@
       + '<div style="font-size:12px;color:#bbb;margin-top:8px">点左侧封面可更换</div></div></div>'
       + '<input accept="image/*" type="file" id="aknvEditCoverInput" style="position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0"/>'
       + '<div style="display:flex;gap:10px;margin-top:16px"><button id="aknvEditCancel" type="button" style="flex:1;height:42px;border-radius:10px;border:1px solid #e0e0e0;background:#f8f8f8;color:#555;font-size:15px;cursor:pointer">取消</button><button id="aknvEditOk" type="button" style="flex:1;height:42px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">保存</button></div>'
-      + '<button id="aknvEditDelete" type="button" style="width:100%;height:42px;margin-top:10px;border-radius:10px;border:1px solid #f3c2c2;background:#fff5f5;color:#e04040;font-size:15px;cursor:pointer">删除本书</button>'
       + '</div>';
     document.body.appendChild(em);
     $('aknvEditCancel').addEventListener('click', function () { em.style.display = 'none'; });
     em.addEventListener('click', function (e) { if (e.target === em) em.style.display = 'none'; });
-    /* zzzt：管理界面删除本书（与长按菜单删除同一逻辑） */
-    $('aknvEditDelete').addEventListener('click', function () {
-      if (!_editBook) return;
-      if (!confirm('确定删除《' + (_editBook.title || '') + '》吗？删除后无法恢复')) return;
-      var id = _editBook.id;
-      _books = _books.filter(function (b) { return b.id !== id; });
-      saveBooks();
-      try { window._idbStore && window._idbStore.remove && window._idbStore.remove(CONTENT_PREFIX + id); } catch (e) {}
-      lsSet(PROGRESS_PREFIX + id, '0');
-      lsSet(PAGEPROG_PREFIX + id, '0');
-      em.style.display = 'none';
-      window.__renderNovelShelf();
-    });
     $('aknvEditCover').addEventListener('click', function () { $('aknvEditCoverInput').click(); });
     $('aknvEditCoverInput').addEventListener('change', function () {
       var f = this.files && this.files[0];
@@ -1628,92 +1544,56 @@
   }
 
 
-  /* ---------- zzzk：陪伴头像光环颜色自定义（zzzw：RGB 三通道滑杆自由调色） ---------- */
-  function hslToRgb(h, s, l) {
-    s /= 100; l /= 100;
-    var k = function (n) { return (n + h / 30) % 12; };
-    var a = s * Math.min(l, 1 - l);
-    var f = function (n) { return l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); };
-    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
-  }
-  function readHaloRgb() {
-    var r = lsGet('akini_halo_r', ''), g = lsGet('akini_halo_g', ''), b = lsGet('akini_halo_b', '');
-    if (r === '' || g === '' || b === '') {
-      /* 旧版 HSL 数据一次性迁移为 RGB */
-      var oh = parseInt(lsGet('akini_halo_hue', '335'), 10) || 0;
-      var os = parseInt(lsGet('akini_halo_sat', '100'), 10); if (isNaN(os)) os = 100;
-      var ol = parseInt(lsGet('akini_halo_light', '75'), 10); if (isNaN(ol)) ol = 75;
-      var c = hslToRgb(oh, os, ol);
-      r = String(c[0]); g = String(c[1]); b = String(c[2]);
-      lsSet('akini_halo_r', r); lsSet('akini_halo_g', g); lsSet('akini_halo_b', b);
-    }
-    return { r: parseInt(r, 10) || 0, g: parseInt(g, 10) || 0, b: parseInt(b, 10) || 0 };
-  }
+  /* ---------- zzzk：陪伴头像光环颜色自定义（色相/浓度滑块） ---------- */
   function applyHaloColor() {
-    var c = readHaloRgb();
-    var r = c.r, g = c.g, b = c.b;
-    /* 浅色变体：与白色混合 25%，用于弧光尾段，同一颜色的明暗层次 */
-    var r2 = Math.round(r + (255 - r) * 0.25), g2 = Math.round(g + (255 - g) * 0.25), b2 = Math.round(b + (255 - b) * 0.25);
+    var h = parseInt(lsGet('akini_halo_hue', '335'), 10) || 0;
+    var s = parseInt(lsGet('akini_halo_sat', '100'), 10);
+    if (isNaN(s)) s = 100;
     var st = document.getElementById('akiniHaloStyle');
     if (!st) { st = document.createElement('style'); st.id = 'akiniHaloStyle'; document.head.appendChild(st); }
-    st.textContent = '.akcp-halo{border-color:rgba(' + r + ',' + g + ',' + b + ',.5)!important}'
-      + '.akcp-halo::before{background:radial-gradient(circle,rgba(' + r + ',' + g + ',' + b + ',.38) 52%,rgba(' + r + ',' + g + ',' + b + ',.12) 66%,rgba(' + r + ',' + g + ',' + b + ',0) 74%)!important}'
-      + '.akcp-halo::after{background:conic-gradient(from 0deg,rgba(' + r + ',' + g + ',' + b + ',0) 0deg,rgba(' + r + ',' + g + ',' + b + ',.95) 40deg,rgba(' + r2 + ',' + g2 + ',' + b2 + ',.95) 80deg,rgba(' + r + ',' + g + ',' + b + ',0) 125deg)!important}';
+    var c1 = 'hsla(' + h + ',' + s + '%,78%,.5)';
+    var c2a = 'hsla(' + h + ',' + s + '%,75%,.38)';
+    var c2b = 'hsla(' + h + ',' + s + '%,75%,.12)';
+    var c3a = 'hsla(' + h + ',' + s + '%,72%,.95)';
+    var c3b = 'hsla(' + h + ',' + Math.max(40, s - 20) + '%,85%,.95)';
+    st.textContent = '.akcp-halo{border-color:' + c1 + '!important}'
+      + '.akcp-halo::before{background:radial-gradient(circle,' + c2a + ' 52%,' + c2b + ' 66%,hsla(' + h + ',' + s + '%,75%,0) 74%)!important}'
+      + '.akcp-halo::after{background:conic-gradient(from 0deg,hsla(' + h + ',' + s + '%,72%,0) 0deg,' + c3a + ' 48deg,' + c3b + ' 70deg,hsla(' + h + ',' + s + '%,72%,0) 115deg)!important}';
   }
   function ensureHaloDom() {
     if ($('akiniHaloModal')) return;
     var m = document.createElement('div');
     m.id = 'akiniHaloModal';
     m.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000020;align-items:center;justify-content:center';
-    m.innerHTML = '<div style="width:88%;max-width:340px;background:#fff;border-radius:16px;padding:18px 16px 14px;box-sizing:border-box">'
+    m.innerHTML = '<div style="width:86%;max-width:320px;background:#fff;border-radius:16px;padding:18px 16px 14px;box-sizing:border-box">'
       + '<div style="font-size:16px;font-weight:700;color:#1a1a1a;text-align:center;margin-bottom:14px">更改头像光环颜色</div>'
-      + '<div style="display:flex;justify-content:center;margin-bottom:16px"><div id="akiniHaloPreview" style="width:64px;height:64px;border-radius:50%;background:#eee;position:relative"><div class="akcp-halo" style="position:absolute;inset:-2px"></div></div></div>'
-      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:13px;color:#666;width:28px;flex-shrink:0">红色</span>'
-      + '<input id="akiniHaloR" class="akini-rgb-slider" type="range" min="0" max="255" value="224"/>'
-      + '<span id="akiniHaloRv" class="akini-rgb-val">224</span></div>'
-      + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><span style="font-size:13px;color:#666;width:28px;flex-shrink:0">绿色</span>'
-      + '<input id="akiniHaloG" class="akini-rgb-slider" type="range" min="0" max="255" value="96"/>'
-      + '<span id="akiniHaloGv" class="akini-rgb-val">96</span></div>'
-      + '<div style="display:flex;align-items:center;gap:10px"><span style="font-size:13px;color:#666;width:28px;flex-shrink:0">蓝色</span>'
-      + '<input id="akiniHaloB" class="akini-rgb-slider" type="range" min="0" max="255" value="138"/>'
-      + '<span id="akiniHaloBv" class="akini-rgb-val">138</span></div>'
-      + '<div style="display:flex;gap:10px;margin-top:18px"><button id="akiniHaloCancel" type="button" style="flex:1;height:42px;border-radius:10px;border:1px solid #e0e0e0;background:#f8f8f8;color:#555;font-size:15px;cursor:pointer">取消</button><button id="akiniHaloOk" type="button" style="flex:1;height:42px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">保存</button></div>'
+      + '<div style="display:flex;justify-content:center;margin-bottom:14px"><div id="akiniHaloPreview" style="width:64px;height:64px;border-radius:50%;background:#eee;position:relative"><div class="akcp-halo" style="position:absolute;inset:-2px"></div></div></div>'
+      + '<div style="font-size:13px;color:#666;margin-bottom:4px">色相</div>'
+      + '<input id="akiniHaloHue" type="range" min="0" max="360" value="335" style="width:100%;accent-color:#e0608a"/>'
+      + '<div style="font-size:13px;color:#666;margin:10px 0 4px">浓度</div>'
+      + '<input id="akiniHaloSat" type="range" min="0" max="100" value="100" style="width:100%;accent-color:#e0608a"/>'
+      + '<div style="display:flex;gap:10px;margin-top:16px"><button id="akiniHaloCancel" type="button" style="flex:1;height:42px;border-radius:10px;border:1px solid #e0e0e0;background:#f8f8f8;color:#555;font-size:15px;cursor:pointer">取消</button><button id="akiniHaloOk" type="button" style="flex:1;height:42px;border-radius:10px;border:none;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">保存</button></div>'
       + '</div>';
     document.body.appendChild(m);
-    /* 白边圆环 thumb（内填当前颜色）+ 数值框样式 */
-    var st2 = document.createElement('style');
-    st2.textContent = '.akini-rgb-slider{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:14px;border-radius:7px;outline:none;background:#eee}'
-      + '.akini-rgb-slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;border-radius:50%;background:var(--akini-thumb-c,#fff);border:4px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);cursor:pointer;box-sizing:border-box}'
-      + '.akini-rgb-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--akini-thumb-c,#fff);border:4px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);cursor:pointer}'
-      + '.akini-rgb-val{min-width:44px;padding:6px 0;text-align:center;background:#1a1a1a;color:#fff;border-radius:10px;font-size:14px;font-weight:600;flex-shrink:0}';
-    document.head.appendChild(st2);
     var upd = function () {
-      var r = +$('akiniHaloR').value, g = +$('akiniHaloG').value, b = +$('akiniHaloB').value;
-      $('akiniHaloRv').textContent = r; $('akiniHaloGv').textContent = g; $('akiniHaloBv').textContent = b;
-      /* 轨道联动渐变：保持另外两通道不变，展示本通道 0→255 的颜色走向（同截图） */
-      $('akiniHaloR').style.background = 'linear-gradient(90deg,rgb(0,' + g + ',' + b + '),rgb(255,' + g + ',' + b + '))';
-      $('akiniHaloG').style.background = 'linear-gradient(90deg,rgb(' + r + ',0,' + b + '),rgb(' + r + ',255,' + b + '))';
-      $('akiniHaloB').style.background = 'linear-gradient(90deg,rgb(' + r + ',' + g + ',0),rgb(' + r + ',' + g + ',255))';
-      /* 三条滑杆的圆环内都填当前合成色 */
-      m.style.setProperty('--akini-thumb-c', 'rgb(' + r + ',' + g + ',' + b + ')');
+      var h = $('akiniHaloHue').value, s = $('akiniHaloSat').value;
       var pv = $('akiniHaloPreview').querySelector('.akcp-halo');
-      if (pv) pv.style.borderColor = 'rgba(' + r + ',' + g + ',' + b + ',.5)';
-      /* 实时整体预览 */
-      var r2 = Math.round(r + (255 - r) * 0.25), g2 = Math.round(g + (255 - g) * 0.25), b2 = Math.round(b + (255 - b) * 0.25);
+      if (pv) {
+        pv.style.borderColor = 'hsla(' + h + ',' + s + '%,78%,.5)';
+      }
+      /* 实时整体预览：临时写局部 style 规则作用预览 */
       var st = document.getElementById('akiniHaloPrevStyle');
       if (!st) { st = document.createElement('style'); st.id = 'akiniHaloPrevStyle'; document.head.appendChild(st); }
-      st.textContent = '#akiniHaloPreview .akcp-halo::before{background:radial-gradient(circle,rgba(' + r + ',' + g + ',' + b + ',.38) 52%,rgba(' + r + ',' + g + ',' + b + ',.12) 66%,rgba(' + r + ',' + g + ',' + b + ',0) 74%)!important}'
-        + '#akiniHaloPreview .akcp-halo::after{background:conic-gradient(from 0deg,rgba(' + r + ',' + g + ',' + b + ',0) 0deg,rgba(' + r + ',' + g + ',' + b + ',.95) 40deg,rgba(' + r2 + ',' + g2 + ',' + b2 + ',.95) 80deg,rgba(' + r + ',' + g + ',' + b + ',0) 125deg)!important}';
+      st.textContent = '#akiniHaloPreview .akcp-halo::before{background:radial-gradient(circle,hsla(' + h + ',' + s + '%,75%,.38) 52%,hsla(' + h + ',' + s + '%,75%,.12) 66%,hsla(' + h + ',' + s + '%,75%,0) 74%)!important}'
+        + '#akiniHaloPreview .akcp-halo::after{background:conic-gradient(from 0deg,hsla(' + h + ',' + s + '%,72%,0) 0deg,hsla(' + h + ',' + s + '%,72%,.95) 48deg,hsla(' + h + ',' + Math.max(40, s - 20) + '%,85%,.95) 70deg,hsla(' + h + ',' + s + '%,72%,0) 115deg)!important}';
     };
-    $('akiniHaloR').addEventListener('input', upd);
-    $('akiniHaloG').addEventListener('input', upd);
-    $('akiniHaloB').addEventListener('input', upd);
+    $('akiniHaloHue').addEventListener('input', upd);
+    $('akiniHaloSat').addEventListener('input', upd);
     $('akiniHaloCancel').addEventListener('click', function () { m.style.display = 'none'; });
     m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
     $('akiniHaloOk').addEventListener('click', function () {
-      lsSet('akini_halo_r', $('akiniHaloR').value);
-      lsSet('akini_halo_g', $('akiniHaloG').value);
-      lsSet('akini_halo_b', $('akiniHaloB').value);
+      lsSet('akini_halo_hue', $('akiniHaloHue').value);
+      lsSet('akini_halo_sat', $('akiniHaloSat').value);
       applyHaloColor();
       m.style.display = 'none';
     });
@@ -1725,9 +1605,9 @@
     btn.addEventListener('click', function () {
       closeSheet('companionMenuSheet');
       ensureHaloDom();
-      var c = readHaloRgb();
-      $('akiniHaloR').value = c.r; $('akiniHaloG').value = c.g; $('akiniHaloB').value = c.b;
-      $('akiniHaloR').dispatchEvent(new Event('input'));
+      $('akiniHaloHue').value = lsGet('akini_halo_hue', '335');
+      $('akiniHaloSat').value = lsGet('akini_halo_sat', '100');
+      $('akiniHaloHue').dispatchEvent(new Event('input'));
       $('akiniHaloModal').style.display = 'flex';
     });
   }

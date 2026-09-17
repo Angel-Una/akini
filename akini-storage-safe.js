@@ -80,13 +80,13 @@
   function memSet(k, v) { memoryCache[k] = v; }
   function memRemove(k) { delete memoryCache[k]; }
 
-  // ---- standard 同款①：大键（>200KB，图片/壁纸 dataURL）不进 localStorage ----
+  // ---- mochi 同款①：大键（>200KB，图片/壁纸 dataURL）不进 localStorage ----
   // 手机 LS 配额仅 ~5MB，几张图片就撑爆；撑爆后【所有】后续 setItem 全部静默失败，
   // 这就是数据"随机消失"的头号根因。大键只进 内存缓存 + IndexedDB（配额大得多）。
   var LS_BIG_LIMIT = 200 * 1024;
   function isBigVal(v) { return typeof v === 'string' && v.length > LS_BIG_LIMIT; }
 
-  // ---- standard 同款②：LS 写失败脏键集合——对账时这些键信 IDB，不信 LS 残留旧值 ----
+  // ---- mochi 同款②：LS 写失败脏键集合——对账时这些键信 IDB，不信 LS 残留旧值 ----
   var _lsDirty = {};
   try {
     var _d = JSON.parse(sessionStorage.getItem('akini_ls_dirty') || '[]');
@@ -154,15 +154,16 @@
     if (m !== null) return m;
     return lsGet(k);
   }
-  // 核心数据资产键：非显式清除操作下一律拒绝被空数组覆盖（彻底解决后台/切回/随机时间数据丢失）
+  // 核心数据资产键：启动恢复竞态窗口内拒绝被空数组覆盖（含 akiniStore 直写路径）
   var _GUARD_KEYS2 = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1 };
+  var _guardUntil2 = Date.now() + 20000;
   function akiniSet(k, v, cb) {
     if (typeof v !== 'string') v = String(v);
-    if ((v === '[]' || v === '{}') && _GUARD_KEYS2[k] && !window.__akiniWiping && !window._akiniAllowRemove) {
+    if (v === '[]' && _GUARD_KEYS2[k] && Date.now() < _guardUntil2) {
       var _gp = memGet(k);
       if (_gp == null) _gp = lsGet(k);
-      if (_gp && _gp !== '[]' && _gp !== '{}' && _gp.length > 2) {
-        console.warn('[存储] 永久防御：拒绝非显式空值覆盖核心键(akiniSet)', k);
+      if (_gp && _gp !== '[]' && _gp.length > 2) {
+        console.warn('[存储] 窗口期内拒绝空数组覆盖核心键(akiniSet)', k);
         if (cb) cb(true);
         return;
       }
@@ -198,7 +199,7 @@
   function akiniGetJson(k, cb, fb) { akiniGet(k, function (v) { cb(safeParse(v, fb)); }); }
   function akiniSetJson(k, v, cb) { var s = safeStringify(v); if (s == null) { if (cb) cb(false); return; } akiniSet(k, s, cb); }
 
-  // ---- 启动全量对账恢复（standard 同款 OOM 防线）：分批流式 + 大键驻留预算 ----
+  // ---- 启动全量对账恢复（mochi 同款 OOM 防线）：分批流式 + 大键驻留预算 ----
   // 背景：几十 MB 的图片/字卡键一次性全量读入内存会把 JS 堆推到渲染进程上限直接崩溃
   //（Chrome "喔唷崩溃啦"），低端安卓机尤其明显。防两条：
   //  ① 分批恢复：每批 4 键、批间隔 25ms，瞬时内存峰值不再叠加；
@@ -245,7 +246,7 @@
               try {
                 if (v != null && v !== '') {
                   _reconciledKeys[k] = 1;
-                  // 对账策略（standard 同款）：localStorage 有值且【不在脏键集合】且非恢复前程序性写入 → 以 LS 为准并回写 IDB；
+                  // 对账策略（mochi 同款）：localStorage 有值且【不在脏键集合】且非恢复前程序性写入 → 以 LS 为准并回写 IDB；
                   // LS 丢失 / LS 是脏键（上次写失败残留旧值）/ 恢复完成前的启动默认值 → 一律信 IDB 镜像回填，杜绝旧数据回滚
                   // 【安卓/鸿蒙加固】空值永不覆盖非空：IDB 异步落盘滞后/写失败时易残留旧空值（'[]'/'{}'），
                   // 若 LS 存有真实数据，空语义 IDB 值一律视为陈旧，改信 LS（根治重启后数据被空值回填消失）
@@ -259,9 +260,9 @@
                   }
                   var big = isBigVal(v);
                   // 彻底修复刷新数据丢失 bug：localStorage 中的非空有效数据具有最高权威，
-                  // 绝不能被陈旧的 IDB 镜像覆盖！如果用户在恢复前写入了新数据（_preRestorePending），
+                  // 绝不能被陈旧的 IDB 镜像覆盖！如果用户在恢复前写入了新数据（preRestore），
                   // 更应该以用户的新写入为准，并将其排队写入 IDB。
-                  if (_preRestorePending && Object.prototype.hasOwnProperty.call(_preRestorePending, k)) {
+                  if (preRestore) {
                     var pendingVal = _preRestorePending[k];
                     if (pendingVal != null && pendingVal !== '') {
                       memSet(k, pendingVal);
@@ -339,7 +340,7 @@
     var lsProto = Object.getPrototypeOf(rawLS);
     if (lsProto && rawLS && typeof origSet === 'function') {
       var self = { memGet: memGet, memSet: memSet, memRemove: memRemove, queueIdbWrite: queueIdbWrite, isCritical: isCriticalKey, origSet: origSet, origGet: origGet, origRemove: origRemove, isBigVal: isBigVal, markDirty: markDirty, clearDirty: clearDirty };
-      // standard 同款③：读取拦截——内存缓存优先（大键只存在内存/IDB，直接读 LS 会拿到空）
+      // mochi 同款③：读取拦截——内存缓存优先（大键只存在内存/IDB，直接读 LS 会拿到空）
       lsProto.getItem = function (k) {
         try {
           if (self.isCritical(k)) {
@@ -354,18 +355,19 @@
           return self.origGet ? self.origGet.call(this, k) : null;
         } catch (e) { return null; }
       };
-      // 核心数据资产键：非显式清除操作下一律拒绝被空数组覆盖（安卓/鸿蒙/iOS慢机切回与后台GC高发防护）
+      // 核心数据资产键：启动恢复竞态窗口内拒绝被空数组覆盖（安卓/鸿蒙慢机恢复未完成时高发数据消失）
       var _GUARD_KEYS = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1 };
+      var _guardUntil = Date.now() + 20000;
       lsProto.setItem = function (k, v) {
         // 清除数据期间：akini_ 键一律拒写（含原始 LS 层），杜绝清完复活
         if (window.__akiniWiping && k && String(k).indexOf('akini_') === 0) return;
         var sv = String(v);
-        if ((sv === '[]' || sv === '{}') && _GUARD_KEYS[k] && !window.__akiniWiping && !window._akiniAllowRemove) {
+        if (sv === '[]' && _GUARD_KEYS[k] && Date.now() < _guardUntil) {
           try {
             var _gp = self.memGet(k);
             if (_gp == null) _gp = self.origGet ? self.origGet.call(this, k) : null;
-            if (_gp && _gp !== '[]' && _gp !== '{}' && _gp.length > 2) {
-              console.warn('[存储] 永久防御：拒绝非显式空值覆盖核心键(setItem)', k);
+            if (_gp && _gp !== '[]' && _gp.length > 2) {
+              console.warn('[存储] 窗口期内拒绝空数组覆盖核心键', k);
               return;
             }
           } catch (e) {}
@@ -455,28 +457,17 @@
     }
   } catch (e) {}
 
-  // ---- 申请持久化存储，彻底消除系统静默清理（启动立即申请 + 首次交互手势加权申请）----
-  function requestPersistentStorage() {
-    try {
-      if (navigator.storage && navigator.storage.persist) {
-        var _p = navigator.storage.persist();
-        if (_p && typeof _p.then === 'function') {
-          _p.then(function (granted) {
-            console.log('[存储] 持久化存储授权:', granted ? '已获准(免清空)' : '未获准(使用多层镜像兜底)');
-          }).catch(function () {});
-        }
+  // ---- 申请持久化存储，降低浏览器/系统清理 IndexedDB 的概率（荣耀/小米等机型尤其需要）----
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      var _persistRet = navigator.storage.persist();
+      if (_persistRet && typeof _persistRet.then === 'function') {
+        _persistRet.then(function (granted) {
+          console.log('[存储] 持久化存储申请', granted ? '已获准' : '未获准（继续使用镜像兜底）');
+        });
       }
-    } catch (e) {}
-  }
-  requestPersistentStorage();
-  // 现代移动端(Safari/Chrome)手势授权：首次点击/触摸时再次调用以极大提高获准率
-  var _persistGestureHandler = function () {
-    requestPersistentStorage();
-    document.removeEventListener('click', _persistGestureHandler, true);
-    document.removeEventListener('touchend', _persistGestureHandler, true);
-  };
-  document.addEventListener('click', _persistGestureHandler, true);
-  document.addEventListener('touchend', _persistGestureHandler, true);
+    }
+  } catch (e) {}
 
   // ---- 启动恢复：等 _idbStore 就绪后全量对账 ----
   var _restoreTimer = null;
@@ -492,30 +483,8 @@
   } else {
     setTimeout(restoreAll, 300);
   }
-
-  // ---- 生命周期守护：后台挂起切回自愈与切离立即落盘 ----
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) {
-      flushIdbQueue();
-      try { if (window.__akiniVaultSave) window.__akiniVaultSave(); } catch (e) {}
-    } else {
-      // 从后台或长时间闲置切回：立即进行健康度巡检，防止变量被回收或数据缺失
-      setTimeout(restoreAll, 100);
-    }
-  });
-  window.addEventListener('pagehide', function () {
-    flushIdbQueue();
-    try { if (window.__akiniVaultSave) window.__akiniVaultSave(); } catch (e) {}
-  });
-  window.addEventListener('pageshow', function (evt) {
-    // 从 bfcache(往返缓存)恢复时，重新对账
-    if (evt && evt.persisted) {
-      setTimeout(restoreAll, 100);
-    }
-  });
-
-  // 每 30s 兜底落盘一次，极端崩溃退出也不丢
-  setInterval(flushIdbQueue, 30000);
+  // 每 60s 兜底落盘一次，极端情况下也不丢
+  setInterval(flushIdbQueue, 60000);
 
   console.log('[akini-storage-safe] 网站式可靠存储层已加载 (v20261026)');
 })();

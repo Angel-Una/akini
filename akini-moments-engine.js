@@ -1,6 +1,6 @@
 /*
  * akini-moments-engine.js
- * 朋友圈 / iCity 自动点赞/评论引擎（对齐 compat 用户定制逻辑）
+ * 朋友圈 / iCity 自动点赞/评论引擎（对齐 syy 用户定制逻辑）
  * - 用户发布动态后，按"消息回复延迟"等待，随后所有联系人 100% 点赞 + 100% 评论
  * - 每个联系人只评论 1 条文字，评论内容仅来自用户字卡库，无兜底句库/表情
  * - 用户回复某联系人评论后，该联系人再回复 1 条（同样延迟）
@@ -223,7 +223,7 @@
     var name = getContactName(contact, app);
     var avatar = getContactAvatar(contact, app);
 
-    // compat 逻辑：20% 概率发表情包（优先该联系人专属库，回退全局库）
+    // syy 逻辑：20% 概率发表情包（优先该联系人专属库，回退全局库）
     var stickers = getContactStickers(contact.id);
     if (!stickers.length) {
       try {
@@ -288,7 +288,7 @@
       didAnything = true;
     });
 
-    // compat 评论数量逻辑：总数按设置（空=随机1~3），打乱联系人、60% 概率参与且至少 1 人，逐人分 1~2 条
+    // syy 评论数量逻辑：总数按设置（空=随机1~3），打乱联系人、60% 概率参与且至少 1 人，逐人分 1~2 条
     var totalComments = getCommentCount();
     var shuffled = contacts.slice().sort(function () { return Math.random() - 0.5; });
     var repliers = [];
@@ -338,7 +338,7 @@
     }
   }
 
-  // compat 评论数量：min/max 都留空 = 随机（70% 1条 / 20% 2条 / 10% 3条）；有值则区间随机（0~20）
+  // syy 评论数量：min/max 都留空 = 随机（70% 1条 / 20% 2条 / 10% 3条）；有值则区间随机（0~20）
   function getCommentCount() {
     var minS = localStorage.getItem('akini_num_commentCountMin');
     var maxS = localStorage.getItem('akini_num_commentCountMax');

@@ -1,5 +1,5 @@
 /**
- * Akini 备份引擎：standard-main 风格 ZIP 导出/导入
+ * Akini 备份引擎：milk-main 风格 ZIP 导出/导入
  * 把 localStorage + IndexedDB 中的数据打包成 ZIP：backup.json + media/* 二进制
  * 避免单文件巨型 JSON 无法解析，导入后再把媒体内联回 data URL。
  */
@@ -441,14 +441,7 @@
       return;
     }
     try {
-      /* zzzx：分块流式解码，避免大备份文件一次性 decode 内存峰值卡崩 */
-      var u8 = new Uint8Array(ab);
-      var dec = new TextDecoder("utf-8");
-      var CH = 4 * 1024 * 1024, text = "";
-      for (var i = 0; i < u8.length; i += CH) {
-        text += dec.decode(u8.subarray(i, Math.min(i + CH, u8.length)), { stream: true });
-      }
-      text += dec.decode();
+      var text = new TextDecoder("utf-8", { fatal: false }).decode(ab);
       if (text.length && text.charCodeAt(0) === 0xfeff) text = text.slice(1);
       done(JSON.parse(text));
     } catch (e) {
@@ -460,7 +453,7 @@
     notify("备份导出", "正在生成 JSON 备份文件…", "info");
     buildBackupPayload(function (payload) {
       var dateStr = new Date().toISOString().slice(0, 10);
-      /* core 同款：直接导出单个 .json 文件（媒体内联在 JSON 内），导入仍兼容旧 ZIP 备份 */
+      /* milk 同款：直接导出单个 .json 文件（媒体内联在 JSON 内），导入仍兼容旧 ZIP 备份 */
       fallbackJson(payload, dateStr);
       return;
 
@@ -607,25 +600,17 @@
         if (pending === 0) finishOk();
       }
 
-      /* zzzx：分批写入（每批 25 键 + setTimeout 让出主线程），
-         大备份导入时页面保持响应，不再假死/被系统误杀 */
-      var _wkeys = [];
       for (var key in lsRaw) {
-        if (Object.prototype.hasOwnProperty.call(lsRaw, key)) _wkeys.push([lsRaw, key]);
+        if (!Object.prototype.hasOwnProperty.call(lsRaw, key)) continue;
+        var v = processLocalStorageValueForImport(lsRaw[key], mediaStore);
+        tryWrite(key, v);
       }
       for (var k2 in idbRaw) {
-        if (Object.prototype.hasOwnProperty.call(idbRaw, k2)) _wkeys.push([idbRaw, k2]);
+        if (!Object.prototype.hasOwnProperty.call(idbRaw, k2)) continue;
+        var v2 = processLocalStorageValueForImport(idbRaw[k2], mediaStore);
+        tryWrite(k2, v2);
       }
-      var _wi = 0;
-      (function step() {
-        var end = Math.min(_wi + 25, _wkeys.length);
-        for (; _wi < end; _wi++) {
-          var src = _wkeys[_wi][0], kk = _wkeys[_wi][1];
-          tryWrite(kk, processLocalStorageValueForImport(src[kk], mediaStore));
-        }
-        if (_wi < _wkeys.length) { setTimeout(step, 0); return; }
-        if (pending === 0) finishOk();
-      })();
+      if (pending === 0) finishOk();
     }
 
     // 清空旧数据（localStorage + sessionStorage + IndexedDB 三层全清，防止旧数据混入）
