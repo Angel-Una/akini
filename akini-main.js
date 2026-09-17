@@ -1854,7 +1854,9 @@ document.addEventListener("DOMContentLoaded", function () {
         var e = document.getElementById(t);
         e &&
           ((e.style.zIndex = "999999"),
-          e.parentNode !== document.body && document.body.appendChild(e),
+          ("homeArea" !== t &&
+            e.parentNode !== document.body &&
+            document.body.appendChild(e)),
           (e.style.display = "flex"),
           e.classList.add("show"),
           "icityArea" === t &&

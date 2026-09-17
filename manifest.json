@@ -1,7 +1,7 @@
 {
   "name": "Akini",
   "short_name": "Akini",
-  "start_url": "akini.html?v=20260916zzzg",
+  "start_url": "akini.html",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
@@ -26,5 +26,6 @@
       "purpose": "any maskable"
     }
   ],
-  "scope": "."
+  "scope": ".",
+  "description": "Akini 情侣空间 v20260917zzzp"
 }

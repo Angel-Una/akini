@@ -146,7 +146,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: relative;
   z-index: 1;
   box-sizing: border-box;
-  padding-top: var(--ak-sat, 0px);
+  padding-top: 0;
+}
+/* zzzp：安全区避让仅在 PWA standalone 生效；浏览器模式由浏览器 UI 自行避让，
+   再叠 env() 会造成双重避让 → 首页被下拉出大片空白 */
+@media (display-mode: standalone) {
+  #homeArea { padding-top: var(--ak-sat, 0px); }
+  .chat-top-bar { padding-top: var(--ak-sat, 0px) !important; }
 }
 .content-wrapper {
   flex: none;
@@ -930,7 +936,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--ak-sat, 0px) 12px 0 !important;
+  padding: 0 12px !important;
   background: rgba(255, 255, 255, 0.97);
   border-bottom: 1px solid #e8e8e8;
   z-index: 1000 !important;
@@ -4917,7 +4923,7 @@ body.dark-mode .akini-slider-value {
   border-top: 1px solid #f0f0f0;
   font-size: 12px;
   color: #888;
-} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示；zzzm 增加安全区避让，避免顶栏挤占状态栏 */
+} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示；zzzp 增加安全区避让，避免顶栏挤占状态栏 */
 .chat-top-bar,
 .chat-list-header,
 .content-header,
@@ -4935,9 +4941,23 @@ body.dark-mode .akini-slider-value {
   width: 100%;
   box-sizing: border-box;
   z-index: 1000 !important;
-  padding-top: var(--ak-sat, 0px) !important;
+  padding-top: 0 !important;
   height: auto !important;
   min-height: 48px;
+}
+@media (display-mode: standalone) {
+  .chat-top-bar,
+  .chat-list-header,
+  .content-header,
+  .settings-header,
+  .beautify-header,
+  .icity-header,
+  .create-group-header,
+  .add-contact-header,
+  .contact-detail-header,
+  #musicContactPicker > div > div:first-child {
+    padding-top: var(--ak-sat, 0px) !important;
+  }
 }
 
 /* 各内容 body 避让固定顶栏，恢复原有正常高度，彻底消除多余拉低 */
