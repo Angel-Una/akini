@@ -6337,7 +6337,12 @@ document.addEventListener("DOMContentLoaded", function () {
     if (typeof window.__akiniSplashProgress !== "number") window.__akiniSplashProgress = 0;
     if (typeof window.__akiniSplashDone === "undefined") window.__akiniSplashDone = !1; // 重复初始化不得重置，否则已点「进入」会被翻回未进入
     if (!window.__akiniSplashStartAt) window.__akiniSplashStartAt = Date.now();
-    if (typeof window.__akiniSplashMinMs === "undefined") window.__akiniSplashMinMs = 3000; // 固定 3s 引导加载，确保核心数据准备完成
+    if (typeof window.__akiniSplashMinMs === "undefined") {
+      /* zzzp：同一会话内的页面重载（Safari 内存回收导致的闪回）快速进入，不再反复播 3s 开屏；首次打开仍保留完整引导 */
+      var __akiniFastSplash = false;
+      try { __akiniFastSplash = window.sessionStorage.getItem("__akiniSplashShown") === "1"; } catch (e) {}
+      window.__akiniSplashMinMs = __akiniFastSplash ? 600 : 3000;
+    }
     window.__akiniSetSplashProgress = function (p, statusText) {
       try {
         if (window.__akiniSplashDone) return;
@@ -6371,6 +6376,7 @@ document.addEventListener("DOMContentLoaded", function () {
     window.__akiniHideSplash = function () {
       if (window.__akiniSplashDone) return;
       window.__akiniSplashDone = !0;
+      try { window.sessionStorage.setItem("__akiniSplashShown", "1"); } catch (e) {}
       try { window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100); } catch (e) {}
       try {
         var el = document.getElementById("akiniSplash");

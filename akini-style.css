@@ -27,10 +27,6 @@ html {
   touch-action: pan-y;
   position: fixed;
 }
-:root {
-  --ak-sat: env(safe-area-inset-top, 0px);
-  --ak-sab: env(safe-area-inset-bottom, 0px);
-}
 @media all and (display-mode: standalone) {
   html, body {
     width: 100% !important;
@@ -1600,8 +1596,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   background: #fff;
   border-top: 1px solid #e8e8e8;
-  /* zzzo：以系统安全区为准，额外留出 8px，最小 8px；避免浏览器或兜底值过大时底栏被过度推高 */
-  padding-bottom: max(calc(var(--ak-sab, env(safe-area-inset-bottom, 0px)) + 8px), 8px) !important;
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 .chat-list-tab {
   flex: 1;
@@ -2759,7 +2754,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .friends-header .back-btn {
   position: absolute;
-  top: calc(12px + var(--ak-sat, 0px));
+  top: 12px;
   left: 16px;
   z-index: 10;
 }
@@ -4552,7 +4547,7 @@ select {
 }
 .friends-header .back-btn {
   position: fixed !important;
-  top: 12px !important;
+  top: calc(12px + env(safe-area-inset-top, 0px)) !important;
   left: 12px !important;
   z-index: 1000 !important;
   background: rgba(255, 255, 255, 0.8) !important;
@@ -4904,16 +4899,16 @@ body.dark-mode .akini-slider-value {
   border-top: 1px solid #f0f0f0;
   font-size: 12px;
   color: #888;
-} /* 固定顶部栏安全区避让：全面屏/灵动岛/添加到桌面 standalone 统一安全下移 */
+} /* 固定顶部栏：除朋友圈外所有页面（原版方案：固定顶栏+固定px避让，机型差异交给系统 env()） */
 .chat-top-bar,
 .chat-list-header,
 .content-header,
 .settings-header,
 .beautify-header,
 .icity-header,
+.create-group-header,
 .add-contact-header,
 .contact-detail-header,
-.create-group-header,
 #musicContactPicker > div > div:first-child {
   position: fixed !important;
   top: 0;
@@ -4922,50 +4917,25 @@ body.dark-mode .akini-slider-value {
   width: 100%;
   box-sizing: border-box;
   z-index: 1000 !important;
-  padding-top: calc(8px + var(--ak-sat, 0px)) !important;
 }
-/* zzzo：这些 header 在 HTML 中原本用内联 padding 覆盖了安全区，已移除内联 padding-top；
-   这里显式覆盖，确保安全区生效 */
-.chat-list-header,
-.add-contact-header,
-.contact-detail-header,
-.create-group-header {
-  padding-left: 16px !important;
-  padding-right: 16px !important;
-  padding-bottom: 12px !important;
-}
-
-/* 微信/通讯录顶栏内部返回与添加按钮随安全区垂直对齐 */
-.chat-list-header #chatListBackBtn {
-  top: calc(8px + var(--ak-sat, 0px)) !important;
-}
-.chat-list-header #chatListAddBtn {
-  top: calc(4px + var(--ak-sat, 0px)) !important;
-}
-
-/* 各内容 body 避让固定顶栏（包含状态栏高度，彻底杜绝内容上移撞入灵动岛） */
 .chat-list-body,
 #contactsListBody,
 .add-contact-body,
-.contact-detail-body,
-.create-group-body {
-  padding-top: calc(52px + var(--ak-sat, 0px)) !important;
+.contact-detail-body {
+  padding-top: 50px !important;
 }
 .settings-body,
 .beautify-body {
-  padding-top: calc(65px + var(--ak-sat, 0px)) !important; /* v20260830bc: 设置/美化内容再下移 3px */
+  padding-top: 65px !important; /* v20260830bc: 设置/美化内容再下移 3px */
 }
 #icityArea > div:nth-child(2) {
-  padding-top: calc(52px + var(--ak-sat, 0px)) !important;
+  padding-top: 50px !important;
 }
 #musicContactPicker > div {
-  padding-top: calc(54px + var(--ak-sat, 0px)) !important;
+  padding-top: 54px !important;
 }
 .content-body {
-  padding-top: calc(60px + var(--ak-sat, 0px)) !important;
-}
-.chat-body {
-  padding-top: calc(56px + var(--ak-sat, 0px)) !important;
+  padding-top: 60px !important;
 }
 
 /* === v20260821d: 彻底禁止界面缩放，防止 iOS 聚焦输入框自动放大且无法还原 === */
@@ -5031,7 +5001,7 @@ a,
   align-items: center !important;
   justify-content: space-between !important;
   padding: 12px 16px !important;
-  padding-top: max(12px, var(--ak-sat, 12px)) !important;
+  padding-top: max(12px, env(safe-area-inset-top, 12px)) !important;
   background: #fff !important;
   border-bottom: 1px solid #e8e8e8 !important;
   z-index: 10 !important;
