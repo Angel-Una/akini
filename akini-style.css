@@ -145,6 +145,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   overflow: hidden;
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
+  padding-top: var(--ak-sat, 0px);
 }
 .content-wrapper {
   flex: none;
@@ -928,11 +930,12 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px !important;
+  padding: var(--ak-sat, 0px) 12px 0 !important;
   background: rgba(255, 255, 255, 0.97);
   border-bottom: 1px solid #e8e8e8;
   z-index: 1000 !important;
-  height: 50px !important;
+  height: auto !important;
+  min-height: 50px;
   position: fixed !important;
   top: 0;
   left: 0;
@@ -4914,7 +4917,7 @@ body.dark-mode .akini-slider-value {
   border-top: 1px solid #f0f0f0;
   font-size: 12px;
   color: #888;
-} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示 */
+} /* 固定顶部栏：除朋友圈外所有页面，统一顶栏高度与层级，恢复原有正常显示；zzzm 增加安全区避让，避免顶栏挤占状态栏 */
 .chat-top-bar,
 .chat-list-header,
 .content-header,
@@ -4932,6 +4935,9 @@ body.dark-mode .akini-slider-value {
   width: 100%;
   box-sizing: border-box;
   z-index: 1000 !important;
+  padding-top: var(--ak-sat, 0px) !important;
+  height: auto !important;
+  min-height: 48px;
 }
 
 /* 各内容 body 避让固定顶栏，恢复原有正常高度，彻底消除多余拉低 */
@@ -4943,23 +4949,23 @@ body.dark-mode .akini-slider-value {
 #app-create-group .create-group-body,
 #app-add-contact .add-contact-body,
 #app-contact-detail .contact-detail-body {
-  padding-top: 50px !important;
+  padding-top: calc(48px + var(--ak-sat, 0px)) !important;
 }
 .settings-body,
 .beautify-body {
-  padding-top: 65px !important; /* v20260830bc: 设置/美化内容再下移 3px */
+  padding-top: calc(65px + var(--ak-sat, 0px)) !important; /* v20260830bc: 设置/美化内容再下移 3px */
 }
 #icityArea > div:nth-child(2) {
-  padding-top: 50px !important;
+  padding-top: calc(48px + var(--ak-sat, 0px)) !important;
 }
 #musicContactPicker > div {
-  padding-top: 54px !important;
+  padding-top: calc(54px + var(--ak-sat, 0px)) !important;
 }
 .content-body {
-  padding-top: 60px !important;
+  padding-top: calc(60px + var(--ak-sat, 0px)) !important;
 }
 .chat-body {
-  padding-top: 50px !important;
+  padding-top: calc(50px + var(--ak-sat, 0px)) !important;
 }
 
 /* === v20260821d: 彻底禁止界面缩放，防止 iOS 聚焦输入框自动放大且无法还原 === */
