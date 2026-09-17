@@ -6393,12 +6393,17 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       } catch (e) {}
     };
-    // 开屏始终手动点击进入，不再自动跳过
+    // 已签署用户直接跳过声明开屏（main.js 异步加载时内联脚本可能还拿不到 hide 函数）
     (function () {
       function doSkip() {
-        // 由用户手动点击开屏进入，此处不再自动跳过
+        if (!window.__akiniSplashShouldSkip) return;
+        try { window.__akiniBootApp && window.__akiniBootApp(); } catch (e) {}
+        try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch (e) {}
       }
       doSkip();
+      setTimeout(doSkip, 200);
+      setTimeout(doSkip, 800);
+      setTimeout(doSkip, 2000);
     })();
     /* SW 通知点击跳转：提前无条件绑定（此前藏在 showInAppNotif 内，冷启动点通知时未绑定导致点击无反应） */
     window.__akiniBindNotifTap = function () {
