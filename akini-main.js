@@ -6369,6 +6369,8 @@ document.addEventListener("DOMContentLoaded", function () {
     };
     // 防弹版：DOM 移除优先、互不阻塞，任何一步异常都不影响「进入」生效
     window.__akiniHideSplash = function () {
+      if (window.__akiniSplashDone) return;
+      window.__akiniSplashDone = !0;
       try { window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100); } catch (e) {}
       try {
         var el = document.getElementById("akiniSplash");
@@ -6379,11 +6381,11 @@ document.addEventListener("DOMContentLoaded", function () {
             try {
               el.style.display = "none";
               if (el && el.parentNode) el.parentNode.removeChild(el);
+              window.__akiniSplashRemoved = !0;
             } catch (e) {}
           }, 300);
         }
       } catch (e) {}
-      window.__akiniSplashDone = !0;
     };
     /* SW 通知点击跳转：提前无条件绑定（此前藏在 showInAppNotif 内，冷启动点通知时未绑定导致点击无反应） */
     window.__akiniBindNotifTap = function () {
