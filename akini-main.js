@@ -6393,6 +6393,18 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       } catch (e) {}
     };
+    // 已签署用户直接跳过声明开屏（main.js 异步加载时内联脚本可能还拿不到 hide 函数）
+    (function () {
+      function doSkip() {
+        if (!window.__akiniSplashShouldSkip) return;
+        try { window.__akiniBootApp && window.__akiniBootApp(); } catch (e) {}
+        try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch (e) {}
+      }
+      doSkip();
+      setTimeout(doSkip, 200);
+      setTimeout(doSkip, 800);
+      setTimeout(doSkip, 2000);
+    })();
     /* SW 通知点击跳转：提前无条件绑定（此前藏在 showInAppNotif 内，冷启动点通知时未绑定导致点击无反应） */
     window.__akiniBindNotifTap = function () {
       try {
@@ -6473,13 +6485,8 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(_bootRefresh, 500);
         setTimeout(_bootRefresh, 1500);
         setTimeout(_bootRefresh, 3000);
-        // 开屏动画：关键数据与界面渲染完成后，给头像/聊天记录等异步恢复预留时间
-        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(92);
-        setTimeout(function () {
-          window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
-          // core 式：加载完成自动进入主界面，无需手动点击
-          try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch (e) {}
-        }, 900);
+        // 开屏进度：数据与界面已就绪，等待用户在声明页点击「进入」
+        window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
       }, 300);
       if (
         (window.__akiniAvatarCache &&

@@ -102,7 +102,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .phone-frame {
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100svh;
   background: transparent;
   overflow: hidden;
   display: flex;
@@ -132,18 +133,17 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   z-index: 0;
   transition: opacity 0.3s;
 }.content-wrapper {
-  flex: none;
+  position: relative;
+  flex: 1;
   width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
+  min-height: 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
   overflow: visible !important;
-  padding-bottom: 0;
-  position: relative;
-  z-index: 1;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
 /* 模块级独立缩放壳：inner 固定 390/380 基准宽渲染，按屏宽等比缩放，垂直 flex 分布 */
 .fit-mod {
@@ -197,7 +197,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   width: 40px;
   height: 40px;
 }.top-card {
-  margin: 0;
+  margin: calc(16px + env(safe-area-inset-top, 0px)) 16px 4px;
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
