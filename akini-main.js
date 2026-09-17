@@ -6336,9 +6336,9 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(99, p));
         if (p >= 100) window.__akiniSplashProgress = 100;
-        // core 式简化：进度条由 CSS 动画平滑驱动（3s 走满），JS 不再逐帧改写 width，杜绝回退/跳变
+        // JS 主动驱动进度条宽度，避免 CSS 动画在某些环境不生效导致进度条不动
         var bar = document.getElementById("akiniSplashBar");
-        if (bar && window.__akiniSplashProgress >= 100) { bar.style.animation = "none"; bar.style.width = "100%"; }
+        if (bar) { bar.style.animation = "none"; bar.style.width = window.__akiniSplashProgress + "%"; }
         var st = document.getElementById("akiniSplashStatus");
         if (st) {
           if (window.__akiniSplashProgress >= 100) st.textContent = "已准备好";
@@ -6351,6 +6351,25 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       } catch (e) {}
     };
+    // 启动 JS 自动推进，5.4s 内从 0% 走到 100%，与外部 setProgress 取较大值
+    if (!window.__akiniSplashAnimStarted) {
+      window.__akiniSplashAnimStarted = !0;
+      (function splashTick() {
+        if (window.__akiniSplashDone) return;
+        try {
+          var elapsed = Date.now() - (window.__akiniSplashStartAt || Date.now());
+          var auto = Math.min(99, Math.max(0, (elapsed / 5400) * 100));
+          window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress || 0, auto);
+          var bar = document.getElementById("akiniSplashBar");
+          if (bar) { bar.style.animation = "none"; bar.style.width = window.__akiniSplashProgress + "%"; }
+          if (window.__akiniSplashProgress >= 100) {
+            window.__akiniSetSplashProgress(100);
+            return;
+          }
+        } catch (e) {}
+        requestAnimationFrame(splashTick);
+      })();
+    }
     // 防弹版：DOM 移除优先、互不阻塞，任何一步异常都不影响「进入」生效
     window.__akiniHideSplash = function () {
       try { window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100); } catch (e) {}
@@ -23108,11 +23127,11 @@ document.addEventListener("DOMContentLoaded", function () {
         Object.keys(ss).forEach(function (k) { wn += ss[k].unread || 0; });
       }
       _setBadge("appBtnChat", wn);
-      /* 信箱：收件数 - 已看游标 */
+      /* 信箱：按单封信 read 状态统计未读数，只有点进信件详情才标记已读 */
       var mails = [];
       try { mails = JSON.parse(localStorage.getItem("akini_mail_received") || "[]"); } catch (e) {}
-      var seen = parseInt(localStorage.getItem("akini_mail_seen_count") || "0", 10) || 0;
-      _setBadge("appBtnMail", Math.max(0, mails.length - seen));
+      var unreadMails = mails.filter(function (m) { return m && !m.read && !m.isRead; }).length;
+      _setBadge("appBtnMail", unreadMails);
       /* 朋友圈 / iCity：未读互动通知数 */
       _setBadge("appBtnFriends", _getNotifs("friends").filter(function (n) { return !n.read; }).length);
       _setBadge("appBtnIcity", _getNotifs("icity").filter(function (n) { return !n.read; }).length);

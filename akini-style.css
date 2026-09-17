@@ -135,7 +135,18 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   pointer-events: none;
   z-index: 0;
   transition: opacity 0.3s;
-}.content-wrapper {
+}#homeArea {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+}
+.content-wrapper {
   flex: none;
   width: 100%;
   max-width: 480px;
