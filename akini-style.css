@@ -143,7 +143,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   justify-content: flex-start;
   align-items: center;
   overflow: visible !important;
-  padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 /* 模块级独立缩放壳：inner 固定 390/380 基准宽渲染，按屏宽等比缩放，垂直 flex 分布 */
 .fit-mod {
@@ -509,7 +509,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .preview-bubble:focus {
   background: rgba(255, 255, 255, 0.75);
 }.bottom-bar {
-  padding: 8px 16px calc(6px + env(safe-area-inset-bottom, 0px));
+  padding: 4px 16px env(safe-area-inset-bottom, 0px);
   flex-shrink: 0;
   display: flex;
   justify-content: center;
