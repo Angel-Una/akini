@@ -152,10 +152,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
    再叠 env() 会造成双重避让 → 首页被下拉出大片空白 */
 @media (display-mode: standalone) {
   #homeArea { padding-top: var(--ak-sat, 0px); }
-  .chat-top-bar { padding-top: var(--ak-sat, 0px) !important; }
+  .chat-top-bar { padding-top: env(safe-area-inset-top, var(--ak-sat, 0px)) !important; }
 }
 .akini-standalone #homeArea { padding-top: var(--ak-sat, 0px); }
-.akini-standalone .chat-top-bar { padding-top: var(--ak-sat, 0px) !important; }
+.akini-standalone .chat-top-bar { padding-top: env(safe-area-inset-top, var(--ak-sat, 0px)) !important; }
 .content-wrapper {
   flex: none;
   width: 100%;
@@ -4958,7 +4958,7 @@ body.dark-mode .akini-slider-value {
   .add-contact-header,
   .contact-detail-header,
   #musicContactPicker > div > div:first-child {
-    padding-top: var(--ak-sat, 0px) !important;
+    padding-top: env(safe-area-inset-top, var(--ak-sat, 0px)) !important;
   }
 }
 .akini-standalone .chat-top-bar,
@@ -4971,7 +4971,7 @@ body.dark-mode .akini-slider-value {
 .akini-standalone .add-contact-header,
 .akini-standalone .contact-detail-header,
 .akini-standalone #musicContactPicker > div > div:first-child {
-  padding-top: var(--ak-sat, 0px) !important;
+  padding-top: env(safe-area-inset-top, var(--ak-sat, 0px)) !important;
 }
 
 /* 各内容 body 避让固定顶栏，恢复原有正常高度，彻底消除多余拉低 */
@@ -4983,23 +4983,23 @@ body.dark-mode .akini-slider-value {
 #app-create-group .create-group-body,
 #app-add-contact .add-contact-body,
 #app-contact-detail .contact-detail-body {
-  padding-top: calc(48px + var(--ak-sat, 0px)) !important;
+  padding-top: calc(48px + env(safe-area-inset-top, var(--ak-sat, 0px))) !important;
 }
 .settings-body,
 .beautify-body {
-  padding-top: calc(65px + var(--ak-sat, 0px)) !important; /* v20260830bc: 设置/美化内容再下移 3px */
+  padding-top: calc(65px + env(safe-area-inset-top, var(--ak-sat, 0px))) !important; /* v20260830bc: 设置/美化内容再下移 3px */
 }
 #icityArea > div:nth-child(2) {
-  padding-top: calc(48px + var(--ak-sat, 0px)) !important;
+  padding-top: calc(48px + env(safe-area-inset-top, var(--ak-sat, 0px))) !important;
 }
 #musicContactPicker > div {
-  padding-top: calc(54px + var(--ak-sat, 0px)) !important;
+  padding-top: calc(54px + env(safe-area-inset-top, var(--ak-sat, 0px))) !important;
 }
 .content-body {
-  padding-top: calc(60px + var(--ak-sat, 0px)) !important;
+  padding-top: calc(60px + env(safe-area-inset-top, var(--ak-sat, 0px))) !important;
 }
 .chat-body {
-  padding-top: calc(50px + var(--ak-sat, 0px)) !important;
+  padding-top: calc(50px + env(safe-area-inset-top, var(--ak-sat, 0px))) !important;
 }
 
 /* === v20260821d: 彻底禁止界面缩放，防止 iOS 聚焦输入框自动放大且无法还原 === */
