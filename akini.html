@@ -108,12 +108,10 @@
   </div>
 </div>
 <script>
-/* Akini 开屏：信息显示 + 星点背景 + 数据预加载 + 点击进入 */
+/* Akini 开屏：信息显示 + 点击进入（和 milk 一致） */
 (function(){
   var ENTER_KEY = 'akini_splash_enter_v1';
   var entered = false;
-  var dataReady = false;
-  var btnEl = null;
   function el(id){ return document.getElementById(id); }
   function trySkip(){
     try {
@@ -141,64 +139,21 @@
     }
     box.appendChild(frag);
   }
-  function setBtnReady(ready){
-    if(!btnEl) return;
-    if(ready){
-      btnEl.textContent = '我已知晓并遵守规则';
-      btnEl.classList.add('ready');
-    } else {
-      btnEl.textContent = '加载中…';
-      btnEl.classList.remove('ready');
-    }
-  }
-  function onDataReady(){
-    dataReady = true;
-    setBtnReady(true);
-  }
   function enterSite(){
-    if(entered) return;
-    if(!dataReady){
-      setBtnReady(false);
-      // 等待首页数据就绪后再进入，避免先闪默认内容
-      var wait = setInterval(function(){
-        if(dataReady || (window.__akiniSplashProgress >= 100)){
-          clearInterval(wait);
-          onDataReady();
-          doEnter();
-        }
-      }, 80);
-      // 最长等 4 秒，兜底
-      setTimeout(function(){ clearInterval(wait); doEnter(); }, 4000);
-      return;
-    }
-    doEnter();
-  }
-  function doEnter(){
     if(entered) return;
     entered = true;
     try { localStorage.setItem(ENTER_KEY, 'true'); } catch(e){}
+    try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
     try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch(e){}
   }
   function bind(){
-    btnEl = el('akiniSplashEnter');
-    if(btnEl){
-      btnEl.onclick = enterSite;
-      if(!dataReady) setBtnReady(false);
-    }
+    var btn = el('akiniSplashEnter');
+    if(btn) btn.onclick = enterSite;
   }
   function init(){
     if(trySkip()) return;
     initStars();
     bind();
-    // 拦截启动进度：100% 表示首页数据已渲染完成
-    var origProgress = window.__akiniSetSplashProgress;
-    window.__akiniSetSplashProgress = function(p){
-      try { origProgress && origProgress(p); } catch(e){}
-      if(p >= 100) onDataReady();
-    };
-    if(window.__akiniSplashProgress >= 100) onDataReady();
-    // 开屏期间后台预加载首页数据，避免进入时闪默认内容
-    try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
     var sp = el('akiniSplash');
     if(sp) sp.classList.add('loaded');
   }
@@ -220,7 +175,7 @@
 .akini-splash-inner{position:relative;z-index:2;width:min(520px,94vw);display:flex;flex-direction:column;align-items:center;padding-top:calc(24px + env(safe-area-inset-top, 0px));padding-bottom:calc(18px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;min-height:100%;animation:akiniSplashInnerIn .6s cubic-bezier(.22,1,.36,1) both}
 @keyframes akiniSplashInnerIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 .akini-splash-top{display:flex;flex-direction:column;align-items:center;margin-bottom:18px;flex-shrink:0}
-.akini-splash-logo{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.1));border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.92);margin-bottom:12px}
+.akini-splash-logo{width:64px;height:64px;border-radius:18px;background:#fff;border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;color:#111;margin-bottom:12px}
 .akini-splash-logo svg{width:30px;height:30px}
 .akini-splash-title{font-size:22px;font-weight:600;letter-spacing:3px;color:rgba(255,255,255,.9);margin-bottom:5px}
 .akini-splash-subtitle{font-size:13px;color:rgba(255,255,255,.42);letter-spacing:1px}
@@ -234,8 +189,7 @@
 .akini-splash-module-body b{color:rgba(255,255,255,.78);font-weight:600}
 .akini-splash-module-body hr{border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0}
 .akini-splash-thanks{color:#fff;font-weight:700}
-.akini-splash-enter{width:min(320px,88vw);flex-shrink:0;padding:13px 24px;background:#fff;color:#111;border:none;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 6px 22px rgba(255,255,255,.28);transition:all .25s ease;margin-bottom:6px;opacity:.55;pointer-events:none}
-.akini-splash-enter.ready{opacity:1;pointer-events:auto}
+.akini-splash-enter{width:min(320px,88vw);flex-shrink:0;padding:13px 24px;background:#fff;color:#111;border:none;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 6px 22px rgba(255,255,255,.28);transition:all .25s ease;margin-bottom:6px}
 .akini-splash-enter:active{background:#f0f0f0;box-shadow:0 8px 28px rgba(255,255,255,.38);transform:translateY(-1px)}
 </style>
 <script>

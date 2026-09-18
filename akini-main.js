@@ -6332,6 +6332,22 @@ document.addEventListener("DOMContentLoaded", function () {
       X = document.getElementById("sendBtn");
     var Y = document.getElementById("chatMenuOverlay"),
       Q = document.getElementById("menuBg");
+    // ========== 首页防闪：数据未就绪前隐藏默认内容 ==========
+    (function () {
+      if (document.getElementById("akiniNoFlashStyle")) return;
+      var style = document.createElement("style");
+      style.id = "akiniNoFlashStyle";
+      style.textContent = ".akini-content-hidden{opacity:0!important;visibility:hidden!important}.akini-content-fade{transition:opacity .25s ease,visibility .25s ease}";
+      document.head.appendChild(style);
+      var cw = document.querySelector(".content-wrapper");
+      if (cw && !cw.classList.contains("akini-content-fade")) {
+        cw.classList.add("akini-content-fade", "akini-content-hidden");
+      }
+    })();
+    window.__akiniShowContent = function () {
+      var cw = document.querySelector(".content-wrapper");
+      if (cw) cw.classList.remove("akini-content-hidden");
+    };
     // ========== 开屏动画：进度条 + 收尾隐藏 ==========
     // 重复初始化全部幂等：进度/起点/时长一旦被重置，用户会看到进度条跳回重涨（开屏"闪"的根因之一）
     if (typeof window.__akiniSplashProgress !== "number") window.__akiniSplashProgress = 0;
@@ -6357,6 +6373,8 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         window.__akiniSplashProgress = Math.max(window.__akiniSplashProgress, Math.min(99, p));
         if (p >= 100) window.__akiniSplashProgress = 100;
+        // 数据就绪后先显示首页（此时开屏仍遮挡，用户点击后才真正看到）
+        if (p >= 100) try { window.__akiniShowContent && window.__akiniShowContent(); } catch (e) {}
         // zzzm：进度条改由 JS 驱动，配合 CSS transition 平滑过渡，避免 CSS animation 与 transition 冲突导致的不流畅
         var bar = document.getElementById("akiniSplashBar");
         if (bar) { bar.style.width = window.__akiniSplashProgress + "%"; }
@@ -6376,6 +6394,8 @@ document.addEventListener("DOMContentLoaded", function () {
     window.__akiniHideSplash = function () {
       if (window.__akiniSplashDone) return;
       window.__akiniSplashDone = !0;
+      // 隐藏开屏前必须让首页可见，避免闪现后空白
+      try { window.__akiniShowContent && window.__akiniShowContent(); } catch (e) {}
       try { window.sessionStorage.setItem("__akiniSplashShown", "1"); } catch (e) {}
       try { window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100); } catch (e) {}
       try {
