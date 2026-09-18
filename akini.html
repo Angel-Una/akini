@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="zh-CN"><head><script>try{if(((navigator.deviceMemory||8)<=4)||((navigator.hardwareConcurrency||8)<=4))document.documentElement.classList.add("low-mem");}catch(e){}</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260918zzzt" name="akini-ver"/><script>(function(){
+<html lang="zh-CN"><head><script>try{if(((navigator.deviceMemory||8)<=4)||((navigator.hardwareConcurrency||8)<=4))document.documentElement.classList.add("low-mem");}catch(e){}</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260918v500" name="akini-ver"/><script>(function(){
   // 版本标记（仅记录，绝不触发 reload，避免循环刷新）
   try {
     var cur = (document.querySelector('meta[name=akini-ver]')||{}).content || "";
@@ -26,7 +26,7 @@
   } catch (e) {}
 })();
 </script>
-<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=localStorage;t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260918zzzt" id="akini-style" rel="stylesheet"/><style id="akini-bubble-force">
+<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=localStorage;t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260918v500" id="akini-style" rel="stylesheet"/><style id="akini-bubble-force">
   /* 强制胶囊形气泡 + 浅灰默认色（内联，随 HTML 一起加载，确保生效）；问卷卡片等富媒体卡片不参与；应用了自定义气泡 CSS（body.bubble-css-on）时整体停用，让美化样式完全接管 */
   body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { border-radius: 999px !important; }
   body:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { background: #e9e9eb !important; color: #111 !important; }
@@ -55,10 +55,13 @@
 <script>(function(){try{var op=parseInt(localStorage.getItem('akini_opacity')||'50',10);if(isNaN(op))op=50;var val=op/50;var alpha=val.toFixed(2);var bg=op>0?'rgba(255,255,255,'+alpha+')':'transparent';var s=document.getElementById('akiniTopCardOpacityStyle');if(s){s.textContent='#topCard,.top-card,body.dark-mode #topCard,body.dark-mode .top-card{background:'+bg+'!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}'}}catch(e){}})();</script>
 <style>.back-btn{font-size:24px;background:transparent;border:none;color:#1a1a1a;padding:0 8px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px;box-sizing:border-box}.music-player-info{align-self:stretch!important;width:100%;min-width:0!important}.music-player-meta{width:100%;min-width:0}.music-player-title,.music-player-artist{width:100%;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style></head><body>
 <div id="akiniSplash">
+  <div class="akini-splash-stars" id="akiniSplashStars"></div>
+  <div class="akini-splash-glow akini-splash-glow-1"></div>
+  <div class="akini-splash-glow akini-splash-glow-2"></div>
   <div class="akini-splash-inner">
     <div class="akini-splash-top">
       <div class="akini-splash-logo">
-        <svg width="42" height="42" viewBox="0 0 64 64" fill="none" stroke="#222" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M32 6c11 0 20 9 20 20 0 13-16 30-20 32-4-2-20-19-20-32 0-11 9-20 20-20z"/><circle cx="32" cy="26" r="4"/></svg>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       </div>
       <div class="akini-splash-title">Akini</div>
       <div class="akini-splash-subtitle">你的出现，是天意，是命运</div>
@@ -66,7 +69,7 @@
     <div class="akini-splash-modules">
       <div class="akini-splash-module">
         <div class="akini-splash-module-head">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           开源作者 & 鸣谢
         </div>
         <div class="akini-splash-module-body">
@@ -86,7 +89,7 @@
       </div>
       <div class="akini-splash-module">
         <div class="akini-splash-module-head">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
           常见问题 & 反馈
         </div>
         <div class="akini-splash-module-body">
@@ -105,7 +108,7 @@
   </div>
 </div>
 <script>
-/* Akini 开屏：信息显示 + 预加载 + 点击进入 */
+/* Akini 开屏：信息显示 + 星点背景 + 数据预加载 + 点击进入 */
 (function(){
   var ENTER_KEY = 'akini_splash_enter_v1';
   var entered = false;
@@ -122,6 +125,21 @@
       }
     } catch(e){}
     return false;
+  }
+  function initStars(){
+    var box = el('akiniSplashStars');
+    if(!box) return;
+    var frag = document.createDocumentFragment();
+    for(var i=0;i<60;i++){
+      var s = document.createElement('span');
+      s.style.left = Math.random()*100 + '%';
+      s.style.top = Math.random()*100 + '%';
+      s.style.width = s.style.height = (Math.random()*2 + 1) + 'px';
+      s.style.animationDelay = (Math.random()*3) + 's';
+      s.style.animationDuration = (2 + Math.random()*2) + 's';
+      frag.appendChild(s);
+    }
+    box.appendChild(frag);
   }
   function setBtnReady(ready){
     if(!btnEl) return;
@@ -141,7 +159,7 @@
     if(entered) return;
     if(!dataReady){
       setBtnReady(false);
-      // 等待数据就绪后再进入，避免闪默认首页
+      // 等待首页数据就绪后再进入，避免先闪默认内容
       var wait = setInterval(function(){
         if(dataReady || (window.__akiniSplashProgress >= 100)){
           clearInterval(wait);
@@ -165,22 +183,21 @@
     btnEl = el('akiniSplashEnter');
     if(btnEl){
       btnEl.onclick = enterSite;
-      // 未就绪时按钮显示加载中
       if(!dataReady) setBtnReady(false);
     }
   }
   function init(){
     if(trySkip()) return;
+    initStars();
     bind();
-    // 拦截启动进度，100% 表示首页数据已渲染完成
+    // 拦截启动进度：100% 表示首页数据已渲染完成
     var origProgress = window.__akiniSetSplashProgress;
     window.__akiniSetSplashProgress = function(p){
       try { origProgress && origProgress(p); } catch(e){}
       if(p >= 100) onDataReady();
     };
-    // 如果 boot 已经完成，直接启用按钮
     if(window.__akiniSplashProgress >= 100) onDataReady();
-    // 立即开始后台预加载首页数据（保持开屏显示）
+    // 开屏期间后台预加载首页数据，避免进入时闪默认内容
     try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
     var sp = el('akiniSplash');
     if(sp) sp.classList.add('loaded');
@@ -190,28 +207,36 @@
 })();
 </script>
 <style>
-#akiniSplash{position:fixed;inset:0;z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:linear-gradient(180deg,#f5f5f5 0%,#ececec 100%);font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;opacity:0;transition:opacity .45s ease}
+#akiniSplash{position:fixed;inset:0;z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;background:#06060e;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;opacity:0;transition:opacity .5s ease}
 #akiniSplash.loaded{opacity:1}
 #akiniSplash.hidden{pointer-events:none;opacity:0}
-.akini-splash-inner{position:relative;z-index:2;width:min(520px,94vw);display:flex;flex-direction:column;align-items:center;padding-top:calc(22px + env(safe-area-inset-top, 0px));padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;min-height:100%}
-.akini-splash-top{display:flex;flex-direction:column;align-items:center;margin-bottom:16px;flex-shrink:0}
-.akini-splash-logo{width:72px;height:72px;border-radius:20px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.08);display:flex;align-items:center;justify-content:center;margin-bottom:14px}
-.akini-splash-logo svg{width:42px;height:42px}
-.akini-splash-title{font-size:20px;font-weight:600;letter-spacing:2.5px;color:#1a1a1a;margin-bottom:6px}
-.akini-splash-subtitle{font-size:13px;color:#777;letter-spacing:.8px}
-.akini-splash-modules{display:grid;grid-template-columns:1fr;gap:12px;width:100%;flex:1;min-height:0;margin-bottom:14px}
-@media (min-width:400px) and (min-height:720px){.akini-splash-modules{grid-template-columns:1fr 1fr}}
-.akini-splash-module{background:#fff;border:1px solid rgba(0,0,0,.06);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 2px 10px rgba(0,0,0,.04);max-height:min(48vh,420px)}
-.akini-splash-module-head{display:flex;align-items:center;gap:7px;padding:12px 14px;border-bottom:1px solid rgba(0,0,0,.05);font-size:12px;font-weight:600;color:#1a1a1a;letter-spacing:.3px;flex-shrink:0}
-.akini-splash-module-body{padding:12px 14px 14px;font-size:11.5px;line-height:1.8;color:#555;overflow-y:auto;overscroll-behavior:contain}
+@keyframes akiniSplashTwinkle{from{opacity:.15}to{opacity:.85}}
+.akini-splash-stars{position:absolute;inset:0;pointer-events:none}
+.akini-splash-stars span{position:absolute;border-radius:50%;background:#fff;animation:akiniSplashTwinkle 3s infinite alternate}
+.akini-splash-glow{position:absolute;border-radius:50%;pointer-events:none}
+.akini-splash-glow-1{width:500px;height:500px;background:radial-gradient(circle,rgba(197,164,126,.1) 0%,transparent 65%);top:8%;left:50%;transform:translateX(-50%);animation:akiniSplashGlowPulse 6s ease-in-out infinite}
+.akini-splash-glow-2{width:300px;height:300px;background:radial-gradient(circle,rgba(120,100,200,.07) 0%,transparent 65%);bottom:10%;right:8%;animation:akiniSplashGlowPulse 8s ease-in-out infinite reverse}
+@keyframes akiniSplashGlowPulse{0%,100%{opacity:.7;transform:translateX(-50%) scale(1)}50%{opacity:1;transform:translateX(-50%) scale(1.15)}}
+.akini-splash-inner{position:relative;z-index:2;width:min(520px,94vw);display:flex;flex-direction:column;align-items:center;padding-top:calc(24px + env(safe-area-inset-top, 0px));padding-bottom:calc(18px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;min-height:100%;animation:akiniSplashInnerIn .6s cubic-bezier(.22,1,.36,1) both}
+@keyframes akiniSplashInnerIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+.akini-splash-top{display:flex;flex-direction:column;align-items:center;margin-bottom:18px;flex-shrink:0}
+.akini-splash-logo{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,rgba(255,255,255,.22),rgba(255,255,255,.1));border:1px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.92);margin-bottom:12px}
+.akini-splash-logo svg{width:30px;height:30px}
+.akini-splash-title{font-size:22px;font-weight:600;letter-spacing:3px;color:rgba(255,255,255,.9);margin-bottom:5px}
+.akini-splash-subtitle{font-size:13px;color:rgba(255,255,255,.42);letter-spacing:1px}
+.akini-splash-modules{display:grid;grid-template-columns:1fr;gap:12px;width:100%;flex:1;min-height:0;margin-bottom:16px}
+@media (min-width:400px) and (min-height:720px){.akini-splash-modules{grid-template-columns:1fr 1fr}}}
+.akini-splash-module{background:linear-gradient(145deg,rgba(255,255,255,.05) 0%,rgba(255,255,255,.025) 100%);border:1px solid rgba(255,255,255,.08);border-radius:18px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);overflow:hidden;display:flex;flex-direction:column;max-height:min(48vh,420px)}
+.akini-splash-module-head{display:flex;align-items:center;gap:7px;padding:12px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;font-weight:700;color:rgba(255,255,255,.95);letter-spacing:.5px;flex-shrink:0}
+.akini-splash-module-body{padding:12px 14px 14px;font-size:11.5px;line-height:1.85;color:rgba(255,255,255,.55);overflow-y:auto;overscroll-behavior:contain}
 .akini-splash-module-body p{margin:0 0 6px}
 .akini-splash-module-body p:last-child{margin-bottom:0}
-.akini-splash-module-body b{color:#1a1a1a;font-weight:600}
-.akini-splash-module-body hr{border:none;border-top:1px solid rgba(0,0,0,.08);margin:10px 0}
-.akini-splash-thanks{color:#1a1a1a;font-weight:700}
-.akini-splash-enter{width:min(320px,88vw);flex-shrink:0;padding:13px 24px;background:#1a1a1a;color:#fff;border:none;border-radius:999px;font-size:15px;font-weight:500;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.18);transition:opacity .25s ease,transform .25s ease;opacity:.55;pointer-events:none;margin-bottom:6px}
+.akini-splash-module-body b{color:rgba(255,255,255,.78);font-weight:600}
+.akini-splash-module-body hr{border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0}
+.akini-splash-thanks{color:#fff;font-weight:700}
+.akini-splash-enter{width:min(320px,88vw);flex-shrink:0;padding:13px 24px;background:#fff;color:#111;border:none;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;box-shadow:0 6px 22px rgba(255,255,255,.28);transition:all .25s ease;margin-bottom:6px;opacity:.55;pointer-events:none}
 .akini-splash-enter.ready{opacity:1;pointer-events:auto}
-.akini-splash-enter:active{transform:translateY(-1px)}
+.akini-splash-enter:active{background:#f0f0f0;box-shadow:0 8px 28px rgba(255,255,255,.38);transform:translateY(-1px)}
 </style>
 <script>
 window.akiniGoBack = function(target){
@@ -1491,7 +1516,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
   }
   function resetProbDefaultsIfNeeded(){
     try {
-      var CURR = 'v20260918zzzt';
+      var CURR = 'v20260918zzzr';
       if (localStorage.getItem('akini_prob_version') === CURR) return;
       lsSet('akini_prob_version', CURR);
       // 本版重置回复相关概率为新默认值（用户指定）
@@ -1593,8 +1618,8 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
   setTimeout(function(){
     try{
       var libs = [
-        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20260918zzzt',
-        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20260918zzzt'
+        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20260918v500',
+        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20260918v500'
       ];
       libs.forEach(function(u){
         var s = document.createElement('script');
@@ -1604,7 +1629,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
     }catch(e){}
   }, 5000);
 })();
-</script><script src="localforage.min.js?v=20260918zzzt"></script><script src="akini-storage-safe.js?v=20260918zzzt"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/></svg>');};</script>
+</script><script src="localforage.min.js?v=20260918v500"></script><script src="akini-storage-safe.js?v=20260918v500"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/></svg>');};</script>
 
 <!-- ===== zzw：陪伴页 ===== -->
 <div id="app-companion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;flex-direction:column;background:#f7f7f7;color:#1a1a1a">
@@ -1728,7 +1753,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
 </div>
 </div>
 <input accept="image/*" class="akini-file-offscreen" id="novelCoverInput" type="file"/>
-<script id="akini-main" src="akini-main.js?v=20260918zzzt"></script><script src="akini-moments-engine.js?v=20260918zzzt"></script><script src="akini-mail-engine.js?v=20260918zzzt"></script><script src="akini-backup.js?v=20260918zzzt"></script><script src="akini-ta-phone.js?v=20260918zzzt"></script><script src="akini-storage-mgr.js?v=20260918zzzt"></script><script src="akini-cloud-backup.js?v=20260918zzzt"></script><script src="akini-novel-companion.js?v=20260918zzzt"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){_hideApps.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});_hideAreas.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});};window.showEl=function showEl(id,z){var e=document.getElementById(id);if(e){e.style.zIndex=z||"999999";e.style.display="flex";e.classList.add("show");return e;}return e;};window.showArea=function showArea(id){var e=document.getElementById(id);if(e){e.style.zIndex="999999";e.style.display="flex";e.classList.add("show");}};function navTo(app){try{window.hideAll();if(app==="chat-list"){__akiniShowAppContainer("chat-list");return}if(app==="music"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}__akiniShowAppContainer("music");var _cp=document.getElementById("musicContactPicker");if(_cp){_cp.style.display="flex";_cp.style.zIndex="1000000";}return}if(app==="survey"){if(window._openSurveyList){window._openSurveyList();return}var _sm=document.getElementById("surveyListModal");if(_sm){_sm.style.display="flex";_sm.style.zIndex="1000001";}return}if(["friends","call","add-contact","contact-detail","create-group"].indexOf(app)>=0){__akiniShowAppContainer(app);return}if(app==="icity"){showArea("icityArea");return}if(app==="settings"){showArea("settingsArea");return}if(app==="storage"){if(window.__openStorageMgr){window.__openStorageMgr();}return}if(app==="beautify"){showArea("beautifyArea");return}if(app==="wordbank"){showArea("wordbankOverlay");if(typeof populateWordbankGroups==="function")populateWordbankGroups();return}if(app==="shop"){showEl("app-shop");if(window.__renderShop)window.__renderShop();return}if(app==="novel"){showEl("app-novel");if(window.__renderNovelShelf)window.__renderNovelShelf();return}if(app==="companion"){showEl("app-companion");if(window.__openCompanion)window.__openCompanion();return}if(app==="mail"){if(typeof window.showPage==="function"){window.showPage("mail");}else{showEl("app-mail");}if(window.__renderMail)window.__renderMail();return}if(app==="home"){showArea("homeArea");return}if(app==="contact-detail"){showArea("contactDetailArea");return}if(app==="add-contact"){showArea("addContactArea");return}if(app==="create-group"){showArea("createGroupArea");return}if(app==="music-together"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}showEl("app-music");return}if(app==="chat-detail"&&window._akiniLastChatId){window.openChat(window._akiniLastChatId,!0);return}if(app==="ta-phone"){if(window.AkiniTaPhone){window.AkiniTaPhone.showTaPhone();}return}if(typeof window.showPage==="function"&&["app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group"].indexOf(app)>=0){window.showPage(app);return}console.warn("navTo unknown app:",app)}catch(err){console.error("navTo error",err)}}
+<script id="akini-main" src="akini-main.js?v=20260918v500"></script><script src="akini-moments-engine.js?v=20260918v500"></script><script src="akini-mail-engine.js?v=20260918v500"></script><script src="akini-backup.js?v=20260918v500"></script><script src="akini-ta-phone.js?v=20260918v500"></script><script src="akini-storage-mgr.js?v=20260918v500"></script><script src="akini-cloud-backup.js?v=20260918v500"></script><script src="akini-novel-companion.js?v=20260918v500"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){_hideApps.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});_hideAreas.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});};window.showEl=function showEl(id,z){var e=document.getElementById(id);if(e){e.style.zIndex=z||"999999";e.style.display="flex";e.classList.add("show");return e;}return e;};window.showArea=function showArea(id){var e=document.getElementById(id);if(e){e.style.zIndex="999999";e.style.display="flex";e.classList.add("show");}};function navTo(app){try{window.hideAll();if(app==="chat-list"){__akiniShowAppContainer("chat-list");return}if(app==="music"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}__akiniShowAppContainer("music");var _cp=document.getElementById("musicContactPicker");if(_cp){_cp.style.display="flex";_cp.style.zIndex="1000000";}return}if(app==="survey"){if(window._openSurveyList){window._openSurveyList();return}var _sm=document.getElementById("surveyListModal");if(_sm){_sm.style.display="flex";_sm.style.zIndex="1000001";}return}if(["friends","call","add-contact","contact-detail","create-group"].indexOf(app)>=0){__akiniShowAppContainer(app);return}if(app==="icity"){showArea("icityArea");return}if(app==="settings"){showArea("settingsArea");return}if(app==="storage"){if(window.__openStorageMgr){window.__openStorageMgr();}return}if(app==="beautify"){showArea("beautifyArea");return}if(app==="wordbank"){showArea("wordbankOverlay");if(typeof populateWordbankGroups==="function")populateWordbankGroups();return}if(app==="shop"){showEl("app-shop");if(window.__renderShop)window.__renderShop();return}if(app==="novel"){showEl("app-novel");if(window.__renderNovelShelf)window.__renderNovelShelf();return}if(app==="companion"){showEl("app-companion");if(window.__openCompanion)window.__openCompanion();return}if(app==="mail"){if(typeof window.showPage==="function"){window.showPage("mail");}else{showEl("app-mail");}if(window.__renderMail)window.__renderMail();return}if(app==="home"){showArea("homeArea");return}if(app==="contact-detail"){showArea("contactDetailArea");return}if(app==="add-contact"){showArea("addContactArea");return}if(app==="create-group"){showArea("createGroupArea");return}if(app==="music-together"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}showEl("app-music");return}if(app==="chat-detail"&&window._akiniLastChatId){window.openChat(window._akiniLastChatId,!0);return}if(app==="ta-phone"){if(window.AkiniTaPhone){window.AkiniTaPhone.showTaPhone();}return}if(typeof window.showPage==="function"&&["app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group"].indexOf(app)>=0){window.showPage(app);return}console.warn("navTo unknown app:",app)}catch(err){console.error("navTo error",err)}}
 window.navTo=navTo;
 /* zzzy：导航统一挂钩——任何入口进入朋友圈/iCity 都把互动消息标记已读，首页角标看过一次后重进不再复显 */
 (function(){/* zzzk：角标只在进入对应功能的通知中心时清除，不再随 navTo 全局清除 */})();
@@ -4631,7 +4656,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
 /* zzzl：应用内不再做任何版本强制重置/强制刷新——更新只在用户下次自然打开时生效 */
 window.__akiniRegisterSW = function(){
   if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./service-worker.js?v=20260918zzzt', {updateViaCache:'none'}).then(function(reg){
+    navigator.serviceWorker.register('./service-worker.js?v=20260918v500', {updateViaCache:'none'}).then(function(reg){
       console.log('[Akini] SW registered', reg.scope);
       // 安卓 Chrome：注册周期性后台同步，应用被杀/冻结后系统仍会定时唤醒 SW 检查未读并发系统通知
       try{
@@ -4658,9 +4683,9 @@ else window.addEventListener('load', function(){ setTimeout(window.__akiniRegist
 
 </script>
 
-<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20260918zzzt"></script>
-<script defer src="akini-compat-bridge.js?v=20260918zzzt"></script>
-<script defer src="akini-backup.js?v=20260918zzzt"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20260918v500"></script>
+<script defer src="akini-compat-bridge.js?v=20260918v500"></script>
+<script defer src="akini-backup.js?v=20260918v500"></script>
 <script>
 // 兼容旧版 JSON 备份的轻量兜底：如果 core 风格备份引擎未加载，仍允许导出基础 JSON
 (function(){
