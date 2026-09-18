@@ -136,13 +136,17 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: relative;
   flex: 1;
   width: 100%;
+  height: 100%;
   min-height: 0;
   z-index: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
-  overflow: visible !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: touch;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 /* 模块级独立缩放壳：inner 固定 390/380 基准宽渲染，按屏宽等比缩放，垂直 flex 分布 */
@@ -179,7 +183,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 /* zzzp：仿状态栏已整体移除——PWA 桌面模式下与系统真状态栏重复（双状态栏），浏览器模式下也无存在必要，用户要求删除 */
 /* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
-.fit-gap-lg { margin-top: 14px; }.fit-gap { margin-top: 10px; }.fit-bottom { margin-top: auto; }.apps-grid {
+.fit-gap-lg { margin-top: 10px; }.fit-gap { margin-top: 8px; }.fit-bottom { margin-top: auto; }.apps-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 12px 4px;
@@ -197,7 +201,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   width: 40px;
   height: 40px;
 }.top-card {
-  margin: calc(16px + env(safe-area-inset-top, 0px)) 16px 4px;
+  margin: calc(10px + env(safe-area-inset-top, 0px)) 16px 4px;
   background: #ffffff;
   border-radius: 26px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
@@ -513,6 +517,11 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-shrink: 0;
   display: flex;
   justify-content: center;
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: transparent;
 }
 .bottom-btn-container {
   background: #ffffff;

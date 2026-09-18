@@ -45,17 +45,27 @@ window.__akiniMedia = (function () {
           var h = img.getAttribute("data-mh");
           if (!h || img.__mhDone) return;
           self.get(h, function (url) {
-            if (url) { img.src = url; img.__mhDone = true; }
+            if (url) {
+              img.src = url;
+              img.__mhDone = true;
+              /* v524：池化头像恢复成功后立即打 keep 标记，下次持久化不再抽离，
+                 从此头像永远内联稳定显示（图片消息仍走池化） */
+              try {
+                if (img.closest && img.closest(".msg-avatar")) img.setAttribute("data-av-keep", "1");
+              } catch (e) {}
+            }
           });
         })(imgs[i]);
       }
     }
   };
 })();
-/* 字符串级瘦身：把 HTML 里 >8KB 的 base64 图抽离入池，替换为 data-mh 引用（行数不变） */
+/* 字符串级瘦身：把 HTML 里 >8KB 的 base64 图抽离入池，替换为 data-mh 引用（行数不变）
+   v524：头像 img 带 data-av-keep="1" 标记（nt/it/lineAvatar 生成时统一注入），
+   持久化瘦身绝不抽离头像——媒体池占位恢复失败曾是"特殊卡片头像消失变空灰圆"的根源 */
 function __akiniStripMedia(html) {
   if (!html || html.indexOf("data:image") < 0 || !window.__akiniMedia) return html;
-  return html.replace(/<img([^>]*?)src="(data:image\/[^"]{8000,})"([^>]*)>/g, function (m, pre, url, post) {
+  return html.replace(/<img((?:(?!data-av-keep=)[^>])*?)src="(data:image\/[^"]{8000,})"((?:(?!data-av-keep=)[^>])*)>/g, function (m, pre, url, post) {
     var h = window.__akiniMedia.put(url);
     if (!h) return m;
     return '<img data-mh="' + h + '"' + pre + ' src="' + window.__akiniMedia.PLACEHOLDER + '"' + post + ">";
@@ -1502,6 +1512,34 @@ document.addEventListener("DOMContentLoaded", function () {
         });
       };
     })();
+/* v524 防闪退兜底：资源加载失败全局捕获（capture 阶段，img 的 error 不冒泡）。
+   头像图加载失败 → 换稳定内联 SVG 线条人像（绝不留裂图/空白圆）；
+   内容图加载失败 → 隐藏裂图占位。任何处理异常都被吞掉，绝不中断页面。 */
+(function () {
+  if (window.__akiniImgErrGuard) return;
+  window.__akiniImgErrGuard = true;
+  window.addEventListener(
+    "error",
+    function (ev) {
+      try {
+        var el = ev && ev.target;
+        if (!el || el.tagName !== "IMG" || el.__akiniErrFixed) return;
+        el.__akiniErrFixed = true;
+        if (el.closest && el.closest(".msg-avatar")) {
+          if (window.__akiniLineAvatarImg) {
+            var tmp = document.createElement("div");
+            tmp.innerHTML = window.__akiniLineAvatarImg();
+            var ni = tmp.querySelector("img");
+            if (ni && ni.src) el.src = ni.src;
+          }
+        } else {
+          el.style.visibility = "hidden";
+        }
+      } catch (e) {}
+    },
+    true,
+  );
+})();
 ((window.onerror = function (t, e, n, i, a) {
       var r = t + "";
       if (a && a.stack) r += "\\n" + a.stack;
@@ -3047,6 +3085,49 @@ document.addEventListener("DOMContentLoaded", function () {
         row.remove();
       });
     }
+    /* v524 核心修复：特殊消息卡片（问卷/转账等）头像丢失根治——
+       媒体池化抽走的头像 data URI 若在 IDB 池中丢失（用户设备的"数据消失"问题），
+       img.src 会永远停在 1x1 透明占位 GIF 上，视觉上就是空白灰圆"头像跑哪去了"。
+       这里在所有聊天渲染路径上强制补齐：空/占位头像一律重写为当前真实头像，
+       同时自动修复聊天记录里已存在的存量坏头像。幂等：修过的行打 data-av-fixed 标记。 */
+    var __akiniFixAvT = null;
+    function __akiniFixChatAvatars(root, rowOnly) {
+      try {
+        var cb = root && root.querySelectorAll ? root : document.getElementById("chatBody");
+        if (!cb) return;
+        var rows = rowOnly && rowOnly.classList ? [rowOnly] : cb.querySelectorAll(".msg-row");
+        var meAv = null, taAv = null;
+        for (var i = 0; i < rows.length; i++) {
+          var row = rows[i];
+          if (!row.classList || row.classList.contains("system") || row.classList.contains("timestamp-row")) continue;
+          if (row.id && row.id.indexOf("typingBubbleRow_") === 0) continue;
+          var av = row.querySelector(".msg-avatar");
+          if (!av || av.getAttribute("data-av-fixed") === "1") continue;
+          var img = av.querySelector("img");
+          var src = img ? (img.getAttribute("src") || "") : "";
+          var bad = !img || !src || src === (window.__akiniMedia && window.__akiniMedia.PLACEHOLDER) || src.indexOf("data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP") === 0;
+          if (!bad) { av.setAttribute("data-av-fixed", "1"); continue; }
+          if (row.classList.contains("me")) {
+            if (meAv === null) meAv = (window.getMyAvatar ? window.getMyAvatar() : "") || (window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : "");
+            if (meAv) av.innerHTML = meAv;
+          } else {
+            if (taAv === null) taAv = (window.getTaAvatar ? window.getTaAvatar() : "") || (window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : "");
+            if (taAv) av.innerHTML = taAv;
+          }
+          av.setAttribute("data-av-fixed", "1");
+        }
+      } catch (e) {}
+    }
+    function __akiniFixChatAvatarsSoon(root, rowOnly) {
+      if (rowOnly) { try { __akiniFixChatAvatars(null, rowOnly); } catch (e) {} return; }
+      if (__akiniFixAvT) return;
+      __akiniFixAvT = setTimeout(function () {
+        __akiniFixAvT = null;
+        __akiniFixChatAvatars();
+      }, 250);
+    }
+    window.__akiniFixChatAvatars = __akiniFixChatAvatars;
+    window.__akiniFixChatAvatarsSoon = __akiniFixChatAvatarsSoon;
     // 历史问卷卡片里的 emoji 图标升级为线条 SVG（新卡片构建时已用 SVG）
     function __akiniUpgradeSurveyIcons(root) {
       if (!window.__akiniSurveyIconSVG || !root || !root.querySelectorAll) return;
@@ -3088,6 +3169,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!chatBody) return;
       Array.from(chatBody.children).forEach(__akiniProcessMsgMeta);
       __akiniScheduleRrGroups();
+      __akiniFixChatAvatarsSoon(chatBody);
       /* 刷新后：将历史遗留的待读回执按 core 时序延迟点亮一次 */
       setTimeout(function () {
         try {
@@ -3109,6 +3191,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 try { __akiniProcessMsgMeta(node); } catch (e) {}
                 try { __akiniInsertTimestampSeparators(); } catch (e) {}
                 try { __akiniUpgradeSurveyIcons(node); } catch (e) {}
+                try { __akiniFixChatAvatars(null, node); } catch (e) {}
               }
             });
           });
@@ -3142,6 +3225,8 @@ document.addEventListener("DOMContentLoaded", function () {
             var __rows = cb.querySelectorAll(".msg-row:not([data-meta-v])");
             var __lim = Math.min(__rows.length, 40);
             for (var __mi = 0; __mi < __lim; __mi++) __akiniProcessMsgMeta(__rows[__mi]);
+            // v524：存量坏头像兜底补扫（媒体池占位/空 img 重写真实头像，幂等标记不重扫）
+            try { __akiniFixChatAvatars(cb); } catch (e) {}
             // 已读回执终兜底：我方所有消息（普通/转账/问卷/引用/表情包/图片）——无回执补建、藏着点亮
             if (__akiniToggleOn("readReceiptToggle")) {
               var __meRows = cb.querySelectorAll(".msg-row.me:not(.timestamp-row)");
@@ -4893,7 +4978,9 @@ document.addEventListener("DOMContentLoaded", function () {
         // zzt 陈旧异步写防护：内存 E[t] 是权威——若回调执行时内存已比本快照短（如刚被用户清除/裁剪），放弃本次旧快照写回
         try {
           var _memNow = "string" == typeof E[t] ? E[t] : "";
-          if (__akiniCountMsgRowsFast(clean) > __akiniCountMsgRowsFast(_memNow)) {
+          /* v524 性能：clean 行数已在上方算过（newRows），不再对同一大字符串重复跑正则全扫——
+             长会话每条消息都重复扫几 MB 字符串是内存尖峰/卡顿来源之一 */
+          if (newRows > __akiniCountMsgRowsFast(_memNow)) {
             console.warn("[C] 跳过陈旧写回：" + key);
             return;
           }
@@ -6332,7 +6419,7 @@ document.addEventListener("DOMContentLoaded", function () {
       X = document.getElementById("sendBtn");
     var Y = document.getElementById("chatMenuOverlay"),
       Q = document.getElementById("menuBg");
-    // ========== 首页防闪：数据未就绪前隐藏默认内容 ==========
+    // ========== 首页防闪：数据未就绪前隐藏默认内容；切后台回来禁止整体下拉 ==========
     (function () {
       if (document.getElementById("akiniNoFlashStyle")) return;
       var style = document.createElement("style");
@@ -6343,6 +6430,17 @@ document.addEventListener("DOMContentLoaded", function () {
       if (cw && !cw.classList.contains("akini-content-fade")) {
         cw.classList.add("akini-content-fade", "akini-content-hidden");
       }
+      function resetScroll(){
+        try { window.scrollTo(0,0); } catch(e){}
+        try { document.documentElement.scrollTop = 0; } catch(e){}
+        try { document.body.scrollTop = 0; } catch(e){}
+        try { if(cw) cw.scrollTop = 0; } catch(e){}
+      }
+      document.addEventListener("visibilitychange", function(){
+        if(!document.hidden) setTimeout(resetScroll, 0);
+      });
+      window.addEventListener("focus", resetScroll);
+      window.addEventListener("pageshow", resetScroll);
     })();
     window.__akiniShowContent = function () {
       var cw = document.querySelector(".content-wrapper");
@@ -6755,7 +6853,7 @@ document.addEventListener("DOMContentLoaded", function () {
       );
     window.__akiniLineAvatarImg = function () {
       return (
-        '<img src="' +
+        '<img data-av-keep="1" src="' +
         AKINI_LINE_AVATAR_URI +
         '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
       );
@@ -6823,7 +6921,7 @@ document.addEventListener("DOMContentLoaded", function () {
         0 === t.indexOf("<img")
           ? t
           : 0 === t.indexOf("data:") || 0 === t.indexOf("http")
-            ? '<img src="' +
+            ? '<img data-av-keep="1" src="' +
               t.replace(/"/g, "&quot;") +
               '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
             : '<span style="font-size:' +
@@ -6853,7 +6951,7 @@ document.addEventListener("DOMContentLoaded", function () {
         t = n[1];
       }
       return 0 === t.indexOf("data:") || 0 === t.indexOf("http")
-        ? '<img src="' +
+        ? '<img data-av-keep="1" src="' +
             t.replace(/"/g, "&quot;") +
             '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
         : window.__akiniIsDefaultAvatarToken(t)
@@ -22523,7 +22621,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
   function partnerAvatarHtml(av) {
     var t = av && String(av).trim();
-    if (t && /^(https?:|data:|blob:)/.test(t)) return '<img src="' + t + '" alt="" style="width:100%;height:100%;object-fit:cover"/>';
+    if (t && /^(https?:|data:|blob:)/.test(t)) return '<img data-av-keep="1" src="' + t + '" alt="" style="width:100%;height:100%;object-fit:cover"/>';
     if (!t || (window.__akiniIsDefaultAvatarToken && window.__akiniIsDefaultAvatarToken(t))) {
       return window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : esc(t || "\ud83d\udc30");
     }
