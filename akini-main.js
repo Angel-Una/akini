@@ -3278,6 +3278,7 @@ document.addEventListener("DOMContentLoaded", function () {
           window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet("akini_icity_ta_avatar", e)));
     }
     function m(t, e, n) {
+      if (!window._idbStore || typeof window._idbStore.get !== "function") return;
       _idbStore.get(e, function (i) {
         if (
           i &&
@@ -6603,6 +6604,30 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(_bootRefresh, 500);
         setTimeout(_bootRefresh, 1500);
         setTimeout(_bootRefresh, 3000);
+        // v525 首页兜底：启动后多次检查关键元素是否仍为默认空状态，尝试重新渲染
+        function _ensureHomeRendered() {
+          try {
+            var left = document.getElementById("homeAvatarLeftPreview");
+            var right = document.getElementById("homeAvatarRightPreview");
+            var dayNum = document.getElementById("dayNumber");
+            if (left && (!left.innerHTML.trim() || left.textContent.trim() === "")) {
+              if (window.renderHomeAvatarPreviews) window.renderHomeAvatarPreviews();
+            }
+            if (right && (!right.innerHTML.trim() || right.textContent.trim() === "")) {
+              if (window.renderHomeAvatarPreviews) window.renderHomeAvatarPreviews();
+            }
+            if (dayNum && dayNum.innerText === "0") {
+              var sd = localStorage.getItem("akini_start_date");
+              if (sd) {
+                var d = new Date(sd), n = new Date(), diff = Math.floor((n - d) / 864e5);
+                dayNum.innerText = diff >= 0 ? diff : 0;
+              }
+            }
+          } catch (e) {}
+        }
+        setTimeout(_ensureHomeRendered, 1000);
+        setTimeout(_ensureHomeRendered, 3000);
+        setTimeout(_ensureHomeRendered, 7000);
         // 开屏进度：数据与界面已就绪，等待用户在声明页点击「进入」
         window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
       }, 300);
