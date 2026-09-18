@@ -492,6 +492,7 @@
   var _readerContacts = []; /* zzzj：共读多选 */
   var _readerParas = [];
   var _readerIdx = 0;
+  var _readerChapters = []; /* zzaa 20260919v503：当前书籍章节索引列表 [{title,pidx}] */
   var RENDER_CHUNK = 120;
 
   var COVER_GRADS = [
@@ -605,6 +606,15 @@
     try { return streamDecode(u8, 'utf-8', false); } catch (e3) { return ''; }
   }
 
+  /* zzaa 20260919v503：书籍信息里保存/读取章节缓存，切换书籍后章节列表立即可用 */
+  var CHAPTER_CACHE_PREFIX = 'akini_novel_chapters_';
+  function cacheChapters(bookId, chapters) {
+    try { lsSet(CHAPTER_CACHE_PREFIX + bookId, JSON.stringify(chapters)); } catch (e) {}
+  }
+  function loadCachedChapters(bookId) {
+    try { var v = lsGet(CHAPTER_CACHE_PREFIX + bookId, ''); return v ? JSON.parse(v) : []; } catch (e) { return []; }
+  }
+
   function importNovel(file) {
     if (!file) return;
     /* zzzx：超大文件护栏——超过 120MB 的 txt 在手机上必然内存崩溃，直接拒绝并明确提示，绝不卡崩 */
@@ -626,6 +636,10 @@
         _books.push(book);
         saveBooks();
         idbSet(CONTENT_PREFIX + id, txt);
+        /* zzaa 20260919v503：导入时立即解析章节并缓存 */
+        var tmpParas = txt.split(/\n+/).map(function (p) { return p.trim(); }).filter(function (p) { return p !== ''; });
+        var chs = parseChapters(tmpParas);
+        cacheChapters(id, chs);
         window.__renderNovelShelf();
       } catch (e) { alert('导入失败：' + (e && e.message ? e.message : '文件解析出错')); }
     };
@@ -895,6 +909,20 @@
     _renderPaged();
   }
 
+  /* ---------- zzaa 20260919v503：章节自动解析 ----------
+     识别常见章节标题：第1章 / 第一章 / 第001章 / Chapter 1 / 序章 / 前言 / 楔子 / 后记 等 */
+  function parseChapters(paras) {
+    var chapters = [];
+    var re = /^(?:第\s*[0-9零一二三四五六七八九十百千万]+\s*[章卷回]|chapter\s+\d+|序[章言]?|前言|楔子|引子|尾声|后记|番外|终章)(.*)$/i;
+    for (var i = 0; i < paras.length; i++) {
+      var p = paras[i].trim();
+      if (re.test(p)) {
+        chapters.push({ title: p, pidx: i });
+      }
+    }
+    return chapters;
+  }
+
   /* ---------- 打开阅读页 ---------- */
   function openReader() {
     if (!_curBook) return;
@@ -919,6 +947,8 @@
     idbGet(CONTENT_PREFIX + _curBook.id, function (txt) {
       txt = txt || '';
       _readerParas = txt.split(/\n+/).map(function (p) { return p.trim(); }).filter(function (p) { return p !== ''; });
+      _readerChapters = parseChapters(_readerParas);
+      cacheChapters(_curBook.id, _readerChapters);
       _readerIdx = 0;
       if (content) content.innerHTML = '';
       if (flipMode() === 'page') {
@@ -995,7 +1025,82 @@
     if (flipMode() === 'page') savePageProgress(); else saveProgress();
     var e = $('app-novel-reader');
     if (e) e.style.display = 'none';
+    closeChapterDrawer();
     window.__renderNovelShelf();
+  }
+
+  /* ---------- zzaa 20260919v503：章节目录侧滑面板 ---------- */
+  function openChapterDrawer() {
+    var drawer = $('novelChapterDrawer');
+    var panel = $('novelChapterDrawerPanel');
+    var list = $('novelChapterDrawerList');
+    if (!drawer || !panel || !list) return;
+    renderChapterList(list);
+    drawer.style.display = 'flex';
+    requestAnimationFrame(function () { panel.style.transform = 'translateX(0)'; });
+  }
+  function closeChapterDrawer() {
+    var drawer = $('novelChapterDrawer');
+    var panel = $('novelChapterDrawerPanel');
+    if (!drawer || !panel) return;
+    panel.style.transform = 'translateX(-100%)';
+    setTimeout(function () { drawer.style.display = 'none'; }, 260);
+  }
+  function renderChapterList(listEl) {
+    if (!_readerParas.length) {
+      listEl.innerHTML = '<div style="text-align:center;color:#bbb;font-size:14px;padding:40px 0">暂无章节</div>';
+      return;
+    }
+    var html = '';
+    if (!_readerChapters.length) {
+      html += '<div style="padding:12px 18px;color:#888;font-size:13px;border-bottom:1px solid #f5f5f5">未识别到章节标题<br><span style="font-size:12px">章节名示例：第1章、第一章、Chapter 1</span></div>';
+    }
+    html += _readerChapters.map(function (ch, idx) {
+      var num = idx + 1;
+      return '<button class="novel-chapter-item" data-pidx="' + ch.pidx + '" type="button" style="display:block;width:100%;padding:13px 18px;background:#fff;border:none;border-bottom:1px solid #f5f5f5;text-align:left;font-size:15px;color:#1a1a1a;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;touch-action:manipulation">'
+        + '<span style="display:inline-block;min-width:28px;color:#999;font-size:13px;margin-right:6px">' + num + '</span>'
+        + esc(ch.title) + '</button>';
+    }).join('');
+    listEl.innerHTML = html;
+    Array.prototype.forEach.call(listEl.querySelectorAll('.novel-chapter-item'), function (btn) {
+      btn.addEventListener('click', function () {
+        var pidx = parseInt(btn.getAttribute('data-pidx'), 10);
+        if (isNaN(pidx)) return;
+        jumpToParagraph(pidx);
+        closeChapterDrawer();
+      });
+    });
+  }
+  function jumpToParagraph(pidx) {
+    if (!_readerParas.length || pidx < 0 || pidx >= _readerParas.length) return;
+    var content = $('novelReaderContent');
+    if (!content) return;
+    if (flipMode() === 'page') {
+      /* 翻页模式：找到该段落所在页 */
+      _pagedIdx = 0;
+      for (var i = 0; i < _pagedPages.length; i++) {
+        var page = _pagedPages[i];
+        var has = false;
+        for (var j = 0; j < page.length; j++) {
+          if (_readerParas.indexOf(page[j]) === pidx) { has = true; break; }
+        }
+        if (has) { _pagedIdx = i; break; }
+      }
+      _renderPaged();
+      savePageProgress();
+    } else {
+      /* 滚动模式：确保该段落已渲染再滚动 */
+      if (_readerIdx <= pidx) {
+        while (_readerIdx <= pidx && _readerIdx < _readerParas.length) renderMoreParas();
+      }
+      requestAnimationFrame(function () {
+        var el = content.querySelector('[data-pidx="' + pidx + '"]');
+        if (el) {
+          content.scrollTop = Math.max(0, el.getBoundingClientRect().top - content.getBoundingClientRect().top + content.scrollTop - 14);
+        }
+      });
+      saveProgress();
+    }
   }
 
   /* ---------- 绑定 ---------- */
@@ -1004,6 +1109,10 @@
     var addBtn = $('novelAddBtn');
     var importInput = $('novelImportInput');
     var readerBack = $('novelReaderBackBtn');
+    var chapterMenuBtn = $('novelChapterMenuBtn');
+    var chapterDrawer = $('novelChapterDrawer');
+    var chapterDrawerMask = $('novelChapterDrawerMask');
+    var chapterDrawerClose = $('novelChapterDrawerClose');
     var menuBtn = $('novelMenuBtn');
     var menuClose = $('novelMenuClose');
     var menuOverlay = $('novelReaderMenu');
@@ -1034,6 +1143,10 @@
       importNovel(f);
     });
     if (readerBack) readerBack.addEventListener('click', closeReader);
+    if (chapterMenuBtn) chapterMenuBtn.addEventListener('click', function () { openChapterDrawer(); });
+    if (chapterDrawerClose) chapterDrawerClose.addEventListener('click', closeChapterDrawer);
+    if (chapterDrawerMask) chapterDrawerMask.addEventListener('click', closeChapterDrawer);
+    if (chapterDrawer) chapterDrawer.addEventListener('click', function (e) { if (e.target === chapterDrawer) closeChapterDrawer(); });
     if (menuBtn) menuBtn.addEventListener('click', function () { openSheet('novelReaderMenu'); });
     if (menuClose) menuClose.addEventListener('click', function () { closeSheet('novelReaderMenu'); });
     if (menuOverlay) menuOverlay.addEventListener('click', function (e) { if (e.target === menuOverlay) closeSheet('novelReaderMenu'); });
