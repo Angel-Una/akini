@@ -6672,7 +6672,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* ===== 崩溃自愈安全模式：禁重渲染特性、允许滚动 ===== */
+/* ===== 崩溃自愈安全模式（纯降级特效，严禁修改首页布局定位与缩放） ===== */
 .akini-safe-mode .preview-bubble,
 .akini-safe-mode .bubble,
 .akini-safe-mode [style*="backdrop-filter"] {
@@ -6680,11 +6680,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row .bubble:not(.transfer-bubble):
   -webkit-backdrop-filter: none !important;
 }
 .akini-safe-mode .preview-bubble { background: rgba(255, 255, 255, 0.95) !important; }
-.akini-safe-mode .fit-inner { transform: none !important; }
-.akini-safe-mode .fit-mod { height: auto !important; margin-top: 8px !important; }
-.akini-safe-mode .content-wrapper { height: auto !important; margin-top: 44px !important; justify-content: flex-start !important; }
-.akini-safe-mode .phone-frame { overflow: hidden !important; } /* zzzv：安全模式下首页也绝不滚动——用户明确要求首页固定不可滑动；极矮屏由 home-fit 整体缩放兜底 */
-.akini-safe-mode .fake-statusbar { display: none !important; }
+/* 严禁对 .content-wrapper 施加 margin-top: 44px 或 height: auto，保证首页永不下移错位 */
 
 /* ===== 深度安全模式（连续崩溃≥4次）：最大幅度减负保数据 ===== */
 .akini-deep-safe *,
@@ -7675,3 +7671,10 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 #app-chat > .chat-wrapper { flex: 0 0 auto !important; }
 #app-chat > .chat-body { flex: 1 1 auto !important; min-height: 0 !important; }
 #app-chat > .chat-input-bar-area { flex: 0 0 auto !important; }
+
+/* 确保首页 content-wrapper 顶格贴合视口，彻底杜绝任何形式的下移 */
+html body .phone-frame .content-wrapper,
+html.akini-safe-mode body .phone-frame .content-wrapper {
+  margin-top: 0 !important;
+  top: 0 !important;
+}
