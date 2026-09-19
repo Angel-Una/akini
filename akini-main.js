@@ -5711,13 +5711,24 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         } catch (e) {}
       }),
-      // 同步写全量应急快照到 sessionStorage：刷新/返回时 IDB 事务可能未落盘，sessionStorage 同步可靠
+      // 同步写应急快照到 sessionStorage：刷新/返回时 IDB 事务可能未落盘，sessionStorage 同步可靠
+      // v506：参照 milk 的截断保护——数据量大时只保留最近 N 条日记/评论，避免 pagehide 序列化数十MB卡死
       (window._akiniEmergencySnapshot = function () {
         try {
           var diaries = q();
           if (Array.isArray(diaries) && diaries.length > 0) {
-            sessionStorage.setItem("akini_icity_diaries_emergency", JSON.stringify(diaries));
-            diaries.forEach(function (d) {
+            /* 估算体积：每条评论约 500 字节；超过 3MB 则只保留最近 60 条日记、每条最近 30 条评论 */
+            var estSize = 0;
+            diaries.forEach(function (d) { estSize += ((d && d.comments && d.comments.length) || 0) * 500; });
+            var slimDiaries = diaries;
+            if (estSize > 3 * 1024 * 1024) {
+              slimDiaries = diaries.slice(-60).map(function (d) {
+                if (!d || !Array.isArray(d.comments)) return d;
+                return Object.assign({}, d, { comments: d.comments.slice(-30) });
+              });
+            }
+            sessionStorage.setItem("akini_icity_diaries_emergency", JSON.stringify(slimDiaries));
+            slimDiaries.forEach(function (d) {
               if (d && d.id && Array.isArray(d.comments) && d.comments.length > 0) {
                 sessionStorage.setItem("akini_icity_comments_emergency_" + d.id, JSON.stringify({ id: d.id, comments: d.comments }));
               }
@@ -5752,6 +5763,17 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (e) {}
       }),
       window.addEventListener("pagehide", function () {
+        try {
+          /* v506 全机型卡崩主因修复：pagehide 的系统时间预算极短（移动端常不足 1s），
+             原来在这里跑「全量存日记 + iCity 全量合并 + 应急快照」三件数十 MB 级同步序列化，
+             超时进程直接被系统杀掉 → 表现为切后台/返回时的卡死崩溃。
+             现只保留轻量应急快照（sessions 已 slim 剔除 messagesHTML）；
+             重量级存盘挪到 visibilitychange(hidden)——它触发更早且 App 仍在前台、时间预算充裕。 */
+          if (typeof window._akiniEmergencySnapshot === "function") window._akiniEmergencySnapshot();
+        } catch (e) {}
+      }),
+      window.addEventListener("visibilitychange", function () {
+        if (document.visibilityState !== "hidden") return;
         try {
           window._akiniSaveDiaries &&
             window._akiniSaveDiaries(window._akiniGetDiaries());
@@ -6248,6 +6270,10 @@ document.addEventListener("DOMContentLoaded", function () {
       return backups;
     }
     function _icitySafetyMerge() {
+      // v506：全量合并（6+源解析→去重→两次 JSON.stringify 全量→双写→全量重渲染）非常重，
+      // 一次生命周期内最多执行 2 次（原为 3 次定时器 + pagehide 1 次 = 4 次），是全机型卡崩主因
+      window.__icityMergeCount = (window.__icityMergeCount || 0) + 1;
+      if (window.__icityMergeCount > 2) return;
       function parseArr(v) {
         try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch (e) { return []; }
       }
@@ -6257,16 +6283,19 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function reconcile(sources) {
         var diaries = {};
+        var seenKeys = {}; // v506：cmtKey 用哈希表去重（原 comments.some 是 O(n²)，评论多时直接卡死）
         sources.forEach(function (arr) {
           (arr || []).forEach(function (d) {
             if (!d || !d.id) return;
-            if (!diaries[d.id]) diaries[d.id] = Object.assign({}, d, { comments: [] });
+            if (!diaries[d.id]) { diaries[d.id] = Object.assign({}, d, { comments: [] }); seenKeys[d.id] = {}; }
             var tgt = diaries[d.id];
+            var seen = seenKeys[d.id];
             (d.comments || []).forEach(function (c) {
               var k = cmtKey(c);
               if (!k) return;
-              var exists = tgt.comments.some(function (x) { return cmtKey(x) === k; });
-              if (!exists) tgt.comments.push(c);
+              if (seen[k]) return;
+              seen[k] = 1;
+              tgt.comments.push(c);
             });
             if (d.likers && d.likers.length) {
               tgt.likers = tgt.likers || [];
@@ -6326,7 +6355,8 @@ document.addEventListener("DOMContentLoaded", function () {
         persistAndRender();
       }
     }
-    [1500, 3000, 6000].forEach(function (d) { setTimeout(_icitySafetyMerge, d); });
+    // v506：启动合并由 3 轮（1.5s/3s/6s）减为 1 轮——全量合并极重，多轮只是兜底时序，节流器已保底
+    setTimeout(_icitySafetyMerge, 1500);
     const U = document.getElementById("chatBody"),
       K = document.getElementById("msgInput"),
       X = document.getElementById("sendBtn");
@@ -6344,6 +6374,8 @@ document.addEventListener("DOMContentLoaded", function () {
         cw.classList.add("akini-content-fade", "akini-content-hidden");
       }
       function resetScroll(){
+        // 开屏已彻底隐藏后不再强制重置滚动，避免切回前台时所有页面跳回顶部
+        if (window.__akiniSplashDone && window.__akiniSplashRemoved) return;
         try { window.scrollTo(0,0); } catch(e){}
         try { document.documentElement.scrollTop = 0; } catch(e){}
         try { document.body.scrollTop = 0; } catch(e){}
@@ -6414,13 +6446,13 @@ document.addEventListener("DOMContentLoaded", function () {
         if (el) {
           el.style.pointerEvents = "none";
           el.classList.add("hidden");
+          el.style.display = "none";
           setTimeout(function () {
             try {
-              el.style.display = "none";
               if (el && el.parentNode) el.parentNode.removeChild(el);
               window.__akiniSplashRemoved = !0;
             } catch (e) {}
-          }, 300);
+          }, 50);
         }
       } catch (e) {}
     };
@@ -6515,7 +6547,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         setTimeout(_bootRefresh, 500);
         setTimeout(_bootRefresh, 1500);
-        setTimeout(_bootRefresh, 3000);
+        // v506：删除第 3 轮 3000ms 延迟刷新——IDB 恢复在此前已由节流后的合并兜底，减少启动期全量重渲染次数
         // 开屏进度：数据与界面已就绪，等待用户在声明页点击「进入」
         window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
       }, 300);
@@ -17746,7 +17778,7 @@ document.addEventListener("DOMContentLoaded", function () {
             _sanitizeRange("akini_num_icityPostMin", "akini_num_icityPostMax", 30, 60, 1);
             _sanitizeRange("akini_num_activeMailMin", "akini_num_activeMailMax", 3, 6, 0.1);
             _sanitizeRange("akini_num_activeMsgMin", "akini_num_activeMsgMax", 5, 10, 0.1);
-            _sanitizeRange("akini_num_replyDelayMin", "akini_num_replyDelayMax", 2, 5, 0.5);
+            _sanitizeRange("akini_num_replyDelayMin", "akini_num_replyDelayMax", 3, 7, 1);
             _sanitizeRange("akini_num_mailDelayMin", "akini_num_mailDelayMax", 10, 24, 0.1);
             _sanitizeRange("akini_num_pinyinCardMin", "akini_num_pinyinCardMax", 2, 3, 1);
           }
@@ -17918,21 +17950,12 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           _kaUserStopped = false;
           if (!_kaAudio) {
-            // 与 core 完全同款：远程 m4a 静音循环流——iOS/微信对「正在播放远程音频」的页面不冻结回收，
-            // 本地超短 wav 循环会被系统判为无实际输出而杀页（挂后台重进的根因）。加载失败回退本地 wav。
-            _kaAudio = new Audio("https://img.heliar.top/file/1772885159972_silence.m4a");
+            // v505 根因修复：原远程静音源 img.heliar.top 域名已失效（DNS 解析失败），
+            // 每次启动都触发网络错误+error 回退链，是安卓反复卡崩的元凶之一。直接使用本地静音 wav 循环。
+            _kaAudio = new Audio("silence.wav");
             _kaAudio.loop = true;
             _kaAudio.volume = 0.01;
             _kaAudio.preload = "auto";
-            _kaAudio.addEventListener("error", function () {
-              try {
-                if (_kaAudio && _kaAudio.src.indexOf("silence.wav") < 0) {
-                  _kaAudio.src = "silence.wav";
-                  _kaAudio.load();
-                  if (_kaAudioEnabled()) _kaAudio.play().catch(function () {});
-                }
-              } catch (e) {}
-            });
             // standard 方案：被系统/其他 App 暂停时退避补播（后台保活失效的另一半原因）
             _kaAudio.addEventListener("pause", function () {
               try {
@@ -17973,6 +17996,35 @@ document.addEventListener("DOMContentLoaded", function () {
         }),
         // 启动时若已开启保活则尝试开播（被自动播放策略拦截时由 unlock 兜底）
         setTimeout(function () { if (_kaAudioEnabled() && !document.documentElement.classList.contains("akini-deep-safe")) _kaAudioStart(); }, 1200));
+      /* ===== v505：全局系统通知发送器（安卓/iOS 平台分支，必须在任何调用前定义） =====
+         根因实测（用户截图）：安卓 Chrome 一旦注册了 Service Worker，页面级 new Notification()
+         会抛 "Illegal constructor. Use ServiceWorkerRegistration.showNotification() instead."
+         milk 未注册 SW 所以 new Notification 合法——这正是 milk 通知可用而本站报错的根因。
+         修复：有 SW 注册一律走 reg.showNotification；仅无 SW 环境才退回 new Notification。
+         另一 bug：此函数此前只在首条消息流经 showInAppNotif 时才被定义，测试推送时它还不存在，
+         走 new Notification → 安卓必炸。现在提前全局定义。 */
+      window.__akiniSystemNotify = function (title, opts, onTap) {
+        opts = opts || {};
+        function tryPageNotification() {
+          try {
+            var d = new Notification(title, opts);
+            d.onclick = function () { window.focus && window.focus(); d.close(); onTap && onTap(); };
+            return true;
+          } catch (e) { return false; }
+        }
+        try {
+          if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+            navigator.serviceWorker.getRegistration().then(function (reg) {
+              try {
+                if (reg && reg.showNotification) reg.showNotification(title, opts);
+                else tryPageNotification();
+              } catch (e) { tryPageNotification(); }
+            }).catch(function () { tryPageNotification(); });
+            return true;
+          }
+        } catch (e) {}
+        return tryPageNotification();
+      };
       var o = window.showInAppNotif,
         r = Date.now();
       ((window.showInAppNotif = function (t) {
@@ -18006,24 +18058,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 ? (i += " · " + sanitized.name)
                 : sanitized.groupName && (i += " · " + sanitized.groupName);
             // 每条消息使用唯一 tag（chatId+时间戳），确保同时收到多条消息时各自独立通知、不会重叠成一条
-            window.__akiniSystemNotify = function (title, opts, onTap) {
-              opts = opts || {};
-              function fallbackNotify() {
-                try {
-                  var d = new Notification(title, opts);
-                  d.onclick = function () { window.focus && window.focus(); d.close(); onTap && onTap(); };
-                } catch (e) {}
-              }
-              try {
-                if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-                  navigator.serviceWorker.ready.then(function (reg) {
-                    if (reg && reg.showNotification) { reg.showNotification(title, opts); return; }
-                    fallbackNotify();
-                  }).catch(fallbackNotify);
-                } else { fallbackNotify(); }
-              } catch (e) { fallbackNotify(); }
-            };
-
+            // v505：通知统一走全局 __akiniSystemNotify（已提前定义，含安卓/iOS 平台分支）
+            // 安卓 Chrome 注册 SW 后 new Notification() 是 Illegal constructor，必须用 reg.showNotification()
             try { window.__akiniBindNotifTap && window.__akiniBindNotifTap(); } catch (e) {}
             window.__akiniSystemNotify(i, {
               body: body,
@@ -18139,8 +18175,8 @@ document.addEventListener("DOMContentLoaded", function () {
           });
         }));
       ([
-        { id: "replyDelayMin", key: "akini_num_replyDelayMin", def: "2" },
-        { id: "replyDelayMax", key: "akini_num_replyDelayMax", def: "5" },
+        { id: "replyDelayMin", key: "akini_num_replyDelayMin", def: "3" },
+        { id: "replyDelayMax", key: "akini_num_replyDelayMax", def: "7" },
         { id: "mailDelayMin", key: "akini_num_mailDelayMin", def: "10" },
         { id: "mailDelayMax", key: "akini_num_mailDelayMax", def: "24" },
         { id: "pinyinCardMin", key: "akini_num_pinyinCardMin", def: "2" },

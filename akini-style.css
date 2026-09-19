@@ -143,11 +143,14 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
-  overflow-y: auto !important;
+  overflow-y: hidden !important;
   overflow-x: hidden !important;
   overscroll-behavior: none !important;
-  -webkit-overflow-scrolling: touch;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.akini-safe-mode .content-wrapper,
+.akini-deep-safe .content-wrapper {
+  overflow-y: auto !important;
 }
 /* 模块级独立缩放壳：inner 固定 390/380 基准宽渲染，按屏宽等比缩放，垂直 flex 分布 */
 .fit-mod {
@@ -5957,8 +5960,15 @@ textarea:focus,
   font-size: 16px !important;
 }
 /* 禁用双击缩放与长按误触发的页面缩放 */
-.phone, .content-wrapper, #chatPreview {
+.phone, #chatPreview {
   touch-action: manipulation;
+}
+.content-wrapper {
+  touch-action: none;
+}
+.akini-safe-mode .content-wrapper,
+.akini-deep-safe .content-wrapper {
+  touch-action: auto;
 }
 
 /* ============ 字卡库界面 v20260908e 重设计（akini 设计语言，仅视觉覆盖，DOM/逻辑不变） ============ */
