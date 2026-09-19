@@ -7472,3 +7472,196 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+
+/* ==========================================================================
+   v521 液态玻璃极致视觉系统 + 加号弹窗原版图标上下对齐重构
+   ========================================================================== */
+
+/* 1. 聊天界面彻底移除上下栏白色底图与生硬边框 */
+#app-chat .chat-top-bar,
+.chat-top-bar {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#app-chat .chat-input-bar-area,
+.chat-input-bar-area,
+#app-chat .chat-input-bar,
+.chat-input-bar {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border-top: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 2. 返回键、通话键、加号键、发送键：圆形液态玻璃底 (磨砂 blur + 微透白底 + 0.35描边 + 柔和投影) */
+#app-chat .chat-top-bar .back-btn,
+#app-chat .chat-top-bar .chat-top-action-btn,
+#app-chat .chat-top-bar #chatCallBtn,
+#app-chat .chat-input-bar #plusMenuBtn,
+#app-chat .chat-input-bar #sendBtn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.2, 0.9, 0.3, 1) !important;
+  color: #1a1a1a !important;
+}
+
+#app-chat .chat-top-bar .back-btn:active,
+#app-chat .chat-top-bar .chat-top-action-btn:active,
+#app-chat .chat-top-bar #chatCallBtn:active,
+#app-chat .chat-input-bar #plusMenuBtn:active,
+#app-chat .chat-input-bar #sendBtn:active {
+  background: rgba(255, 255, 255, 0.65) !important;
+  transform: scale(0.92) !important;
+}
+
+/* 3. 名字栏：胶囊液态玻璃底 */
+#app-chat .chat-top-bar .ta-name-pill {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+  border-radius: 20px !important;
+  padding: 5px 14px !important;
+  transition: all 0.2s ease !important;
+}
+
+/* 4. 输入框：胶囊液态玻璃底 */
+#app-chat .chat-input-bar .input-wrap {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.5) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06), inset 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+  border-radius: 22px !important;
+  padding: 2px 12px !important;
+  min-height: 40px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+#app-chat .chat-input-bar .chat-input,
+#app-chat .chat-input-bar input {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  color: #1a1a1a !important;
+}
+
+/* 5. 联系人默认气泡：磨砂半透明液态玻璃感 (非自定义气泡主题时) */
+#app-chat .msg-row:not(.bubble-css-on) .bubble,
+#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
+#app-chat .msg-row.ta:not(.bubble-css-on) .bubble {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(12px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.05), inset 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+  color: #1a1a1a !important;
+}
+
+/* 6. 加号弹窗图标重构：恢复原版图标、上下严格居中对齐 */
+.plus-menu#plusMenu {
+  display: none;
+  position: absolute !important;
+  bottom: calc(100% + 12px) !important;
+  left: 12px !important;
+  right: auto !important;
+  top: auto !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(255, 255, 255, 0.65) !important;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.16), inset 0 1px 1px rgba(255, 255, 255, 0.9) !important;
+  padding: 10px !important;
+  z-index: 99999 !important;
+  min-width: 140px !important;
+}
+
+.plus-menu#plusMenu.show {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  animation: pmPopIn 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards !important;
+}
+
+@keyframes pmPopIn {
+  from { opacity: 0; transform: scale(0.9) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.plus-menu#plusMenu .plus-menu-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  padding: 10px 14px !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  background: transparent !important;
+  border: none !important;
+  transition: background 0.15s ease !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.plus-menu#plusMenu .plus-menu-item:active {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+.plus-menu#plusMenu .plus-menu-item .pm-icon {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  color: #1a1a1a !important;
+  margin: 0 !important;
+}
+
+.plus-menu#plusMenu .plus-menu-item .pm-icon svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+}
+
+.plus-menu#plusMenu .plus-menu-item span {
+  font-size: 15px !important;
+  line-height: 1.2 !important;
+  color: #1a1a1a !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  display: flex !important;
+  align-items: center !important;
+}

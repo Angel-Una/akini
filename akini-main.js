@@ -23376,7 +23376,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var activeChatId = window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
         var bn = 0;
         Object.keys(ss).forEach(function (k) { if (k !== activeChatId) bn += ss[k].unread || 0; });
-        backBadge.textContent = String(bn);
+        backBadge.textContent = bn > 99 ? "99+" : String(bn);
         backBadge.style.display = bn > 0 ? "flex" : "none";
       }
       /* 消息中心按钮小红点同步 */
