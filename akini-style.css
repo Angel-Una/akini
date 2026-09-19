@@ -7193,7 +7193,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 .plus-menu-sheet-bg {
   position: absolute;
   inset: 0;
-  /* v517: 去掉黑色透明遮罩，仅保留点击关闭层 */
+  /* v518: 去掉黑色透明遮罩，仅保留点击关闭层 */
   background: transparent;
   opacity: 1;
   transition: none;
@@ -7306,110 +7306,62 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   background: rgba(0, 0, 0, 0.06);
 }
 
-/* iMessage 风格气泡 */
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  overflow: visible !important;
-}
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #34c759 !important;
-  color: #fff !important;
-  border-bottom-right-radius: 4px !important;
-}
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::after {
-  content: "";
-  position: absolute;
-  right: -5px;
-  bottom: 1px;
-  width: 10px;
-  height: 10px;
-  background: #34c759;
-  border-radius: 0 0 0 100%;
-}
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.other
-  .bubble:not(.survey-bubble):not(.shop-card-bubble),
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.ta
-  .bubble:not(.survey-bubble):not(.shop-card-bubble) {
-  background: #e5e5ea !important;
-  color: #111 !important;
-  border-bottom-left-radius: 4px !important;
-}
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.other
-  .bubble:not(.survey-bubble):not(.shop-card-bubble)::after,
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.ta
-  .bubble:not(.survey-bubble):not(.shop-card-bubble)::after {
-  content: "";
-  position: absolute;
-  left: -5px;
-  bottom: 1px;
-  width: 10px;
-  height: 10px;
-  background: #e5e5ea;
-  border-radius: 0 0 100% 0;
-}
 
-
-/* ===== v517: plus-menu 7 项 · 最多显示 3 项可下滑 · 图标严格对齐 ===== */
-.plus-menu#plusMenu .plus-menu-list {
-  max-height: 180px !important;
-  overflow-y: auto !important;
-  overflow-x: hidden !important;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
+/* ===== v518: 加号菜单改回加号上方圆角弹窗 ===== */
+.plus-menu#plusMenu {
+  position: absolute !important;
+  bottom: calc(100% + 8px) !important;
+  left: 10px !important;
+  right: auto !important;
+  top: auto !important;
+  display: none;
+  flex-direction: column !important;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  padding: 6px 8px !important;
+  min-width: 150px !important;
+  z-index: 110 !important;
+  transform-origin: bottom left !important;
+  transform: scale(0.96) translateY(8px) !important;
+  opacity: 0 !important;
+  transition: opacity 0.18s ease, transform 0.18s ease !important;
+}
+.plus-menu#plusMenu.show {
+  display: flex !important;
+  opacity: 1 !important;
+  transform: scale(1) translateY(0) !important;
 }
 .plus-menu#plusMenu .plus-menu-item {
   display: flex !important;
   flex-direction: row !important;
   align-items: center !important;
-  gap: 14px !important;
-  height: 60px !important;
-  min-height: 60px !important;
-  flex: 0 0 60px !important;
+  gap: 12px !important;
+  height: 42px !important;
+  min-height: 42px !important;
   box-sizing: border-box !important;
-  padding: 0 16px !important;
+  padding: 0 12px !important;
   margin: 0 !important;
-  border-radius: 12px !important;
-  width: 100% !important;
-}
-.plus-menu#plusMenu .plus-menu-item .icon-circle {
-  width: 34px !important;
-  height: 34px !important;
-  min-width: 34px !important;
-  border: none !important;
   border-radius: 10px !important;
-  background: rgba(0, 0, 0, 0.06) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  flex-shrink: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  width: 100% !important;
+  cursor: pointer !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
-.plus-menu#plusMenu .plus-menu-item .icon-circle svg {
+.plus-menu#plusMenu .plus-menu-item:active {
+  background: rgba(0, 0, 0, 0.06) !important;
+}
+.plus-menu#plusMenu .plus-menu-item .pm-icon {
   width: 22px !important;
   height: 22px !important;
+  min-width: 22px !important;
+  flex-shrink: 0 !important;
+  color: #333 !important;
   display: block !important;
   margin: 0 !important;
 }
 .plus-menu#plusMenu .plus-menu-item span {
   display: block !important;
-  font-size: 16px !important;
+  font-size: 15px !important;
   line-height: 20px !important;
   color: #111 !important;
   margin: 0 !important;
@@ -7418,6 +7370,105 @@ body:not(.bubble-css-on)
   white-space: nowrap !important;
   pointer-events: none !important;
 }
-.plus-menu#plusMenu .plus-menu-sheet {
-  max-height: none;
+
+/* ===== v518: 聊天界面顶部/底部栏去白色底图 ===== */
+.chat-top-bar {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: none !important;
+}
+.chat-input-bar-area {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-top: none !important;
+}
+
+/* ===== v518: 顶部返回键/通话键放大并上移 ===== */
+.chat-top-bar .back-btn {
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 28px !important;
+  line-height: 38px !important;
+  margin-top: -4px !important;
+}
+.chat-top-bar .call-btn {
+  width: 40px !important;
+  height: 40px !important;
+  margin-top: -4px !important;
+}
+.chat-top-bar .call-btn svg {
+  width: 26px !important;
+  height: 26px !important;
+}
+
+/* ===== v518: 底部输入栏按钮放大 ===== */
+.plus-btn {
+  width: 48px !important;
+  height: 48px !important;
+}
+.plus-btn svg {
+  width: 28px !important;
+  height: 28px !important;
+}
+.action-btn {
+  width: 48px !important;
+  height: 48px !important;
+}
+.action-btn svg {
+  width: 26px !important;
+  height: 26px !important;
+}
+.input-wrap #msgInput {
+  font-size: 16px !important;
+}
+
+/* ===== v519: 降低聊天下栏整体高度 ===== */
+.chat-input-bar-area {
+  padding-bottom: max(2px, env(safe-area-inset-bottom, 0px)) !important;
+}
+.chat-input-bar {
+  min-height: 48px !important;
+  padding: 5px 10px !important;
+  margin-bottom: 2px !important;
+}
+.input-wrap #msgInput {
+  min-height: 40px !important;
+  padding: 7px 12px !important;
+}
+
+/* ===== v518: 聊天内容区减少顶部空白 ===== */
+.chat-body {
+  padding-top: 76px !important;
+  padding-bottom: 86px !important;
+}
+
+/* ===== v518: 系统消息胶囊缩小 ===== */
+html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  font-size: 10px !important;
+  padding: 1px 8px !important;
+  line-height: 1.5 !important;
+  border-radius: 12px !important;
+  max-width: 84% !important;
+  background: rgba(200, 200, 200, 0.32) !important;
+  box-shadow: none !important;
+}
+
+/* ===== v519: 首页禁止上下滑动，底部模块更贴近屏幕底，底栏保持原样 ===== */
+.content-wrapper {
+  touch-action: none !important;
+  padding-bottom: 0 !important;
+}
+.fit-bottom {
+  margin-top: auto !important;
+  padding-bottom: 0 !important;
+}
+.bottom-bar {
+  padding: 2px 16px max(2px, env(safe-area-inset-bottom, 0px)) !important;
+}
+.bottom-btn-container {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

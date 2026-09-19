@@ -7997,6 +7997,8 @@ document.addEventListener("DOMContentLoaded", function () {
     wt &&
       wt.addEventListener("click", function (t) {
         t.stopPropagation();
+        var _chatListApp = document.getElementById("app-chat-list");
+        if (!_chatListApp || _chatListApp.style.display === "none") return;
         if (document.querySelector(".chat-list-add-menu-overlay")) return;
         var e = document.createElement("div");
         e.className = "chat-list-add-menu-overlay";
@@ -8584,6 +8586,8 @@ document.addEventListener("DOMContentLoaded", function () {
     (Ft &&
       Y &&
       a(Ft, function () {
+        var _chatApp = document.getElementById("app-chat");
+        if (!_chatApp || _chatApp.style.display === "none") return;
         ((Y.style.display = "flex"), (Y.style.pointerEvents = "auto"));
         var t = window.akiniContacts
           ? window.akiniContacts.getChatTarget(
@@ -8943,7 +8947,7 @@ document.addEventListener("DOMContentLoaded", function () {
           if ("emoji" === n) {
             re && ("flex" === re.style.display ? hideEmojiPanel() : (showEmojiPanel(), hidePlusMenu()));
           } else if ("continue" === n) {
-            /* v517: 「继续说」= 让对方按正常节奏回复一条消息 */
+            /* v518: 「继续说」= 让对方按正常节奏回复一条消息 */
             window.__akiniForceReply && window.__akiniForceReply();
           } else if ("camera" === n || "image" === n) {
             var ib = document.getElementById("fileInputImageSend");
