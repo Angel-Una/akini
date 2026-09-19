@@ -6355,8 +6355,23 @@ document.addEventListener("DOMContentLoaded", function () {
         persistAndRender();
       }
     }
-    // v506：启动合并由 3 轮（1.5s/3s/6s）减为 1 轮——全量合并极重，多轮只是兜底时序，节流器已保底
-    setTimeout(_icitySafetyMerge, 1500);
+    // v509：低内存/iOS 设备把启动全量合并推迟到首次用户交互，避免启动期内存峰值直接崩；非低内存仍 1.5s 兜底
+    if (window.__akiniLowMem) {
+      window.__akiniDeferIcityMerge = function () {
+        delete window.__akiniDeferIcityMerge;
+        try { _icitySafetyMerge(); } catch (e) {}
+      };
+      var __akiniMergeHandler = function () {
+        if (window.__akiniDeferIcityMerge) window.__akiniDeferIcityMerge();
+        document.removeEventListener("click", __akiniMergeHandler);
+        document.removeEventListener("touchstart", __akiniMergeHandler);
+      };
+      document.addEventListener("click", __akiniMergeHandler, { passive: true, once: true });
+      document.addEventListener("touchstart", __akiniMergeHandler, { passive: true, once: true });
+      setTimeout(function () { if (window.__akiniDeferIcityMerge) window.__akiniDeferIcityMerge(); }, 8000);
+    } else {
+      setTimeout(_icitySafetyMerge, 1500);
+    }
     const U = document.getElementById("chatBody"),
       K = document.getElementById("msgInput"),
       X = document.getElementById("sendBtn");
@@ -6524,7 +6539,8 @@ document.addEventListener("DOMContentLoaded", function () {
         try { if (typeof window._akiniRescueEmptyData === "function") window._akiniRescueEmptyData(); } catch (e) {}
         setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 1500);
         setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 4000);
-        try { if (typeof window._icitySafetyMerge === "function") window._icitySafetyMerge(); } catch (e) {}
+        // v509：低内存/iOS 设备在 boot 时不立刻跑全量合并，交给顶部的 deferred 合并；非低内存仍保留兜底
+        try { if (!window.__akiniLowMem && typeof window._icitySafetyMerge === "function") window._icitySafetyMerge(); } catch (e) {}
         if ("function" == typeof window.renderChatList) window.renderChatList();
         if ("function" == typeof window._renderIcity) window._renderIcity();
         if ("function" == typeof window.updatePreview) window.updatePreview();
@@ -21035,6 +21051,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       function V() {
         try {
+          /* v509：低内存/iOS 设备不初始化保活音频，避免音频解码+MediaSession 占用内存导致启动崩溃 */
+          if (window.__akiniLowMem) return;
           if (h && !h.paused) return;
           if (
             (h ||
