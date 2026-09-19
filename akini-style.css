@@ -391,9 +391,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #666;
   font-weight: 500;
 }.right-card {
-  background: #ffffff;
+  background: transparent;
   border-radius: 18px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  box-shadow: none;
   margin-left: 5px;
   display: flex;
   flex-direction: column;
@@ -422,7 +422,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   margin-bottom: 6px;
   z-index: 2;
   position: relative;
-  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9);
 }
 .right-card .number {
   font-size: 44px;
@@ -432,14 +432,14 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   margin-bottom: 6px;
   z-index: 2;
   position: relative;
-  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9);
 }
 .right-card .unit {
   font-size: 15px;
   color: #2a2a2a;
   z-index: 2;
   position: relative;
-  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 3px rgba(255, 255, 255, 0.9);
 }
 .chat-preview {
   max-width: 100%;
@@ -486,20 +486,19 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex: 0 1 auto;
   width: fit-content;
   min-width: 0;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  background: transparent;
   border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   padding: 8px 12px;
   font-size: 13px;
   color: #333;
   line-height: 1.5;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
   /* 预览气泡永不换行：任何字数、任何屏幕都单行显示，超出截断 */
   white-space: nowrap !important;
   overflow: hidden !important;
   text-overflow: clip; /* 超出直接截断，绝不显示省略号 */
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: none;
   outline: 0;
   -webkit-user-modify: read-write;
   user-select: text;
@@ -514,9 +513,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   text-overflow: clip; /* 超出直接截断，绝不显示省略号 */
 }
 .preview-bubble:focus {
-  background: rgba(255, 255, 255, 0.75);
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.45);
 }.bottom-bar {
-  padding: 2px 16px env(safe-area-inset-bottom, 0px);
+  padding: 2px 16px calc(16px + env(safe-area-inset-bottom, 0px));
   flex-shrink: 0;
   display: flex;
   justify-content: center;
@@ -527,11 +527,11 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   background: transparent;
 }
 .bottom-btn-container {
-  background: #ffffff;
-  border-radius: 24px;
-  padding: 4px 10px;
+  background: transparent;
+  border-radius: 28px;
+  padding: 6px 12px;
   display: flex;
-  gap: 6px;
+  gap: 8px;
   box-shadow: none;
 }
 .bottom-btn {
@@ -545,21 +545,21 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  gap: 1px;
-  padding: 4px 10px;
+  gap: 2px;
+  padding: 6px 12px;
 }
 .bottom-btn:active {
   transform: scale(0.92);
 }
 .bottom-btn .icon-wrap {
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
   border: none;
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 20px;
+  font-size: 24px;
   color: #666;
   background: transparent;
   padding: 0;
@@ -574,7 +574,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: block;
 }
 .bottom-btn .label {
-  font-size: 11px;
+  font-size: 13px;
   color: #666;
   font-weight: 500;
 }
@@ -926,8 +926,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   align-items: center;
   justify-content: space-between;
   padding: 0 12px !important;
-  background: rgba(255, 255, 255, 0.97);
-  border-bottom: 1px solid #e8e8e8;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
   z-index: 1000 !important;
   height: 50px !important;
   position: fixed !important;
@@ -1827,11 +1829,18 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
      装饰会穿透到聊天背景图下面而消失（看起来不完整）；isolate 保证负层装饰
      只垫在气泡底色之下、页面背景之上，任何美化 CSS 的装饰都完整可见 */
   isolation: isolate !important;
-  /* v20260909zf 核心修复（对齐 core .message 的 overflow:hidden）：
-     弧带/翅膀类美化装饰是按"被气泡边缘裁掉"设计的——core 默认 overflow:hidden 把
-     inset:0 的弧带裁成胶囊形；我们之前气泡没有 overflow 基线（默认 visible），
-     弧带原样溢出气泡上下边缘 → 看起来就是被割断。这里给低优先级默认 hidden：
-     美化 CSS 自己写了 overflow:visible !important（如外贴翅膀）仍可正常覆盖。 */
+}
+/* 默认 iMessage 模式下气泡允许尾巴伸出；自定义气泡 CSS 保留 overflow:hidden */
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  overflow: visible;
+}
+body.bubble-css-on
+  .chat-body
+  .msg-row
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   overflow: hidden;
 }
 /* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带阴影停用 */
@@ -1990,8 +1999,8 @@ body:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #e9e9eb !important;
-  color: #111 !important;
+  background: #007aff !important;
+  color: #fff !important;
 }
 body.bubble-pink:not(.bubble-css-on)
   .chat-body
@@ -2043,9 +2052,61 @@ body.bubble-gray:not(.bubble-css-on)
 body:not(.bubble-css-on)
   .chat-body
   .msg-row.other
+  .bubble:not(.survey-bubble):not(.shop-card-bubble),
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.ta
   .bubble:not(.survey-bubble):not(.shop-card-bubble) {
-  background: #fff;
+  background: rgba(229, 229, 234, 0.75);
   color: #111;
+}
+/* iMessage 尾巴 */
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border-radius: 3px;
+  z-index: -1;
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
+  right: -6px;
+  transform: rotate(45deg);
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.other
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before,
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.ta
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
+  left: -6px;
+  transform: rotate(45deg);
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  border-bottom-right-radius: 4px !important;
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.other
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.ta
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  border-bottom-left-radius: 4px !important;
 }
 .chat-body .msg-row.me .bubble .quote-bubble {
   background: #fff !important;
@@ -2503,10 +2564,13 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   border-radius: 20px;
   padding: 2px 14px;
-  box-shadow: inset 0 0 0 1px #e8e8e8;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 .chat-input-bar .input-wrap input {
   flex: 1;
@@ -2702,12 +2766,16 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
 }
 .chat-menu-overlay .menu-panel {
   position: absolute;
-  top: 60px;
-  right: 10px;
-  background: #fff;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
   border-radius: 16px;
   width: 240px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
   padding: 12px 0;
   display: flex;
   flex-direction: column;
@@ -4357,7 +4425,7 @@ body.dark-mode .bottom-row,
 body.dark-mode .bottom-btn-container,
 body.dark-mode .right-card,
 body.dark-mode .app-item .icon-wrap {
-  background: #2a2a2e !important;
+  background: transparent !important;
 }
 body.dark-mode .app-item .app-label {
   color: #aaa !important;
@@ -6936,4 +7004,341 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   height: 36px !important;
   font-size: 12px !important;
   background: #e8e8e8 !important;
+}
+
+/* iMessage 风格聊天界面覆盖 */
+.chat-top-bar {
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: saturate(180%) blur(14px) !important;
+  -webkit-backdrop-filter: saturate(180%) blur(14px) !important;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: none !important;
+}
+.chat-top-bar .back-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  color: #111;
+  font-size: 22px;
+  padding: 0;
+  margin: 0;
+}
+.back-unread-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #ff3b30;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+}
+.chat-top-bar .ta-info {
+  align-items: center;
+  gap: 10px;
+}
+.chat-top-bar .ta-info .ta-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.chat-top-bar .ta-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.chat-top-bar .ta-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chat-top-bar .ta-name-row .ta-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+}
+.chat-top-bar .ta-status {
+  font-size: 12px;
+  color: #8e8e93;
+  line-height: 1.2;
+}
+.chat-contact-menu-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0 0 0 2px;
+  color: rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: none;
+}
+.chat-top-bar .call-btn#chatCallBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.chat-top-bar .call-btn#chatCallBtn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 输入栏 */
+.chat-input-bar {
+  gap: 8px;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+}
+.chat-input-bar .plus-btn#plusMenuBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  color: #111;
+}
+.chat-input-bar .plus-btn#plusMenuBtn svg {
+  width: 22px;
+  height: 22px;
+}
+.chat-input-bar .action-btn#sendBtn {
+  width: 34px;
+  height: 34px;
+  background: #34c759;
+  color: #fff;
+}
+.chat-input-bar .action-btn#sendBtn .wechat-send {
+  width: 18px;
+  height: 18px;
+  stroke: #fff;
+}
+.chat-input-bar .input-wrap {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.chat-input-bar .input-wrap input::placeholder {
+  color: #b4b4b7;
+}
+
+/* 底部 plus-menu sheet */
+.plus-menu#plusMenu {
+  display: none;
+  position: fixed !important;
+  inset: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  top: 0 !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  box-shadow: none !important;
+  z-index: 10001 !important;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+.plus-menu#plusMenu.show {
+  display: flex !important;
+  pointer-events: auto;
+}
+.plus-menu-sheet-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.plus-menu#plusMenu.show .plus-menu-sheet-bg {
+  opacity: 1;
+}
+.plus-menu-sheet {
+  position: relative;
+  width: 100%;
+  max-height: 72vh;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-radius: 24px 24px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.45);
+  padding: 16px 0 calc(16px + env(safe-area-inset-bottom, 0px));
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.12);
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.plus-menu#plusMenu.show .plus-menu-sheet {
+  transform: translateY(0);
+}
+.plus-menu-sheet-title {
+  text-align: center;
+  font-size: 13px;
+  color: #8e8e93;
+  font-weight: 600;
+  margin-bottom: 8px;
+  padding: 0 20px;
+}
+.plus-menu-list {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 0 8px;
+}
+.plus-menu#plusMenu .plus-menu-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 13px 16px !important;
+  border-radius: 12px !important;
+  width: 100% !important;
+  flex: none !important;
+  box-sizing: border-box;
+}
+.plus-menu#plusMenu .plus-menu-item .icon-circle {
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.06);
+}
+.plus-menu#plusMenu .plus-menu-item span {
+  font-size: 16px;
+  color: #111 !important;
+  pointer-events: none;
+}
+
+/* 微信聊天列表右上角加号菜单 */
+.chat-list-add-menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding-top: 52px;
+  padding-right: 12px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.chat-list-add-menu-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+.chat-list-add-menu-bg {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+}
+.chat-list-add-menu-panel {
+  position: relative;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+  min-width: 160px;
+}
+.chat-list-add-menu-item {
+  padding: 14px 18px;
+  font-size: 15px;
+  color: #333;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  text-align: center;
+}
+.chat-list-add-menu-item:last-child {
+  border-bottom: none;
+}
+.chat-list-add-menu-item:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* iMessage 风格气泡 */
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  overflow: visible !important;
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background: #34c759 !important;
+  color: #fff !important;
+  border-bottom-right-radius: 4px !important;
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::after {
+  content: "";
+  position: absolute;
+  right: -5px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  background: #34c759;
+  border-radius: 0 0 0 100%;
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.other
+  .bubble:not(.survey-bubble):not(.shop-card-bubble),
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.ta
+  .bubble:not(.survey-bubble):not(.shop-card-bubble) {
+  background: #e5e5ea !important;
+  color: #111 !important;
+  border-bottom-left-radius: 4px !important;
+}
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.other
+  .bubble:not(.survey-bubble):not(.shop-card-bubble)::after,
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row.ta
+  .bubble:not(.survey-bubble):not(.shop-card-bubble)::after {
+  content: "";
+  position: absolute;
+  left: -5px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  background: #e5e5ea;
+  border-radius: 0 0 100% 0;
 }

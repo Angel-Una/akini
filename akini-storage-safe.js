@@ -1,5 +1,5 @@
 /*
- * akini-storage-safe.js  v20261026 重做版
+ * akini-storage-safe.js  v20261027 重做版
  * 网站式可靠存储：localStorage 同步读写为主（和普通网站一致），
  * IndexedDB 双副本镜像兜底，启动时全量对账恢复。
  * 保证：写入绝不中断、绝不主动删除任何数据、退出/刷新/随时打开数据都在。
@@ -258,27 +258,28 @@
                     return;
                   }
                   var big = isBigVal(v);
-                  // 彻底修复刷新数据丢失 bug：localStorage 中的非空有效数据具有最高权威，
-                  // 绝不能被陈旧的 IDB 镜像覆盖！如果用户在恢复前写入了新数据（_preRestorePending），
-                  // 更应该以用户的新写入为准，并将其排队写入 IDB。
-                  if (_preRestorePending && Object.prototype.hasOwnProperty.call(_preRestorePending, k)) {
-                    var pendingVal = _preRestorePending[k];
-                    if (pendingVal != null && pendingVal !== '') {
-                      memSet(k, pendingVal);
-                      lsSet(k, pendingVal);
-                      queueIdbWrite(k, pendingVal);
-                      if (--pending === 0) setTimeout(nextBatch, 25);
-                      return;
+                  // 彻底修复刷新/切回数据丢失 bug：localStorage 中的非空有效数据具有【绝对最高权威】，
+                  // 绝不能被陈旧的 IDB 镜像覆盖（IDB 镜像 500ms 防抖，切回/重进时极易滞后为旧值）。
+                  // 策略：LS 有非空真实值 → 永远以 LS 为准（仅当 LS 与 IDB 不一致时回写 IDB 纠正）；
+                  //       LS 丢失/空 → 才信 IDB 兜底回填。
+                  if (ls != null && ls !== '' && ls !== '[]' && ls !== '{}' && ls !== 'null') {
+                    if (_preRestorePending && Object.prototype.hasOwnProperty.call(_preRestorePending, k)) {
+                      var pendingVal = _preRestorePending[k];
+                      if (pendingVal != null && pendingVal !== '') {
+                        memSet(k, pendingVal);
+                        lsSet(k, pendingVal);
+                        queueIdbWrite(k, pendingVal);
+                        if (--pending === 0) setTimeout(nextBatch, 25);
+                        return;
+                      }
                     }
-                  }
-                  if (ls != null && ls !== '' && !_lsDirty[k]) {
                     if (big && _bigMemUsed + ls.length > BIG_MEM_BUDGET) {
                       window.__akiniDeferredKeys[k] = 1; // 超预算：不驻留，按需水合
                     } else {
                       memSet(k, ls);
                       if (big) _bigMemUsed += ls.length;
                     }
-                    if (ls !== v) queueIdbWrite(k, ls);
+                    if (ls !== v) queueIdbWrite(k, ls); // LS 与 IDB 不一致，以 LS 回写 IDB
                   } else if (big) {
                     // 大键不回填 LS（防回填又撑爆配额）；预算内驻留内存，超预算按需水合
                     if (_bigMemUsed + v.length > BIG_MEM_BUDGET) {
@@ -289,6 +290,7 @@
                     }
                     lsRemoveRaw(k);
                   } else {
+                    // 仅当 LS 为空/丢失时，才用 IDB 镜像兜底回填（绝不覆盖已有真实数据）
                     memSet(k, v);
                     if (lsSet(k, v)) clearDirty(k); else markDirty(k);
                   }
@@ -344,12 +346,16 @@
         try {
           if (self.isCritical(k)) {
             var m = self.memGet(k);
-            if (m !== null) return m;
+            if (m !== null && m !== '') return m;
             // 超预算大键未驻留内存：触发异步水合，本次先返回 LS 值，水合完成后下次读取即得
             if (window.__akiniDeferredKeys && window.__akiniDeferredKeys[k]) {
               delete window.__akiniDeferredKeys[k];
               idbGet(k, function (v) { if (v != null && v !== '') memSet(k, v); });
             }
+            // 内存缓存为空时回退到原始 LS（绝不让内存的空状态遮蔽 LS 里的真实数据）
+            var raw = self.origGet ? self.origGet.call(this, k) : null;
+            if (raw != null && raw !== '') return raw;
+            return null;
           }
           return self.origGet ? self.origGet.call(this, k) : null;
         } catch (e) { return null; }
@@ -432,11 +438,14 @@
         try {
           if (isCriticalKey(k)) {
             var m = memGet(k);
-            if (m !== null) return m;
+            if (m !== null && m !== '') return m;
             if (window.__akiniDeferredKeys && window.__akiniDeferredKeys[k]) {
               delete window.__akiniDeferredKeys[k];
               idbGet(k, function (v) { if (v != null && v !== '') memSet(k, v); });
             }
+            var raw = _shimGet.call(rawLS, k);
+            if (raw != null && raw !== '') return raw;
+            return null;
           }
         } catch (e) {}
         try { return _shimGet.call(rawLS, k); } catch (e) { return null; }
@@ -493,14 +502,16 @@
     setTimeout(restoreAll, 300);
   }
 
-  // ---- 生命周期守护：后台挂起切回自愈与切离立即落盘 ----
+  // ---- 生命周期守护：后台挂起切回立即落盘，切离也立即落盘 ----
+  // 注意：切回/往返缓存恢复时【不再】重新跑全量对账——这些场景 localStorage 根本不会丢失，
+  // 重复对账反而会在 IDB 镜像滞后的情况下用旧值覆盖 LS 真实数据（导致设置/纪念日被重置）。
+  // 仅做落盘（把内存里的最新值写回 IDB），保证数据不丢。
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) {
       flushIdbQueue();
       try { if (window.__akiniVaultSave) window.__akiniVaultSave(); } catch (e) {}
     } else {
-      // 从后台或长时间闲置切回：立即进行健康度巡检，防止变量被回收或数据缺失
-      setTimeout(restoreAll, 100);
+      flushIdbQueue();
     }
   });
   window.addEventListener('pagehide', function () {
@@ -508,14 +519,14 @@
     try { if (window.__akiniVaultSave) window.__akiniVaultSave(); } catch (e) {}
   });
   window.addEventListener('pageshow', function (evt) {
-    // 从 bfcache(往返缓存)恢复时，重新对账
+    // 从 bfcache(往返缓存)恢复时，仅落盘，不重新对账
     if (evt && evt.persisted) {
-      setTimeout(restoreAll, 100);
+      flushIdbQueue();
     }
   });
 
   // 每 30s 兜底落盘一次，极端崩溃退出也不丢
   setInterval(flushIdbQueue, 30000);
 
-  console.log('[akini-storage-safe] 网站式可靠存储层已加载 (v20261026)');
+  console.log('[akini-storage-safe] 网站式可靠存储层已加载 (v20261027)');
 })();

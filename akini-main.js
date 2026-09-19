@@ -3716,7 +3716,7 @@ document.addEventListener("DOMContentLoaded", function () {
         parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5"),
         parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5")
       );
-      var __watchMs = Math.min(Math.max(__maxS * 1000 + 15000, 20000), 120000);
+      var __watchMs = Math.min(Math.max(__maxS * 1000 + 15000, 20000), 300000);
       window.__akiniTypingMap[t] = {
         avatar: avatar,
         timer: setTimeout(function () {
@@ -3839,13 +3839,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
       var baseWait = typeof delayOverride === "number" ? delayOverride : 0;
       var __readDelay = baseWait + 1500 + Math.random() * 2500; // core 式：1.5~4s 后显示已读
-      var __typingDelay = __readDelay + 400 + Math.random() * 500; // 已读后再弹输入动态
+      var _rm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+          _rx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+      if (!(_rm > 0)) _rm = 3;
+      if (!(_rx >= _rm)) _rx = Math.max(_rm, 7);
       var _fm = parseFloat(localStorage.getItem("akini_num_typingDelayMin") || "3"),
           _fx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5");
       if (!(_fm > 0)) _fm = 3;
       if (!(_fx >= _fm)) _fx = Math.max(_fm, 5);
-      // 回复时刻 = 输入动态出现 + 打字时长：输入动态必然持续一段打字时间后回复才到达，绝不秒回
-      var __replyDelay = __typingDelay + 1e3 * (_fm + Math.random() * (_fx - _fm));
+      // 回复时刻 = 已读后 + 用户设置的「消息回复延迟」（设置页秒数，最低值如实生效，绝不秒回）
+      // 输入动态只在回复前最后一段打字时长弹出，静默期不提前显示
+      var __replyDelay = __readDelay + 1e3 * (_rm + Math.random() * (_rx - _rm));
+      var __typingDelay = Math.max(
+        __readDelay + 400 + Math.random() * 500,
+        __replyDelay - 1e3 * (_fm + Math.random() * (_fx - _fm))
+      );
 
       var __isGroup = "group" === target.type;
       var __member = pending.memberId || (__isGroup ? (target.memberIds || [])[0] : null);
@@ -4030,12 +4038,20 @@ document.addEventListener("DOMContentLoaded", function () {
           if (window.__akiniForceReplyInFlight) return; // 一轮进行中，防连点堆积
           window.__akiniForceReplyInFlight = true;
           var _fRead = 1500 + Math.random() * 2500;                 // 1.5~4s 后显示已读
-          var _fType = _fRead + 400 + Math.random() * 500;          // 已读后再弹输入动态
+          var _rm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+              _rx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+          if (!(_rm > 0)) _rm = 3;
+          if (!(_rx >= _rm)) _rx = Math.max(_rm, 7);
           var _fm = parseFloat(localStorage.getItem("akini_num_typingDelayMin") || "3"),
               _fx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5");
           if (!(_fm > 0)) _fm = 3;
           if (!(_fx >= _fm)) _fx = Math.max(_fm, 5);
-          var _fReply = _fType + 1e3 * (_fm + Math.random() * (_fx - _fm)); // 输入动态持续打字延迟后才回
+          // 已读后按设置的「消息回复延迟」回复；输入动态在回复前最后一段打字时长弹出
+          var _fReply = _fRead + 1e3 * (_rm + Math.random() * (_rx - _rm));
+          var _fType = Math.max(
+            _fRead + 400 + Math.random() * 500,
+            _fReply - 1e3 * (_fm + Math.random() * (_fx - _fm))
+          );
           var _fMember = "group" === _ft.type ? (_ft.memberIds || [])[0] : null;
           setTimeout(function () {
             try {
@@ -4583,12 +4599,20 @@ document.addEventListener("DOMContentLoaded", function () {
       // 统一走发消息同款回复流程：先已读 → 弹"对方正在输入"动态 → 打字时长后才发回复消息
       var isActive = (t === window.akiniContacts.getActiveChatId());
       var __readDelay = 1500 + Math.random() * 2500;
-      var __typingDelay = __readDelay + 400;
+      var _rm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+          _rx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+      if (!(_rm > 0)) _rm = 3;
+      if (!(_rx >= _rm)) _rx = Math.max(_rm, 7);
       var _tm = parseFloat(localStorage.getItem("akini_num_typingDelayMin") || "3"),
           _tx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5");
       if (!(_tm > 0)) _tm = 3;
       if (!(_tx >= _tm)) _tx = Math.max(_tm, 5);
-      var __replyDelay = __typingDelay + 1e3 * (_tm + Math.random() * (_tx - _tm));
+      // 统一走发消息同款回复流程：已读 → 静默到设定的恢复时间 → 输入动态（打字时长）→ 回复到达
+      var __replyDelay = __readDelay + 1e3 * (_rm + Math.random() * (_rx - _rm));
+      var __typingDelay = Math.max(
+        __readDelay + 400,
+        __replyDelay - 1e3 * (_tm + Math.random() * (_tx - _tm))
+      );
       setTimeout(function () {
         var cb = document.getElementById("chatBody");
         if (!cb) return;
@@ -7788,6 +7812,9 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch (e) {}
           var a = document.getElementById("inputTaName");
           a && (a.value = t.name);
+          var statusEl = document.getElementById("chatTaStatus");
+          statusEl && (statusEl.textContent = "在线");
+          typeof window.__akiniApplyHideSendBtn === "function" && window.__akiniApplyHideSendBtn();
           var o = document.getElementById("typingIndicator");
           o &&
             ((o.style.display = "none"),
@@ -7947,40 +7974,45 @@ document.addEventListener("DOMContentLoaded", function () {
         a(vt, function (t) {
           (t && (t.stopPropagation(), t.preventDefault()),
             window.__navBack() || o("chat-list"),
-            _t("contacts"));
+            _t());
         }),
       ht &&
         a(ht, function (t) {
           (t && (t.stopPropagation(), t.preventDefault()),
             window.__navBack() || o("chat-list"),
-            _t("contacts"));
+            _t());
         }));
     var wt = document.getElementById("chatListAddBtn");
     wt &&
       wt.addEventListener("click", function (t) {
-        (t.stopPropagation(),
-          o("contacts" === kt ? "add-contact" : "create-group"));
+        t.stopPropagation();
+        if (document.querySelector(".chat-list-add-menu-overlay")) return;
+        var e = document.createElement("div");
+        e.className = "chat-list-add-menu-overlay";
+        e.innerHTML = '<div class="chat-list-add-menu-bg"></div><div class="chat-list-add-menu-panel"><div class="chat-list-add-menu-item" data-action="add-contact">创建联系人</div><div class="chat-list-add-menu-item" data-action="create-group">创建群聊</div></div>';
+        document.body.appendChild(e);
+        requestAnimationFrame(function () { e.classList.add("show"); });
+        e.addEventListener("click", function (t) {
+          var n = t.target.closest(".chat-list-add-menu-item");
+          if (n) {
+            var i = n.getAttribute("data-action");
+            "add-contact" === i && o("add-contact");
+            "create-group" === i && o("create-group");
+          }
+          e.classList.remove("show");
+          setTimeout(function () { e.remove(); }, 200);
+        });
       });
     var kt = "wechat";
     function _t(t) {
-      kt = t;
+      kt = "wechat";
       var e = document.getElementById("wechatTabPanel"),
         n = document.getElementById("contactsTabPanel");
-      (document.querySelectorAll(".chat-list-tab").forEach(function (e) {
-        var n = e.getAttribute("data-tab") === t;
-        e.classList.toggle("active", n);
-        var i = e.querySelector(".chat-list-tab-label");
-        (i && (i.style.color = n ? "#07c160" : "#666"),
-          i && (i.style.fontWeight = n ? "600" : "400"));
-        var ic = e.querySelector(".chat-list-tab-icon");
-        ic && (ic.style.color = n ? "#07c160" : "#666");
-      }),
-        e && (e.style.display = "wechat" === t ? "flex" : "none"),
-        n && (n.style.display = "contacts" === t ? "flex" : "none"));
+      e && (e.style.display = "flex");
+      n && (n.style.display = "none");
       var i = document.getElementById("chatListTitle");
-      (i && ("wechat" === t ? (i.textContent = "微信") : (i.textContent = "通讯录")),
-        "wechat" === t && ot(),
-        "contacts" === t && xt());
+      i && (i.textContent = "微信");
+      ot();
     }
     function bt() {
       /* zzi: 按需求删除顶部未读数量，标题恒为"微信"（未读改到首页角标） */
@@ -8534,9 +8566,10 @@ document.addEventListener("DOMContentLoaded", function () {
           __akiniScheduleReply(chatId, null, totalWait);
         });
     })();
-    const Ft = document.getElementById("chatMoreBtn"),
+    const Ft = document.getElementById("chatContactMenuBtn"),
       qt = document.getElementById("dismissGroupBtn"),
-      jt = document.getElementById("changeGroupAvatarBtn");
+      jt = document.getElementById("changeGroupAvatarBtn"),
+      delCtcBtn = document.getElementById("chatMenuDeleteContactBtn");
     (Ft &&
       Y &&
       a(Ft, function () {
@@ -8547,12 +8580,56 @@ document.addEventListener("DOMContentLoaded", function () {
             )
           : null;
         (qt && (qt.style.display = t && "group" === t.type ? "flex" : "none"),
-          jt && (jt.style.display = t && "group" === t.type ? "flex" : "none"));
+          jt && (jt.style.display = t && "group" === t.type ? "flex" : "none"),
+          delCtcBtn && (delCtcBtn.style.display = t && "group" === t.type ? "none" : "flex"));
       }),
       Q &&
         Q.addEventListener("click", function () {
           Y && ((Y.style.display = "none"), (Y.style.pointerEvents = "none"));
         }));
+    delCtcBtn &&
+      a(delCtcBtn, function () {
+        var t = window.akiniContacts
+          ? window.akiniContacts.getActiveChatId()
+          : null;
+        if (!t) return;
+        window.__akiniCenterModal("确认", "确定删除该联系人吗？相关聊天记录也会被删除。", {
+          confirm: true,
+          okText: "删除",
+          cancelText: "取消",
+          onClose: function (ok) {
+            if (!ok) return;
+            window.akiniContacts.deleteContact(t) && (
+              Y && ((Y.style.display = "none"), (Y.style.pointerEvents = "none")),
+              "function" == typeof renderHomeAvatarContacts && renderHomeAvatarContacts(),
+              "function" == typeof window._renderIcity && window._renderIcity(),
+              o("chat-list"),
+              _t("contacts")
+            );
+          }
+        });
+      });
+    const hideSendCheckbox = document.getElementById("hideSendCheckbox"),
+      sendBtnEl = document.getElementById("sendBtn");
+    function applyHideSendBtn() {
+      var t = !1;
+      try { t = localStorage.getItem("akini_hide_send_btn") === "1"; } catch (e) {}
+      hideSendCheckbox && (hideSendCheckbox.checked = t);
+      sendBtnEl && (sendBtnEl.style.display = t ? "none" : "");
+    }
+    window.__akiniApplyHideSendBtn = applyHideSendBtn;
+    hideSendCheckbox && hideSendCheckbox.addEventListener("change", function() {
+      var t = !!hideSendCheckbox.checked;
+      try { localStorage.setItem("akini_hide_send_btn", t ? "1" : "0"); } catch (e) {}
+      applyHideSendBtn();
+    });
+    applyHideSendBtn();
+    const chatCallBtn = document.getElementById("chatCallBtn"),
+      hiddenCallBtn = document.getElementById("callBtn");
+    chatCallBtn &&
+      a(chatCallBtn, function () {
+        hiddenCallBtn && hiddenCallBtn.click();
+      });
     const $t = document.getElementById("changeTaAvatarBtn"),
       Wt_avatar = document.getElementById("fileInputChangeTaAvatar");
     $t &&
@@ -8837,6 +8914,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function showPlusMenu() {
       plusMenu &&
         ((plusMenu.style.display = ""), plusMenu.classList.add("show"));
+      typeof hideEmojiPanel === "function" && hideEmojiPanel();
     }
     (plusMenuBtn &&
       plusMenu &&
@@ -8851,15 +8929,27 @@ document.addEventListener("DOMContentLoaded", function () {
         var e = t.target.closest("[data-action]");
         if (e) {
           var n = e.getAttribute("data-action");
-          if ("call" === n) {
-            var cb = document.getElementById("callBtn");
-            cb && cb.click();
+          if ("emoji" === n) {
+            re && ("flex" === re.style.display ? hideEmojiPanel() : (showEmojiPanel(), hidePlusMenu()));
+          } else if ("continue" === n) {
+            typeof window.__akiniContinueTalk === "function" && (window.__akiniContinueTalk(), hidePlusMenu());
+          } else if ("camera" === n || "image" === n) {
+            var ib = document.getElementById("fileInputImageSend");
+            ib && ib.click();
+          } else if ("sticker" === n) {
+            var addStickerBtn = document.getElementById("addStickerBtn");
+            addStickerBtn ? addStickerBtn.click() : (window.__akiniToast && window.__akiniToast("贴纸功能开发中"));
+          } else if ("audio" === n) {
+            window.__akiniToast && window.__akiniToast("音频功能开发中");
+          } else if ("shop" === n) {
+            window.navTo && window.navTo("shop");
+          } else if ("safe" === n) {
+            window.__akiniToast && window.__akiniToast("平安确认功能开发中");
+          } else if ("vote" === n) {
+            window.__akiniToast && window.__akiniToast("投票功能开发中");
           } else if ("transfer" === n) {
             var tb = document.getElementById("transferBtn");
             tb && tb.click();
-          } else if ("image" === n) {
-            var ib = document.getElementById("fileInputImageSend");
-            ib && ib.click();
           } else if ("batch" === n) {
             window.__akiniOpenBatchSend && window.__akiniOpenBatchSend();
           } else if ("poke" === n) {
@@ -8888,9 +8978,7 @@ document.addEventListener("DOMContentLoaded", function () {
         hidePlusMenu();
       re &&
         "flex" === re.style.display &&
-        oe &&
         !re.contains(t.target) &&
-        !oe.contains(t.target) &&
         hideEmojiPanel();
     });
     const ce = document.getElementById("addStickerBtn"),
@@ -12469,11 +12557,12 @@ document.addEventListener("DOMContentLoaded", function () {
     const Ye = document.getElementById("chatTaAvatar"),
       Qe = document.getElementById("chatTaName");
     function Ze() {
-      const t = document.getElementById("replyDelayMin"),
-        e = document.getElementById("replyDelayMax"),
-        n = 1e3 * parseFloat((t && t.value) || 2),
-        i = 1e3 * parseFloat((e && e.value) || 5),
-        a = n + Math.random() * Math.max(0, i - n);
+      // 双击头像触发回复：读取设置页实际保存的「消息回复延迟」（localStorage），而非输入框临时值
+      var _zm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+          _zx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+      if (!(_zm > 0)) _zm = 3;
+      if (!(_zx >= _zm)) _zx = Math.max(_zm, 7);
+      var a = 1e3 * (_zm + Math.random() * (_zx - _zm));
       setTimeout(function () {
         window.triggerTaReplyOnce && window.triggerTaReplyOnce();
       }, a);
@@ -23260,6 +23349,15 @@ document.addEventListener("DOMContentLoaded", function () {
       /* 朋友圈 / iCity：未读互动通知数 */
       _setBadge("appBtnFriends", _getNotifs("friends").filter(function (n) { return !n.read; }).length);
       _setBadge("appBtnIcity", _getNotifs("icity").filter(function (n) { return !n.read; }).length);
+      /* 聊天页返回角标：除当前会话外的未读总数 */
+      var backBadge = document.getElementById("chatBackUnreadBadge");
+      if (backBadge && window.akiniContacts && window.akiniContacts.getSessions) {
+        var activeChatId = window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+        var bn = 0;
+        Object.keys(ss).forEach(function (k) { if (k !== activeChatId) bn += ss[k].unread || 0; });
+        backBadge.textContent = String(bn);
+        backBadge.style.display = bn > 0 ? "flex" : "none";
+      }
       /* 消息中心按钮小红点同步 */
       _syncNotifBtn("friends");
       _syncNotifBtn("icity");
