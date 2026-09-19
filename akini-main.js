@@ -215,10 +215,12 @@ window.__akiniBootStep = "start";
 /* 尽早同步用户装扮，避免先显示默认再替换的闪烁 */
 (function () {
   try {
+    /* v516: 启动时不再自动应用旧版 home_bg，避免用户清除后仍残留灰色/纹理底图；
+       用户可在美化页手动重新设置或清除 */
     var bg = localStorage.getItem("akini_home_bg");
     if (bg) {
       var pf = document.getElementById("phoneFrame");
-      if (pf) {
+      if (pf && pf.classList.contains("force-home-bg")) {
         pf.style.backgroundImage = "url(" + bg + ")";
         pf.style.backgroundSize = "cover";
         pf.style.backgroundPosition = "center";
@@ -3726,6 +3728,12 @@ document.addEventListener("DOMContentLoaded", function () {
         }, __watchMs),
       };
       __akiniPaintTypingFloat();
+      /* v516: 部分浏览器在 DOM 写入后不会立即重绘，延迟一帧再次刷新保证输入动态实时显示 */
+      try {
+        if (typeof requestAnimationFrame === "function") {
+          requestAnimationFrame(function () { __akiniPaintTypingFloat(); });
+        }
+      } catch (e) {}
     }
     function hideTypingBubble(t) {
       if (t) {
@@ -4828,6 +4836,10 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(function () { try { U.scrollTop = U.scrollHeight; } catch (e) {} }, _ms);
       });
       __akiniSetupChatMetaObserver();
+      /* v516: 每次聊天 body 重绘后刷新 typing 悬浮层，避免发送消息后输入动态不显示 */
+      try {
+        typeof __akiniPaintTypingFloat === "function" && __akiniPaintTypingFloat();
+      } catch (e) {}
     }
     function __akiniLoadMoreHistory(chatId) {
       if (!U) return;
@@ -7812,8 +7824,7 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch (e) {}
           var a = document.getElementById("inputTaName");
           a && (a.value = t.name);
-          var statusEl = document.getElementById("chatTaStatus");
-          statusEl && (statusEl.textContent = "在线");
+          /* v516: 顶栏已移除在线状态元素，保留兼容不操作 */
           typeof window.__akiniApplyHideSendBtn === "function" && window.__akiniApplyHideSendBtn();
           var o = document.getElementById("typingIndicator");
           o &&
@@ -8932,28 +8943,11 @@ document.addEventListener("DOMContentLoaded", function () {
           if ("emoji" === n) {
             re && ("flex" === re.style.display ? hideEmojiPanel() : (showEmojiPanel(), hidePlusMenu()));
           } else if ("continue" === n) {
-            typeof window.__akiniContinueTalk === "function" && (window.__akiniContinueTalk(), hidePlusMenu());
+            /* v517: 「继续说」= 让对方按正常节奏回复一条消息 */
+            window.__akiniForceReply && window.__akiniForceReply();
           } else if ("camera" === n || "image" === n) {
             var ib = document.getElementById("fileInputImageSend");
             ib && ib.click();
-          } else if ("sticker" === n) {
-            var addStickerBtn = document.getElementById("addStickerBtn");
-            addStickerBtn ? addStickerBtn.click() : (window.__akiniToast && window.__akiniToast("贴纸功能开发中"));
-          } else if ("audio" === n) {
-            window.__akiniToast && window.__akiniToast("音频功能开发中");
-          } else if ("shop" === n) {
-            window.navTo && window.navTo("shop");
-          } else if ("safe" === n) {
-            window.__akiniToast && window.__akiniToast("平安确认功能开发中");
-          } else if ("vote" === n) {
-            window.__akiniToast && window.__akiniToast("投票功能开发中");
-          } else if ("transfer" === n) {
-            var tb = document.getElementById("transferBtn");
-            tb && tb.click();
-          } else if ("batch" === n) {
-            window.__akiniOpenBatchSend && window.__akiniOpenBatchSend();
-          } else if ("poke" === n) {
-            window.__akiniSendPoke && window.__akiniSendPoke();
           } else if ("survey" === n) {
             if (window._openSurveyList) {
               window._openSurveyList();
@@ -8965,6 +8959,13 @@ document.addEventListener("DOMContentLoaded", function () {
                 if (typeof window.renderSurveyList === "function") window.renderSurveyList();
               }
             }
+          } else if ("transfer" === n) {
+            var tb = document.getElementById("transferBtn");
+            tb && tb.click();
+          } else if ("batch" === n) {
+            window.__akiniOpenBatchSend && window.__akiniOpenBatchSend();
+          } else if ("poke" === n) {
+            window.__akiniSendPoke && window.__akiniSendPoke();
           }
           hidePlusMenu();
         }
@@ -17005,7 +17006,23 @@ document.addEventListener("DOMContentLoaded", function () {
                 (e.style.backgroundRepeat = "no-repeat"),
                 e.classList.add("has-custom-bg"));
             }
-          }));
+          }),
+          (function () {
+            const clearBtn = document.getElementById("clearHomeBgBtn");
+            if (!clearBtn) return;
+            clearBtn.addEventListener("click", function () {
+              try { localStorage.removeItem("akini_home_bg"); } catch (e) {}
+              const pf = document.getElementById("phoneFrame");
+              if (pf) {
+                pf.style.backgroundImage = "";
+                pf.style.backgroundSize = "";
+                pf.style.backgroundPosition = "";
+                pf.style.backgroundRepeat = "";
+                pf.classList.remove("has-custom-bg");
+              }
+              window.__akiniToast && window.__akiniToast("已清除主页壁纸");
+            });
+          })());
         const d = document.getElementById("fileInputMusicBg");
         d &&
           (d.addEventListener("change", function () {
