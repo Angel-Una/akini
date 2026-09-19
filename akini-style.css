@@ -7665,3 +7665,13 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   display: flex !important;
   align-items: center !important;
 }
+
+
+/* ==========================================================================
+   v522 聊天页满屏修复（根因：真实 DOM 中 chat-wrapper 仅包含顶栏，
+   其 flex:1 与 chat-body 平分可用高度，导致聊天界面只显示一半）
+   ========================================================================== */
+#app-chat { overflow: hidden !important; }
+#app-chat > .chat-wrapper { flex: 0 0 auto !important; }
+#app-chat > .chat-body { flex: 1 1 auto !important; min-height: 0 !important; }
+#app-chat > .chat-input-bar-area { flex: 0 0 auto !important; }
