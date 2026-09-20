@@ -7381,7 +7381,8 @@ document.addEventListener("DOMContentLoaded", function () {
     function _akPinList() {
       return _akPinGet();
     }
-    function ot() {\n      window.__akiniRefreshChatListBadges = ot;
+    function ot() {
+      window.__akiniRefreshChatListBadges = ot;
       (at && clearTimeout(at),
         (at = setTimeout(function () {
           ((at = null),
