@@ -8311,3 +8311,87 @@ button#plusMenuBtn {
 #watchSendBtn svg {
   stroke: #1a1a1a !important;
 }
+
+
+/* ==========================================================================
+   v532: 彻底清除微信底栏白色底图，昵称条下移，微信输入框删除线条，输入动态照搬陪伴
+   ========================================================================== */
+
+/* 1. 聊天背景全屏通透（#app-chat 铺满壁纸，输入栏彻底全透明） */
+#app-chat {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+#app-chat .chat-wrapper,
+#app-chat .chat-input-bar-area,
+.chat-input-bar-area,
+#app-chat .chat-input-bar,
+.chat-input-bar {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 2. 昵称条往下移动一点 */
+#app-chat .chat-top-bar {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 14px) !important;
+}
+#app-chat .chat-top-bar .ta-info {
+  margin-top: 10px !important;
+}
+#app-chat .chat-top-bar .ta-name-pill {
+  margin-top: 6px !important;
+}
+
+/* 3. 输入动态完全照搬陪伴界面：左侧纯白三点跳跃胶囊气泡，无头像 */
+.akini-typing-float,
+#watchTypingFloat {
+  position: absolute !important;
+  left: 14px !important;
+  bottom: calc(100% + 12px) !important;
+  z-index: 50 !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+}
+
+.akini-typing-float .typing-bubble,
+#watchTypingFloat .typing-bubble,
+.companion-typing-bubble {
+  background: rgba(255, 255, 255, 0.96) !important;
+  background-color: rgba(255, 255, 255, 0.96) !important;
+  border-radius: 20px !important;
+  padding: 0 16px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  min-width: 58px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1) !important;
+  border: none !important;
+}
+
+.akini-typing-float .msg-avatar {
+  display: none !important;
+}
+
+.typing-dot {
+  width: 5px !important;
+  height: 5px !important;
+  border-radius: 50% !important;
+  background: #666666 !important;
+  animation: typingPulse 1.2s infinite ease-in-out !important;
+}

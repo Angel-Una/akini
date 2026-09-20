@@ -7835,54 +7835,48 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     function st(t) {
       const e = document.getElementById("chatBody");
-      if (!e || !window.loadBgFromStorage) return;
-      /* 防闪烁：先同步读内存缓存，有值立即应用；无值立即清空（避免残留上一聊天的背景），再异步校正 */
+      const appChat = document.getElementById("app-chat");
+      if (!window.loadBgFromStorage) return;
       var _memV = "";
       try { if (window.akiniStore && window.akiniStore.memoryGet) _memV = window.akiniStore.memoryGet("akini_chat_bg_" + t) || ""; } catch (err) {}
-      if (_memV) {
-        if (e.getAttribute("data-current-bg") !== _memV) {
-          e.style.backgroundImage = "url(" + _memV + ")";
+      function applyBg(url) {
+        if (appChat) {
+          appChat.style.backgroundImage = url ? "url(" + url + ")" : "";
+          appChat.style.backgroundSize = "cover";
+          appChat.style.backgroundPosition = "center";
+          appChat.style.backgroundRepeat = "no-repeat";
+        }
+        if (e) {
+          e.style.backgroundImage = url ? "url(" + url + ")" : "";
           e.style.backgroundSize = "cover";
           e.style.backgroundPosition = "center";
           e.style.backgroundRepeat = "no-repeat";
-          e.setAttribute("data-current-bg", _memV);
+          e.setAttribute("data-current-bg", url || "");
+        }
+      }
+      if (_memV) {
+        if (e && e.getAttribute("data-current-bg") !== _memV) {
+          applyBg(_memV);
         }
         return;
       }
-      if (e.getAttribute("data-current-bg")) {
-        e.style.backgroundImage = "";
-        e.style.backgroundSize = "";
-        e.style.backgroundPosition = "";
-        e.style.backgroundRepeat = "";
-        e.setAttribute("data-current-bg", "");
+      if (e && e.getAttribute("data-current-bg")) {
+        applyBg("");
       }
       window.loadBgFromStorage("akini_chat_bg_" + t, function (n) {
         if (n) { try { window.akiniStore && window.akiniStore.memorySet && window.akiniStore.memorySet("akini_chat_bg_" + t, n); } catch (err) {} }
         if (!n) {
-          e.style.backgroundImage = "";
-          e.style.backgroundSize = "";
-          e.style.backgroundPosition = "";
-          e.style.backgroundRepeat = "";
-          e.setAttribute("data-current-bg", "");
+          applyBg("");
           return;
         }
-        // 当前已是同一张背景则不再重置，避免闪烁
-        if (e.getAttribute("data-current-bg") === n) return;
+        if (e && e.getAttribute("data-current-bg") === n) return;
         var img = new Image();
         img.onload = function () {
           if (window.akiniContacts && window.akiniContacts.getActiveChatId() !== t) return;
-          e.style.backgroundImage = "url(" + n + ")";
-          e.style.backgroundSize = "cover";
-          e.style.backgroundPosition = "center";
-          e.style.backgroundRepeat = "no-repeat";
-          e.setAttribute("data-current-bg", n);
+          applyBg(n);
         };
         img.onerror = function () {
-          e.style.backgroundImage = "";
-          e.style.backgroundSize = "";
-          e.style.backgroundPosition = "";
-          e.style.backgroundRepeat = "";
-          e.setAttribute("data-current-bg", "");
+          applyBg("");
         };
         img.src = n;
       });
