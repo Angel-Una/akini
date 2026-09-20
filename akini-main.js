@@ -3689,8 +3689,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (el.__lastAvatar !== m.avatar) {
         el.__lastAvatar = m.avatar;
         el.innerHTML =
-          '<div class="msg-avatar">' + m.avatar + '</div>' +
-          '<div class="typing-bubble"><div class=typing-dot></div><div class=typing-dot></div><div class=typing-dot></div></div>';
+          '<div class="typing-bubble companion-typing-bubble"><div class=typing-dot></div><div class=typing-dot></div><div class=typing-dot></div></div>';
       }
       el.style.display = "flex";
       if (chatBody) {
@@ -22766,10 +22765,8 @@ document.addEventListener("DOMContentLoaded", function () {
     var floatEl = document.createElement("div");
     floatEl.id = "watchTypingFloat";
     floatEl.className = "akini-typing-float";
-    floatEl.style.cssText = "position:absolute;left:12px;bottom:calc(100% + 8px);z-index:20;display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.96);padding:5px 12px 5px 8px;border-radius:18px;box-shadow:0 3px 12px rgba(0,0,0,0.12);pointer-events:none;transition:opacity 0.2s ease;";
-    floatEl.innerHTML =
-      '<div style="width:24px;height:24px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;">' + partnerAvatarHtml(c && c.avatar) + '</div>' +
-      '<div style="display:flex;align-items:center;gap:3px;"><span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span></div>';
+    floatEl.style.cssText = "position:absolute;left:16px;bottom:calc(100% + 10px);z-index:20;pointer-events:none;transition:opacity 0.2s ease;";
+    floatEl.innerHTML = '<div class="typing-bubble companion-typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>';
     bar.style.position = "relative";
     bar.appendChild(floatEl);
   }

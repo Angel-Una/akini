@@ -8212,3 +8212,102 @@ body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):no
   flex-shrink: 0 !important;
   color: #1a1a1a !important;
 }
+
+
+/* ==========================================================================
+   v530: 彻底清除微信输入栏下方的白色通栏底图，加号圆形白底完全生效
+   ========================================================================== */
+
+#app-chat .chat-input-bar-area,
+.chat-input-bar-area,
+#app-chat .chat-input-bar,
+.chat-input-bar,
+#app-chat .chat-wrapper {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* 微信加号按钮：与发送按钮绝对一致的 44x44 陪伴同款圆形乳白底 */
+#app-chat .chat-input-bar #plusMenuBtn,
+.chat-input-bar #plusMenuBtn,
+button#plusMenuBtn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  background-color: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  color: #1a1a1a !important;
+}
+
+
+/* ==========================================================================
+   v531: 微信与观影聊天界面的输入动态（正在输入）完全统一为图一陪伴界面样式
+   ========================================================================== */
+
+/* 输入动态悬浮层与气泡容器：纯白底胶囊，无头像干扰，三点匀速轻柔跳跃 */
+.akini-typing-float {
+  left: 16px !important;
+  bottom: calc(100% + 10px) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+}
+
+.akini-typing-float .msg-avatar {
+  display: none !important;
+}
+
+.typing-bubble,
+.companion-typing-bubble,
+.akini-typing-float .typing-bubble {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  border-radius: 20px !important;
+  padding: 0 16px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  max-height: 36px !important;
+  min-width: 58px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  outline: none !important;
+}
+
+/* 陪伴同款灰色小圆点与跳动动画 */
+.typing-dot {
+  width: 5px !important;
+  height: 5px !important;
+  border-radius: 50% !important;
+  background: #666666 !important;
+  background-color: #666666 !important;
+  opacity: 0.8 !important;
+  animation: typingPulse 1.2s infinite ease-in-out !important;
+}
+.typing-dot:nth-child(1) { animation-delay: 0s !important; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s !important; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s !important; }
+
+/* 观影发送键图标颜色恢复为深色 #1a1a1a */
+#watchSendBtn {
+  color: #1a1a1a !important;
+}
+#watchSendBtn svg {
+  stroke: #1a1a1a !important;
+}
