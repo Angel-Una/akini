@@ -6952,22 +6952,32 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
    对方消息头像在气泡左侧、靠上；我的消息头像在气泡右侧、靠下；间距紧凑。
    padding 用 !important 对抗 .chat-body 顶部 60px 的 !important padding。 */
 .chat-body.bubble-css-preview {
+  position: relative !important;
+  height: auto !important;
+  min-height: 120px !important;
   flex: none !important;
   margin-top: 12px !important;
-  padding: 12px !important;
+  padding: 16px 12px !important;
   background: #f5f5f5 !important;
   border-radius: 14px !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: 8px !important;
-  overflow: hidden !important;
+  gap: 12px !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
 }
-.chat-body.bubble-css-preview .msg-row { margin-bottom: 0 !important; }
+.chat-body.bubble-css-preview .msg-row { margin-bottom: 0 !important; width: 100% !important; }
 .chat-body.bubble-css-preview .msg-row .msg-avatar {
   width: 36px !important;
   height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
   font-size: 12px !important;
   background: #e8e8e8 !important;
+  border-radius: 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 /* iMessage 风格聊天界面覆盖 */
@@ -7003,8 +7013,8 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   height: 18px;
   padding: 0 5px;
   border-radius: 9px;
-  background: #ff3b30;
-  color: #fff;
+  background: #ffffff;
+  color: #111111;
   font-size: 11px;
   font-weight: 700;
   display: flex;
@@ -8924,3 +8934,324 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
   z-index: 5 !important;
 }
+
+
+
+/* v547: 保留用户原有的白底黑字未读标，仅在有未读时延伸返回按钮为液态玻璃胶囊 */
+#chatBackBtn {
+  position: relative !important;
+  overflow: visible !important;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  padding: 0 6px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+#chatBackBtn.has-unread {
+  background: rgba(235, 230, 218, 0.88) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-radius: 9999px !important;
+  padding: 0 12px 0 8px !important;
+  min-width: 62px !important;
+  gap: 6px !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
+}
+#chatBackBtn.has-unread .back-unread-badge,
+#chatBackBtn.has-unread #chatBackUnreadBadge {
+  position: static !important;
+  display: inline-flex !important;
+}
+
+/* ==========================================================================
+   v548 终极修复：微信聊天界面排版、方向、时间戳居中、气泡自适应、贴底布局
+   ========================================================================== */
+
+/* 1. 聊天外层容器与聊天记录滚动贴底 padding-bottom */
+#app-chat .chat-wrapper,
+.chat-wrapper {
+  position: relative !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#app-chat .chat-body,
+.chat-body,
+#companionMsgs.chat-body,
+#watchChatBody.chat-body {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box !important;
+  padding-top: 86px !important;
+  /* 确保最新一条消息完全贴在输入栏上方，添加到桌面或浏览器下都紧凑贴合，不被遮挡 */
+  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  z-index: 1 !important;
+}
+
+#app-chat .chat-input-bar-area,
+.chat-input-bar-area {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 100 !important;
+  background: transparent !important;
+  pointer-events: auto !important;
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)) !important;
+}
+
+/* 针对 iOS PWA/添加到桌面全屏模式 (standalone) 彻底消除底部多余留白 */
+@media all and (display-mode: standalone) {
+  #app-chat .chat-input-bar-area,
+  .chat-input-bar-area {
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+  }
+  #app-chat .chat-body,
+  .chat-body {
+    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* 2. 消息行与内容排列：严格对齐双方方向 */
+/* 对方消息 (other)：头像在左，内容在右 */
+.msg-row.other {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-bottom: 14px !important;
+}
+
+.msg-row.other .msg-content-line {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  gap: 10px !important;
+}
+
+/* 我方消息 (me)：内容在左，头像在右 */
+.msg-row.me {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-bottom: 14px !important;
+}
+
+.msg-row.me .msg-content-line {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  gap: 10px !important;
+}
+
+/* 3. 头像与时间戳垂直列：时间戳正正正居中于双方头像正下方，无偏移 */
+.avatar-col {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  flex-shrink: 0 !important;
+  text-align: center !important;
+  position: relative !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.avatar-col .msg-avatar {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.avatar-col .msg-avatar img,
+.avatar-col .msg-avatar svg {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 6px !important;
+  display: block !important;
+}
+
+/* 无论任何格式，时间戳必须在双方头像正下方正中间，静态流式布局，禁止绝对定位偏离 */
+.avatar-col .msg-ts,
+.msg-row .avatar-col .msg-ts,
+.msg-row.me .avatar-col .msg-ts,
+.msg-row.other .avatar-col .msg-ts {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  max-width: 100% !important;
+  text-align: center !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  color: #8c8c8c !important;
+  margin-top: 4px !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+  letter-spacing: -0.2px !important;
+}
+
+/* 4. 气泡容器 bubble-wrap 及气泡宽度自适应紧贴内容 */
+.bubble-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  max-width: calc(100% - 110px) !important;
+  min-width: 0 !important;
+  flex: 0 1 auto !important;
+}
+
+.msg-row.me .bubble-wrap {
+  align-items: flex-end !important;
+}
+
+.msg-row.other .bubble-wrap {
+  align-items: flex-start !important;
+}
+
+/* 普通文本消息气泡：未开启美化时自适应收缩；开启美化后由美化CSS完全控制 */
+body:not(.bubble-css-on) .msg-row .bubble:not(.survey-bubble):not(.shop-bubble):not(.redpacket-bubble):not(.sticker-bubble) {
+  display: inline-block !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: pre-wrap !important;
+}
+
+/* 5. 问卷卡片 (survey-bubble) 终极修复：结构完整、紧凑自适应、我方对方布局一致 */
+.bubble.survey-bubble {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 250px !important;
+  max-width: 250px !important;
+  min-width: 230px !important;
+  background: #ffffff !important;
+  border-radius: 14px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  padding: 12px 14px !important;
+  box-sizing: border-box !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.bubble.survey-bubble .survey-bubble-inner {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.bubble.survey-bubble .survey-bubble-icon {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  border-radius: 10px !important;
+  background: #f4f5f7 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+.bubble.survey-bubble .survey-bubble-icon svg {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+.bubble.survey-bubble .survey-bubble-content {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.bubble.survey-bubble .survey-bubble-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: #1a1a1a !important;
+  line-height: 1.35 !important;
+  word-break: break-word !important;
+}
+
+.bubble.survey-bubble .survey-bubble-q {
+  font-size: 12px !important;
+  color: #8c8c8c !important;
+  line-height: 1.3 !important;
+  word-break: break-word !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.bubble.survey-bubble .survey-bubble-divider {
+  width: 100% !important;
+  height: 1px !important;
+  background: #f0f0f0 !important;
+  margin: 10px 0 8px !important;
+}
+
+.bubble.survey-bubble .survey-bubble-footer {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  font-size: 12px !important;
+  color: #8c8c8c !important;
+}
+
+.bubble.survey-bubble .survey-bubble-status {
+  font-size: 12px !important;
+  color: #576b95 !important;
+  font-weight: 500 !important;
+}
+

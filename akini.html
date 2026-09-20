@@ -6,7 +6,7 @@ try{
   window.__akiniLowMem = ((navigator.deviceMemory||8) <= 4) || ((navigator.hardwareConcurrency||8) <= 4) || (/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window.MSStream));
   if(window.__akiniLowMem) document.documentElement.classList.add("low-mem");
 }catch(e){}
-</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260920v545" name="akini-ver"/><script>(function(){
+</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260921v549" name="akini-ver"/><script>(function(){
   // 版本标记（仅记录，绝不触发 reload，避免循环刷新）
   try {
     var cur = (document.querySelector('meta[name=akini-ver]')||{}).content || "";
@@ -26,7 +26,7 @@ try{
   } catch (e) {}
 })();
 </script>
-<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=localStorage;t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260920v545" id="akini-style" rel="stylesheet"/><style id="akini-override-style-z">
+<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=localStorage;t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260921v549" id="akini-style" rel="stylesheet"/><style id="akini-override-style-z">
   .music-player-right::before{left:-12px !important;background:rgba(255,255,255,0.12) !important}
   .music-player-left{justify-content:flex-start !important;gap:8px !important}
   .music-player-info{align-items:flex-start !important;padding:0 !important}
@@ -52,11 +52,51 @@ try{
 <style>.back-btn{font-size:24px;background:transparent;border:none;color:#1a1a1a;padding:0 8px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px;box-sizing:border-box}.music-player-info{align-self:stretch!important;width:100%;min-width:0!important}.music-player-meta{width:100%;min-width:0}.music-player-title,.music-player-artist{width:100%;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style></head><body>
 <div id="akiniSplash">
   <div class="akini-splash-inner">
-    <div class="akini-splash-logo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <div class="akini-splash-top">
+      <div class="akini-splash-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      </div>
+      <div class="akini-splash-title">Akini</div>
+      <div class="akini-splash-subtitle">你的出现，是天意，是命运</div>
     </div>
-    <div class="akini-splash-title">Akini</div>
-    <div class="akini-splash-subtitle">你的出现，是天意，是命运</div>
+    <div class="akini-splash-modules">
+      <div class="akini-splash-module">
+        <div class="akini-splash-module-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          开源作者 & 鸣谢
+        </div>
+        <div class="akini-splash-module-body">
+          <p>抖音：QSL1027CYLOVO</p>
+          <p>小红书：4297298313</p>
+          <p>大部分功能灵感来源于 milk 老师</p>
+          <p>TA 的手机是之缘老师</p>
+          <p>观影是我要学英语老师</p>
+          <p class="akini-splash-thanks">感谢以上老师</p>
+          <hr/>
+          <p>二传标明出处 🈲二改 发视频请打 tag</p>
+          <p>嘴过乙游男主的使用替我挡灾</p>
+          <p>请不要使用我的网站进行对比、拉踩、诋毁，请不要无端造谣</p>
+          <p>网站无 AI 纯概率抽字卡，不存在👻说</p>
+          <p>网站内容功能很简单，自行摸索</p>
+        </div>
+      </div>
+      <div class="akini-splash-module">
+        <div class="akini-splash-module-head">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          常见问题 & 反馈
+        </div>
+        <div class="akini-splash-module-body">
+          <p><b>Bug 反馈</b></p>
+          <p>如有 bug 带手机型号和问题截屏找我。我的设备是 17pm，型号不同会出现不同的 bug。</p>
+          <hr/>
+          <p><b>网易云歌单导入</b></p>
+          <p>进入网易云 → 点进想要导入的歌单 → 点击分享复制链接 → 进入浏览器删掉文字搜索链接 → 进入界面后点击地址栏出现的长链接导入即可。观影链接步骤同。</p>
+          <hr/>
+          <p><b>MJ 头像在哪里更换/添加</b></p>
+          <p>进入首页 → 微信 → 右上角加号创建 → 确认创建。后续更换名字/头像，进入聊天界面点击昵称条后面的小括号管理弹窗。</p>
+        </div>
+      </div>
+    </div>
     <button class="akini-splash-enter" id="akiniSplashEnter" type="button">我已知晓并遵守规则</button>
   </div>
 </div>
@@ -150,13 +190,23 @@ try{
 #akiniSplash{position:fixed;inset:0;z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#06060e;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;opacity:0;transition:opacity .35s ease}
 #akiniSplash.loaded{opacity:1}
 #akiniSplash.hidden{pointer-events:none;opacity:0;display:none}
-.akini-splash-inner{position:relative;z-index:2;width:min(520px,94vw);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;min-height:100%;animation:akiniSplashInnerIn .6s cubic-bezier(.22,1,.36,1) both}
+.akini-splash-inner{position:relative;z-index:2;width:min(520px,94vw);display:flex;flex-direction:column;align-items:center;padding:calc(18px + env(safe-area-inset-top, 0px)) 16px calc(18px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;height:100%;max-height:100vh;animation:akiniSplashInnerIn .6s cubic-bezier(.22,1,.36,1) both}
 @keyframes akiniSplashInnerIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-.akini-splash-logo{width:64px;height:64px;border-radius:18px;background:#fff;border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;color:#111;margin-bottom:16px}
-.akini-splash-logo svg{width:30px;height:30px}
-.akini-splash-title{font-size:26px;font-weight:600;letter-spacing:4px;color:rgba(255,255,255,.95);margin-bottom:8px}
-.akini-splash-subtitle{font-size:14px;color:rgba(255,255,255,.45);letter-spacing:1px;margin-bottom:42px}
-.akini-splash-enter{width:min(320px,88vw);padding:13px 24px;background:#fff;color:#111;border:none;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;transition:all .25s ease}
+.akini-splash-top{display:flex;flex-direction:column;align-items:center;margin-bottom:12px;flex-shrink:0}
+.akini-splash-logo{width:56px;height:56px;border-radius:16px;background:#fff;border:1px solid rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center;color:#111;margin-bottom:10px}
+.akini-splash-logo svg{width:26px;height:26px}
+.akini-splash-title{font-size:22px;font-weight:600;letter-spacing:3px;color:rgba(255,255,255,.92);margin-bottom:4px}
+.akini-splash-subtitle{font-size:12px;color:rgba(255,255,255,.45);letter-spacing:1px}
+.akini-splash-modules{display:flex;flex-direction:column;gap:12px;width:100%;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;margin-bottom:14px;box-sizing:border-box}
+.akini-splash-module{background:linear-gradient(145deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,.03) 100%);border:1px solid rgba(255,255,255,.09);border-radius:16px;backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);overflow:hidden;display:flex;flex-direction:column;flex-shrink:0}
+.akini-splash-module-head{display:flex;align-items:center;gap:7px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;font-weight:700;color:rgba(255,255,255,.95);letter-spacing:.5px;flex-shrink:0}
+.akini-splash-module-body{padding:12px 14px 14px;font-size:12px;line-height:1.8;color:rgba(255,255,255,.6)}
+.akini-splash-module-body p{margin:0 0 6px}
+.akini-splash-module-body p:last-child{margin-bottom:0}
+.akini-splash-module-body b{color:rgba(255,255,255,.85);font-weight:600}
+.akini-splash-module-body hr{border:none;border-top:1px solid rgba(255,255,255,.08);margin:10px 0}
+.akini-splash-thanks{color:#fff;font-weight:700}
+.akini-splash-enter{width:min(320px,88vw);flex-shrink:0;padding:12px 24px;background:#fff;color:#111;border:none;border-radius:999px;font-size:15px;font-weight:600;cursor:pointer;transition:all .25s ease}
 .akini-splash-enter:active{background:#f0f0f0;transform:translateY(-1px)}
 </style>
 <script>
@@ -327,7 +377,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
 <input class="akini-range" id="akiniOpacitySlider" max="50" min="0" step="1" style="margin-top:8px" type="range" value="25"/>
 </div>
 </div>
-<div class="settings-card"><div class="card-title">微信聊天气泡颜色</div><div class="settings-row" style="justify-content:flex-start;gap:12px;flex-wrap:wrap"><div class="bubble-color-option" data-color="gray" title="浅灰"><div class="bubble-color-preview" style="background:#e9e9eb"></div><span>浅灰</span></div><div class="bubble-color-option" data-color="pink" title="浅粉色"><div class="bubble-color-preview" style="background:#ffd1dc"></div><span>浅粉</span></div><div class="bubble-color-option" data-color="blue" title="iOS 蓝"><div class="bubble-color-preview" style="background:#007aff"></div><span>iOS蓝</span></div><div class="bubble-color-option" data-color="green" title="微信绿"><div class="bubble-color-preview" style="background:#07c160"></div><span>微信绿</span></div><div class="bubble-color-option" data-color="black" title="酷黑"><div class="bubble-color-preview" style="background:#111"></div><span>酷黑</span></div></div></div><div class="settings-card"><div class="card-title">气泡美化 &amp; CSS</div><div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:10px">粘贴任意 CSS 气泡美化代码，点“应用样式”即可生效。系统会自动将 <code>.message</code> / <code>.message-sent</code> / <code>.message-received</code> 映射到本应用的气泡结构，并自动提升优先级以覆盖默认颜色。影响范围：联系人和我的聊天气泡都会同步更换。</div><textarea id="bubbleCssInput" placeholder="在此粘贴 CSS 气泡美化代码…" style="width:100%;min-height:170px;border:1px solid #e0e0e0;border-radius:12px;padding:10px 12px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;resize:vertical;outline:0;background:#fafafa;box-sizing:border-box"></textarea><div id="bubbleCssPreview" class="chat-body bubble-css-preview"><div class="msg-row other"><div class="msg-content-line"><div class="msg-avatar">对方</div><div class="bubble">美化气泡预览</div></div></div><div class="msg-row me"><div class="msg-content-line"><div class="bubble">美化气泡预览</div><div class="msg-avatar">我</div></div></div></div><div style="display:flex;gap:8px;margin-top:12px"><button id="bubbleCssApply" style="flex:1;padding:11px;background:#333;color:#fff;border:none;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit" type="button">应用样式</button><button id="bubbleCssClear" style="flex:1;padding:11px;background:#fff;color:#333;border:1px solid #e0e0e0;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit" type="button">清除</button></div></div><div class="settings-card"><div class="card-title">纪念日设置</div><div class="settings-row"><div class="info"><div class="label">纪念日标题</div></div><input class="num-input" id="inputDayLabelBeautify" style="width:100px" value="纪念日"/></div><div class="settings-row" ><div class="info"><div class="label">起始日期</div></div><input class="num-input" id="inputStartDateBeautify" style="width:130px" type="date"/></div></div><div class="settings-card"><div class="card-title">聊天预览联系人</div><div class="settings-row" style="align-items:center"><div class="info"><div class="label">更换这个模块的联系人人物</div><div class="desc">修改主页聊天预览模块中对方头像和昵称</div></div><select class="num-input" id="selectChatPreviewContact" style="width:auto;min-width:150px;max-width:100%"><option value="0">联系人1</option></select></div></div></div></div></div><div id="watchArea" style="display:none;position:fixed;inset:0;background:#f5f5f5;z-index:100003;flex-direction:column">
+<div class="settings-card"><div class="card-title">微信聊天气泡颜色</div><div class="settings-row" style="justify-content:flex-start;gap:12px;flex-wrap:wrap"><div class="bubble-color-option" data-color="gray" title="浅灰"><div class="bubble-color-preview" style="background:#e9e9eb"></div><span>浅灰</span></div><div class="bubble-color-option" data-color="pink" title="浅粉色"><div class="bubble-color-preview" style="background:#ffd1dc"></div><span>浅粉</span></div><div class="bubble-color-option" data-color="blue" title="iOS 蓝"><div class="bubble-color-preview" style="background:#007aff"></div><span>iOS蓝</span></div><div class="bubble-color-option" data-color="green" title="微信绿"><div class="bubble-color-preview" style="background:#07c160"></div><span>微信绿</span></div><div class="bubble-color-option" data-color="black" title="酷黑"><div class="bubble-color-preview" style="background:#111"></div><span>酷黑</span></div></div></div><div class="settings-card"><div class="card-title">气泡美化 &amp; CSS</div><div style="font-size:12px;color:#888;line-height:1.6;margin-bottom:10px">粘贴任意 CSS 气泡美化代码，点“应用样式”即可生效。系统会自动将 <code>.message</code> / <code>.message-sent</code> / <code>.message-received</code> 映射到本应用的气泡结构，并自动提升优先级以覆盖默认颜色。影响范围：联系人和我的聊天气泡都会同步更换。</div><textarea id="bubbleCssInput" placeholder="在此粘贴 CSS 气泡美化代码…" style="width:100%;min-height:170px;border:1px solid #e0e0e0;border-radius:12px;padding:10px 12px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.5;resize:vertical;outline:0;background:#fafafa;box-sizing:border-box"></textarea><div id="bubbleCssPreview" class="chat-body bubble-css-preview"><div class="msg-row other"><div class="msg-content-line"><div class="avatar-col"><div class="msg-avatar">对方</div><div class="msg-ts">00:01</div></div><div class="bubble-wrap"><div class="bubble">美化气泡预览</div></div></div></div><div class="msg-row me"><div class="msg-content-line"><div class="bubble-wrap"><div class="bubble">美化气泡预览</div></div><div class="avatar-col"><div class="msg-avatar">我</div><div class="msg-ts">00:02</div></div></div></div></div><div style="display:flex;gap:8px;margin-top:12px"><button id="bubbleCssApply" style="flex:1;padding:11px;background:#333;color:#fff;border:none;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit" type="button">应用样式</button><button id="bubbleCssClear" style="flex:1;padding:11px;background:#fff;color:#333;border:1px solid #e0e0e0;border-radius:12px;font-size:14px;cursor:pointer;font-family:inherit" type="button">清除</button></div></div><div class="settings-card"><div class="card-title">纪念日设置</div><div class="settings-row"><div class="info"><div class="label">纪念日标题</div></div><input class="num-input" id="inputDayLabelBeautify" style="width:100px" value="纪念日"/></div><div class="settings-row" ><div class="info"><div class="label">起始日期</div></div><input class="num-input" id="inputStartDateBeautify" style="width:130px" type="date"/></div></div><div class="settings-card"><div class="card-title">聊天预览联系人</div><div class="settings-row" style="align-items:center"><div class="info"><div class="label">更换这个模块的联系人人物</div><div class="desc">修改主页聊天预览模块中对方头像和昵称</div></div><select class="num-input" id="selectChatPreviewContact" style="width:auto;min-width:150px;max-width:100%"><option value="0">联系人1</option></select></div></div></div></div></div><div id="watchArea" style="display:none;position:fixed;inset:0;background:#f5f5f5;z-index:100003;flex-direction:column">
 <div id="watchVideoBox" style="position:relative;width:100%;background:#000;flex-shrink:0">
 <video id="watchVideo" playsinline webkit-playsinline style="display:none;width:100%;aspect-ratio:16/9;background:#000;object-fit:contain"></video>
 <iframe id="watchFrame" allowfullscreen allow="autoplay;fullscreen" style="display:none;width:100%;aspect-ratio:16/9;border:0;background:#000"></iframe>
@@ -1602,8 +1652,8 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
   setTimeout(function(){
     try{
       var libs = [
-        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20260920v545',
-        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20260920v545'
+        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20260920v547',
+        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20260920v547'
       ];
       libs.forEach(function(u){
         var s = document.createElement('script');
@@ -1613,7 +1663,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
     }catch(e){}
   }, 5000);
 })();
-</script><script src="localforage.min.js?v=20260920v545"></script><script src="akini-storage-safe.js?v=20260920v545"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/></svg>');};</script>
+</script><script src="localforage.min.js?v=20260920v547"></script><script src="akini-storage-safe.js?v=20260920v547"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/></svg>');};</script>
 
 <!-- ===== zzw：陪伴页 ===== -->
 <div id="app-companion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;flex-direction:column;background:#f7f7f7;color:#1a1a1a">
@@ -1748,7 +1798,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
 </div>
 </div>
 <input accept="image/*" class="akini-file-offscreen" id="novelCoverInput" type="file"/>
-<script id="akini-main" src="akini-main.js?v=20260920v545"></script><script src="akini-moments-engine.js?v=20260920v545"></script><script src="akini-mail-engine.js?v=20260920v545"></script><script src="akini-backup.js?v=20260920v545"></script><script src="akini-ta-phone.js?v=20260920v545"></script><script src="akini-storage-mgr.js?v=20260920v545"></script><script src="akini-cloud-backup.js?v=20260920v545"></script><script src="akini-novel-companion.js?v=20260920v545"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
+<script id="akini-main" src="akini-main.js?v=20260920v547"></script><script src="akini-moments-engine.js?v=20260920v547"></script><script src="akini-mail-engine.js?v=20260920v547"></script><script src="akini-backup.js?v=20260920v547"></script><script src="akini-ta-phone.js?v=20260920v547"></script><script src="akini-storage-mgr.js?v=20260920v547"></script><script src="akini-cloud-backup.js?v=20260920v547"></script><script src="akini-novel-companion.js?v=20260920v547"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
     _akiniCleanPopups();_hideApps.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});_hideAreas.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});var _cmo=document.getElementById("chatMenuOverlay");if(_cmo){_cmo.style.display="none";_cmo.classList.remove("show");}var _camo=document.querySelector(".chat-list-add-menu-overlay");if(_camo){_camo.classList.remove("show");setTimeout(function(){_camo.remove();},200);}};window.showEl=function showEl(id,z){var e=document.getElementById(id);if(e){e.style.zIndex=z||"999999";e.style.display="flex";e.classList.add("show");return e;}return e;};window.showArea=function showArea(id){var e=document.getElementById(id);if(e){e.style.zIndex="999999";e.style.display="flex";e.classList.add("show");}};function navTo(app){try{window.hideAll();if(app==="chat-list"){__akiniShowAppContainer("chat-list");return}if(app==="music"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}__akiniShowAppContainer("music");var _cp=document.getElementById("musicContactPicker");if(_cp){_cp.style.display="flex";_cp.style.zIndex="1000000";}return}if(app==="survey"){if(window._openSurveyList){window._openSurveyList();return}var _sm=document.getElementById("surveyListModal");if(_sm){_sm.style.display="flex";_sm.style.zIndex="1000001";}return}if(["friends","call","add-contact","contact-detail","create-group"].indexOf(app)>=0){__akiniShowAppContainer(app);return}if(app==="icity"){showArea("icityArea");return}if(app==="settings"){showArea("settingsArea");return}if(app==="storage"){if(window.__openStorageMgr){window.__openStorageMgr();}return}if(app==="beautify"){showArea("beautifyArea");return}if(app==="wordbank"){showArea("wordbankOverlay");if(typeof populateWordbankGroups==="function")populateWordbankGroups();return}if(app==="shop"){showEl("app-shop");if(window.__renderShop)window.__renderShop();return}if(app==="novel"){showEl("app-novel");if(window.__renderNovelShelf)window.__renderNovelShelf();return}if(app==="companion"){showEl("app-companion");if(window.__openCompanion)window.__openCompanion();return}if(app==="mail"){if(typeof window.showPage==="function"){window.showPage("mail");}else{showEl("app-mail");}if(window.__renderMail)window.__renderMail();return}if(app==="home"){
   // v510：返回真正的首页（.content-wrapper），不是微信聊天列表
   window.hideAll && window.hideAll();
@@ -2202,12 +2252,16 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     try{ s.get(key, cb); }catch(e){ if(cb) cb(null); }
   }
 
+  var __lastSnapshotAll = 0;
   function snapshotAll(){
     if (window.__akiniWiping) return; // 清除数据期间禁止快照，防止清完又被写回
-    // 超大键（图片/表情包 dataURL）有模块独立备份，跳过大键避免周期性 stringify 大字符串引发内存峰值
+    // v547: 降低快照频率并严格过滤大键，避免低内存设备 stringify 整个 LS 导致 jetsam 闪退
+    var now = Date.now();
+    if (now - __lastSnapshotAll < 60000) return;
+    __lastSnapshotAll = now;
     var all = getAllLS();
     for (var k in all) {
-      if (Object.prototype.hasOwnProperty.call(all, k) && typeof all[k] === 'string' && all[k].length > 262144) delete all[k];
+      if (Object.prototype.hasOwnProperty.call(all, k) && typeof all[k] === 'string' && all[k].length > 32768) delete all[k];
     }
     var json = JSON.stringify(all);
     idbSet(SNAPSHOT_KEY, json);
@@ -2392,7 +2446,7 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     runRestore();
   }
 
-  setInterval(function(){ if(document.hidden) return; snapshotAll(); }, 20000);
+  setInterval(function(){ if(document.hidden) return; snapshotAll(); }, 120000);
   window.addEventListener('beforeunload', snapshotAll);
   document.addEventListener('visibilitychange', function(){
     if(document.visibilityState === 'hidden') snapshotAll();
@@ -2813,15 +2867,10 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     var meSel=".chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
     var otherSel=".chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
     var anySel=".chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
-    /* 单次遍历替换：替换结果不会被再次替换，避免生成嵌套的无效选择器
-       zzzy：扩充常见美化模板别名（_bubble/.txt/.msg-bubble/.bom 等），用户直接粘贴模板也能命中气泡 */
+    /* 允许针对双方、我方、对方分别定义 */
     return css.replace(/\.message\.message-sent|\.message\.message-received|\.bubble\.me(?![\w-])|\.bubble\.other(?![\w-])|\.message-sent|\.message-received|_bubble(?![\w-])|\.msg-bubble(?![\w-])|\.chat-bubble(?![\w-])|\.bubble(?![\w-])|\.bom(?![\w-])|\.message(?![\w-])|\.txt(?![\w-])/g,function(m){
-      if(m===".message.message-sent") return meSel;
-      if(m===".message.message-received") return otherSel;
-      if(m===".message-sent") return meSel;
-      if(m===".message-received") return otherSel;
-      if(m===".bubble.me") return meSel;
-      if(m===".bubble.other") return otherSel;
+      if(m===".message.message-sent" || m===".message-sent" || m===".bubble.me") return meSel;
+      if(m===".message.message-received" || m===".message-received" || m===".bubble.other") return otherSel;
       return anySel;
     });
   }
@@ -2830,10 +2879,10 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     var raw=css||"";
     var final="";
     if(raw.trim()){
-      /* zzzy 修复：保底背景必须放用户 CSS 之前——原先后置 + !important 会永远覆盖用户自定义颜色，导致“换了美化还显示默认色” */
-      final="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background-color:#e9e9eb !important;color:#111 !important;}\n.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background-color:#fff !important;color:#111 !important;}\n";
+      /* 保底背景放最前面，优先级较低，方便被用户自定义属性覆盖 */
+      final="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background-color:#e9e9eb;color:#111;}\n.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background-color:#fff;color:#111;}\n";
       final+=addImportant(translateSelectors(raw));
-      /* 自动保护：弧形/大圆角气泡下长文本不越出气泡边缘 */
+      /* 自动保护：防止文本越出气泡，同时保留自定义宽高和内边距 */
       final+="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){max-width:100% !important;box-sizing:border-box !important;overflow-wrap:break-word !important;word-break:break-word !important;}\n";
     }
     styleEl.textContent=final;
@@ -4332,12 +4381,18 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       var row = document.createElement("div");
       row.className = "msg-row " + (isReply ? "other" : "me");
       var avatar = isReply ? (window.getTaAvatar ? window.getTaAvatar(memberId || chatId) : window.__akAvatarPH||"") : (window.getMyAvatar ? window.getMyAvatar() : "🐱");
-      var content = '<div class="msg-content-line">'
-        + (isReply ? '<div class="msg-avatar">' + avatar + '</div>' : '')
-        + '<div class="bubble survey-bubble" data-survey-id="' + survey.id + '" data-survey-reply="' + (isReply ? "1" : "0") + '"' + (isReply && memberId ? ' data-member-id="' + memberId + '"' : '') + '>'
+      var now = new Date();
+      var hh = String(now.getHours()).padStart(2, "0");
+      var mm = String(now.getMinutes()).padStart(2, "0");
+      var ss = String(now.getSeconds()).padStart(2, "0");
+      var timeStr = hh + ":" + mm + ":" + ss;
+      var tsHtml = '<div class="msg-ts">' + timeStr + '</div>';
+      var avatarCol = '<div class="avatar-col"><div class="msg-avatar">' + avatar + '</div>' + tsHtml + '</div>';
+      var bubbleWrap = '<div class="bubble-wrap"><div class="bubble survey-bubble" data-survey-id="' + survey.id + '" data-survey-reply="' + (isReply ? "1" : "0") + '"' + (isReply && memberId ? ' data-member-id="' + memberId + '"' : '') + '>'
         + buildSurveyCardHtml(survey, isReply, statusText)
-        + '</div>'
-        + (isReply ? '' : '<div class="msg-avatar">' + avatar + '</div>')
+        + '</div></div>';
+      var content = '<div class="msg-content-line">'
+        + (isReply ? (avatarCol + bubbleWrap) : (bubbleWrap + avatarCol))
         + '</div>';
       row.innerHTML = content;
       var bubble = row.querySelector('.bubble.survey-bubble');
@@ -4766,16 +4821,16 @@ window.__akiniRegisterSW = function(){
   if('serviceWorker' in navigator){
     navigator.serviceWorker.register('./service-worker.js', {updateViaCache:'none'}).then(function(reg){
       console.log('[Akini] SW registered', reg.scope);
-      // 安卓 Chrome：注册周期性后台同步，应用被杀/冻结后系统仍会定时唤醒 SW 检查未读并发系统通知
-      try{
-        if('periodicSync' in reg){
-          navigator.permissions && navigator.permissions.query({name:'periodic-background-sync'}).then(function(st){
-            if(st && st.state === 'granted'){
-              reg.periodicSync.register('akini-bg-check', {minInterval: 15*60*1000}).catch(function(){});
-            }
-          }).catch(function(){});
-        }
-      }catch(e){}
+      // v547: 关闭周期性后台同步，避免后台频繁唤醒 SW 增加设备负担和异常重启
+      // try{
+      //   if('periodicSync' in reg){
+      //     navigator.permissions && navigator.permissions.query({name:'periodic-background-sync'}).then(function(st){
+      //       if(st && st.state === 'granted'){
+      //         reg.periodicSync.register('akini-bg-check', {minInterval: 15*60*1000}).catch(function(){});
+      //       }
+      //     }).catch(function(){});
+      //   }
+      // }catch(e){}
     }).catch(function(err){
       console.warn('[Akini] SW registration failed', err);
     });
@@ -4791,8 +4846,8 @@ else window.addEventListener('load', function(){ setTimeout(window.__akiniRegist
 
 </script>
 
-<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20260920v545"></script>
-<script defer src="akini-compat-bridge.js?v=20260920v545"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20260920v547"></script>
+<script defer src="akini-compat-bridge.js?v=20260920v547"></script>
 <script>
 // 兼容旧版 JSON 备份的轻量兜底：如果 core 风格备份引擎未加载，仍允许导出基础 JSON
 (function(){

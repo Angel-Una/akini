@@ -832,9 +832,10 @@ document.addEventListener("DOMContentLoaded", function () {
           if (window.__akiniWiping) { if (typeof cb === "function") cb(); return; }
           if (typeof force === "function") { cb = force; force = false; }
           var done = function () { if (typeof cb === "function") cb(); };
-          /* v20261024 节流：30s 内重复调用直接跳过，避免高频全库遍历比对导致卡顿/发烫 */
+          /* v547 节流：低内存/iOS 120s，其他 60s，避免高频全库遍历导致闪退 */
           var _now = Date.now();
-          if (!force && this._lastBA && _now - this._lastBA < 30000) { done(); return; }
+          var _throttle = (window.__akiniLowMem || /iPad|iPhone|iPod/.test(navigator.userAgent)) ? 120000 : 60000;
+          if (!force && this._lastBA && _now - this._lastBA < _throttle) { done(); return; }
           this._lastBA = _now;
           // 收集 localStorage 中需要备份的键值，写入 IDB 前逐个比对长度，
           // 防止用可能已过期/被系统清空的 localStorage 数据覆盖 IDB 主存储。
@@ -999,9 +1000,10 @@ document.addEventListener("DOMContentLoaded", function () {
         SNAPSHOT_KEY = "akini_localstorage_snapshot";
       window._akiniCacheStore = {
         backupAll: function (e) {
-          /* v20261024 节流：30s 内重复调用直接跳过 */
+          /* v547 节流：低内存/iOS 120s，其他 60s */
           var _now2 = Date.now();
-          if (this._lastBA && _now2 - this._lastBA < 30000) return void (e && e());
+          var _throttle2 = (window.__akiniLowMem || /iPad|iPhone|iPod/.test(navigator.userAgent)) ? 120000 : 60000;
+          if (this._lastBA && _now2 - this._lastBA < _throttle2) return void (e && e());
           this._lastBA = _now2;
           try {
             if ("undefined" == typeof caches || !caches.open) return void (e && e());
@@ -2488,18 +2490,30 @@ document.addEventListener("DOMContentLoaded", function () {
           return (p(n), n[i]);
         },
         deleteGroup: function (t) {
-          p(
-            y().filter(function (e) {
-              return e.id !== t;
-            }),
-          );
-          var e = k();
-          (delete e[t], _(e));
+          if (!t) return;
+          var tid = String(t);
+          var newGroups = y().filter(function (e) {
+            return e && String(e.id) !== tid;
+          });
+          p(newGroups);
+          try { localStorage.setItem("akini_groups", JSON.stringify(newGroups)); } catch(e){}
+          try { window._idbStore && window._idbStore.set && window._idbStore.set("akini_groups", JSON.stringify(newGroups)); } catch(e){}
+          
+          var e = k() || {};
+          delete e[t];
+          delete e[tid];
+          _(e);
+          try { localStorage.setItem("akini_chat_sessions", JSON.stringify(e)); } catch(e){}
+          try { window._idbStore && window._idbStore.set && window._idbStore.set("akini_chat_sessions", JSON.stringify(e)); } catch(e){}
+
           // 解散群聊后同步清理置顶、聊天记录缓存及历史记录，防止解散后仍出现在列表
           try { "function" == typeof _akPinRemove && _akPinRemove(t); } catch (err) {}
-          try { E && delete E[t]; } catch (err) {}
+          try { "function" == typeof _akPinRemove && _akPinRemove(tid); } catch (err) {}
+          try { E && (delete E[t], delete E[tid]); } catch (err) {}
           try { localStorage.removeItem("akini_chat_history_" + t); } catch (err) {}
+          try { localStorage.removeItem("akini_chat_history_" + tid); } catch (err) {}
           try { window._idbStore && window._idbStore.remove && window._idbStore.remove("akini_chat_history_" + t); } catch (err) {}
+          try { window._idbStore && window._idbStore.remove && window._idbStore.remove("akini_chat_history_" + tid); } catch (err) {}
           try { "function" == typeof window._snapshotCritical && window._snapshotCritical(); } catch (err) {}
         },
         migrateContacts: function () {
@@ -3141,6 +3155,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       if (!chatBody.__akiniMetaInterval) {
         chatBody.__akiniMetaInterval = setInterval(function () {
+          // v547: 由 3000ms 延长到 10000ms，降低后台聊天时的 DOM 扫描频率
           if (document.hidden) return;
           var cb = document.getElementById("chatBody");
           if (cb && cb.getClientRects().length === 0) return; // fixed 布局 offsetParent 恒 null，用渲染框判断可见性
@@ -3163,7 +3178,7 @@ document.addEventListener("DOMContentLoaded", function () {
             __akiniUpgradeSurveyIcons(cb);
             __akiniSyncCardStatus(cb);
           }
-        }, 5000); // 兜底巡检降频：实时渲染已由 MutationObserver 承担，此处仅补偿遗漏，5s 一次降低耗电/卡顿
+        }, 10000); // 兜底巡检降频：实时渲染已由 MutationObserver 承担，此处仅补偿遗漏，5s 一次降低耗电/卡顿
       }
     }
     window.__akiniSetupChatMetaObserver = __akiniSetupChatMetaObserver;
@@ -6600,8 +6615,7 @@ document.addEventListener("DOMContentLoaded", function () {
             }
           } catch (e) {}
         }
-        setTimeout(_bootRefresh, 500);
-        setTimeout(_bootRefresh, 1500);
+        setTimeout(_bootRefresh, 800);
         // v506：删除第 3 轮 3000ms 延迟刷新——IDB 恢复在此前已由节流后的合并兜底，减少启动期全量重渲染次数
         // 开屏进度：数据与界面已就绪，等待用户在声明页点击「进入」
         window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(100);
@@ -7712,7 +7726,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var c = document.getElementById("typingIndicator");
         /* zzzk 性能：me() 每次进聊天都全量重建表情面板（读 IDB + 逐个建 img），是点进对话框卡顿的主因之一。
            表情包库在会话期间不会变，改为仅首次构建；增删表情包处已显式调用 me() 刷新 */
-        (c && (c.style.display = "none"), st(t), (!U || !U.__akiniEmojiPanelBuilt) && me(), U && (U.__akiniEmojiPanelBuilt = !0), e || o("chat"));
+        (c && (c.style.display = "none"), st(t), (!U || !U.__akiniEmojiPanelBuilt) && me(null, false), U && (U.__akiniEmojiPanelBuilt = !0), typeof hideEmojiPanel === "function" && hideEmojiPanel(), typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(), e || o("chat"));
       }
       function l(t) {
         U &&
@@ -8946,7 +8960,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function showEmojiPanel() {
       var p = re || document.getElementById("emojiPanel");
       if (p) {
-        try { typeof me === "function" && me(); } catch (e) {}
+        try { typeof me === "function" && me(window.__akiniEmojiSelCid || "me", true); } catch (e) {}
         p.style.display = "flex";
         p.style.visibility = "visible";
         p.style.pointerEvents = "auto";
@@ -9121,11 +9135,16 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     const de = document.getElementById("changeChatWallpaperBtn"),
       ue = document.getElementById("fileInputChatWallpaper");
-    function me(selCid) {
+    function me(selCid, shouldShow) {
       const t = document.getElementById("emojiPanel");
       if (!t) return;
-      t.style.display = "flex";
-      t.classList.add("show");
+      if (shouldShow === true) {
+        t.style.display = "flex";
+        t.classList.add("show");
+      } else if (shouldShow === false) {
+        t.style.display = "none";
+        t.classList.remove("show");
+      }
       
       /* ===== v545：字卡库风格工具（头像渲染 / 我的头像 / 名字转义） ===== */
       function __emAvHtml(av, size) {
@@ -9155,11 +9174,8 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!_people.some(function (p) { return String(p.id) === String(_sel); })) _sel = "me";
       window.__akiniEmojiSelCid = _sel;
 
-      // 内置可爱默认表情，防止空状态无反应
-      const defaultStickers = [
-        "❤️", "🥰", "😘", "🥺", "🫂", "💕", "✨", "🌸", 
-        "🌹", "🍬", "🎉", "💤", "🧸", "🐱", "🐶", "🐰"
-      ];
+      // v547：完全删掉兜底表情包，空状态不显示任何默认 emoji
+      const defaultStickers = [];
 
       N(_sel, function (e) {
         t.innerHTML = "";
@@ -9177,7 +9193,7 @@ document.addEventListener("DOMContentLoaded", function () {
           it.addEventListener("click", function (ev) {
             ev.stopPropagation();
             if (String(p.id) === String(window.__akiniEmojiSelCid)) return;
-            me(p.id);
+            me(p.id, true);
           });
           strip.appendChild(it);
         });
@@ -9196,29 +9212,11 @@ document.addEventListener("DOMContentLoaded", function () {
         t.appendChild(listWrap);
 
         if (!e || e.length === 0) {
-          // v545：空状态先给出轻提示，再显示默认内置表情网格兜底
+          // v547：彻底移除兜底表情包，仅显示暂无表情包提示
           const emTip = document.createElement("div");
-          emTip.style.cssText = "width:100%;text-align:center;font-size:12px;color:#bbb;padding:0 0 8px;";
-          emTip.textContent = String(_sel) === "me" ? "你还没有表情包，点下方表情先聊起来～" : (__emPeopleName(_sel) + " 还没有表情包");
+          emTip.style.cssText = "width:100%;text-align:center;font-size:12px;color:#bbb;padding:24px 0;";
+          emTip.textContent = String(_sel) === "me" ? "暂无表情包" : (__emPeopleName(_sel) + " 暂无表情包");
           listWrap.appendChild(emTip);
-          defaultStickers.forEach(emojiText => {
-            const btn = document.createElement("button");
-            btn.className = "sticker-img-btn default-emoji-btn";
-            btn.style.cssText = "background:rgba(0,0,0,0.04);border:none;border-radius:10px;width:48px;height:48px;font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.1s;";
-            btn.textContent = emojiText;
-            btn.addEventListener("click", function(ev) {
-              ev.stopPropagation();
-              // 直接发送文字/表情
-              var input = document.getElementById("msgInput");
-              if (input) {
-                input.value = (input.value || "") + emojiText;
-                var sendBtn = document.getElementById("sendBtn");
-                if (sendBtn) sendBtn.click();
-              }
-              hideEmojiPanel();
-            });
-            listWrap.appendChild(btn);
-          });
           return;
         }
           e.forEach((e, n) => {
@@ -9295,11 +9293,19 @@ document.addEventListener("DOMContentLoaded", function () {
             cancelText: "取消",
             onClose: function (ok) {
               if (!ok) return;
-              try { window.akiniContacts.deleteGroup(t); } catch(err){}
+              try { window.akiniContacts && window.akiniContacts.deleteGroup && window.akiniContacts.deleteGroup(t); } catch(err){}
               if (Y) { Y.style.display = "none"; Y.style.pointerEvents = "none"; }
               
-              // 彻底关闭并退出聊天窗口
-              try { window.akiniContacts.setActiveChatId && window.akiniContacts.setActiveChatId(null); } catch(err){}
+              // 彻底解散：清除 activeChatId
+              try { window.akiniContacts && window.akiniContacts.setActiveChatId && window.akiniContacts.setActiveChatId(null); } catch(err){}
+              
+              // 模拟返回按钮点击，触发生命周期
+              try {
+                var _bk = document.getElementById("chatBackBtn");
+                if (_bk) _bk.click();
+              } catch(err){}
+
+              // 彻底关闭并退出聊天窗口，强制显示聊天列表
               try {
                 var _chat = document.getElementById("app-chat");
                 if (_chat) {
@@ -9309,36 +9315,39 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
                 var _body = document.getElementById("chatBody");
                 if (_body) _body.innerHTML = "";
-              } catch(err){}
-
-              // 退出到聊天列表
-              try {
+                var _list = document.getElementById("app-chat-list");
+                if (_list) {
+                  _list.style.display = "flex";
+                  _list.classList.add("show");
+                  _list.style.zIndex = "999999";
+                  _list.removeAttribute("aria-hidden");
+                }
                 if (typeof window.akiniGoBack === "function") {
                   window.akiniGoBack("chat-list");
                 } else if (typeof window.__navBack === "function") {
-                  window.__navBack() || o("chat-list");
-                } else {
-                  o("chat-list");
+                  window.__navBack();
                 }
-              } catch(err){
-                o("chat-list");
-              }
-              
+              } catch(err){}
+
+              // 立即全量刷新聊天列表、徽标
               try { typeof ot === "function" && ot(); } catch(err){}
-                            try { typeof ot === "function" && ot(); } catch(err){}
               try { typeof window.__updateHomeBadges === "function" && window.__updateHomeBadges(); } catch(err){}
+              try { typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(); } catch(err){}
               setTimeout(function(){ try { ot(); } catch(e){} }, 50);
-              setTimeout(function(){ try { ot(); } catch(e){} }, 300);
+              setTimeout(function(){ try { ot(); } catch(e){} }, 200);
+              setTimeout(function(){ try { ot(); } catch(e){} }, 500);
             }
           });
         }));
 
     window.__akiniUpdateChatBackBadge = function() {
       try {
+        var backBtn = document.getElementById("chatBackBtn");
         var backBadge = document.getElementById("chatBackUnreadBadge");
         if (!backBadge) return;
         if (!window.akiniContacts || !window.akiniContacts.getSessions) {
           backBadge.style.display = "none";
+          if (backBtn) backBtn.classList.remove("has-unread");
           return;
         }
         var ss = window.akiniContacts.getSessions();
@@ -9349,11 +9358,17 @@ document.addEventListener("DOMContentLoaded", function () {
             bn += Number(ss[k].unread || 0);
           }
         });
-        backBadge.textContent = bn > 99 ? "99+" : String(bn);
-        backBadge.style.display = bn > 0 ? "flex" : "none";
+        if (bn > 0) {
+          backBadge.textContent = bn > 99 ? "99+" : String(bn);
+          backBadge.style.display = "inline-flex";
+          if (backBtn) backBtn.classList.add("has-unread");
+        } else {
+          backBadge.style.display = "none";
+          if (backBtn) backBtn.classList.remove("has-unread");
+        }
       } catch(e) {}
     };
-    (me(),
+    (me(null, false),
       (function () {
         let t = "main",
           e = "",
@@ -22540,7 +22555,7 @@ document.addEventListener("DOMContentLoaded", function () {
         window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
       } catch (e) {}
     }
-    setInterval(_akiniImmediateBackup, 120000);
+    setInterval(_akiniImmediateBackup, 180000);
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) _akiniImmediateBackup();
     });
@@ -22640,7 +22655,7 @@ document.addEventListener("DOMContentLoaded", function () {
         try { if (typeof R === "function" && z && z.length) R(z); } catch (e) {}
         try { if (typeof j === "function" && F && F.length) j(F); } catch (e) {}
       } catch (e) {}
-    }, 180000);
+    }, 300000);
 
     // ===== iOS Safari 崩溃修复：切换到后台时暂停所有无限 CSS 动画 =====
     // 根因：position:fixed + backdrop-filter（聊天顶栏）与多个 transform 无限动画并发，
@@ -23790,7 +23805,7 @@ document.addEventListener("DOMContentLoaded", function () {
   var _badgeTimer = setInterval(function () {
     _syncMailSeen();
     window.__updateHomeBadges();
-  }, 3000);
+  }, 5000);
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
       _syncMailSeen();
