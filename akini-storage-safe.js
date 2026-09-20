@@ -1,5 +1,5 @@
 /*
- * akini-storage-safe.js  v20261027 重做版
+ * akini-storage-safe.js  v20261028 重做版
  * 网站式可靠存储：localStorage 同步读写为主（和普通网站一致），
  * IndexedDB 双副本镜像兜底，启动时全量对账恢复。
  * 保证：写入绝不中断、绝不主动删除任何数据、退出/刷新/随时打开数据都在。
@@ -57,8 +57,42 @@
   function lsGet(k) {
     try { return origGet ? origGet.call(rawLS, k) : rawLS.getItem(k); } catch (e) { return null; }
   }
+  // 图片/壁纸类大键：配额紧张时优先清理它们，为关键数据腾出空间
+  var BIG_IMG_RE = /^akini_(chat_history_|home_bg|bubble_css|icity_|my_avatar|ta_avatar|contact_avatar_)/;
+  function _evictBigKeys() {
+    var removed = 0;
+    try {
+      var keys = lsKeys();
+      // 优先清理最大的图片键（聊天记录/壁纸），保留联系人/设置等小键
+      var bigs = [];
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (!k || String(k).indexOf('akini_') !== 0) continue;
+        var v = lsGet(k);
+        if (v && typeof v === 'string' && v.length > 60000) bigs.push({ k: k, len: v.length });
+      }
+      bigs.sort(function (a, b) { return b.len - a.len; });
+      // 最多清理最大的 8 个大键（它们在 IndexedDB 中有镜像，可按需水合恢复）
+      for (var j = 0; j < bigs.length && j < 8; j++) {
+        try { lsRemoveRaw(bigs[j].k); removed++; } catch (e) {}
+      }
+    } catch (e) {}
+    return removed;
+  }
   function lsSet(k, v) {
-    try { if (origSet) origSet.call(rawLS, k, v); else rawLS.setItem(k, v); return true; } catch (e) { return false; }
+    try { if (origSet) origSet.call(rawLS, k, v); else rawLS.setItem(k, v); return true; }
+    catch (e) {
+      // 配额满（QuotaExceededError）：清理大体积图片键后重试，避免关键数据静默丢失
+      try {
+        var evicted = _evictBigKeys();
+        if (evicted > 0) {
+          if (origSet) origSet.call(rawLS, k, v); else rawLS.setItem(k, v);
+          console.warn('[存储] 配额紧张，已清理' + evicted + '个大键后重试写入', k);
+          return true;
+        }
+      } catch (e2) {}
+      return false;
+    }
   }
   function lsRemoveRaw(k) {
     try { if (origRemove) origRemove.call(rawLS, k); else rawLS.removeItem(k); return true; } catch (e) { return false; }
@@ -382,7 +416,14 @@
         if (big) {
           try { self.origRemove.call(this, k); } catch (e) {}
         } else {
-          try { self.origSet.call(this, k, v); } catch (e) { ok = false; }
+          try { self.origSet.call(this, k, v); } catch (e) {
+            // 配额满：清理大体积图片键后重试，避免关键数据静默丢失
+            try {
+              var _ev = _evictBigKeys();
+              if (_ev > 0) { self.origSet.call(this, k, v); ok = true; }
+              else { ok = false; }
+            } catch (e2) { ok = false; }
+          }
         }
         // 2) 镜像层失败无所谓，绝不影响数据本体
         try {
@@ -528,5 +569,5 @@
   // 每 30s 兜底落盘一次，极端崩溃退出也不丢
   setInterval(flushIdbQueue, 30000);
 
-  console.log('[akini-storage-safe] 网站式可靠存储层已加载 (v20261027)');
+  console.log('[akini-storage-safe] 网站式可靠存储层已加载 (v20261028)');
 })();

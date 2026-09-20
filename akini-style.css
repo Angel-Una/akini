@@ -8587,3 +8587,55 @@ button#plusMenuBtn {
 #app-chat .chat-input-bar .input-wrap input::placeholder {
   color: rgba(0, 0, 0, 0.45) !important;
 }
+
+
+/* ==========================================================================
+   v535: 微信聊天界面昵称条继续往上挪 3px
+   ========================================================================== */
+#app-chat .chat-top-bar {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 4px) !important;
+}
+#app-chat .chat-top-bar .ta-info {
+  margin-top: 0px !important;
+}
+#app-chat .chat-top-bar .ta-name-pill {
+  margin-top: -4px !important;
+}
+
+
+/* ==========================================================================
+   v536: 时间戳与已读回执颜色加深强化（强可读性）
+   ========================================================================== */
+.msg-ts,
+#app-chat .msg-ts,
+.chat-body .msg-ts {
+  color: #222222 !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+.msg-rr,
+#app-chat .msg-rr,
+.chat-body .msg-rr {
+  color: #222222 !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+.msg-meta,
+#app-chat .msg-meta,
+.chat-body .msg-meta {
+  color: #222222 !important;
+  font-weight: 500 !important;
+}
+
+/* 观影聊天区时间戳与已读回执同步加深 */
+#watchChatBody .msg-ts,
+#watchChatBody .msg-rr,
+#watchChatBody .msg-meta {
+  color: #222222 !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+}
+
+
