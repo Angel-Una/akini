@@ -2514,6 +2514,12 @@ document.addEventListener("DOMContentLoaded", function () {
           try { localStorage.removeItem("akini_chat_history_" + tid); } catch (err) {}
           try { window._idbStore && window._idbStore.remove && window._idbStore.remove("akini_chat_history_" + t); } catch (err) {}
           try { window._idbStore && window._idbStore.remove && window._idbStore.remove("akini_chat_history_" + tid); } catch (err) {}
+          try { window._idbStore && window._idbStore.remove && window._idbStore.remove("akini_chat_history_backup_" + t); } catch (err) {}
+          try { window._idbStore && window._idbStore.remove && window._idbStore.remove("akini_chat_history_backup_" + tid); } catch (err) {}
+          /* v550：强制刷新关键数据快照（true 跳过 5 秒节流）。
+             否则解散后快照仍是含该群的旧版本，重进网站时旧快照把群聊"复活" */
+          try { "function" == typeof window._snapshotCritical && window._snapshotCritical(true); } catch (err) {}
+          try { "function" == typeof _snapshotCritical && _snapshotCritical(true); } catch (err) {}
           try { "function" == typeof window._snapshotCritical && window._snapshotCritical(); } catch (err) {}
         },
         migrateContacts: function () {
@@ -3579,7 +3585,8 @@ document.addEventListener("DOMContentLoaded", function () {
               lastSenderName: c.name,
             });
             S();
-            U.scrollTop = U.scrollHeight;
+            /* v550：多时段兜底滚底——图片/气泡加载撑高内容后仍保证最新消息贴住输入栏上沿 */
+            (function(){var _sc=function(){try{U.scrollTop=U.scrollHeight;}catch(e){}};_sc();requestAnimationFrame(_sc);setTimeout(_sc,80);setTimeout(_sc,240);})();
           } else {
             var _G = window.akiniContacts.getSession(t);
             var _R = __akiniStampMsgRows((_G.messagesHTML || "") + _p.outerHTML);
@@ -4295,7 +4302,7 @@ document.addEventListener("DOMContentLoaded", function () {
           const i = document.createElement("div");
           ((i.innerHTML = n),
             U.appendChild(i.firstChild),
-            (U.scrollTop = U.scrollHeight),
+            (function(){var _sc=function(){try{U.scrollTop=U.scrollHeight;}catch(e){}};_sc();requestAnimationFrame(_sc);setTimeout(_sc,80);setTimeout(_sc,240);})(),
             S(),
             window.akiniContacts.updateSession(t, {
               lastMsg: "【表情包】",

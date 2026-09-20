@@ -7851,30 +7851,33 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
   color: #1a1a1a !important;
 }
 
-/* 我的默认气泡：实色 iOS 蓝（#007aff），字体纯白清晰 */
-body:not(.bubble-pink):not(.bubble-green):not(.bubble-black):not(.bubble-gray) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-body.bubble-blue .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-#app-chat .msg-row.me:not(.bubble-css-on) .bubble {
+/* 我的默认气泡：实色 iOS 蓝（#007aff），字体纯白清晰
+   v550 修复：删掉错误的 #app-chat .msg-row.me:not(.bubble-css-on) 选择器
+   （bubble-css-on 打在 body 上，挂在 msg-row 上的 :not 永远为真，且 ID 特异性
+   压过一切 → 我方气泡永远 iOS 蓝、并覆盖用户粘贴的自定义美化 CSS）。
+   现全部加 body:not(.bubble-css-on) 前缀：开启美化 CSS 时自带底色彻底让位 */
+body:not(.bubble-css-on):not(.bubble-pink):not(.bubble-green):not(.bubble-black):not(.bubble-gray) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+body.bubble-blue:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #007aff !important;
   color: #ffffff !important;
   border: none !important;
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
 }
 
-/* 自选其他颜色时的实色支持 */
-body.bubble-pink .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+/* 自选其他颜色时的实色支持（v550：同样加 :not(.bubble-css-on)，美化开启时让位） */
+body.bubble-pink:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #ffd1dc !important;
   color: #111 !important;
 }
-body.bubble-green .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+body.bubble-green:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #07c160 !important;
   color: #fff !important;
 }
-body.bubble-black .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+body.bubble-black:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #111111 !important;
   color: #fff !important;
 }
-body.bubble-gray .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+body.bubble-gray:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #e9e9eb !important;
   color: #111 !important;
 }
@@ -8996,8 +8999,10 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   height: 100% !important;
   box-sizing: border-box !important;
   padding-top: 86px !important;
-  /* 确保最新一条消息完全贴在输入栏上方，添加到桌面或浏览器下都紧凑贴合，不被遮挡 */
-  padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px)) !important;
+  /* v550：恢复 76px 贴底值——v549 改成 60px 后低于输入栏实际总高，
+     导致发送消息时最新消息被输入栏遮挡，必须下滑才能看见。
+     76px + safe-area 可保证最后一条消息紧贴输入栏上沿 */
+  padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
   z-index: 1 !important;
@@ -9013,18 +9018,18 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   z-index: 100 !important;
   background: transparent !important;
   pointer-events: auto !important;
-  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* 针对 iOS PWA/添加到桌面全屏模式 (standalone) 彻底消除底部多余留白 */
+/* 针对 iOS PWA/添加到桌面全屏模式 (standalone)：输入栏紧贴屏幕底 */
 @media all and (display-mode: standalone) {
   #app-chat .chat-input-bar-area,
   .chat-input-bar-area {
-    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
   }
   #app-chat .chat-body,
   .chat-body {
-    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
@@ -9149,8 +9154,11 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   align-items: flex-start !important;
 }
 
-/* 普通文本消息气泡：未开启美化时自适应收缩；开启美化后由美化CSS完全控制 */
-body:not(.bubble-css-on) .msg-row .bubble:not(.survey-bubble):not(.shop-bubble):not(.redpacket-bubble):not(.sticker-bubble) {
+/* 普通文本消息气泡：宽度随文字自适应收缩，绝不允许比消息文字长
+   v550：恢复无条件生效（v549 加的 body:not(.bubble-css-on) 前缀导致开启美化时
+   气泡失去 inline-block 变成整行拉伸）。自定义美化 CSS 映射后的选择器与此处
+   特异性相同且注入的 style 元素位于文档末尾，仍可正常覆盖宽度 */
+.msg-row .bubble:not(.survey-bubble):not(.shop-bubble):not(.redpacket-bubble):not(.sticker-bubble) {
   display: inline-block !important;
   width: auto !important;
   max-width: 100% !important;
@@ -9255,3 +9263,68 @@ body:not(.bubble-css-on) .msg-row .bubble:not(.survey-bubble):not(.shop-bubble):
   font-weight: 500 !important;
 }
 
+
+/* ==========================================================================
+   v550 终极修复：PWA 贴底、美化预览完整显示、默认色与美化彻底解耦
+   ========================================================================== */
+
+/* 1. PWA 添加到桌面（standalone）：容器高度对齐真实可视高度。
+   .phone-frame 基础样式用 100svh，iOS standalone 下 svh 可能小于真实可视高，
+   导致整屏容器变矮、输入栏（absolute bottom:0）悬在半空——底部按钮太靠上 */
+@media all and (display-mode: standalone) {
+  .phone-frame,
+  #phoneFrame {
+    height: 100% !important;
+    max-height: 100% !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+  }
+}
+
+/* 2. 聊天容器零内边距兜底：输入栏必须贴屏幕底，消除任何底部空隙 */
+#app-chat {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+}
+
+/* 3. 气泡美化预览区完整显示：
+   v548 块把 .chat-body 统一改为 absolute + padding-top:86px !important（文件顺序靠后），
+   预览容器也带 .chat-body class 被连带挤压 → 顶部大片空白、内容被裁。
+   此处用更高优先级选择器彻底还原预览为文档流内完整卡片 */
+html body .chat-body.bubble-css-preview,
+html body #bubbleCssPreview.bubble-css-preview,
+html body .chat-body.bubble-css-preview#bubbleCssPreview {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  left: auto !important;
+  right: auto !important;
+  bottom: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 170px !important;
+  max-height: none !important;
+  flex: none !important;
+  padding: 14px 12px !important;
+  padding-top: 14px !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  z-index: auto !important;
+  transform: none !important;
+}
+
+/* 4. 预览内行结构微调：紧凑且完整展示双方气泡与时间戳 */
+html body .chat-body.bubble-css-preview .msg-row {
+  margin-bottom: 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+html body .chat-body.bubble-css-preview .msg-content-line {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  width: 100% !important;
+  align-items: flex-start !important;
+}

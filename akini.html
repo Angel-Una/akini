@@ -6,7 +6,7 @@ try{
   window.__akiniLowMem = ((navigator.deviceMemory||8) <= 4) || ((navigator.hardwareConcurrency||8) <= 4) || (/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window.MSStream));
   if(window.__akiniLowMem) document.documentElement.classList.add("low-mem");
 }catch(e){}
-</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260921v549" name="akini-ver"/><script>(function(){
+</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260921v550" name="akini-ver"/><script>(function(){
   // 版本标记（仅记录，绝不触发 reload，避免循环刷新）
   try {
     var cur = (document.querySelector('meta[name=akini-ver]')||{}).content || "";
@@ -26,7 +26,7 @@ try{
   } catch (e) {}
 })();
 </script>
-<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=localStorage;t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260921v549" id="akini-style" rel="stylesheet"/><style id="akini-override-style-z">
+<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=window.localStorage;try{t.removeItem("__aktest__");}catch(_e0){}t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var _n=e&&(e.name||"");var _c=(e&&typeof e.code==="number")?e.code:-1;var _quota=(_n==="QuotaExceededError"||_n==="NS_ERROR_DOM_STORAGE_QUOTA_REACHED"||_n==="QuotaExceeded"||_c===22||_c===1014);if(_quota){try{window.localStorage.removeItem("__aktest__");}catch(_e1){}console.warn("[Akini] localStorage 配额已满：保留原生存储，旧数据仍可读写");return;}var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260921v550" id="akini-style" rel="stylesheet"/><style id="akini-override-style-z">
   .music-player-right::before{left:-12px !important;background:rgba(255,255,255,0.12) !important}
   .music-player-left{justify-content:flex-start !important;gap:8px !important}
   .music-player-info{align-items:flex-start !important;padding:0 !important}
@@ -2761,6 +2761,37 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
                 if(v&&v!=="null"&&v!=="undefined"){
                   try{localStorage.setItem(k,v);}catch(e){}
                   try{localStorage.setItem(k+"_backup",v);}catch(e){}
+                  /* v550：sessions 恢复成功后二次枚举，恢复各会话聊天记录。
+                     此前 history 键列表在回调返回前就已固定——当 sessions 本身丢失时，
+                     逐会话的 akini_chat_history_* 永远不会被恢复 → 重进后聊天记录全空 */
+                  if(k==="akini_chat_sessions"){
+                    try{
+                      var _so=JSON.parse(v);
+                      for(var _sid in _so){
+                        if(Object.prototype.hasOwnProperty.call(_so,_sid)){
+                          (function(sid){
+                            var hk="akini_chat_history_"+sid;
+                            var hv=localStorage.getItem(hk);
+                            if(!hv||hv==="null"||hv==="undefined"){
+                              window._idbStore.get(hk,function(hv2){
+                                if(hv2&&hv2!=="null"&&hv2!=="undefined"){
+                                  try{localStorage.setItem(hk,hv2);}catch(e2){}
+                                }
+                              });
+                              window._idbStore.get(hk+"_backup",function(hv3){
+                                if(hv3&&hv3!=="null"&&hv3!=="undefined"){
+                                  try{
+                                    var _cur2=localStorage.getItem(hk);
+                                    if(!_cur2||_cur2.length<hv3.length)localStorage.setItem(hk,hv3);
+                                  }catch(e3){}
+                                }
+                              });
+                            }
+                          })(_sid);
+                        }
+                      }
+                    }catch(e4){}
+                  }
                 }
               });
               window._idbStore.get(k+"_backup",function(v){
@@ -2841,6 +2872,30 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
 })();
 </script>
 <script>
+/* ============ v550：进入聊天界面时表情包面板必须默认关闭（防自动弹出） ============ */
+(function(){
+  function _akHideEmojiPanelNow(){
+    try{
+      var p=document.getElementById("emojiPanel");
+      if(p){p.style.display="none";p.style.visibility="hidden";p.style.pointerEvents="none";p.classList.remove("show");}
+    }catch(e){}
+  }
+  try{
+    var _chat=document.getElementById("app-chat");
+    if(_chat&&window.MutationObserver){
+      var _mo=new MutationObserver(function(){
+        /* #app-chat 每次从隐藏变为可见（重进网站后打开聊天/切换会话）都强制收起表情包面板 */
+        if(_chat.style.display!=="none")_akHideEmojiPanelNow();
+      });
+      _mo.observe(_chat,{attributes:true,attributeFilter:["style","class"]});
+    }
+    /* 兜底：切回前台（PWA 闪退重进/后台切回）时也确保收起 */
+    document.addEventListener("visibilitychange",function(){
+      if(!document.hidden)setTimeout(_akHideEmojiPanelNow,60);
+    });
+  }catch(e){}
+})();
+</script><script>
 /* ============ 气泡美化 & CSS 自定义 ============ */
 (function(){
   var KEY="akini_bubble_css";
