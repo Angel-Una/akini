@@ -2060,53 +2060,19 @@ body:not(.bubble-css-on)
   background: rgba(229, 229, 234, 0.75);
   color: #111;
 }
-/* iMessage 尾巴 */
+/* iMessage 尾巴已彻底物理移除（纯净圆角气泡，绝无伪元素白块/角标） */
 body:not(.bubble-css-on)
   .chat-body
   .msg-row
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
-  content: "";
-  position: absolute;
-  bottom: 0;
-  width: 14px;
-  height: 14px;
-  background: inherit;
-  border-radius: 3px;
-  z-index: -1;
-}
+  .bubble::before,
 body:not(.bubble-css-on)
   .chat-body
-  .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
-  right: -6px;
-  transform: rotate(45deg);
-}
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.other
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before,
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.ta
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
-  left: -6px;
-  transform: rotate(45deg);
-}
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  border-bottom-right-radius: 4px !important;
-}
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.other
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-body:not(.bubble-css-on)
-  .chat-body
-  .msg-row.ta
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  border-bottom-left-radius: 4px !important;
+  .msg-row
+  .bubble::after {
+  display: none !important;
+  content: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 .chat-body .msg-row.me .bubble .quote-bubble {
   background: #fff !important;
@@ -7948,4 +7914,301 @@ body.bubble-gray .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.stick
   border-bottom-left-radius: 4px !important;
   padding: 11px 15px !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04), inset 0 1px 1px rgba(255, 255, 255, 0.7) !important;
+}
+
+
+/* ==========================================================================
+   v527: 气泡尾巴、液态玻璃描边、顶部白底与底栏白底精准修复
+   ========================================================================== */
+
+/* 1. 禁用默认气泡的 iMessage 小尾巴，恢复圆角对话气泡 */
+body:not(.bubble-css-on)
+  .chat-body
+  .msg-row
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
+  display: none !important;
+  content: none !important;
+}
+body:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+body:not(.bubble-css-on) .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+#app-chat .msg-row.me:not(.bubble-css-on) .bubble,
+#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
+#app-chat .msg-row.ta:not(.bubble-css-on) .bubble,
+#companionMsgs .msg-row.me .bubble,
+#companionMsgs .msg-row.other .bubble,
+#companionMsgs .msg-row.ta .bubble,
+#watchChatBody .msg-row.me .bubble,
+#watchChatBody .msg-row.other .bubble,
+#watchChatBody .msg-row.ta .bubble {
+  border-radius: 18px !important;
+}
+
+/* 2. 液态玻璃去掉所有描边（包括气泡、顶部按钮、输入框、昵称药丸条） */
+.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+.chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
+#app-chat .msg-row.ta:not(.bubble-css-on) .bubble,
+#companionMsgs .msg-row.other .bubble,
+#companionMsgs .msg-row.ta .bubble,
+#watchChatBody .msg-row.other .bubble,
+#watchChatBody .msg-row.ta .bubble,
+.chat-top-bar .back-btn,
+#app-chat .chat-top-bar .back-btn,
+#app-chat .chat-top-bar #chatCallBtn,
+.chat-input-bar .plus-btn#plusMenuBtn,
+#app-chat .chat-input-bar #plusMenuBtn,
+#app-chat .chat-input-bar .input-wrap,
+.chat-input-bar .input-wrap,
+#watchInputBar .input-wrap,
+.chat-top-bar .ta-name-pill,
+#app-chat .chat-top-bar .ta-name-pill {
+  border: none !important;
+  outline: none !important;
+}
+
+/* 3. 顶部昵称药丸条：完全透明液态玻璃，无白底无描边 */
+.chat-top-bar .ta-name-pill,
+#app-chat .chat-top-bar .ta-name-pill {
+  background: rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+}
+
+/* 4. 底部输入栏区域：彻底清除白色底图，保留加号圆形液态玻璃底图 */
+.chat-input-bar-area,
+.chat-input-bar,
+#app-chat .chat-input-bar-area,
+#app-chat .chat-input-bar,
+#watchInputBar,
+#companionPickerView > div:last-child {
+  background: transparent !important;
+  background-color: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
+}
+
+/* 加号按钮保持圆形液态玻璃底图，无描边 */
+.chat-input-bar .plus-btn#plusMenuBtn,
+#app-chat .chat-input-bar #plusMenuBtn {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08) !important;
+  border: none !important;
+}
+
+
+/* ==========================================================================
+   v528: 彻底消除系统消息白色色块 + 全局液态玻璃零白色描边/零内高光
+   ========================================================================== */
+
+/* 1. 系统消息彻底干净：无伪元素、无方块、无白色描边、半透明微灰胶囊 */
+.chat-body .msg-row.system,
+#app-chat .chat-body .msg-row.system {
+  display: flex !important;
+  justify-content: center !important;
+  margin: 6px 0 !important;
+}
+.chat-body .msg-row.system .bubble,
+#app-chat .chat-body .msg-row.system .bubble {
+  background: rgba(0, 0, 0, 0.22) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  border-radius: 999px !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 3px 12px !important;
+  font-size: 11px !important;
+  position: relative !important;
+}
+.chat-body .msg-row.system .bubble::before,
+.chat-body .msg-row.system .bubble::after,
+#app-chat .chat-body .msg-row.system .bubble::before,
+#app-chat .chat-body .msg-row.system .bubble::after,
+.chat-body .msg-row.system::before,
+.chat-body .msg-row.system::after {
+  display: none !important;
+  content: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 2. 所有液态玻璃元素：彻底禁止任何 border、outline 以及 inset 带有白色的内高光阴影 */
+/* 包括：对方气泡、加号按钮、输入框、顶栏按钮等 */
+.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+.chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
+#app-chat .msg-row.ta:not(.bubble-css-on) .bubble,
+#companionMsgs .msg-row.other .bubble,
+#companionMsgs .msg-row.ta .bubble,
+#watchChatBody .msg-row.other .bubble,
+#watchChatBody .msg-row.ta .bubble {
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important; /* 纯外微阴影，绝无任何白色内描边/白框 */
+}
+
+/* 加号按钮纯液态玻璃 */
+.chat-input-bar .plus-btn#plusMenuBtn,
+#app-chat .chat-input-bar #plusMenuBtn {
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08) !important; /* 无白色描边 */
+}
+
+/* 输入框胶囊纯液态玻璃 */
+.chat-input-bar .input-wrap,
+#app-chat .chat-input-bar .input-wrap,
+#watchInputBar .input-wrap,
+#companionMsgInput {
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* 顶部按钮与昵称条纯液态玻璃 */
+.chat-top-bar .back-btn,
+#app-chat .chat-top-bar .back-btn,
+#app-chat .chat-top-bar #chatCallBtn,
+.chat-top-bar .call-btn,
+.chat-top-bar .ta-name-pill,
+#app-chat .chat-top-bar .ta-name-pill {
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+/* 再次确保任何气泡伪元素绝对不存在 */
+.chat-body .msg-row .bubble::before,
+.chat-body .msg-row .bubble::after,
+#app-chat .chat-body .msg-row .bubble::before,
+#app-chat .chat-body .msg-row .bubble::after {
+  display: none !important;
+  content: none !important;
+}
+
+
+/* ==========================================================================
+   v529: 微信、观影与陪伴界面输入栏格式完全一致化
+   ========================================================================== */
+
+/* 1. 输入栏容器对齐与间距统一 */
+.chat-input-bar,
+#app-chat .chat-input-bar,
+#watchInputBar,
+#companionPickerView > div:last-child {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+  background: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+}
+
+/* 2. 陪伴同款胶囊输入框：高度44px，高亮乳白背景，圆角24px，左侧内嵌气泡图标 */
+.chat-input-bar .input-wrap,
+#app-chat .chat-input-bar .input-wrap,
+#watchInputBar .input-wrap,
+.companion-style-input-wrap {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  border-radius: 24px !important;
+  padding: 0 14px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+}
+
+/* 内部 input 输入框 */
+.chat-input-bar .input-wrap input,
+#app-chat .chat-input-bar .input-wrap input,
+#watchInputBar .input-wrap input,
+#msgInput,
+#watchMsgInput,
+#companionMsgInput {
+  flex: 1 !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  font-size: 15px !important;
+  color: #1a1a1a !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+/* 3. 伴随按钮（加号、发送、表情）统一规范 */
+/* 发送按钮统一为44x44圆形白色背景乳白高亮质感 */
+.chat-input-bar .action-btn#sendBtn,
+#app-chat .chat-input-bar #sendBtn,
+#watchSendBtn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #1a1a1a !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+}
+
+/* 观影表情按钮也统一为44x44圆球 */
+#watchStickerBtn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* 微信加号按钮保持44x44圆形液态玻璃/乳白底 */
+.chat-input-bar .plus-btn#plusMenuBtn,
+#app-chat .chat-input-bar #plusMenuBtn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  color: #1a1a1a !important;
 }
