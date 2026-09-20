@@ -6,7 +6,7 @@ try{
   window.__akiniLowMem = ((navigator.deviceMemory||8) <= 4) || ((navigator.hardwareConcurrency||8) <= 4) || (/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window.MSStream));
   if(window.__akiniLowMem) document.documentElement.classList.add("low-mem");
 }catch(e){}
-</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260920v541" name="akini-ver"/><script>(function(){
+</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260920v542" name="akini-ver"/><script>(function(){
   // 版本标记（仅记录，绝不触发 reload，避免循环刷新）
   try {
     var cur = (document.querySelector('meta[name=akini-ver]')||{}).content || "";
@@ -26,7 +26,7 @@ try{
   } catch (e) {}
 })();
 </script>
-<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=localStorage;t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260920v541" id="akini-style" rel="stylesheet"/><style id="akini-override-style-z">
+<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=localStorage;t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20260920v542" id="akini-style" rel="stylesheet"/><style id="akini-override-style-z">
   .music-player-right::before{left:-12px !important;background:rgba(255,255,255,0.12) !important}
   .music-player-left{justify-content:flex-start !important;gap:8px !important}
   .music-player-info{align-items:flex-start !important;padding:0 !important}
@@ -438,15 +438,14 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
 <svg class="wechat-send" fill="none" height="24" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewbox="0 0 24 24" width="24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
 </button>
 </div>
-<div class="plus-menu" <div class="plus-menu" id="plusMenu" style="display:none">
+<div class="plus-menu" id="plusMenu" style="display:none">
 <div class="plus-menu-item" data-action="emoji"><svg class="pm-icon" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg><span>表情包</span></div>
 <div class="plus-menu-item" data-action="continue"><svg class="pm-icon" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8"/><path d="M8 13h5"/></svg><span>继续说</span></div>
-<div class="plus-menu-item" data-action="transfer"><svg class="pm-icon" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><rect x="4.5" y="8" width="15" height="11" rx="2" fill="currentColor"/><path d="M8 8V6a4 4 0 0 1 8 0v2" stroke="currentColor" fill="none"/><path d="M4.5 11h15" stroke="#fff" stroke-width="1.3"/><circle cx="12" cy="14.5" r="1.2" fill="#fff"/></svg><span>转账</span></div>
+<div class="plus-menu-item" data-action="transfer"><div class="pm-circle-icon"><svg viewBox="0 0 36 36" width="22" height="22" fill="none" class="pm-icon"><circle cx="18" cy="18" r="17" stroke="currentColor" stroke-width="2"/><rect x="11" y="14" width="14" height="11" rx="2" fill="currentColor" stroke="currentColor" stroke-width="1.5"/><path d="M15 14v-2a3 3 0 0 1 6 0v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><path d="M11 17h14" stroke="#fff" stroke-width="1.5"/><circle cx="18" cy="20" r="1.2" fill="#fff"/></svg></div><span>转账</span></div>
 <div class="plus-menu-item" data-action="poke"><svg class="pm-icon" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"/><path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg><span>拍一拍</span></div>
 <div class="plus-menu-item" data-action="batch"><svg class="pm-icon" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><path d="M4 6h13"/><path d="M4 12h16"/><path d="M4 18h10"/><path d="M19 16l3 2-3 2"/></svg><span>连发</span></div>
 <div class="plus-menu-item" data-action="survey"><svg class="pm-icon" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><rect x="5" y="5" width="14" height="17" rx="2.5"/><path d="M9 5V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="13.5" x2="15" y2="13.5"/><line x1="9" y1="17" x2="13" y2="17"/></svg><span>问卷</span></div>
 <div class="plus-menu-item" data-action="image"><svg class="pm-icon" fill="none" height="22" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="22"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="8" cy="9.5" r="1.3" fill="currentColor"/><path d="M3 17l4.5-4.5 3 3 4-4L21 17.5" stroke-linejoin="round"/></svg><span>图片</span></div>
-</div><span>继续说</span></div>
 </div>
 <button class="call-btn" id="callBtn" style="display:none" type="button">📞</button><button class="transfer-btn" id="transferBtn" style="display:none" type="button">🧸</button><input accept="image/*" class="akini-file-offscreen" id="fileInputImageSend" type="file"/><div class="emoji-panel" id="emojiPanel"></div></div></div><div id="batchSendModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000002;align-items:flex-end"><div style="background:#f7f7f8;border-radius:20px 20px 0 0;width:100%;max-height:82vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #ececec;flex-shrink:0"><button id="batchSendCancel" style="background:0 0;border:none;font-size:15px;color:#666;cursor:pointer;padding:4px" type="button">取消</button><span style="font-weight:600;font-size:16px;color:#1a1a1a">连发消息</span><button id="batchSendGo" style="background:#000000;border:none;border-radius:16px;padding:7px 16px;color:#fff;font-size:14px;font-weight:600;cursor:pointer" type="button">发送</button></div><div id="batchSendList" style="flex:1;overflow-y:auto;padding:14px 16px;min-height:120px"></div><div style="display:flex;gap:10px;padding:12px 16px calc(16px + env(safe-area-inset-bottom,0px));flex-shrink:0;border-top:1px solid #ececec;background:#fff"><button id="batchAddText" style="flex:1;height:42px;border-radius:12px;border:1px dashed #ccc;background:#fafafa;color:#555;font-size:14px;cursor:pointer" type="button">＋ 文字</button><label style="flex:1;height:42px;border-radius:12px;border:1px dashed #ccc;background:#fafafa;color:#555;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">＋ 图片<input accept="image/*" class="akini-file-offscreen" id="batchImageInput" multiple type="file"/></label></div></div></div><div id="pokeSendModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000002;align-items:flex-end"><div style="background:#f7f7f8;border-radius:20px 20px 0 0;width:100%;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #ececec;flex-shrink:0"><button id="pokeSendCancel" style="background:0 0;border:none;font-size:15px;color:#666;cursor:pointer;padding:4px" type="button">取消</button><span style="font-weight:600;font-size:16px;color:#1a1a1a">拍一拍</span><button id="pokeSendGo" style="background:#1a1a1a;border:none;border-radius:16px;padding:7px 16px;color:#fff;font-size:14px;font-weight:600;cursor:pointer" type="button">发送</button></div><div style="padding:18px 16px calc(20px + env(safe-area-inset-bottom,0px))"><input id="pokeSendInput" maxlength="30" placeholder="自定义拍一拍内容" style="width:100%;box-sizing:border-box;height:44px;border:1px solid #e5e5e5;border-radius:12px;padding:0 14px;font-size:15px;outline:0;background:#fff"/><div id="pokeSendPreview" style="margin-top:10px;font-size:13px;color:#999;line-height:1.5"></div></div></div></div><div id="msgContextMenu" style="display:none"><div class="ctx-row"><div class="ctx-item" id="ctxCopy" title="复制" aria-label="复制"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></div><div class="ctx-item" id="ctxQuote" title="引用" aria-label="引用"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"></polyline><path d="M20 18v-2a4 4 0 0 0-4-4H4"></path></svg></div><div class="ctx-item danger" id="ctxDelete" title="删除" aria-label="删除"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></div></div></div><div id="msgContextMenuOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:8999;pointer-events:none"></div><div class="chat-menu-overlay" id="chatMenuOverlay" style="display:none"><div class="menu-bg" id="menuBg"></div><div class="menu-panel">
 <label class="menu-item" id="changeGroupAvatarBtn" style="display:none;position:relative;overflow:hidden;cursor:pointer"><input accept="image/*" class="file-input-local" id="fileInputChangeGroupAvatar" type="file"/><span class="label">更换群头像</span><span style="font-size:12px;color:#999">点击</span></label>
@@ -1603,8 +1602,8 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
   setTimeout(function(){
     try{
       var libs = [
-        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20260920v541',
-        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20260920v541'
+        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20260920v542',
+        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20260920v542'
       ];
       libs.forEach(function(u){
         var s = document.createElement('script');
@@ -1614,7 +1613,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
     }catch(e){}
   }, 5000);
 })();
-</script><script src="localforage.min.js?v=20260920v541"></script><script src="akini-storage-safe.js?v=20260920v541"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/></svg>');};</script>
+</script><script src="localforage.min.js?v=20260920v542"></script><script src="akini-storage-safe.js?v=20260920v542"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/></svg>');};</script>
 
 <!-- ===== zzw：陪伴页 ===== -->
 <div id="app-companion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;flex-direction:column;background:#f7f7f7;color:#1a1a1a">
@@ -1749,7 +1748,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
 </div>
 </div>
 <input accept="image/*" class="akini-file-offscreen" id="novelCoverInput" type="file"/>
-<script id="akini-main" src="akini-main.js?v=20260920v541"></script><script src="akini-moments-engine.js?v=20260920v541"></script><script src="akini-mail-engine.js?v=20260920v541"></script><script src="akini-backup.js?v=20260920v541"></script><script src="akini-ta-phone.js?v=20260920v541"></script><script src="akini-storage-mgr.js?v=20260920v541"></script><script src="akini-cloud-backup.js?v=20260920v541"></script><script src="akini-novel-companion.js?v=20260920v541"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
+<script id="akini-main" src="akini-main.js?v=20260920v542"></script><script src="akini-moments-engine.js?v=20260920v542"></script><script src="akini-mail-engine.js?v=20260920v542"></script><script src="akini-backup.js?v=20260920v542"></script><script src="akini-ta-phone.js?v=20260920v542"></script><script src="akini-storage-mgr.js?v=20260920v542"></script><script src="akini-cloud-backup.js?v=20260920v542"></script><script src="akini-novel-companion.js?v=20260920v542"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
     _akiniCleanPopups();_hideApps.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});_hideAreas.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});var _cmo=document.getElementById("chatMenuOverlay");if(_cmo){_cmo.style.display="none";_cmo.classList.remove("show");}var _camo=document.querySelector(".chat-list-add-menu-overlay");if(_camo){_camo.classList.remove("show");setTimeout(function(){_camo.remove();},200);}};window.showEl=function showEl(id,z){var e=document.getElementById(id);if(e){e.style.zIndex=z||"999999";e.style.display="flex";e.classList.add("show");return e;}return e;};window.showArea=function showArea(id){var e=document.getElementById(id);if(e){e.style.zIndex="999999";e.style.display="flex";e.classList.add("show");}};function navTo(app){try{window.hideAll();if(app==="chat-list"){__akiniShowAppContainer("chat-list");return}if(app==="music"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}__akiniShowAppContainer("music");var _cp=document.getElementById("musicContactPicker");if(_cp){_cp.style.display="flex";_cp.style.zIndex="1000000";}return}if(app==="survey"){if(window._openSurveyList){window._openSurveyList();return}var _sm=document.getElementById("surveyListModal");if(_sm){_sm.style.display="flex";_sm.style.zIndex="1000001";}return}if(["friends","call","add-contact","contact-detail","create-group"].indexOf(app)>=0){__akiniShowAppContainer(app);return}if(app==="icity"){showArea("icityArea");return}if(app==="settings"){showArea("settingsArea");return}if(app==="storage"){if(window.__openStorageMgr){window.__openStorageMgr();}return}if(app==="beautify"){showArea("beautifyArea");return}if(app==="wordbank"){showArea("wordbankOverlay");if(typeof populateWordbankGroups==="function")populateWordbankGroups();return}if(app==="shop"){showEl("app-shop");if(window.__renderShop)window.__renderShop();return}if(app==="novel"){showEl("app-novel");if(window.__renderNovelShelf)window.__renderNovelShelf();return}if(app==="companion"){showEl("app-companion");if(window.__openCompanion)window.__openCompanion();return}if(app==="mail"){if(typeof window.showPage==="function"){window.showPage("mail");}else{showEl("app-mail");}if(window.__renderMail)window.__renderMail();return}if(app==="home"){
   // v510：返回真正的首页（.content-wrapper），不是微信聊天列表
   window.hideAll && window.hideAll();
@@ -4792,8 +4791,8 @@ else window.addEventListener('load', function(){ setTimeout(window.__akiniRegist
 
 </script>
 
-<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20260920v541"></script>
-<script defer src="akini-compat-bridge.js?v=20260920v541"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20260920v542"></script>
+<script defer src="akini-compat-bridge.js?v=20260920v542"></script>
 <script>
 // 兼容旧版 JSON 备份的轻量兜底：如果 core 风格备份引擎未加载，仍允许导出基础 JSON
 (function(){
@@ -5624,4 +5623,106 @@ else window.addEventListener('load', function(){ setTimeout(window.__akiniRegist
   </div>
 </div>
 
+<script>
+/* ==========================================================================
+   v542: 加号菜单 7 大功能统一可靠分发器（彻底解决手机端点击无响应问题）
+   ========================================================================== */
+(function() {
+  function handlePlusMenuAction(action) {
+    var pm = document.getElementById("plusMenu");
+    if (pm) { pm.style.display = "none"; pm.classList.remove("show"); }
+
+    if (action === "emoji") {
+      var ep = document.getElementById("emojiPanel");
+      if (ep) {
+        if (ep.style.display === "flex") {
+          ep.style.display = "none";
+          ep.classList.remove("show");
+        } else {
+          ep.style.display = "flex";
+          ep.classList.add("show");
+          if (typeof window.renderEmojiPanel === "function") window.renderEmojiPanel();
+        }
+      }
+    } else if (action === "continue") {
+      if (typeof window.__akiniForceReply === "function") {
+        window.__akiniForceReply();
+      } else {
+        var cid = window.akiniContacts ? window.akiniContacts.getActiveChatId() : localStorage.getItem("akini_active_chat_id");
+        if (typeof window.__akiniScheduleReply === "function") window.__akiniScheduleReply(cid, null, 600);
+      }
+    } else if (action === "transfer") {
+      var tb = document.getElementById("transferBtn");
+      if (tb) tb.click();
+      else if (typeof window.__akiniOpenTransferModal === "function") window.__akiniOpenTransferModal();
+    } else if (action === "poke") {
+      if (typeof window.__akiniSendPoke === "function") {
+        window.__akiniSendPoke();
+      } else {
+        var pkm = document.getElementById("pokeSendModal");
+        if (pkm) { pkm.style.display = "flex"; pkm.style.zIndex = "1000002"; }
+      }
+    } else if (action === "batch") {
+      if (typeof window.__akiniOpenBatchSend === "function") {
+        window.__akiniOpenBatchSend();
+      } else {
+        var bsm = document.getElementById("batchSendModal");
+        if (bsm) { bsm.style.display = "flex"; bsm.style.zIndex = "1000002"; }
+      }
+    } else if (action === "survey") {
+      if (typeof window._openSurveyList === "function") {
+        window._openSurveyList();
+      } else if (typeof window.navTo === "function") {
+        window.navTo("survey");
+      } else {
+        var sm = document.getElementById("surveyListModal");
+        if (sm) {
+          sm.style.display = "flex";
+          sm.style.zIndex = "1000001";
+          if (typeof window.renderSurveyList === "function") window.renderSurveyList();
+        }
+      }
+    } else if (action === "image" || action === "camera") {
+      var fi = document.getElementById("fileInputImageSend");
+      if (fi) fi.click();
+    }
+  }
+
+  function bindPlusMenu() {
+    var pm = document.getElementById("plusMenu");
+    if (!pm || pm.__boundV542) return;
+    pm.__boundV542 = true;
+
+    // 捕获阶段与冒泡阶段统一快速响应
+    function onTrigger(e) {
+      var item = e.target.closest && e.target.closest(".plus-menu-item[data-action]");
+      if (item && pm.contains(item)) {
+        e.preventDefault();
+        e.stopPropagation();
+        var act = item.getAttribute("data-action");
+        handlePlusMenuAction(act);
+      }
+    }
+
+    pm.addEventListener("click", onTrigger, true);
+    pm.addEventListener("touchend", function(e) {
+      var item = e.target.closest && e.target.closest(".plus-menu-item[data-action]");
+      if (item && pm.contains(item)) {
+        e.preventDefault();
+        e.stopPropagation();
+        var act = item.getAttribute("data-action");
+        handlePlusMenuAction(act);
+      }
+    }, { passive: false });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bindPlusMenu);
+  } else {
+    bindPlusMenu();
+  }
+  setTimeout(bindPlusMenu, 300);
+  setTimeout(bindPlusMenu, 1000);
+})();
+</script>
 </body></html>

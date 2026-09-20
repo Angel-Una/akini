@@ -8603,39 +8603,115 @@ button#plusMenuBtn {
 }
 
 
+
 /* ==========================================================================
-   v536: 时间戳与已读回执颜色加深强化（强可读性）
+   v542: 时间戳与已读回执淡雅柔和化 + 彻底移除白色阴影
    ========================================================================== */
 .msg-ts,
 #app-chat .msg-ts,
-.chat-body .msg-ts {
-  color: #222222 !important;
-  font-weight: 600 !important;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
-}
-
+.chat-body .msg-ts,
 .msg-rr,
 #app-chat .msg-rr,
-.chat-body .msg-rr {
-  color: #222222 !important;
-  font-weight: 600 !important;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
-}
-
+.chat-body .msg-rr,
 .msg-meta,
 #app-chat .msg-meta,
-.chat-body .msg-meta {
-  color: #222222 !important;
-  font-weight: 500 !important;
-}
-
-/* 观影聊天区时间戳与已读回执同步加深 */
+.chat-body .msg-meta,
 #watchChatBody .msg-ts,
 #watchChatBody .msg-rr,
 #watchChatBody .msg-meta {
-  color: #222222 !important;
-  font-weight: 600 !important;
-  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8) !important;
+  color: rgba(0, 0, 0, 0.42) !important;
+  font-weight: 400 !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0 !important;
 }
 
+/* ==========================================================================
+   v542: 微信聊天界面返回键/通话键/加号键/发送键/输入栏/昵称条超透液态毛玻璃
+   ========================================================================== */
+/* 1. 微信聊天顶栏：返回键、通话键高透毛玻璃 */
+#app-chat .chat-top-bar .back-btn,
+.chat-top-bar .back-btn,
+#app-chat .chat-top-bar #chatCallBtn,
+.chat-top-bar .call-btn#chatCallBtn {
+  background: rgba(255, 255, 255, 0.22) !important;
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+  color: #1a1a1a !important;
+}
 
+#app-chat .chat-top-bar .back-btn:active,
+.chat-top-bar .back-btn:active,
+#app-chat .chat-top-bar #chatCallBtn:active,
+.chat-top-bar .call-btn#chatCallBtn:active {
+  background: rgba(255, 255, 255, 0.38) !important;
+  transform: scale(0.92) !important;
+}
+
+/* 2. 微信聊天顶栏：昵称胶囊药丸条超透毛玻璃 */
+#app-chat .chat-top-bar .ta-name-pill,
+.chat-top-bar .ta-name-pill {
+  background: rgba(255, 255, 255, 0.18) !important;
+  background-color: rgba(255, 255, 255, 0.18) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* 3. 微信底栏加号按钮与发送按钮超透毛玻璃 */
+#app-chat .chat-input-bar #plusMenuBtn,
+.chat-input-bar .plus-btn#plusMenuBtn,
+button#plusMenuBtn,
+#app-chat .chat-input-bar #sendBtn,
+.chat-input-bar .action-btn#sendBtn {
+  background: rgba(255, 255, 255, 0.22) !important;
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+  color: #1a1a1a !important;
+}
+
+#app-chat .chat-input-bar #plusMenuBtn:active,
+#app-chat .chat-input-bar #sendBtn:active {
+  background: rgba(255, 255, 255, 0.38) !important;
+  transform: scale(0.92) !important;
+}
+
+/* 4. 微信输入栏胶囊超透毛玻璃 */
+#app-chat .chat-input-bar .input-wrap,
+.chat-input-bar .input-wrap {
+  background: rgba(255, 255, 255, 0.22) !important;
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+
+#app-chat .chat-input-bar .input-wrap input {
+  color: #1a1a1a !important;
+}
+
+#app-chat .chat-input-bar .input-wrap input::placeholder {
+  color: rgba(0, 0, 0, 0.38) !important;
+}
+
+/* 5. 确保加号菜单项中转账圆圈图标样式对齐 */
+.plus-menu-item .pm-circle-icon {
+  width: 22px !important;
+  height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+.plus-menu-item .pm-circle-icon svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+}
