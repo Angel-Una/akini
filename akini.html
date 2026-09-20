@@ -1,12 +1,66 @@
 <!DOCTYPE html>
 
 <html lang="zh-CN"><head><script>
+/* 终极老旧机型兼容 Polyfill (Android 9 / Chrome 70+ / vivo Y9s 等老内核兜底) */
+(function(){
+  try {
+    if (typeof window !== 'undefined') {
+      window.globalThis = window.globalThis || window;
+      if (!Promise.allSettled) {
+        Promise.allSettled = function(promises) {
+          return Promise.all(Array.prototype.map.call(promises, function(p) {
+            return Promise.resolve(p).then(
+              function(val) { return { status: 'fulfilled', value: val }; },
+              function(err) { return { status: 'rejected', reason: err }; }
+            );
+          }));
+        };
+      }
+      if (!String.prototype.replaceAll) {
+        String.prototype.replaceAll = function(search, replacement) {
+          if (search instanceof RegExp) {
+            return this.replace(new RegExp(search.source, search.flags + (search.flags.indexOf('g') === -1 ? 'g' : '')), replacement);
+          }
+          return this.split(search).join(replacement);
+        };
+      }
+      if (!Array.prototype.flat) {
+        Array.prototype.flat = function(depth) {
+          var d = depth === undefined ? 1 : Math.floor(depth);
+          if (d <= 0) return this.slice();
+          return Array.prototype.reduce.call(this, function(acc, val) {
+            return acc.concat(Array.isArray(val) ? (d > 1 ? val.flat(d - 1) : val) : val);
+          }, []);
+        };
+      }
+      if (!Object.fromEntries) {
+        Object.fromEntries = function(entries) {
+          var obj = {};
+          if (entries && typeof entries[Symbol.iterator] === 'function') {
+            var it = entries[Symbol.iterator]();
+            var step;
+            while (!(step = it.next()).done) {
+              var pair = step.value;
+              if (pair && pair.length >= 2) obj[pair[0]] = pair[1];
+            }
+          }
+          return obj;
+        };
+      }
+      if (!window.queueMicrotask) {
+        window.queueMicrotask = function(fn) {
+          Promise.resolve().then(fn).catch(function(e) { setTimeout(function() { throw e; }, 0); });
+        };
+      }
+    }
+  } catch(e) { console.warn('[Akini Polyfill]', e); }
+})();
 /* 低内存检测：给全局做标记，后续 SW/保活/重合并均可读取 */
 try{
   window.__akiniLowMem = ((navigator.deviceMemory||8) <= 4) || ((navigator.hardwareConcurrency||8) <= 4) || (/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window.MSStream));
   if(window.__akiniLowMem) document.documentElement.classList.add("low-mem");
 }catch(e){}
-</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260921v550" name="akini-ver"/><script>(function(){
+</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260921v551" name="akini-ver"/><script>(function(){
   // 版本标记（仅记录，绝不触发 reload，避免循环刷新）
   try {
     var cur = (document.querySelector('meta[name=akini-ver]')||{}).content || "";
@@ -51,6 +105,7 @@ try{
 <script>(function(){try{var op=parseInt(localStorage.getItem('akini_opacity')||'50',10);if(isNaN(op))op=50;var val=op/50;var alpha=val.toFixed(2);var bg=op>0?'rgba(255,255,255,'+alpha+')':'transparent';var s=document.getElementById('akiniTopCardOpacityStyle');if(s){s.textContent='#topCard,.top-card,body.dark-mode #topCard,body.dark-mode .top-card{background:'+bg+'!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important}'}}catch(e){}})();</script>
 <style>.back-btn{font-size:24px;background:transparent;border:none;color:#1a1a1a;padding:0 8px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-width:40px;min-height:40px;box-sizing:border-box}.music-player-info{align-self:stretch!important;width:100%;min-width:0!important}.music-player-meta{width:100%;min-width:0}.music-player-title,.music-player-artist{width:100%;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}</style></head><body>
 <div id="akiniSplash">
+  <button class="akini-splash-skip" id="akiniSplashSkipBtn" type="button" onclick="try{window.__akiniEnterSite&&window.__akiniEnterSite();}catch(e){}">跳过 ›</button>
   <div class="akini-splash-inner">
     <div class="akini-splash-top">
       <div class="akini-splash-logo">
@@ -100,6 +155,61 @@ try{
     <button class="akini-splash-enter" id="akiniSplashEnter" type="button">我已知晓并遵守规则</button>
   </div>
 </div>
+<style id="akiniSplashCompatStyle">
+/* 老旧内核(Chrome 70-74 / Android 9 / vivo Y9s) CSS 终极回退兼容 */
+#akiniSplash {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  z-index: 9999999 !important;
+}
+.akini-splash-inner {
+  width: 94vw !important;
+  max-width: 520px !important;
+  width: min(520px, 94vw) !important;
+}
+.akini-splash-enter {
+  width: 88vw !important;
+  max-width: 320px !important;
+  width: min(320px, 88vw) !important;
+}
+.akini-splash-skip {
+  position: absolute !important;
+  top: calc(14px + env(safe-area-inset-top, 0px)) !important;
+  right: 16px !important;
+  z-index: 10000000 !important;
+  background: rgba(255, 255, 255, 0.16) !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  color: rgba(255, 255, 255, 0.88) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: 999px !important;
+  padding: 5px 14px !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+}
+.phone-frame, #phoneFrame, #app-chat, .chat-wrapper {
+  top: 0; left: 0; right: 0; bottom: 0;
+}
+</style>
+<script>
+/* 页面预先加载气泡颜色，防止渲染闪烁或默认蓝覆盖 */
+(function(){
+  try{
+    var c = localStorage.getItem('akini_bubble_color') || 'blue';
+    if(c && document.body) {
+      document.body.classList.remove('bubble-pink','bubble-blue','bubble-green','bubble-black','bubble-gray');
+      document.body.classList.add('bubble-' + c);
+    }
+  }catch(e){}
+})();
+</script>
 <script>
 /* Akini 开屏：简化版，降低崩溃风险 */
 (function(){
@@ -165,13 +275,24 @@ try{
     if(entered) return;
     entered = true;
     markEntered();
-    try { var sp = el('akiniSplash'); if(sp){ sp.classList.add('hidden'); sp.style.display='none'; } } catch(e){}
+    try {
+      var sp = el('akiniSplash');
+      if(sp){
+        sp.classList.add('hidden');
+        sp.style.display='none';
+        sp.style.opacity='0';
+        sp.style.pointerEvents='none';
+      }
+    } catch(e){}
     try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
     try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch(e){}
   }
+  window.__akiniEnterSite = enterSite;
   function bind(){
     var btn = el('akiniSplashEnter');
     if(btn) btn.onclick = enterSite;
+    var skip = el('akiniSplashSkipBtn');
+    if(skip) skip.onclick = enterSite;
   }
   function init(){
     if(trySkip()) return;
@@ -181,6 +302,12 @@ try{
     tryIdbSkip();
     setTimeout(tryIdbSkip, 300);
     setTimeout(tryIdbSkip, 1200);
+    /* vivo Y9s 等老机型绝对安全保底：若超时未关闭且已进入过，强制跳过 */
+    setTimeout(function(){
+      if(!entered && (localStorage.getItem(ENTER_KEY) === 'true' || readCookie())) {
+        enterSite();
+      }
+    }, 2500);
   }
   if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
@@ -2922,8 +3049,14 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     var meSel=".chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
     var otherSel=".chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
     var anySel=".chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
+    /* 先清理已有前缀，避免正则多次嵌套产生 .chat-body .chat-body */
+    var cleaned = (css || "")
+      .replace(/\.chat-body\s*/g, " ")
+      .replace(/#app-chat\s*/g, " ")
+      .replace(/\.msg-row\s*/g, " ")
+      .replace(/\.bubble-wrap\s*/g, " ");
     /* 允许针对双方、我方、对方分别定义 */
-    return css.replace(/\.message\.message-sent|\.message\.message-received|\.bubble\.me(?![\w-])|\.bubble\.other(?![\w-])|\.message-sent|\.message-received|_bubble(?![\w-])|\.msg-bubble(?![\w-])|\.chat-bubble(?![\w-])|\.bubble(?![\w-])|\.bom(?![\w-])|\.message(?![\w-])|\.txt(?![\w-])/g,function(m){
+    return cleaned.replace(/\.message\.message-sent|\.message\.message-received|\.bubble\.me(?![\w-])|\.bubble\.other(?![\w-])|\.message-sent|\.message-received|_bubble(?![\w-])|\.msg-bubble(?![\w-])|\.chat-bubble(?![\w-])|\.bubble(?![\w-])|\.bom(?![\w-])|\.message(?![\w-])|\.txt(?![\w-])/g,function(m){
       if(m===".message.message-sent" || m===".message-sent" || m===".bubble.me") return meSel;
       if(m===".message.message-received" || m===".message-received" || m===".bubble.other") return otherSel;
       return anySel;
@@ -2934,8 +3067,8 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     var raw=css||"";
     var final="";
     if(raw.trim()){
-      /* 保底背景放最前面，优先级较低，方便被用户自定义属性覆盖 */
-      final="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background-color:#e9e9eb;color:#111;}\n.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background-color:#fff;color:#111;}\n";
+      /* 保底半透明高级背景放最前面，杜绝任何情况下气泡变全透明裸奔 */
+      final="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background:rgba(255,255,255,0.78) !important;color:#111 !important;-webkit-backdrop-filter:blur(12px) !important;backdrop-filter:blur(12px) !important;box-shadow:0 2px 10px rgba(0,0,0,0.06) !important;}\n.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background:rgba(255,255,255,0.85) !important;color:#111 !important;-webkit-backdrop-filter:blur(12px) !important;backdrop-filter:blur(12px) !important;box-shadow:0 2px 10px rgba(0,0,0,0.06) !important;}\n";
       final+=addImportant(translateSelectors(raw));
       /* 自动保护：防止文本越出气泡，同时保留自定义宽高和内边距 */
       final+="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){max-width:100% !important;box-sizing:border-box !important;overflow-wrap:break-word !important;word-break:break-word !important;}\n";

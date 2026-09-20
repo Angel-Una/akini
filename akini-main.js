@@ -23573,8 +23573,15 @@ document.addEventListener("DOMContentLoaded", function () {
         var activeChatId = window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
         var bn = 0;
         Object.keys(ss).forEach(function (k) { if (k !== activeChatId) bn += ss[k].unread || 0; });
-        backBadge.textContent = bn > 99 ? "99+" : String(bn);
-        backBadge.style.display = bn > 0 ? "flex" : "none";
+        var backBtn = document.getElementById("chatBackBtn");
+        if (backBtn) backBtn.classList.toggle("has-unread", bn > 0);
+        if (bn > 0) {
+          backBadge.textContent = bn > 99 ? "99+" : String(bn);
+          backBadge.style.display = "inline-flex";
+        } else {
+          backBadge.textContent = "";
+          backBadge.style.display = "none";
+        }
       }
       /* 消息中心按钮小红点同步 */
       _syncNotifBtn("friends");

@@ -1994,34 +1994,47 @@ body:not(.bubble-css-on)
   color: #1a1a1a;
   background: rgba(0, 0, 0, 0.06);
 }
-/* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带底色整体停用 */
-body:not(.bubble-css-on)
+/* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带底色整体停用
+   v551 修复：默认色仅在未选择任何颜色且未开美化时作为 iOS 蓝 fallback；
+   所有自选色规则加 html body 前缀提升特异性，确保选粉/选绿/选黑/选灰立即生效 */
+html body:not(.bubble-css-on):not(.bubble-pink):not(.bubble-green):not(.bubble-black):not(.bubble-gray)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-blue:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #007aff !important;
   color: #fff !important;
 }
-body.bubble-pink:not(.bubble-css-on)
+html body.bubble-pink:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #ffd1dc !important;
   color: #111 !important;
 }
-body.bubble-blue:not(.bubble-css-on)
-  .chat-body
-  .msg-row.me
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #007aff !important;
-  color: #fff !important;
-}
-body.bubble-green:not(.bubble-css-on)
+html body.bubble-green:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #07c160 !important;
   color: #fff !important;
+}
+html body.bubble-black:not(.bubble-css-on)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background: #111 !important;
+  color: #fff !important;
+}
+html body.bubble-gray:not(.bubble-css-on)
+  .chat-body
+  .msg-row.me
+  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background: #e9e9eb !important;
+  color: #111 !important;
 }
 body.bubble-black:not(.bubble-css-on)
   .chat-body
@@ -7088,10 +7101,11 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   height: 20px;
 }
 
-/* 输入栏 */
+/* 输入栏：去除内层重复的安全区 padding，消除底部留白悬空问题 */
 .chat-input-bar {
   gap: 8px;
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 4px 10px 4px 10px !important;
+  margin-bottom: 0 !important;
 }
 .chat-input-bar .plus-btn#plusMenuBtn {
   width: 36px;
@@ -7852,34 +7866,40 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
 }
 
 /* 我的默认气泡：实色 iOS 蓝（#007aff），字体纯白清晰
-   v550 修复：删掉错误的 #app-chat .msg-row.me:not(.bubble-css-on) 选择器
-   （bubble-css-on 打在 body 上，挂在 msg-row 上的 :not 永远为真，且 ID 特异性
-   压过一切 → 我方气泡永远 iOS 蓝、并覆盖用户粘贴的自定义美化 CSS）。
-   现全部加 body:not(.bubble-css-on) 前缀：开启美化 CSS 时自带底色彻底让位 */
-body:not(.bubble-css-on):not(.bubble-pink):not(.bubble-green):not(.bubble-black):not(.bubble-gray) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-body.bubble-blue:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+   v551 修复：所有自选色规则全部加上 html body 高特异性前缀，彻底压倒一切潜在冲突；
+   开启美化 CSS（body.bubble-css-on）时，自带底色彻底让位 */
+html body:not(.bubble-css-on):not(.bubble-pink):not(.bubble-green):not(.bubble-black):not(.bubble-gray) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-blue:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #007aff !important;
   color: #ffffff !important;
   border: none !important;
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
 }
 
-/* 自选其他颜色时的实色支持（v550：同样加 :not(.bubble-css-on)，美化开启时让位） */
-body.bubble-pink:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+/* 自选其他颜色时的实色支持（v551：html body 高权重保证立即生效） */
+html body.bubble-pink:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #ffd1dc !important;
-  color: #111 !important;
+  color: #111111 !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(255, 180, 200, 0.28) !important;
 }
-body.bubble-green:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+html body.bubble-green:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #07c160 !important;
-  color: #fff !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.25) !important;
 }
-body.bubble-black:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+html body.bubble-black:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #111111 !important;
-  color: #fff !important;
+  color: #ffffff !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
 }
-body.bubble-gray:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+html body.bubble-gray:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #e9e9eb !important;
-  color: #111 !important;
+  color: #111111 !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05) !important;
 }
 
 /* 7. 观影和微信的输入气泡改成陪伴那样的圆角通透胶囊 */
@@ -8909,7 +8929,8 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
 }
 
 /* ==========================================================================
-   v544: 聊天界面返回键那里的消息数量也改成白底黑数字，显示其他联系人未读总和
+   v551: 聊天界面返回键与未读消息数量终极修复
+   彻底消除幽灵绝对定位0徽标与叠放问题；仅在真正有未读时作为胶囊内联展示
    ========================================================================== */
 .chat-top-bar .back-btn,
 #app-chat .chat-top-bar .back-btn {
@@ -8917,30 +8938,22 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   overflow: visible !important;
 }
 
+/* 默认态：严格隐藏未读角标，禁止绝对定位浮动 */
 .back-unread-badge,
 #chatBackUnreadBadge {
-  position: absolute !important;
-  top: -3px !important;
-  right: -5px !important;
-  min-width: 18px !important;
-  height: 18px !important;
-  padding: 0 5px !important;
-  border-radius: 9px !important;
-  background: #ffffff !important;
-  color: #111111 !important;
-  font-size: 11px !important;
-  font-weight: 700 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  line-height: 1 !important;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
-  z-index: 5 !important;
+  display: none !important;
+  visibility: hidden !important;
+  position: static !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  min-width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
 }
 
-
-
-/* v547: 保留用户原有的白底黑字未读标，仅在有未读时延伸返回按钮为液态玻璃胶囊 */
+/* 返回按钮基础样式 */
 #chatBackBtn {
   position: relative !important;
   overflow: visible !important;
@@ -8955,20 +8968,37 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   align-items: center !important;
   justify-content: center !important;
 }
+
+/* 仅在有未读消息时，才扩展为胶囊并显现未读徽标 */
 #chatBackBtn.has-unread {
   background: rgba(235, 230, 218, 0.88) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
   border-radius: 9999px !important;
-  padding: 0 12px 0 8px !important;
-  min-width: 62px !important;
-  gap: 6px !important;
+  padding: 0 10px 0 8px !important;
+  min-width: 48px !important;
+  gap: 4px !important;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.6) !important;
 }
 #chatBackBtn.has-unread .back-unread-badge,
 #chatBackBtn.has-unread #chatBackUnreadBadge {
   position: static !important;
   display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12) !important;
+  margin-left: 2px !important;
 }
 
 /* ==========================================================================
@@ -9018,22 +9048,25 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   z-index: 100 !important;
   background: transparent !important;
   pointer-events: auto !important;
-  padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: max(2px, env(safe-area-inset-bottom, 0px)) !important;
 }
 
-/* 针对 iOS PWA/添加到桌面全屏模式 (standalone)：输入栏紧贴屏幕底 */
+/* 针对 iOS PWA/添加到桌面全屏模式 (standalone)：输入栏紧贴屏幕底，消除悬空留白 */
 @media all and (display-mode: standalone) {
   #app-chat .chat-input-bar-area,
   .chat-input-bar-area {
-    padding-bottom: max(4px, env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: max(2px, env(safe-area-inset-bottom, 0px)) !important;
   }
   #app-chat .chat-body,
   .chat-body {
-    padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)) !important;
+    padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 
-/* 2. 消息行与内容排列：严格对齐双方方向 */
+/* 2. 消息行与内容排列：气泡与头像垂直居中对齐，杜绝偏上 */
+.chat-body .msg-row .bubble-wrap {
+  margin-top: 3px !important; /* 使单行短气泡中心线与42px头像中心线完美水平平齐，告别顶贴悬空偏上 */
+}
 /* 对方消息 (other)：头像在左，内容在右 */
 .msg-row.other {
   display: flex !important;
