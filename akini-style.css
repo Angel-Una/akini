@@ -7757,9 +7757,7 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
   padding-top: 82px !important;
 }
 
-/* 3. 最下面那一栏的白色底图彻底去除（完全透明，透出背景图） */
-#app-chat,
-.chat-wrapper,
+/* 3. 最下面那一栏的白色底图去掉（输入栏本身透明透出背景图，但保留聊天背景图） */
 .chat-input-bar-area,
 .chat-input-bar,
 #app-chat .chat-input-bar-area,
@@ -7768,27 +7766,99 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
 #companionPickerView > div:last-child {
   background: transparent !important;
   background-color: transparent !important;
-  background-image: none !important;
   border-top: none !important;
   box-shadow: none !important;
 }
+/* 确保 #app-chat 和 #chatBody 保留背景图渲染能力与尺寸 */
+#app-chat {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+#chatBody {
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
 
-/* 4. 输入框加号按钮：去黑线圆圈，只保留加号，纯净无边框背景 */
+/* 4. 输入框加号按钮：保留液态玻璃圆形底图 + 纯净加号线条（无黑圈） */
 .chat-input-bar .plus-btn#plusMenuBtn,
 #app-chat .chat-input-bar #plusMenuBtn {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08), inset 0 1px 1px rgba(255, 255, 255, 0.8) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #1a1a1a !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+}
+.chat-input-bar .plus-btn#plusMenuBtn:active,
+#app-chat .chat-input-bar #plusMenuBtn:active {
+  background: rgba(255, 255, 255, 0.65) !important;
+  transform: scale(0.92) !important;
 }
 
-/* 5. 昵称条位置往上移动一点点 */
-.chat-top-bar .ta-info {
-  top: 44% !important;
+/* 5. 顶栏返回键与通话键横向水平居中对齐 */
+.chat-top-bar {
+  align-items: center !important;
 }
-.chat-top-bar .ta-name-pill {
-  transform: translateY(-3px) !important;
+.chat-top-bar .back-btn,
+#app-chat .chat-top-bar .back-btn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  margin-top: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+}
+.chat-top-bar .call-btn,
+#app-chat .chat-top-bar #chatCallBtn,
+.chat-top-bar .call-btn#chatCallBtn {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  min-height: 38px !important;
+  margin-top: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+}
+
+/* 6. 昵称条继续往上挪，使昵称药丸条被上方头像下沿稍微挡住/重叠一点点 */
+.chat-top-bar .ta-info {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+.chat-top-bar .ta-info .ta-avatar {
+  position: relative !important;
+  z-index: 2 !important;
+  margin-bottom: 0 !important;
+}
+.chat-top-bar .ta-name-pill,
+#app-chat .chat-top-bar .ta-name-pill {
+  position: relative !important;
+  z-index: 1 !important;
+  margin-top: -10px !important; /* 向上穿透重叠，被圆形头像底部挡住一部分 */
+  transform: none !important;
 }
 
 /* 6. 统一气泡样式：我的默认气泡为iOS蓝实色，联系人默认气泡更透明，液态玻璃更通透 */
