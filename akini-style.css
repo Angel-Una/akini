@@ -8395,3 +8395,76 @@ button#plusMenuBtn {
   background: #666666 !important;
   animation: typingPulse 1.2s infinite ease-in-out !important;
 }
+
+
+/* ==========================================================================
+   v533: 输入动态100%照搬陪伴界面（akcp-typing + wt-dot，不跳动，只透明度呼吸渐变）
+         微信聊天界面昵称条往上挪 4px
+   ========================================================================== */
+
+/* 微信顶部昵称条往上挪 4px */
+#app-chat .chat-top-bar {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 10px) !important;
+}
+#app-chat .chat-top-bar .ta-info {
+  margin-top: 6px !important;
+}
+#app-chat .chat-top-bar .ta-name-pill {
+  margin-top: 2px !important;
+}
+
+/* 陪伴同款 akcp-typing 输入动态容器与微阴影气泡，彻底不跳动，只呼吸闪烁 */
+.akini-typing-float,
+#watchTypingFloat {
+  position: absolute !important;
+  left: 14px !important;
+  bottom: calc(100% + 8px) !important;
+  z-index: 50 !important;
+  display: flex !important;
+  align-items: center !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+}
+
+.akini-typing-float .akcp-typing,
+#watchTypingFloat .akcp-typing {
+  align-self: flex-start !important;
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-radius: 16px !important;
+  border-bottom-left-radius: 4px !important;
+  padding: 11px 14px !important;
+  display: flex !important;
+  gap: 4px !important;
+  align-items: center !important;
+  width: fit-content !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+}
+
+/* 陪伴同款 wt-dot：纯透明度呼吸渐变，无任何 translateY 跳动！ */
+.akcp-typing .wt-dot,
+.wt-dot {
+  width: 6px !important;
+  height: 6px !important;
+  border-radius: 50% !important;
+  background: #999999 !important;
+  animation: wtBlink 1.2s infinite ease-in-out !important;
+  transform: none !important;
+}
+.akcp-typing .wt-dot:nth-child(2),
+.wt-dot:nth-child(2) {
+  animation-delay: 0.2s !important;
+}
+.akcp-typing .wt-dot:nth-child(3),
+.wt-dot:nth-child(3) {
+  animation-delay: 0.4s !important;
+}
+
+@keyframes wtBlink {
+  0%, 60%, 100% { opacity: 0.25; }
+  30% { opacity: 1; }
+}

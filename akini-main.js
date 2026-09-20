@@ -3680,16 +3680,15 @@ document.addEventListener("DOMContentLoaded", function () {
         if (el.style.display !== "none") {
           el.style.display = "none";
           el.innerHTML = "";
-          el.__lastAvatar = null;
+          el.__lastAvatar = null; el.__hasCompanionTyping = false;
         }
         if (chatBody) chatBody.classList.remove("typing-on");
         return;
       }
-      // 头像未变则不动 innerHTML，避免打字点动画重起造成闪烁
-      if (el.__lastAvatar !== m.avatar) {
-        el.__lastAvatar = m.avatar;
-        el.innerHTML =
-          '<div class="typing-bubble companion-typing-bubble"><div class=typing-dot></div><div class=typing-dot></div><div class=typing-dot></div></div>';
+      // 100% 照搬陪伴界面输入动态：无头像，akcp-typing，三点透明度呼吸闪烁（不跳动）
+      if (!el.__hasCompanionTyping) {
+        el.__hasCompanionTyping = true;
+        el.innerHTML = '<div class="akcp-typing"><span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span></div>';
       }
       el.style.display = "flex";
       if (chatBody) {
@@ -22755,12 +22754,11 @@ document.addEventListener("DOMContentLoaded", function () {
     var bar = $("watchInputBar");
     if (!bar) return;
     if ($("watchTypingFloat")) return;
-    var c = watchPartners[0];
     var floatEl = document.createElement("div");
     floatEl.id = "watchTypingFloat";
     floatEl.className = "akini-typing-float";
-    floatEl.style.cssText = "position:absolute;left:16px;bottom:calc(100% + 10px);z-index:20;pointer-events:none;transition:opacity 0.2s ease;";
-    floatEl.innerHTML = '<div class="typing-bubble companion-typing-bubble"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>';
+    floatEl.style.cssText = "position:absolute;left:14px;bottom:calc(100% + 8px);z-index:20;pointer-events:none;transition:opacity 0.2s ease;";
+    floatEl.innerHTML = '<div class="akcp-typing"><span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span></div>';
     bar.style.position = "relative";
     bar.appendChild(floatEl);
   }
