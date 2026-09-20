@@ -9000,7 +9000,7 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   font-size: 24px !important;
   font-weight: 300 !important;
   line-height: 1 !important;
-  color: #ffffff !important;
+  color: #1a1a1a !important;
   margin: 0 !important;
   padding: 0 !important;
   box-sizing: border-box !important;
@@ -9243,12 +9243,13 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
 .msg-row .bubble:not(.survey-bubble):not(.shop-bubble):not(.redpacket-bubble):not(.sticker-bubble) {
   display: inline-block !important;
   width: auto !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
+  max-width: 68% !important;
+  min-width: 24px !important;
   box-sizing: border-box !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
   white-space: pre-wrap !important;
+  writing-mode: horizontal-tb !important;
 }
 
 /* 5. 问卷卡片 (survey-bubble) 终极修复：结构完整、紧凑自适应、我方对方布局一致 */
@@ -9542,11 +9543,14 @@ body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   box-sizing: border-box !important;
 }
 .chat-body .msg-row.me:has(.survey-bubble) .msg-content-line,
-.chat-body .msg-row.me .msg-content-line:has(.survey-bubble) {
+.chat-body .msg-row.me .msg-content-line:has(.survey-bubble),
+.chat-body .msg-row.me .msg-content-line {
   justify-content: flex-end !important;
 }
 .chat-body .msg-row.other:has(.survey-bubble) .msg-content-line,
-.chat-body .msg-row.other .msg-content-line:has(.survey-bubble) {
+.chat-body .msg-row.other .msg-content-line:has(.survey-bubble),
+.chat-body .msg-row.other .msg-content-line,
+.chat-body .msg-row.ta .msg-content-line {
   justify-content: flex-start !important;
 }
 .chat-body .msg-row .bubble.survey-bubble,
@@ -9556,7 +9560,18 @@ body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   max-width: 240px !important;
   min-width: 220px !important;
   box-sizing: border-box !important;
-  margin: 0 !important;
+}
+.chat-body .msg-row.me .bubble.survey-bubble,
+.chat-body .msg-row.me .bubble-wrap:has(.survey-bubble) {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+}
+.chat-body .msg-row.other .bubble.survey-bubble,
+.chat-body .msg-row.ta .bubble.survey-bubble,
+.chat-body .msg-row.other .bubble-wrap:has(.survey-bubble),
+.chat-body .msg-row.ta .bubble-wrap:has(.survey-bubble) {
+  margin-left: 0 !important;
+  margin-right: auto !important;
 }
 .chat-body .msg-row .avatar-col {
   flex-shrink: 0 !important;
@@ -9567,14 +9582,16 @@ body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
 .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   writing-mode: horizontal-tb !important;
   text-orientation: mixed !important;
-  min-width: 38px !important;
+  min-width: 24px !important;
   max-width: 68% !important;
   word-break: break-word !important;
   overflow-wrap: break-word !important;
   white-space: pre-wrap !important;
+  pointer-events: auto !important;
 }
 
-/* 3. 会话列表联系人头像右上角角标确保展示 */
+/* 3. 会话列表联系人头像右上角角标确保展示（支持 .cli-avatar 与 .cli-avatar-wrap） */
+.chat-list-item .cli-avatar,
 .chat-list-item .cli-avatar-wrap {
   position: relative !important;
   overflow: visible !important;
@@ -9618,11 +9635,13 @@ body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   font-size: 24px !important;
   font-weight: 300 !important;
   line-height: 1 !important;
-  color: #ffffff !important;
-  text-align: center !important;
+  color: #1a1a1a !important;
   margin: 0 !important;
   padding: 0 !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
 }
+#chatBackBtn.has-unread .back-arrow-icon { color: #1a1a1a !important; font-size: 24px !important; line-height: 1 !important; }
 #chatBackBtn:not(.has-unread) {
   width: 36px !important;
   min-width: 36px !important;
@@ -9668,3 +9687,306 @@ body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   margin: 0 0 0 1px !important;
   flex-shrink: 0 !important;
 }
+
+/* ===== v558 核心卡片防黑 & 气泡菜单 & 全端角标终极保障 ===== */
+html body #app-chat .bubble.transfer-bubble,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble,
+html body #app-chat .bubble.shop-card-bubble,
+html body.bubble-css-on #app-chat .bubble.shop-card-bubble,
+html body #app-chat .bubble.survey-bubble,
+html body.bubble-css-on #app-chat .bubble.survey-bubble {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+html body #app-chat .bubble.transfer-bubble *,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble *,
+html body #app-chat .bubble.shop-card-bubble *,
+html body.bubble-css-on #app-chat .bubble.shop-card-bubble *,
+html body #app-chat .bubble.survey-bubble *,
+html body.bubble-css-on #app-chat .bubble.survey-bubble * {
+  color: inherit;
+}
+
+html body #app-chat .bubble.transfer-bubble .tr-amount,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble .tr-amount {
+  color: #1a1a1a !important;
+}
+html body #app-chat .bubble.transfer-bubble .tr-note,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble .tr-note {
+  color: #6b7280 !important;
+}
+html body #app-chat .bubble.transfer-bubble .tr-status,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble .tr-status {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #1a1a1a !important;
+}
+html body #app-chat .bubble.shop-card-bubble .shop-card-bubble-title,
+html body.bubble-css-on #app-chat .bubble.shop-card-bubble .shop-card-bubble-title {
+  color: #1a1a1a !important;
+}
+html body #app-chat .bubble.shop-card-bubble .shop-card-bubble-name,
+html body.bubble-css-on #app-chat .bubble.shop-card-bubble .shop-card-bubble-name {
+  color: #6b7280 !important;
+}
+html body #app-chat .bubble.shop-card-bubble .shop-card-bubble-status,
+html body.bubble-css-on #app-chat .bubble.shop-card-bubble .shop-card-bubble-status {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #1a1a1a !important;
+}
+
+/* 消息长按/点击操作弹窗保障 */
+#msgContextMenu {
+  z-index: 999999 !important;
+  position: fixed !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28) !important;
+  pointer-events: auto !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+#msgContextMenu .context-btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* 全端角标统一样式：白底黑字、99+封顶、高对比度 */
+.home-badge,
+.cli-unread-badge,
+.back-unread-badge,
+#chatBackUnreadBadge {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+}
+
+
+/* === v559: 聊天返回键永久纯黑线条 + 未读胶囊展开锁定 === */
+#chatBackBtn {
+  position: relative !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  transition: width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), min-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), max-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), border-radius 0.2s ease, background 0.2s ease !important;
+}
+#chatBackBtn .back-arrow-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  flex-shrink: 0 !important;
+  font-size: 24px !important;
+  font-weight: 300 !important;
+  line-height: 1 !important;
+  color: #1a1a1a !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+  text-align: center !important;
+}
+#chatBackBtn.has-unread .back-arrow-icon {
+  color: #1a1a1a !important;
+}
+#chatBackBtn:not(.has-unread) {
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  border-radius: 50% !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+}
+#chatBackBtn:not(.has-unread) #chatBackUnreadBadge,
+#chatBackBtn:not(.has-unread) .back-unread-badge {
+  display: none !important;
+}
+#chatBackBtn.has-unread {
+  width: auto !important;
+  min-width: 56px !important;
+  max-width: 82px !important;
+  height: 36px !important;
+  border-radius: 9999px !important;
+  padding: 0 8px 0 0 !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 2px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+#chatBackBtn.has-unread #chatBackUnreadBadge,
+#chatBackBtn.has-unread .back-unread-badge,
+#chatBackUnreadBadge {
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15) !important;
+  margin: 0 0 0 1px !important;
+  flex-shrink: 0 !important;
+}
+
+/* === v559: 问卷卡片左右对齐彻底锁定（我方紧贴右侧头像，对方紧贴左侧头像） === */
+.chat-body .msg-row.me .msg-content-line {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-start !important;
+  justify-content: flex-end !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.chat-body .msg-row.other .msg-content-line,
+.chat-body .msg-row.ta .msg-content-line {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-start !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+.chat-body .msg-row.me .bubble-wrap:has(.survey-bubble),
+.chat-body .msg-row.me .bubble.survey-bubble {
+  margin: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+.chat-body .msg-row.other .bubble-wrap:has(.survey-bubble),
+.chat-body .msg-row.ta .bubble-wrap:has(.survey-bubble),
+.chat-body .msg-row.other .bubble.survey-bubble,
+.chat-body .msg-row.ta .bubble.survey-bubble {
+  margin: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+.chat-body .msg-row .avatar-col {
+  margin: 0 !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+}
+
+/* === v559: 原生核心卡片终极免疫防污染（转账/商店/问卷强制原装白底黑字） === */
+html body #app-chat .bubble.transfer-bubble,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble,
+html body #app-chat .bubble.shop-card-bubble,
+html body.bubble-css-on #app-chat .bubble.shop-card-bubble,
+html body #app-chat .bubble.survey-bubble,
+html body.bubble-css-on #app-chat .bubble.survey-bubble {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html body #app-chat .bubble.transfer-bubble *,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble * {
+  text-shadow: none !important;
+}
+html body #app-chat .bubble.transfer-bubble .tr-amount,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble .tr-amount {
+  color: #1a1a1a !important;
+}
+html body #app-chat .bubble.transfer-bubble .tr-note,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble .tr-note {
+  color: #666666 !important;
+}
+html body #app-chat .bubble.transfer-bubble .tr-type,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble .tr-type {
+  color: #888888 !important;
+}
+html body #app-chat .bubble.transfer-bubble .tr-claim-tip,
+html body.bubble-css-on #app-chat .bubble.transfer-bubble .tr-claim-tip {
+  color: #666666 !important;
+}
+html body #app-chat .bubble.shop-card-bubble *,
+html body.bubble-css-on #app-chat .bubble.shop-card-bubble * {
+  text-shadow: none !important;
+}
+html body #app-chat .bubble.survey-bubble *,
+html body.bubble-css-on #app-chat .bubble.survey-bubble * {
+  text-shadow: none !important;
+}
+
+/* === v559: 气泡防单字竖排与防挤压最高特异性保障 === */
+html body #app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-css-on #app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  width: auto !important;
+  min-width: 36px !important;
+  max-width: 100% !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  display: inline-block !important;
+  box-sizing: border-box !important;
+}
+html body #app-chat .chat-body .msg-row .msg-content-line > .bubble-wrap,
+html body.bubble-css-on #app-chat .chat-body .msg-row .msg-content-line > .bubble-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 48px !important;
+  max-width: calc(100% - 75px) !important;
+  flex-shrink: 1 !important;
+  width: fit-content !important;
+}
+
+
+
+/* === v559: 首页功能图标角标、列表项角标与返回键角标全局统一纯白底黑字 === */
+.home-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: absolute !important;
+  top: -4px !important;
+  right: -8px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+  z-index: 20 !important;
+  pointer-events: none !important;
+}
+
