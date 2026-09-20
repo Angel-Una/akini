@@ -8826,3 +8826,101 @@ body.hide-send-btn .chat-input-bar .input-wrap {
   display: flex !important;
   flex-wrap: wrap !important;
 }
+
+
+/* ==========================================================================
+   v544: 所有界面发表情包绝不准有气泡（纯透明，无背景、无阴影、无边框）
+   ========================================================================== */
+.bubble.sticker-bubble,
+.chat-body .msg-row .bubble.sticker-bubble,
+#app-chat .chat-body .msg-row .bubble.sticker-bubble,
+#companionMsgs .bubble.sticker-bubble,
+#watchChatBody .bubble.sticker-bubble,
+.msg-row.me .bubble.sticker-bubble,
+.msg-row.other .bubble.sticker-bubble,
+.msg-row.ta .bubble.sticker-bubble,
+.msg-row.group .bubble.sticker-bubble,
+body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
+#app-chat .msg-row:not(.bubble-css-on) .bubble.sticker-bubble,
+.bubble:has(> img.comment-sticker-img),
+.bubble:has(> img[data-sticker="1"]),
+.bubble:has(> img.default-emoji-img) {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-radius: 0 !important;
+}
+
+.bubble.sticker-bubble::before,
+.bubble.sticker-bubble::after,
+.chat-body .msg-row .bubble.sticker-bubble::before,
+.chat-body .msg-row .bubble.sticker-bubble::after {
+  display: none !important;
+  content: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* ==========================================================================
+   v544: 聊天列表窗口的消息角标挪到头像右上角，白底黑数字
+   ========================================================================== */
+.cli-avatar {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.cli-avatar .cli-unread-badge,
+.chat-list-item .cli-unread-badge {
+  position: absolute !important;
+  top: -3px !important;
+  right: -5px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  border-radius: 9px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  z-index: 5 !important;
+}
+
+/* ==========================================================================
+   v544: 聊天界面返回键那里的消息数量也改成白底黑数字，显示其他联系人未读总和
+   ========================================================================== */
+.chat-top-bar .back-btn,
+#app-chat .chat-top-bar .back-btn {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+.back-unread-badge,
+#chatBackUnreadBadge {
+  position: absolute !important;
+  top: -3px !important;
+  right: -5px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16), 0 0 0 1px rgba(0, 0, 0, 0.08) !important;
+  z-index: 5 !important;
+}

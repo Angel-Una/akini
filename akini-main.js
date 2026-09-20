@@ -8786,12 +8786,21 @@ document.addEventListener("DOMContentLoaded", function () {
         Zt.__akiniInputTimer = setTimeout(function () {
           if (window.akiniContacts) {
             var t = window.akiniContacts.getActiveChatId();
-            t && window.akiniContacts.updateContact(t, { name: val });
-            try {
-              localStorage.setItem("akini_ta_name", val);
-            } catch (e) {}
+            if (t) {
+              var target = window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(t) : null;
+              if (target && target.type === "group") {
+                window.akiniContacts.updateGroup(t, { name: val });
+              } else {
+                window.akiniContacts.updateContact(t, { name: val });
+                try { localStorage.setItem("akini_ta_name", val); } catch (e) {}
+              }
+              // 同步更新聊天窗口顶栏显示的名称
+              var pillName = document.getElementById("chatTaName");
+              if (pillName) pillName.textContent = val;
+            }
           }
           Tn();
+          if (typeof ot === "function") ot();
           window.renderBeautifyContacts && window.renderBeautifyContacts();
           window.renderHomeAvatarContacts && window.renderHomeAvatarContacts();
           "function" == typeof window._renderIcity && window._renderIcity();
@@ -9112,52 +9121,86 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     const de = document.getElementById("changeChatWallpaperBtn"),
       ue = document.getElementById("fileInputChatWallpaper");
-    function me() {
+    function me(selCid) {
       const t = document.getElementById("emojiPanel");
       if (!t) return;
       t.style.display = "flex";
       t.classList.add("show");
       
+      /* ===== v545：字卡库风格工具（头像渲染 / 我的头像 / 名字转义） ===== */
+      function __emAvHtml(av, size) {
+        if (av && /^(data:|https?:|blob:|\/)/.test(av)) return '<img src="' + av + '" style="width:100%;height:100%;object-fit:cover;" alt=""/>';
+        if (typeof window.nt === "function") return window.nt(av || "", size || 40);
+        return '<span style="font-size:' + Math.round((size || 40) * 0.45) + 'px;">' + (av || "") + "</span>";
+      }
+      function __emMyAvatar() {
+        try { if (typeof window.getMyAvatar === "function") { var _a = window.getMyAvatar(); if (_a) return _a; } } catch (err0) {}
+        try { return localStorage.getItem("akini_my_avatar") || (window.__akiniAvatarCache && window.__akiniAvatarCache.my) || "🐱"; } catch (err1) { return "🐱"; }
+      }
+      function __emEsc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+      /* ===== v545：联系人列表（我 + 所有联系人），点击切换该联系人的独立表情包 ===== */
+      var __emContacts = (window.akiniContacts && window.akiniContacts.getContacts) ? window.akiniContacts.getContacts() : [];
+      var __emMyName = (typeof g === "function" && g()) || "我";
+      var _people = [{ id: "me", name: __emMyName, avatar: __emMyAvatar() }].concat(
+        __emContacts.map(function (c) { return { id: c.id, name: c.name || "对方", avatar: c.avatar || "" }; })
+      );
+      function __emPeopleName(cid) {
+        for (var pi = 0; pi < _people.length; pi++) if (String(_people[pi].id) === String(cid)) return _people[pi].name;
+        return "TA";
+      }
+      var _sel = null;
+      if (selCid) _sel = selCid;
+      else if (window.__akiniEmojiSelCid) _sel = window.__akiniEmojiSelCid;
+      else _sel = "me";
+      if (!_people.some(function (p) { return String(p.id) === String(_sel); })) _sel = "me";
+      window.__akiniEmojiSelCid = _sel;
+
       // 内置可爱默认表情，防止空状态无反应
       const defaultStickers = [
         "❤️", "🥰", "😘", "🥺", "🫂", "💕", "✨", "🌸", 
         "🌹", "🍬", "🎉", "💤", "🧸", "🐱", "🐶", "🐰"
       ];
 
-      N("me", function (e) {
+      N(_sel, function (e) {
         t.innerHTML = "";
         
-        // 顶部控制条
-        const header = document.createElement("div");
-        header.style.cssText = "width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 4px 10px;border-bottom:1px solid rgba(0,0,0,0.06);margin-bottom:8px;";
-        header.innerHTML = `
-          <span style="font-size:13px;font-weight:600;color:#333;">我的表情</span>
-          <div style="display:flex;gap:8px;">
-            <button id="emojiPanelAddBtn" style="background:#07c160;color:#fff;border:none;border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;">+ 添加</button>
-            <button id="emojiPanelCloseBtn" style="background:none;border:none;color:#999;font-size:16px;line-height:1;cursor:pointer;padding:0 4px;">✕</button>
-          </div>
-        `;
-        t.appendChild(header);
-
-        header.querySelector("#emojiPanelAddBtn").addEventListener("click", function(ev) {
-          ev.stopPropagation();
-          try {
-            var fi = document.getElementById("fileInputAddSticker");
-            if (fi) fi.click();
-            else if (typeof openStickerManager === "function") openStickerManager();
-          } catch(err){}
+        /* ===== v545：顶部改为字卡库表情包风格——头像 + 下方名字横滑条 ===== */
+        const strip = document.createElement("div");
+        strip.style.cssText = "position:relative;width:100%;display:flex;gap:14px;overflow-x:auto;padding:10px 38px 8px 14px;background:#fff;-webkit-overflow-scrolling:touch;flex-shrink:0;border-bottom:1px solid rgba(0,0,0,0.06);margin-bottom:8px;";
+        _people.forEach(function (p) {
+          var on = String(p.id) === String(_sel);
+          const it = document.createElement("div");
+          it.style.cssText = "display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;flex-shrink:0;-webkit-tap-highlight-color:transparent;";
+          it.innerHTML =
+            '<div style="width:44px;height:44px;border-radius:50%;background:#f0f0f0;overflow:hidden;display:flex;align-items:center;justify-content:center;flex-shrink:0;' + (on ? "box-shadow:0 0 0 2px #1a1a1a;" : "") + '">' + __emAvHtml(p.avatar, 44) + "</div>" +
+            '<div style="font-size:11px;' + (on ? "color:#1a1a1a;font-weight:600;" : "color:#888;") + 'max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.2;">' + __emEsc(p.name) + "</div>";
+          it.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            if (String(p.id) === String(window.__akiniEmojiSelCid)) return;
+            me(p.id);
+          });
+          strip.appendChild(it);
         });
-        header.querySelector("#emojiPanelCloseBtn").addEventListener("click", function(ev) {
+        const stripClose = document.createElement("button");
+        stripClose.style.cssText = "position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,0.06);border:none;color:#666;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;";
+        stripClose.textContent = "✕";
+        stripClose.addEventListener("click", function(ev) {
           ev.stopPropagation();
           hideEmojiPanel();
         });
+        strip.appendChild(stripClose);
+        t.appendChild(strip);
 
         const listWrap = document.createElement("div");
         listWrap.style.cssText = "width:100%;display:flex;flex-wrap:wrap;gap:10px;align-items:center;max-height:35vh;overflow-y:auto;-webkit-overflow-scrolling:touch;";
         t.appendChild(listWrap);
 
         if (!e || e.length === 0) {
-          // 显示默认内置表情网格
+          // v545：空状态先给出轻提示，再显示默认内置表情网格兜底
+          const emTip = document.createElement("div");
+          emTip.style.cssText = "width:100%;text-align:center;font-size:12px;color:#bbb;padding:0 0 8px;";
+          emTip.textContent = String(_sel) === "me" ? "你还没有表情包，点下方表情先聊起来～" : (__emPeopleName(_sel) + " 还没有表情包");
+          listWrap.appendChild(emTip);
           defaultStickers.forEach(emojiText => {
             const btn = document.createElement("button");
             btn.className = "sticker-img-btn default-emoji-btn";
@@ -9252,25 +9295,64 @@ document.addEventListener("DOMContentLoaded", function () {
             cancelText: "取消",
             onClose: function (ok) {
               if (!ok) return;
-              (window.akiniContacts.deleteGroup(t),
-              (Y.style.display = "none"),
-              (Y.style.pointerEvents = "none"),
-              // 显式关闭聊天窗口并清除当前会话，避免解散后聊天窗口残留
-              window.akiniContacts.setActiveChatId && window.akiniContacts.setActiveChatId(null),
-              (function () {
+              try { window.akiniContacts.deleteGroup(t); } catch(err){}
+              if (Y) { Y.style.display = "none"; Y.style.pointerEvents = "none"; }
+              
+              // 彻底关闭并退出聊天窗口
+              try { window.akiniContacts.setActiveChatId && window.akiniContacts.setActiveChatId(null); } catch(err){}
+              try {
                 var _chat = document.getElementById("app-chat");
-                if (_chat) { _chat.classList.remove("show"); _chat.style.display = "none"; }
+                if (_chat) {
+                  _chat.classList.remove("show");
+                  _chat.style.display = "none";
+                  _chat.setAttribute("aria-hidden", "true");
+                }
                 var _body = document.getElementById("chatBody");
                 if (_body) _body.innerHTML = "";
-              })(),
-              o("chat-list"),
-              ot(),
-              // 多次刷新列表，确保异步清理与 UI 渲染一致
-              setTimeout(function(){ try { ot(); } catch(e){} }, 50),
-              setTimeout(function(){ try { ot(); } catch(e){} }, 300));
+              } catch(err){}
+
+              // 退出到聊天列表
+              try {
+                if (typeof window.akiniGoBack === "function") {
+                  window.akiniGoBack("chat-list");
+                } else if (typeof window.__navBack === "function") {
+                  window.__navBack() || o("chat-list");
+                } else {
+                  o("chat-list");
+                }
+              } catch(err){
+                o("chat-list");
+              }
+              
+              try { typeof ot === "function" && ot(); } catch(err){}
+                            try { typeof ot === "function" && ot(); } catch(err){}
+              try { typeof window.__updateHomeBadges === "function" && window.__updateHomeBadges(); } catch(err){}
+              setTimeout(function(){ try { ot(); } catch(e){} }, 50);
+              setTimeout(function(){ try { ot(); } catch(e){} }, 300);
             }
           });
         }));
+
+    window.__akiniUpdateChatBackBadge = function() {
+      try {
+        var backBadge = document.getElementById("chatBackUnreadBadge");
+        if (!backBadge) return;
+        if (!window.akiniContacts || !window.akiniContacts.getSessions) {
+          backBadge.style.display = "none";
+          return;
+        }
+        var ss = window.akiniContacts.getSessions();
+        var activeChatId = window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+        var bn = 0;
+        Object.keys(ss).forEach(function (k) {
+          if (String(k) !== String(activeChatId)) {
+            bn += Number(ss[k].unread || 0);
+          }
+        });
+        backBadge.textContent = bn > 99 ? "99+" : String(bn);
+        backBadge.style.display = bn > 0 ? "flex" : "none";
+      } catch(e) {}
+    };
     (me(),
       (function () {
         let t = "main",
