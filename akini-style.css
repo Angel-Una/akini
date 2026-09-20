@@ -8715,3 +8715,114 @@ button#plusMenuBtn,
   height: 22px !important;
   display: block !important;
 }
+
+
+/* ==========================================================================
+   v543: 发送键显隐强力覆盖规则（解决关闭后聊天界面仍存在发送键问题）
+   ========================================================================== */
+body.hide-send-btn #sendBtn,
+body.hide-send-btn #app-chat .chat-input-bar #sendBtn,
+body.hide-send-btn .chat-input-bar #sendBtn,
+body.hide-send-btn button#sendBtn,
+#sendBtn.is-hidden {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+
+body.hide-send-btn #app-chat .chat-input-bar .input-wrap,
+body.hide-send-btn .chat-input-bar .input-wrap {
+  flex: 1 1 auto !important;
+  width: auto !important;
+}
+
+/* ==========================================================================
+   v543: 聊天界面滑动防抖动、丝滑惯性滚动与硬件加速
+   ========================================================================== */
+#chatBody,
+.chat-body,
+#app-chat .chat-body {
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain !important;
+  scroll-behavior: auto !important;
+  touch-action: pan-y !important;
+  will-change: scroll-position !important;
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+}
+
+/* 消除子像素抖动 */
+#chatBody .msg-row,
+.chat-body .msg-row {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* ==========================================================================
+   v543: 转账纯向上箭头图标（移除黑色线条圆圈）
+   ========================================================================== */
+.plus-menu-item .pm-arrow-icon {
+  width: 22px !important;
+  height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  color: #1a1a1a !important;
+}
+
+.plus-menu-item .pm-arrow-icon svg {
+  width: 22px !important;
+  height: 22px !important;
+  display: block !important;
+  stroke: #1a1a1a !important;
+  fill: none !important;
+}
+
+/* 确保过去的 pm-circle-icon 即使残留也绝不带任何黑圈 */
+.plus-menu-item .pm-circle-icon {
+  border: none !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+
+/* ==========================================================================
+   v543: 表情包面板层级提升与精美毛玻璃展示
+   ========================================================================== */
+#emojiPanel,
+.emoji-panel {
+  position: absolute !important;
+  bottom: 100% !important;
+  left: 0 !important;
+  width: 100% !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border-radius: 20px 20px 0 0 !important;
+  box-shadow: 0 -6px 28px rgba(0, 0, 0, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.6) !important;
+  border-bottom: none !important;
+  padding: 14px 16px 18px !important;
+  max-height: 45vh !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  z-index: 100010 !important;
+  box-sizing: border-box !important;
+}
+
+#emojiPanel.show {
+  display: flex !important;
+  flex-wrap: wrap !important;
+}

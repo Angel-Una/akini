@@ -8641,8 +8641,21 @@ document.addEventListener("DOMContentLoaded", function () {
     function applyHideSendBtn() {
       var t = !1;
       try { t = localStorage.getItem("akini_hide_send_btn") === "1"; } catch (e) {}
-      hideSendCheckbox && (hideSendCheckbox.checked = t);
-      sendBtnEl && (sendBtnEl.style.display = t ? "none" : "");
+      if (hideSendCheckbox) hideSendCheckbox.checked = t;
+      var el = sendBtnEl || document.getElementById("sendBtn");
+      if (t) {
+        document.body.classList.add("hide-send-btn");
+        if (el) {
+          el.classList.add("is-hidden");
+          el.style.display = "none";
+        }
+      } else {
+        document.body.classList.remove("hide-send-btn");
+        if (el) {
+          el.classList.remove("is-hidden");
+          el.style.display = "";
+        }
+      }
     }
     window.__akiniApplyHideSendBtn = applyHideSendBtn;
     hideSendCheckbox && hideSendCheckbox.addEventListener("change", function() {
@@ -8913,18 +8926,39 @@ document.addEventListener("DOMContentLoaded", function () {
     const oe = document.getElementById("emojiToggleBtn"),
       re = document.getElementById("emojiPanel");
     function hideEmojiPanel() {
-      re &&
-        ((re.style.display = "none"),
-        (re.style.visibility = "hidden"),
-        (re.style.pointerEvents = "none"));
+      var p = re || document.getElementById("emojiPanel");
+      if (p) {
+        p.style.display = "none";
+        p.style.visibility = "hidden";
+        p.style.pointerEvents = "none";
+        p.classList.remove("show");
+      }
     }
     function showEmojiPanel() {
-      re &&
-        (me(),
-        (re.style.display = "flex"),
-        (re.style.visibility = "visible"),
-        (re.style.pointerEvents = "auto"));
+      var p = re || document.getElementById("emojiPanel");
+      if (p) {
+        try { typeof me === "function" && me(); } catch (e) {}
+        p.style.display = "flex";
+        p.style.visibility = "visible";
+        p.style.pointerEvents = "auto";
+        p.classList.add("show");
+      }
     }
+    function toggleEmojiPanel() {
+      var p = re || document.getElementById("emojiPanel");
+      if (p) {
+        if (p.classList.contains("show") || p.style.display === "flex") {
+          hideEmojiPanel();
+        } else {
+          showEmojiPanel();
+          hidePlusMenu();
+        }
+      }
+    }
+    window.__akiniShowEmojiPanel = showEmojiPanel;
+    window.__akiniHideEmojiPanel = hideEmojiPanel;
+    window.__akiniToggleEmojiPanel = toggleEmojiPanel;
+    window.__akiniRenderEmojiPanel = me;
     oe &&
       re &&
       a(oe, function () {
@@ -9080,20 +9114,70 @@ document.addEventListener("DOMContentLoaded", function () {
       ue = document.getElementById("fileInputChatWallpaper");
     function me() {
       const t = document.getElementById("emojiPanel");
-      /* zzf：表情面板只显示“我”的表情包；联系人发表情包走对方回复逻辑（已用其独立表情包） */
-      t &&
-        N("me", function (e) {
-          if (
-            (t.querySelectorAll(".sticker-img-btn").forEach((t) => t.remove()),
-            0 === e.length)
-          ) {
-            const e = document.createElement("div");
-            ((e.className = "sticker-img-btn"),
-              (e.style.cssText =
-                "width:100%; text-align:center; color:#999; font-size:13px; padding:12px 0;"),
-              (e.textContent = "暂无表情包，点击右上角菜单添加"),
-              t.appendChild(e));
-          }
+      if (!t) return;
+      t.style.display = "flex";
+      t.classList.add("show");
+      
+      // 内置可爱默认表情，防止空状态无反应
+      const defaultStickers = [
+        "❤️", "🥰", "😘", "🥺", "🫂", "💕", "✨", "🌸", 
+        "🌹", "🍬", "🎉", "💤", "🧸", "🐱", "🐶", "🐰"
+      ];
+
+      N("me", function (e) {
+        t.innerHTML = "";
+        
+        // 顶部控制条
+        const header = document.createElement("div");
+        header.style.cssText = "width:100%;display:flex;align-items:center;justify-content:space-between;padding:0 4px 10px;border-bottom:1px solid rgba(0,0,0,0.06);margin-bottom:8px;";
+        header.innerHTML = `
+          <span style="font-size:13px;font-weight:600;color:#333;">我的表情</span>
+          <div style="display:flex;gap:8px;">
+            <button id="emojiPanelAddBtn" style="background:#07c160;color:#fff;border:none;border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;">+ 添加</button>
+            <button id="emojiPanelCloseBtn" style="background:none;border:none;color:#999;font-size:16px;line-height:1;cursor:pointer;padding:0 4px;">✕</button>
+          </div>
+        `;
+        t.appendChild(header);
+
+        header.querySelector("#emojiPanelAddBtn").addEventListener("click", function(ev) {
+          ev.stopPropagation();
+          try {
+            var fi = document.getElementById("fileInputAddSticker");
+            if (fi) fi.click();
+            else if (typeof openStickerManager === "function") openStickerManager();
+          } catch(err){}
+        });
+        header.querySelector("#emojiPanelCloseBtn").addEventListener("click", function(ev) {
+          ev.stopPropagation();
+          hideEmojiPanel();
+        });
+
+        const listWrap = document.createElement("div");
+        listWrap.style.cssText = "width:100%;display:flex;flex-wrap:wrap;gap:10px;align-items:center;max-height:35vh;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+        t.appendChild(listWrap);
+
+        if (!e || e.length === 0) {
+          // 显示默认内置表情网格
+          defaultStickers.forEach(emojiText => {
+            const btn = document.createElement("button");
+            btn.className = "sticker-img-btn default-emoji-btn";
+            btn.style.cssText = "background:rgba(0,0,0,0.04);border:none;border-radius:10px;width:48px;height:48px;font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform 0.1s;";
+            btn.textContent = emojiText;
+            btn.addEventListener("click", function(ev) {
+              ev.stopPropagation();
+              // 直接发送文字/表情
+              var input = document.getElementById("msgInput");
+              if (input) {
+                input.value = (input.value || "") + emojiText;
+                var sendBtn = document.getElementById("sendBtn");
+                if (sendBtn) sendBtn.click();
+              }
+              hideEmojiPanel();
+            });
+            listWrap.appendChild(btn);
+          });
+          return;
+        }
           e.forEach((e, n) => {
             var _src = e && typeof e === "object" ? e.s : e;
             if ((e && typeof e === "object" && e.b) || !_src) return;
