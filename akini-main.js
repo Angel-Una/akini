@@ -16888,7 +16888,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       (function () {
         function t(t) {
-          ((t = t || "gray"),
+          ((t = t || "blue"),
             document.body.classList.remove(
               "bubble-gray",
               "bubble-pink",
