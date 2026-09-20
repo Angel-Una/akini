@@ -6772,32 +6772,29 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch (t) {}
       }, 300);
     }
+    /* 防抖全量备份：收发消息时绝不在主线程高频遍历整库，避免移动端 OOM 闪退卡崩 */
+    var __akiniBackupDebounceTimer = null;
     function V() {
       try {
-        /* boot 恢复完成前禁止备份，防空内存覆盖 IDB 好备份（随机数据消失根因） */
         if (!window._akiniDataRestored) return;
-        (A(),
-          window._idbStore &&
-            window._idbStore.backupAll &&
-            window._idbStore.backupAll(),
-          localStorage.length > 0 &&
-            window._akiniCacheStore &&
-            window._akiniCacheStore.backupAll &&
-            window._akiniCacheStore.backupAll(),
-          window.akiniContacts &&
-            window.akiniContacts.backupToIDB &&
-            (window.akiniContacts.backupToIDB(
-              "akini_contacts",
-              window.akiniContacts.getContacts(),
-            ),
-            window.akiniContacts.backupToIDB(
-              "akini_groups",
-              window.akiniContacts.getGroups(),
-            ),
-            window.akiniContacts.backupToIDB(
-              "akini_chat_sessions",
-              window.akiniContacts.getSessions(),
-            )));
+        if (__akiniBackupDebounceTimer) clearTimeout(__akiniBackupDebounceTimer);
+        __akiniBackupDebounceTimer = setTimeout(function () {
+          __akiniBackupDebounceTimer = null;
+          try {
+            if (document.hidden) return;
+            A();
+            if (window._idbStore && window._idbStore.backupAll) {
+              window._idbStore.backupAll();
+            }
+            if (window.akiniContacts && window.akiniContacts.backupToIDB) {
+              window.akiniContacts.backupToIDB("akini_contacts", window.akiniContacts.getContacts());
+              window.akiniContacts.backupToIDB("akini_groups", window.akiniContacts.getGroups());
+              window.akiniContacts.backupToIDB("akini_chat_sessions", window.akiniContacts.getSessions());
+            }
+          } catch (err) {
+            console.warn("[Akini] debounced backup error", err);
+          }
+        }, 5000);
       } catch (t) {
         console.warn("forceBackupNow error", t);
       }
@@ -23602,41 +23599,88 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
   window.__updateHomeBadges = function () {
+    var ss = {};
     try {
-      /* 微信：会话未读求和 */
-      var wn = 0;
       if (window.akiniContacts && window.akiniContacts.getSessions) {
-        var ss = window.akiniContacts.getSessions();
-        Object.keys(ss).forEach(function (k) { wn += Number(ss[k].unread || 0); });
+        ss = window.akiniContacts.getSessions() || {};
       }
+    } catch (e) {}
+
+    /* 1. 微信底部/桌面图标：全部会话未读求和 */
+    try {
+      var wn = 0;
+      Object.keys(ss).forEach(function (k) { wn += Number(ss[k].unread || 0); });
       _setBadge("appBtnChat", wn);
-      /* 信箱：未读信件数（仅点进未读信件详情才会将 read/isRead 置 true） */
+    } catch (e) {}
+
+    /* 2. 信箱：未读信件数 */
+    try {
       var mails = [];
       try { mails = JSON.parse(localStorage.getItem("akini_mail_received") || "[]"); } catch (e) {}
       var unread = mails.filter(function (m) { return !(m && (m.read || m.isRead)); }).length;
       _setBadge("appBtnMail", Math.max(0, unread));
-      /* 朋友圈 / iCity：未读互动通知数 */
+    } catch (e) {}
+
+    /* 3. 朋友圈 / iCity：未读互动通知数 */
+    try {
       _setBadge("appBtnFriends", _getNotifs("friends").filter(function (n) { return !n.read; }).length);
+    } catch (e) {}
+    try {
       _setBadge("appBtnIcity", _getNotifs("icity").filter(function (n) { return !n.read; }).length);
-      /* 聊天页返回角标：除当前会话外的未读总数 */
+    } catch (e) {}
+
+    /* 4. 聊天页左上角返回按钮：胶囊展开与未读数（除当前会话外的未读总数） */
+    try {
+      var backBtn = document.getElementById("chatBackBtn");
       var backBadge = document.getElementById("chatBackUnreadBadge");
-      if (backBadge && window.akiniContacts && window.akiniContacts.getSessions) {
-        var activeChatId = window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+      if (backBtn && backBadge) {
+        var activeChatId = (window.akiniContacts && window.akiniContacts.getActiveChatId) ? window.akiniContacts.getActiveChatId() : "";
         var bn = 0;
-        Object.keys(ss).forEach(function (k) { if (k !== activeChatId) bn += ss[k].unread || 0; });
-        var backBtn = document.getElementById("chatBackBtn");
-        if (backBtn) backBtn.classList.toggle("has-unread", bn > 0);
+        Object.keys(ss).forEach(function (k) { if (k !== activeChatId) bn += Number(ss[k].unread || 0); });
         if (bn > 0) {
+          backBtn.classList.add("has-unread");
           backBadge.textContent = bn > 99 ? "99+" : String(bn);
           backBadge.style.display = "inline-flex";
         } else {
+          backBtn.classList.remove("has-unread");
           backBadge.textContent = "";
           backBadge.style.display = "none";
         }
       }
-      /* 消息中心按钮小红点同步 */
-      _syncNotifBtn("friends");
-      _syncNotifBtn("icity");
+    } catch (e) {}
+
+    /* 5. 消息中心按钮小红点即时同步 */
+    try { _syncNotifBtn("friends"); } catch (e) {}
+    try { _syncNotifBtn("icity"); } catch (e) {}
+
+    /* 6. 会话列表联系人项角标同步（即时更新，不延迟） */
+    try {
+      var chatItems = document.querySelectorAll(".chat-list-item");
+      if (chatItems && chatItems.length) {
+        chatItems.forEach(function (item) {
+          var cid = item.getAttribute("data-id") || item.getAttribute("data-chat-id");
+          if (!cid) return;
+          var itemSess = ss[cid] || {};
+          var itemUnread = Number(itemSess.unread || 0);
+          var badgeEl = item.querySelector(".cli-unread-badge");
+          if (itemUnread > 0) {
+            if (!badgeEl) {
+              var wrap = item.querySelector(".cli-avatar-wrap");
+              if (wrap) {
+                badgeEl = document.createElement("span");
+                badgeEl.className = "cli-unread-badge";
+                wrap.appendChild(badgeEl);
+              }
+            }
+            if (badgeEl) {
+              badgeEl.textContent = itemUnread > 99 ? "99+" : String(itemUnread);
+              badgeEl.style.display = "inline-flex";
+            }
+          } else if (badgeEl) {
+            badgeEl.style.display = "none";
+          }
+        });
+      }
     } catch (e) {}
   };
   function _syncNotifBtn(app) {
