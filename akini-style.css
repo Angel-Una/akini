@@ -1554,14 +1554,17 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  background: #ff3b30;
-  color: #fff;
+  background: #ffffff;
+  color: #1a1a1a;
   border-radius: 9px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  line-height: 1;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
 }
 .chat-list-item .cli-info {
   flex: 1;
@@ -9476,4 +9479,89 @@ body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   margin-left: 4px !important;
   align-items: center !important;
   justify-content: center !important;
+}
+
+/* ==========================================================================
+   v554 终极修复：会话角标、返回键角标、CSS美化防竖排、问卷卡片防换行错位
+   ========================================================================== */
+/* 1. 问卷卡片强力对齐防错位 */
+.chat-body .msg-row:has(.survey-bubble) .msg-content-line,
+.chat-body .msg-row .msg-content-line:has(.survey-bubble) {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+}
+.chat-body .msg-row .bubble.survey-bubble {
+  flex-shrink: 0 !important;
+  width: 250px !important;
+  max-width: 250px !important;
+  min-width: 230px !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
+}
+.chat-body .msg-row .avatar-col {
+  flex-shrink: 0 !important;
+  width: 38px !important;
+}
+
+/* 2. 气泡防单列竖排防极度拉长终极兜底 */
+.chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  writing-mode: horizontal-tb !important;
+  text-orientation: mixed !important;
+  min-width: 28px !important;
+  max-width: 68% !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: pre-wrap !important;
+}
+
+/* 3. 会话列表联系人头像右上角角标确保展示 */
+.chat-list-item .cli-avatar-wrap {
+  position: relative !important;
+  overflow: visible !important;
+}
+.chat-list-item .cli-unread-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: absolute !important;
+  top: -4px !important;
+  right: -6px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+  z-index: 10 !important;
+}
+
+/* 4. 聊天返回键未读徽标 */
+#chatBackBtn {
+  position: relative !important;
+  overflow: visible !important;
+}
+#chatBackUnreadBadge {
+  position: absolute !important;
+  top: -4px !important;
+  right: -8px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  line-height: 16px !important;
+  text-align: center !important;
+  border: 1px solid rgba(0, 0, 0, 0.15) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15) !important;
+  z-index: 20 !important;
 }

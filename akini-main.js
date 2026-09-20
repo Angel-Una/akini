@@ -2291,6 +2291,8 @@ document.addEventListener("DOMContentLoaded", function () {
               } catch (t) {}
               u("ta", e.avatar);
             }
+          } else {
+            try { localStorage.removeItem(a); } catch (t) {}
           }
         },
         getHomeAvatars: E,
@@ -3364,7 +3366,18 @@ document.addEventListener("DOMContentLoaded", function () {
         var r = window.akiniContacts.getChatTarget(t),
           c = window.akiniContacts.getChatTarget(a);
         if (!r || !c) return;
-        var l = t === window.akiniContacts.getActiveChatId(),
+        var _isChatWindowOpen = (function() {
+          try {
+            var chatEl = document.getElementById("app-chat");
+            if (!chatEl) return false;
+            if (!chatEl.classList.contains("show") || chatEl.style.display === "none" || chatEl.getAttribute("aria-hidden") === "true") return false;
+            var act = window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : window.akiniContacts.getActiveChatId();
+            if (!act || String(act) !== String(t)) return false;
+            if (document.hidden) return false;
+            return true;
+          } catch(e) { return false; }
+        })();
+        var l = _isChatWindowOpen,
           s = "group" === r.type,
           u = (function () {
             var _av = c.avatar && String(c.avatar).trim();
@@ -7511,9 +7524,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         })
                       : "",
                     n = t.displayAvatar || t.avatar,
-                    i = t.unread
-                      ? '<span class="cli-unread-badge">' + t.unread + "</span>"
-                      : "",
+                    i = t.unread ? '<span class="cli-unread-badge">' + (t.unread > 99 ? "99+" : String(t.unread)) + "</span>" : "",
                     a = t.pinned
                       ? '<span class="chat-pin-badge">置顶</span>'
                       : "",
@@ -8249,6 +8260,14 @@ document.addEventListener("DOMContentLoaded", function () {
             closeSurveyCreatedList();
         } catch (e) {}
         A();
+        try {
+          if (window.akiniContacts && window.akiniContacts.setActiveChatId) {
+            window.akiniContacts.setActiveChatId(null);
+          }
+        } catch (e) {}
+        try { typeof window.__updateHomeBadges === "function" && window.__updateHomeBadges(); } catch (e) {}
+        try { typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(); } catch (e) {}
+        try { typeof window.__akiniRefreshChatListBadges === "function" && window.__akiniRefreshChatListBadges(); } catch (e) {}
         try {
           window.__navBack
             ? window.__navBack() || o("chat-list")
@@ -17762,6 +17781,7 @@ document.addEventListener("DOMContentLoaded", function () {
                             t.text = "[表情包]";
                           }
                           e.comments.push(_cmtA);
+                          try { window.__akiniPushNotif && window.__akiniPushNotif("friends", t.replyTo ? "reply" : "comment", n, i, String(t.text || "").slice(0, 30), e.id || e.ts, { replyTo: _cmtA.replyTo, sticker: _cmtA.sticker }); } catch (_eN) {}
                         })(),
                         (s = !0));
                       var dmsg = t.replyTo
@@ -17799,6 +17819,7 @@ document.addEventListener("DOMContentLoaded", function () {
                           t.text = "[表情包]";
                         }
                         e.comments.push(_cmtB);
+                        try { window.__akiniPushNotif && window.__akiniPushNotif("friends", t.replyTo ? "reply" : "comment", n, i, String(t.text || "").slice(0, 30), e.id || e.ts, { replyTo: _cmtB.replyTo, sticker: _cmtB.sticker }); } catch (_eN) {}
                       })(),
                       (s = !0));
                     var dmsg = t.replyTo
@@ -17893,6 +17914,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     }
                     l[v].comments = l[v].comments || [];
                     l[v].comments.push(_cmtC);
+                    try { window.__akiniPushNotif && window.__akiniPushNotif("friends", "reply", n, i, String(y || "").slice(0, 30), p.id || p.ts, { replyTo: _cmtC.replyTo, sticker: _cmtC.sticker }); } catch (_eN) {}
                     s = !0;
                     window.showInAppNotif({
                       app: "朋友圈",
@@ -19102,6 +19124,7 @@ document.addEventListener("DOMContentLoaded", function () {
                   if (!interactor) return;
                   var a = interactor.name,
                     c = interactor.avatar;
+                  try { window.__akiniPushNotif && window.__akiniPushNotif("icity", "like", a, c, String(n.content || n.text || "").replace(/\n/g, " ").slice(0, 30), n.id); } catch (_eN) {}
                   ((n.likers = n.likers || []),
                     n.likers.indexOf(a) < 0 &&
                       (n.likers.push(a),
@@ -19180,6 +19203,7 @@ document.addEventListener("DOMContentLoaded", function () {
                           i = "[表情包]";
                         }
                         n.comments.push(_cmtD);
+                        try { window.__akiniPushNotif && window.__akiniPushNotif("icity", "comment", l, s, String(i || "").slice(0, 30), n.id, { sticker: _cmtD.sticker }); } catch (_eN) {}
                       })(),
                       j(e),
                       window._renderIcity && window._renderIcity(),
@@ -23510,6 +23534,30 @@ document.addEventListener("DOMContentLoaded", function () {
       try { localStorage.setItem(_nk(app) + "_backup", s); } catch (e2) {}
     } catch (e) {}
   }
+  /* v556: 通用互动通知写入——朋友圈/iCity 消息中心角标数据源（引擎路径之外的补充） */
+  window.__akiniPushNotif = function (app, type, name, avatar, text, momentId, extra) {
+    try {
+      if (app !== "friends" && app !== "icity") return;
+      var raw = _getNotifs(app);
+      var item = {
+        id: "n_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        type: type,
+        name: name || "对方",
+        avatar: avatar || "",
+        text: String(text || "").slice(0, 60),
+        momentId: String(momentId || ""),
+        ts: Date.now(),
+        read: false
+      };
+      if (extra && extra.sticker) item.sticker = extra.sticker;
+      if (extra && extra.replyTo) item.replyTo = extra.replyTo;
+      raw.push(item);
+      if (raw.length > 100) raw = raw.slice(-100);
+      _saveNotifs(app, raw);
+      if (window.__updateHomeBadges) window.__updateHomeBadges();
+    } catch (e) {}
+  };
+
   /* zzzy→zzzk：仅在打开对应功能的通知中心（互动消息面板）时标记已读——朋友圈/iCity 主界面不再自动清除角标 */
   window.__akiniMarkNotifsRead = function (app) {
     try {
@@ -23597,6 +23645,11 @@ document.addEventListener("DOMContentLoaded", function () {
     var n = _getNotifs(app).filter(function (x) { return !x.read; }).length;
     if (n > 0) {
       b.style.display = "block";
+      b.style.background = "#ffffff";
+      b.style.color = "#1a1a1a";
+      b.style.border = "1px solid rgba(0,0,0,.1)";
+      b.style.boxShadow = "0 1px 4px rgba(0,0,0,.18)";
+      b.style.fontWeight = "600";
       b.textContent = n > 99 ? "99+" : String(n);
     } else {
       b.style.display = "none";
