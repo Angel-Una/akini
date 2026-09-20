@@ -2191,9 +2191,11 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
         for (var a in e) e.hasOwnProperty(a) && (i[a] = e[a]);
-        // zza：未读数变化时实时刷新首页微信角标
+        // zza：未读数变化时实时刷新首页微信角标、聊天返回键徽标与会话列表角标
         if (e && typeof e.unread !== "undefined") {
           try { window.__updateHomeBadges && window.__updateHomeBadges(); } catch (e2) {}
+          try { window.__akiniUpdateChatBackBadge && window.__akiniUpdateChatBackBadge(); } catch (e2) {}
+          try { window.__akiniRefreshChatListBadges && window.__akiniRefreshChatListBadges(); } catch (e2) {}
         }
         // 内存中保留 messagesHTML 用于即时渲染，但不随 sessions 写入 localStorage
         var memHtml = __akiniStripTypingRows(i.messagesHTML);
@@ -7379,7 +7381,7 @@ document.addEventListener("DOMContentLoaded", function () {
     function _akPinList() {
       return _akPinGet();
     }
-    function ot() {
+    function ot() {\n      window.__akiniRefreshChatListBadges = ot;
       (at && clearTimeout(at),
         (at = setTimeout(function () {
           ((at = null),
@@ -23556,7 +23558,7 @@ document.addEventListener("DOMContentLoaded", function () {
       var wn = 0;
       if (window.akiniContacts && window.akiniContacts.getSessions) {
         var ss = window.akiniContacts.getSessions();
-        Object.keys(ss).forEach(function (k) { wn += ss[k].unread || 0; });
+        Object.keys(ss).forEach(function (k) { wn += Number(ss[k].unread || 0); });
       }
       _setBadge("appBtnChat", wn);
       /* 信箱：未读信件数（仅点进未读信件详情才会将 read/isRead 置 true） */

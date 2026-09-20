@@ -7557,8 +7557,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   color: #1a1a1a !important;
 }
 
-/* 5. 联系人默认气泡：磨砂半透明液态玻璃感 (非自定义气泡主题时) */
-#app-chat .msg-row:not(.bubble-css-on) .bubble,
+/* 5. 联系人默认气泡：磨砂半透明液态玻璃感 (非自定义气泡主题时，仅限对方，绝不覆盖我方气泡) */
 #app-chat .msg-row.other:not(.bubble-css-on) .bubble,
 #app-chat .msg-row.ta:not(.bubble-css-on) .bubble {
   background: rgba(255, 255, 255, 0.65) !important;
@@ -9360,4 +9359,121 @@ html body .chat-body.bubble-css-preview .msg-content-line {
   gap: 8px !important;
   width: 100% !important;
   align-items: flex-start !important;
+}
+
+
+/* ==========================================================================
+   v552: 彻底消灭强制液态玻璃气泡、自选颜色与CSS美化100%生效、输入栏紧贴底端
+   ========================================================================== */
+
+/* 1. 自选气泡颜色高权重保障：直接挂在 #app-chat 之上，消除液态玻璃 */
+#app-chat .msg-row.me:not(.bubble-css-on) .bubble,
+#app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+  background: #007aff !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+
+body.bubble-blue #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
+body.bubble-blue #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+  background: #007aff !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+
+body.bubble-pink #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
+body.bubble-pink #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+  background: #ffd1dc !important;
+  color: #111111 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(255, 209, 220, 0.4) !important;
+}
+
+body.bubble-green #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
+body.bubble-green #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+  background: #4cd964 !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(76, 217, 100, 0.3) !important;
+}
+
+body.bubble-black #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
+body.bubble-black #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+  background: #1c1c1e !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.bubble-gray #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
+body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+  background: #e5e5ea !important;
+  color: #111111 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 2. 聊天界面输入栏、加号键、发送键整体下沉紧贴底端 */
+#app-chat .chat-input-bar-area,
+.chat-input-bar-area {
+  padding-bottom: max(2px, calc(env(safe-area-inset-bottom, 0px) - 16px)) !important;
+  bottom: 0 !important;
+}
+
+#app-chat .chat-input-bar {
+  margin-bottom: 0 !important;
+  padding-top: 6px !important;
+  padding-bottom: 4px !important;
+  min-height: 48px !important;
+}
+
+@media all and (display-mode: standalone) {
+  #app-chat .chat-input-bar-area,
+  .chat-input-bar-area {
+    padding-bottom: max(2px, calc(env(safe-area-inset-bottom, 0px) - 22px)) !important;
+    bottom: 0 !important;
+  }
+  #app-chat .chat-body,
+  .chat-body {
+    padding-bottom: calc(52px + max(2px, calc(env(safe-area-inset-bottom, 0px) - 22px))) !important;
+  }
+  #app-chat .chat-input-bar {
+    margin-bottom: 0 !important;
+    padding-bottom: 2px !important;
+  }
+}
+
+/* 3. 返回键有未读时高亮白底黑字胶囊 */
+#chatBackBtn.has-unread #chatBackUnreadBadge,
+#chatBackBtn.has-unread .back-unread-badge {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  border-radius: 9px !important;
+  padding: 0 6px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  line-height: 18px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18) !important;
+  margin-left: 4px !important;
+  align-items: center !important;
+  justify-content: center !important;
 }

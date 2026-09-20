@@ -60,7 +60,7 @@ try{
   window.__akiniLowMem = ((navigator.deviceMemory||8) <= 4) || ((navigator.hardwareConcurrency||8) <= 4) || (/iPad|iPhone|iPod/.test(navigator.userAgent) && !(window.MSStream));
   if(window.__akiniLowMem) document.documentElement.classList.add("low-mem");
 }catch(e){}
-</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260921v551" name="akini-ver"/><script>(function(){
+</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="20260921v552" name="akini-ver"/><script>(function(){
   // 版本标记（仅记录，绝不触发 reload，避免循环刷新）
   try {
     var cur = (document.querySelector('meta[name=akini-ver]')||{}).content || "";
@@ -236,20 +236,39 @@ try{
     writeCookie();
     writeIdb();
   }
+  function destroySplash(){
+    entered = true;
+    try {
+      var sp = el('akiniSplash');
+      if(sp){
+        sp.classList.add('hidden');
+        sp.style.setProperty('display', 'none', 'important');
+        sp.style.setProperty('pointer-events', 'none', 'important');
+        sp.style.setProperty('visibility', 'hidden', 'important');
+        sp.style.setProperty('z-index', '-99999', 'important');
+        sp.style.opacity = '0';
+        setTimeout(function(){
+          try { sp.remove ? sp.remove() : (sp.parentNode && sp.parentNode.removeChild(sp)); } catch(e){}
+        }, 30);
+      }
+    } catch(e){}
+    try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
+    try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch(e){}
+  }
+  window.__akiniDestroySplash = destroySplash;
+
   function trySkip(){
     try {
       if (localStorage.getItem(ENTER_KEY) === 'true') {
         window.__akiniSplashShouldSkip = true;
-        try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
-        try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch(e){}
+        destroySplash();
         return true;
       }
     } catch(e){}
     if (readCookie()) {
       try { localStorage.setItem(ENTER_KEY, 'true'); } catch(e){}
       window.__akiniSplashShouldSkip = true;
-      try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
-      try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch(e){}
+      destroySplash();
       return true;
     }
     return false;
@@ -264,8 +283,7 @@ try{
           if(entered || window.__akiniSplashShouldSkip) return;
           if((vals && (vals[0] === 'true' || vals[1] === 'true'))) {
             markEntered();
-            try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
-            try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch(e){}
+            destroySplash();
           }
         }).catch(function(){});
       }
@@ -273,19 +291,8 @@ try{
   }
   function enterSite(){
     if(entered) return;
-    entered = true;
     markEntered();
-    try {
-      var sp = el('akiniSplash');
-      if(sp){
-        sp.classList.add('hidden');
-        sp.style.display='none';
-        sp.style.opacity='0';
-        sp.style.pointerEvents='none';
-      }
-    } catch(e){}
-    try { window.__akiniBootApp && window.__akiniBootApp(); } catch(e){}
-    try { window.__akiniHideSplash && window.__akiniHideSplash(); } catch(e){}
+    destroySplash();
   }
   window.__akiniEnterSite = enterSite;
   function bind(){
@@ -3046,9 +3053,9 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
 
   /* 将常见气泡选择器映射到本应用结构，并加 .chat-body 前缀提升权重；排除转账与表情包气泡 */
   function translateSelectors(css){
-    var meSel=".chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
-    var otherSel=".chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
-    var anySel=".chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
+    var meSel="#app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
+    var otherSel="#app-chat .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
+    var anySel="#app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)";
     /* 先清理已有前缀，避免正则多次嵌套产生 .chat-body .chat-body */
     var cleaned = (css || "")
       .replace(/\.chat-body\s*/g, " ")
@@ -3067,8 +3074,8 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     var raw=css||"";
     var final="";
     if(raw.trim()){
-      /* 保底半透明高级背景放最前面，杜绝任何情况下气泡变全透明裸奔 */
-      final="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background:rgba(255,255,255,0.78) !important;color:#111 !important;-webkit-backdrop-filter:blur(12px) !important;backdrop-filter:blur(12px) !important;box-shadow:0 2px 10px rgba(0,0,0,0.06) !important;}\n.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){background:rgba(255,255,255,0.85) !important;color:#111 !important;-webkit-backdrop-filter:blur(12px) !important;backdrop-filter:blur(12px) !important;box-shadow:0 2px 10px rgba(0,0,0,0.06) !important;}\n";
+      /* 开启 CSS 美化时，彻底清除磨砂液态玻璃，完全交给自定义样式接管 */
+      final="\nbody.bubble-css-on #app-chat .bubble { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }\n";
       final+=addImportant(translateSelectors(raw));
       /* 自动保护：防止文本越出气泡，同时保留自定义宽高和内边距 */
       final+="\n.chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble){max-width:100% !important;box-sizing:border-box !important;overflow-wrap:break-word !important;word-break:break-word !important;}\n";
