@@ -8468,3 +8468,122 @@ button#plusMenuBtn {
   0%, 60%, 100% { opacity: 0.25; }
   30% { opacity: 1; }
 }
+
+
+/* ==========================================================================
+   v534: 微信输入栏全套液态玻璃 + 消息穿透输入栏底部（上栏同款透视） + 昵称条上移3px
+   ========================================================================== */
+
+/* 1. 微信顶部昵称条继续往上挪 3px */
+#app-chat .chat-top-bar {
+  padding-top: calc(env(safe-area-inset-top, 0px) + 7px) !important;
+}
+#app-chat .chat-top-bar .ta-info {
+  margin-top: 3px !important;
+}
+#app-chat .chat-top-bar .ta-name-pill {
+  margin-top: -1px !important;
+}
+
+/* 2. 聊天内容全屏通透穿透：chat-body 占满全高，输入栏悬浮在底部，聊天内容滑下去可以透在输入栏底下（与上栏完全一致） */
+#app-chat .chat-wrapper {
+  position: relative !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+}
+
+#app-chat .chat-body {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  padding-top: 86px !important;
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+  overflow-y: auto !important;
+  z-index: 1 !important;
+}
+
+#app-chat .chat-input-bar-area {
+  position: absolute !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  z-index: 100 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  border-top: none !important;
+  pointer-events: auto !important;
+}
+
+/* 3. 圈起来的输入栏（加号键、输入胶囊、发送键）完全变回上栏同款纯液态玻璃（高透磨砂无白边） */
+#app-chat .chat-input-bar #plusMenuBtn,
+#app-chat .chat-input-bar #sendBtn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.45) !important;
+  background-color: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08) !important;
+  border: none !important;
+  outline: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+  color: #1a1a1a !important;
+  transition: all 0.2s cubic-bezier(0.2, 0.9, 0.3, 1) !important;
+}
+
+#app-chat .chat-input-bar #plusMenuBtn:active,
+#app-chat .chat-input-bar #sendBtn:active {
+  background: rgba(255, 255, 255, 0.65) !important;
+  transform: scale(0.92) !important;
+}
+
+#app-chat .chat-input-bar .input-wrap {
+  flex: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  background: rgba(255, 255, 255, 0.45) !important;
+  background-color: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(16px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
+  border-radius: 24px !important;
+  padding: 0 16px !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  outline: none !important;
+  box-sizing: border-box !important;
+}
+
+#app-chat .chat-input-bar .input-wrap input {
+  flex: 1 !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  font-size: 15px !important;
+  color: #1a1a1a !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+#app-chat .chat-input-bar .input-wrap input::placeholder {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
