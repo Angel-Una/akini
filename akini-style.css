@@ -1912,12 +1912,12 @@ body:not(.bubble-css-on)
   border: none !important;
   outline: none !important;
 }
-/* v573: 问卷卡片与转账卡片尺寸形状完全统一（width auto/min200/max250、全16px圆角、无小尖角） */
+/* v575: 问卷卡片宽度收窄，footer 左右贴边 */
 .chat-body .msg-row .bubble.survey-bubble {
   width: auto !important;
-  min-width: 200px !important;
-  max-width: 250px !important;
-  padding: 13px 14px !important;
+  min-width: 180px !important;
+  max-width: 220px !important;
+  padding: 13px 14px 10px !important;
   border-radius: 16px !important;
   background: #ffffff !important;
   border: 1px solid #e8e8e8 !important;
@@ -1980,7 +1980,10 @@ html body .chat-body .msg-row.ta .bubble.survey-bubble {
   margin: 6px 0 4px;
 }
 .survey-bubble-footer {
-  padding: 0;
+  padding: 8px 14px 10px;
+  margin: 8px -14px -10px;
+  width: calc(100% + 28px);
+  box-sizing: border-box;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -6495,10 +6498,12 @@ body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-
   text-align: right;
   margin-top: 3px;
 }
-/* 问卷卡 footer 横线与转账/商店卡统一：细灰线 + 上间距 */
+/* v575: 问卷卡 footer 左右贴边对齐 */
 .survey-bubble-footer {
-  margin-top: 12px !important;
-  padding: 10px 12px 8px !important;
+  margin: 8px -14px 0 !important;
+  padding: 8px 14px 10px !important;
+  width: calc(100% + 28px) !important;
+  box-sizing: border-box !important;
   border-top: 1px solid #f0f0f0 !important;
 }
 
@@ -9332,18 +9337,18 @@ html body:not(.bubble-css-on) #app-chat .msg-row .bubble.sticker-bubble,
   writing-mode: horizontal-tb !important;
 }
 
-/* 5. 问卷卡片 (survey-bubble) 终极修复：结构完整、紧凑自适应、我方对方布局一致 */
+/* v575: 问卷卡片宽度收窄，footer 左右贴边对齐 */
 .bubble.survey-bubble {
   display: flex !important;
   flex-direction: column !important;
-  width: 250px !important;
-  max-width: 250px !important;
-  min-width: 230px !important;
+  width: 220px !important;
+  max-width: 220px !important;
+  min-width: 200px !important;
   background: #ffffff !important;
   border-radius: 14px !important;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08) !important;
   border: 1px solid rgba(0, 0, 0, 0.06) !important;
-  padding: 12px 14px !important;
+  padding: 12px 14px 0 !important;
   box-sizing: border-box !important;
   cursor: pointer !important;
   user-select: none !important;
@@ -9415,7 +9420,10 @@ html body:not(.bubble-css-on) #app-chat .msg-row .bubble.sticker-bubble,
   flex-direction: row !important;
   justify-content: space-between !important;
   align-items: center !important;
-  width: 100% !important;
+  width: calc(100% + 28px) !important;
+  margin: 8px -14px 0 !important;
+  padding: 8px 14px 10px !important;
+  box-sizing: border-box !important;
   font-size: 12px !important;
   color: #8c8c8c !important;
 }
@@ -10263,10 +10271,18 @@ html body.bubble-css-on #app-chat .chat-body .msg-row.system .bubble:not(.transf
   box-shadow: none !important;
 }
 
-/* --- v573-3: 问卷/商店卡片与转账卡完全同款尺寸形状（覆盖历史消息里的旧内联220px） --- */
+/* --- v575: 问卷卡片宽度收窄（覆盖历史消息里的旧内联250px） --- */
 html body .chat-body .msg-row .bubble.survey-bubble,
+html body .chat-body .msg-row .msg-content-line .bubble.survey-bubble {
+  width: auto !important;
+  min-width: 180px !important;
+  max-width: 220px !important;
+  border-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  border-top-left-radius: 16px !important;
+  padding: 13px 14px 0 !important;
+}
 html body .chat-body .msg-row .bubble.shop-card-bubble,
-html body .chat-body .msg-row .msg-content-line .bubble.survey-bubble,
 html body .chat-body .msg-row .msg-content-line .bubble.shop-card-bubble {
   width: auto !important;
   min-width: 200px !important;
@@ -10284,4 +10300,108 @@ html body .chat-body .msg-row.other .bubble.shop-card-bubble,
 html body .chat-body .msg-row.ta .bubble.shop-card-bubble {
   border-top-right-radius: 16px !important;
   border-top-left-radius: 16px !important;
+}
+
+/* ==========================================================================
+   v576: 聊天返回键——无未读时为圆形，有未读(has-unread)时才展开成胶囊
+   ========================================================================== */
+html body #app-chat .chat-top-bar #chatBackBtn,
+html body #chatBackBtn {
+  position: relative !important;
+  box-sizing: border-box !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  backdrop-filter: blur(12px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(160%) !important;
+  transition: width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+              min-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+              max-width 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+              padding 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+              background 0.2s ease !important;
+  overflow: visible !important;
+}
+
+html body #app-chat .chat-top-bar #chatBackBtn .back-arrow-icon,
+html body #chatBackBtn .back-arrow-icon {
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 18px !important;
+  min-width: 18px !important;
+  max-width: none !important;
+  height: 18px !important;
+  font-size: 20px !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+  color: #1a1a1a !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: center !important;
+  transform: none !important;
+}
+
+html body #app-chat .chat-top-bar #chatBackBtn .back-unread-badge,
+html body #app-chat .chat-top-bar #chatBackBtn #chatBackUnreadBadge,
+html body #chatBackBtn .back-unread-badge,
+html body #chatBackBtn #chatBackUnreadBadge {
+  position: absolute !important;
+  top: 50% !important;
+  right: 6px !important;
+  transform: translateY(-50%) !important;
+  display: none !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  border-radius: 9px !important;
+  background: #ffffff !important;
+  color: #111111 !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18) !important;
+  pointer-events: none !important;
+}
+
+/* 有未读消息时：返回键展开为胶囊，箭头居左、未读数在胶囊内右侧 */
+html body #app-chat .chat-top-bar #chatBackBtn.has-unread,
+html body #chatBackBtn.has-unread {
+  width: auto !important;
+  min-width: 56px !important;
+  max-width: none !important;
+  padding: 0 28px 0 10px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+}
+
+html body #app-chat .chat-top-bar #chatBackBtn.has-unread .back-arrow-icon,
+html body #chatBackBtn.has-unread .back-arrow-icon {
+  color: #1a1a1a !important;
+}
+
+html body #app-chat .chat-top-bar #chatBackBtn.has-unread .back-unread-badge,
+html body #app-chat .chat-top-bar #chatBackBtn.has-unread #chatBackUnreadBadge,
+html body #chatBackBtn.has-unread .back-unread-badge,
+html body #chatBackBtn.has-unread #chatBackUnreadBadge {
+  display: inline-flex !important;
+}
+
+html body #app-chat .chat-top-bar #chatBackBtn:not(.has-unread) .back-unread-badge,
+html body #app-chat .chat-top-bar #chatBackBtn:not(.has-unread) #chatBackUnreadBadge,
+html body #chatBackBtn:not(.has-unread) .back-unread-badge,
+html body #chatBackBtn:not(.has-unread) #chatBackUnreadBadge {
+  display: none !important;
 }

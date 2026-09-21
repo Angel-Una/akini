@@ -18472,9 +18472,9 @@ document.addEventListener("DOMContentLoaded", function () {
         window._akiniKeepAliveAudioStop = _kaAudioStop,
         // 切回前台时若保活开着但音频被系统暂停，自动续播
         document.addEventListener("visibilitychange", function () {
-          if (_kaAudioEnabled() && "visible" === document.visibilityState && _kaAudio && _kaAudio.paused) {
+          if (_kaAudioEnabled() && "visible" === document.visibilityState) {
             _kaDelay = 0;
-            _kaAudio.play().catch(function () {});
+            if (_kaAudio && _kaAudio.paused) _kaAudio.play().catch(function () {});
           }
         }),
         // 启动时若已开启保活则尝试开播（被自动播放策略拦截时由 unlock 兜底）
@@ -25217,4 +25217,73 @@ window.__akiniNotifyUnreadChanged = function() {
   try { window.__akiniRefreshChatListBadges && window.__akiniRefreshChatListBadges(); } catch(e){}
   try { if (window.akiniContacts && window.akiniContacts.renderChatList) window.akiniContacts.renderChatList(); } catch(e){}
 };
+
+
+/* ===== v576: 首页纵向自适应——矮屏/带浏览器工具栏设备上等比缩小上方模块，
+   确保「设置 / 美化 / 字卡库」底栏永远在视口内可见 =====
+   根因：phone-frame 为 fixed 全视口容器 + content-wrapper overflow:hidden + touch-action:none
+   （v519 起首页禁止上下滑动）。当 top-card + 音乐 + 应用网格 + 预览的总高超过视口时，
+   fit-bottom 底栏被挤出屏幕外且无法滚动查看。此处按可用高度等比缩放上方模块收拢布局；
+   放得下时不做任何事（fit-bottom 的 margin-top:auto 自然贴底）。 */
+(function () {
+  function fit() {
+    try {
+      if (document.documentElement.classList.contains("akini-safe-mode") ||
+          document.documentElement.classList.contains("akini-deep-safe")) return; /* 安全模式允许滚动，不缩放 */
+      var wrap = document.querySelector(".phone-frame > .content-wrapper");
+      if (!wrap) return;
+      var barMod = wrap.querySelector(":scope > .fit-bottom");
+      var mods = Array.prototype.slice.call(wrap.querySelectorAll(":scope > .fit-mod:not(.fit-bottom)"));
+      if (!barMod || !mods.length) return;
+      /* 先复位再量自然高，保证幂等 */
+      mods.forEach(function (m) { m.style.transform = ""; m.style.marginBottom = ""; });
+      var cs = window.getComputedStyle(wrap);
+      var availH = wrap.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+      var barH = barMod.offsetHeight;
+      var boxH = 0, gapH = 0;
+      mods.forEach(function (m) {
+        boxH += m.offsetHeight;
+        gapH += parseFloat(window.getComputedStyle(m).marginTop) || 0;
+      });
+      if (boxH <= 0) return;
+      if (boxH + gapH + barH <= availH) return;
+      var k = (availH - barH - gapH) / boxH;
+      if (k > 1) k = 1;
+      if (k < 0.5) k = 0.5; /* 下限：避免极端矮屏过度缩小不可用 */
+      mods.forEach(function (m) {
+        m.style.transformOrigin = "top center";
+        m.style.transform = "scale(" + k.toFixed(4) + ")";
+      });
+      /* transform 不改变布局占位：末模块负 margin 收拢省出的高度，把底栏拉回视口 */
+      mods[mods.length - 1].style.marginBottom = -(boxH * (1 - k)).toFixed(1) + "px";
+    } catch (e) {}
+  }
+  window.__akiniHomeAutoFit = fit;
+  function boot() { fit(); setTimeout(fit, 300); setTimeout(fit, 1200); setTimeout(fit, 3000); }
+  if ("loading" === document.readyState) document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+  window.addEventListener("resize", boot);
+  window.addEventListener("orientationchange", function () { setTimeout(fit, 250); });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) setTimeout(fit, 400); });
+  /* 页面切换后首页模块显隐变化，导航函数包一层重新适配（防重复包装） */
+  function hookNav() {
+    ["navTo", "__navShowArea", "__openWordBank", "__akiniGoBack"].forEach(function (fn) {
+      try {
+        var orig = window[fn];
+        if ("function" !== typeof orig || orig.__akiniFitWrapped) return;
+        var wrapped = function () {
+          var r = orig.apply(this, arguments);
+          setTimeout(fit, 150);
+          setTimeout(fit, 700);
+          return r;
+        };
+        wrapped.__akiniFitWrapped = true;
+        window[fn] = wrapped;
+      } catch (e) {}
+    });
+  }
+  hookNav();
+  if ("loading" === document.readyState) document.addEventListener("DOMContentLoaded", hookNav);
+  else hookNav();
+})();
 
