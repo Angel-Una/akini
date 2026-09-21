@@ -1460,6 +1460,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 .chat-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden !important;
   padding: 100px 14px 90px !important;
   transition: background 0.3s;
   background-size: cover;
@@ -1844,7 +1845,7 @@ body.bubble-css-on
   .chat-body
   .msg-row
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  overflow: hidden;
+  overflow: visible !important;
 }
 /* 自定义气泡 CSS 生效（body.bubble-css-on）时，自带阴影停用 */
 body:not(.bubble-css-on)
@@ -7968,7 +7969,7 @@ html body.bubble-gray:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.tr
 body:not(.bubble-css-on)
   .chat-body
   .msg-row
-  .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
+  body:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)::before {
   display: none !important;
   content: none !important;
 }
@@ -8133,7 +8134,7 @@ body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):no
 .chat-body .msg-row .bubble::before,
 .chat-body .msg-row .bubble::after,
 #app-chat .chat-body .msg-row .bubble::before,
-#app-chat .chat-body .msg-row .bubble::after {
+body:not(.bubble-css-on) #app-chat .chat-body .msg-row .bubble::after {
   display: none !important;
   content: none !important;
 }
@@ -9219,13 +9220,15 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   letter-spacing: -0.2px !important;
 }
 
-/* 4. 气泡容器 bubble-wrap 及气泡宽度自适应紧贴内容 */
+/* 4. 气泡容器 bubble-wrap 及气泡宽度自适应紧贴内容（短消息自适应紧凑，长消息绝不超出屏幕） */
 .bubble-wrap {
   display: flex !important;
   flex-direction: column !important;
-  max-width: calc(100% - 110px) !important;
+  width: fit-content !important;
+  max-width: calc(100% - 56px) !important;
   min-width: 0 !important;
   flex: 0 1 auto !important;
+  box-sizing: border-box !important;
 }
 
 .msg-row.me .bubble-wrap {
@@ -9236,18 +9239,15 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   align-items: flex-start !important;
 }
 
-/* 普通文本消息气泡：宽度随文字自适应收缩，绝不允许比消息文字长
-   v550：恢复无条件生效（v549 加的 body:not(.bubble-css-on) 前缀导致开启美化时
-   气泡失去 inline-block 变成整行拉伸）。自定义美化 CSS 映射后的选择器与此处
-   特异性相同且注入的 style 元素位于文档末尾，仍可正常覆盖宽度 */
-.msg-row .bubble:not(.survey-bubble):not(.shop-bubble):not(.redpacket-bubble):not(.sticker-bubble) {
+/* 普通文本消息气泡：宽度随文字自适应收缩，短消息紧凑，长消息在最大宽度内自动折行，绝不横向超出屏幕 */
+.msg-row .bubble:not(.survey-bubble):not(.shop-card-bubble):not(.transfer-bubble):not(.redpacket-bubble):not(.sticker-bubble) {
   display: inline-block !important;
-  width: auto !important;
-  max-width: 68% !important;
-  min-width: 24px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   box-sizing: border-box !important;
   word-break: break-word !important;
-  overflow-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
   white-space: pre-wrap !important;
   writing-mode: horizontal-tb !important;
 }
@@ -9417,9 +9417,9 @@ html body .chat-body.bubble-css-preview .msg-content-line {
    v552: 彻底消灭强制液态玻璃气泡、自选颜色与CSS美化100%生效、输入栏紧贴底端
    ========================================================================== */
 
-/* 1. 自选气泡颜色高权重保障：直接挂在 #app-chat 之上，消除液态玻璃 */
-#app-chat .msg-row.me:not(.bubble-css-on) .bubble,
-#app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+/* 1. 自选气泡颜色高权重保障：直接挂在 #app-chat 之上，消除液态玻璃（严格排除所有特殊卡片与表情包，绝不染色！） */
+#app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+#app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #007aff !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9428,8 +9428,8 @@ html body .chat-body.bubble-css-preview .msg-content-line {
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
 }
 
-body.bubble-blue #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
-body.bubble-blue #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+body.bubble-blue #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+body.bubble-blue #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #007aff !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9438,8 +9438,8 @@ body.bubble-blue #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
 }
 
-body.bubble-pink #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
-body.bubble-pink #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+body.bubble-pink #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+body.bubble-pink #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #ffd1dc !important;
   color: #111111 !important;
   backdrop-filter: none !important;
@@ -9448,8 +9448,8 @@ body.bubble-pink #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   box-shadow: 0 2px 8px rgba(255, 209, 220, 0.4) !important;
 }
 
-body.bubble-green #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
-body.bubble-green #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+body.bubble-green #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+body.bubble-green #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #4cd964 !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9458,8 +9458,8 @@ body.bubble-green #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   box-shadow: 0 2px 8px rgba(76, 217, 100, 0.3) !important;
 }
 
-body.bubble-black #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
-body.bubble-black #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+body.bubble-black #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+body.bubble-black #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #1c1c1e !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9468,8 +9468,8 @@ body.bubble-black #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
-body.bubble-gray #app-chat .msg-row.me:not(.bubble-css-on) .bubble,
-body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble {
+body.bubble-gray #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #e5e5ea !important;
   color: #111111 !important;
   backdrop-filter: none !important;
@@ -9941,7 +9941,7 @@ html body.bubble-css-on #app-chat .bubble.survey-bubble * {
   text-shadow: none !important;
 }
 
-/* === v560: 气泡自然包裹与防撑满防挤压（聊天区与预览区完全统一） === */
+/* === v561+: 气泡自然包裹与严格防超出屏幕（双方长短消息均完美自适应，绝不撑破边界） === */
 html body #app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body.bubble-css-on #app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body #bubbleCssPreview .bubble {
@@ -9949,10 +9949,10 @@ html body #bubbleCssPreview .bubble {
   text-orientation: mixed !important;
   width: fit-content !important;
   max-width: 100% !important;
-  min-width: 24px !important;
+  min-width: 0 !important;
   white-space: pre-wrap !important;
   word-break: break-word !important;
-  overflow-wrap: break-word !important;
+  overflow-wrap: anywhere !important;
   display: inline-block !important;
   box-sizing: border-box !important;
   position: relative !important;
@@ -9961,22 +9961,28 @@ html body #bubbleCssPreview .bubble {
 html body #app-chat .chat-body .msg-row .msg-content-line > .bubble-wrap,
 html body.bubble-css-on #app-chat .chat-body .msg-row .msg-content-line > .bubble-wrap,
 html body #bubbleCssPreview .bubble-wrap {
-  display: inline-flex !important;
+  display: flex !important;
   flex-direction: column !important;
-  max-width: 70% !important;
   width: fit-content !important;
-  min-width: fit-content !important;
-  flex-shrink: 0 !important;
+  max-width: calc(100% - 56px) !important;
+  min-width: 0 !important;
+  flex: 0 1 auto !important;
+  flex-shrink: 1 !important;
+  box-sizing: border-box !important;
 }
 html body #app-chat .chat-body .msg-row.me .msg-content-line > .bubble-wrap,
 html body.bubble-css-on #app-chat .chat-body .msg-row.me .msg-content-line > .bubble-wrap,
 html body #bubbleCssPreview .msg-row.me .bubble-wrap {
   align-items: flex-end !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
 }
 html body #app-chat .chat-body .msg-row.other .msg-content-line > .bubble-wrap,
 html body.bubble-css-on #app-chat .chat-body .msg-row.other .msg-content-line > .bubble-wrap,
 html body #bubbleCssPreview .msg-row.other .bubble-wrap {
   align-items: flex-start !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
 }
 
 /* === v560: 首页功能图标角标、列表项角标与返回键角标：只有未读>0才显示，严格禁止永久常显 === */
@@ -10066,3 +10072,120 @@ html body .chat-body .bubble.survey-bubble .survey-bubble-footer {
   color: #888888 !important;
 }
 
+
+/* === 强化表情包彻底透明底图防污染 === */
+.chat-body .msg-row .bubble.sticker-bubble,
+.chat-body .msg-row.me .bubble.sticker-bubble,
+.chat-body .msg-row.other .bubble.sticker-bubble,
+.chat-body .msg-row.ta .bubble.sticker-bubble,
+html body #app-chat .chat-body .bubble.sticker-bubble,
+html body.bubble-black .chat-body .bubble.sticker-bubble,
+html body.bubble-css-on .chat-body .bubble.sticker-bubble {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* === 问卷卡片行与头像紧密粘合绝对无缝布局 === */
+.chat-body .msg-row.me .msg-content-line.survey-line,
+.chat-body .msg-row.me .msg-content-line:has(.survey-bubble) {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-end !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.chat-body .msg-row.other .msg-content-line.survey-line,
+.chat-body .msg-row.ta .msg-content-line.survey-line,
+.chat-body .msg-row.other .msg-content-line:has(.survey-bubble),
+.chat-body .msg-row.ta .msg-content-line:has(.survey-bubble) {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  width: fit-content !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
+}
+
+.chat-body .msg-row.me .msg-content-line.survey-line > .bubble-wrap,
+.chat-body .msg-row.me .msg-content-line:has(.survey-bubble) > .bubble-wrap {
+  margin: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+.chat-body .msg-row.other .msg-content-line.survey-line > .bubble-wrap,
+.chat-body .msg-row.ta .msg-content-line.survey-line > .bubble-wrap,
+.chat-body .msg-row.other .msg-content-line:has(.survey-bubble) > .bubble-wrap,
+.chat-body .msg-row.ta .msg-content-line:has(.survey-bubble) > .bubble-wrap {
+  margin: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+/* === 全局终极防消息超出屏幕与水平溢出保障 === */
+html body #app-chat .chat-body {
+  overflow-x: hidden !important;
+  box-sizing: border-box !important;
+}
+
+html body #app-chat .chat-body .msg-row {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  overflow: visible !important;
+}
+
+html body #app-chat .chat-body .msg-row .msg-content-line {
+  max-width: 100% !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+}
+
+html body #app-chat .chat-body .msg-row.me .msg-content-line {
+  justify-content: flex-end !important;
+}
+
+html body #app-chat .chat-body .msg-row.other .msg-content-line,
+html body #app-chat .chat-body .msg-row.ta .msg-content-line {
+  justify-content: flex-start !important;
+}
+
+html body #app-chat .chat-body .msg-row .msg-content-line > .bubble-wrap {
+  max-width: calc(100% - 56px) !important;
+  min-width: 0 !important;
+  width: fit-content !important;
+  flex-shrink: 1 !important;
+  box-sizing: border-box !important;
+}
+
+html body #app-chat .chat-body .msg-row .msg-content-line > .bubble-wrap > .bubble {
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
+  white-space: pre-wrap !important;
+}

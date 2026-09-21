@@ -2996,6 +2996,11 @@ document.addEventListener("DOMContentLoaded", function () {
       if (lineEl) {
         var bub0 = lineEl.querySelector(":scope > .bubble");
         var wrap0 = (bub0 && bub0.parentNode && bub0.parentNode.classList && bub0.parentNode.classList.contains("bubble-wrap")) ? bub0.parentNode : null;
+        if (bub0 && !bub0.querySelector(".bubble-widget") && !bub0.classList.contains("sticker-bubble") && !bub0.classList.contains("survey-bubble") && !bub0.classList.contains("transfer-bubble") && !bub0.classList.contains("shop-card-bubble")) {
+          var _wgt = document.createElement("span");
+          _wgt.className = "bubble-widget";
+          bub0.appendChild(_wgt);
+        }
         if (bub0 && !wrap0) {
           wrap0 = document.createElement("div");
           wrap0.className = "bubble-wrap";
@@ -4402,23 +4407,47 @@ document.addEventListener("DOMContentLoaded", function () {
       } // === 最外层：文字回复（已读必回，100%）===
       var __isQuote = !!ex.quote;
       // compat 照搬「拼字卡」：30% 概率从字卡库随机抽 min~max 句，用「，」拼成一条发出
-      var _pinyinMerged = null;
-      if (window.__akiniToggleOn("pinyinCardToggle", false) && Math.random() < 0.3 && window.pickWordCards) {
+      // 拼字卡模式：智能抽取 2~3 句，作为独立气泡依序发送（真正自然的情侣断句，绝不硬用逗号拼成一条）
+      var _pinyinCards = null;
+      if (window.__akiniToggleOn("pinyinCardToggle", false) && Math.random() < 0.35 && window.pickWordCards) {
         var _pcMin = Math.max(2, parseInt(localStorage.getItem("akini_num_pinyinCardMin") || "2", 10) || 2),
           _pcMax = Math.max(_pcMin, parseInt(localStorage.getItem("akini_num_pinyinCardMax") || "3", 10) || 3),
           _pcCount = _pcMin + Math.floor(Math.random() * (_pcMax - _pcMin + 1));
         var _pcRaw = window.pickWordCards(_pcCount, e && e.id);
         if (_pcRaw) {
           var _pcPicked = _pcRaw.split("\n").map(function (s) { return (s || "").trim(); }).filter(Boolean);
-          if (_pcPicked.length >= 2) _pinyinMerged = _pcPicked.join("，");
+          if (_pcPicked.length >= 2) _pinyinCards = _pcPicked;
         }
       }
-      // compat 逻辑：固定概率 1/2/3 条，每条作为独立消息发送（拼字卡命中时只有拼合的一条）
-      var replyCount = _pinyinMerged ? 1 : window.AKR.getReplyCount();
+
       var messages = [];
-      for (var _ci = 0; _ci < replyCount; _ci++) {
-        var _one = _pinyinMerged || (window.pickWordCards ? window.pickWordCards(1, e && e.id) : "");
-        if (_one && _one.trim()) messages.push(_one.trim());
+      if (_pinyinCards && _pinyinCards.length) {
+        messages = _pinyinCards;
+      } else {
+        var replyCount = window.AKR.getReplyCount();
+        for (var _ci = 0; _ci < replyCount; _ci++) {
+          var _one = window.pickWordCards ? window.pickWordCards(1, e && e.id) : "";
+          if (_one && _one.trim()) {
+            var rawText = _one.trim();
+            // 智能断句：如果单条文本很长（超过28字）且内部包含明确句末标点（。/！/？），自动拆成多个独立分句气泡发送！
+            if (rawText.length > 28 && /[。！？!?]/.test(rawText)) {
+              var splitSentences = rawText.split(/([。！？!?]+)/).filter(Boolean);
+              var recombined = [];
+              for (var si = 0; si < splitSentences.length; si += 2) {
+                var sPart = splitSentences[si] ? splitSentences[si].trim() : "";
+                var pPart = splitSentences[si + 1] ? splitSentences[si + 1].trim() : "";
+                if (sPart) recombined.push(sPart + pPart);
+              }
+              if (recombined.length > 1) {
+                messages.push.apply(messages, recombined);
+              } else {
+                messages.push(rawText);
+              }
+            } else {
+              messages.push(rawText);
+            }
+          }
+        }
       }
       if (0 === messages.length) {
         // 字卡库为空或无可用内容时，不发送任何回复（无兜底），但必须结清 pending 防残留爆发
@@ -16930,30 +16959,16 @@ document.addEventListener("DOMContentLoaded", function () {
     const Mn = document.getElementById("inputTaName"),
       Ln = document.getElementById("inputMyName");
     function Dn(count) {
-      // compat envelope 式合成：随机 5-12 句，句号连接成段 + 随机 1-3 处句号后换行
       count = parseInt(count, 10);
-      if (isNaN(count) || count < 1) count = Math.floor(Math.random() * 8) + 5;
+      if (isNaN(count) || count < 1) count = Math.floor(Math.random() * 4) + 2;
       const raw = window.pickWordCards(count);
       if (!raw) return "";
       var sentences = raw
         .split("\n")
         .filter(function (s) { return s && s.trim(); })
-        .map(function (s) { return s.trim().replace(/。+$/, "") + "。"; });
-      var content = sentences.join("");
-      var periodPositions = [];
-      for (var i2 = 0; i2 < content.length; i2++) {
-        if (content[i2] === "。") periodPositions.push(i2);
-      }
-      var breakCount = Math.min(Math.floor(Math.random() * 3) + 1, periodPositions.length);
-      var shuffled = periodPositions.sort(function () { return Math.random() - 0.5; });
-      for (var b = 0; b < breakCount; b++) {
-        var pos = shuffled[b] + 1;
-        content = content.substring(0, pos) + "\n" + content.substring(pos);
-        for (var j = b + 1; j < shuffled.length; j++) {
-          if (shuffled[j] > pos - 1) shuffled[j]++;
-        }
-      }
-      return content.trim();
+        .map(function (s) { return s.trim().replace(/[。！!？?]+$/, ""); });
+      return sentences.join("。");
+    }
     }
     (Mn,
       Ln,
