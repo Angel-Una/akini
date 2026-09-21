@@ -2874,12 +2874,24 @@ document.addEventListener("DOMContentLoaded", function () {
         }
       } catch (e) {}
     }
-    // 历史已完成转账卡清理：旧版 nn() 写入的内联灰底会序列化进缓存，这里统一移除交给 tr-finished CSS
-    function __akiniCleanFinishedTransferInline(root) {
+    // 历史卡片清洗：彻底移除旧版残留的内联深色/彩色背景，确保转账、商店、问卷卡片均为原装白底浅边黑字
+    function __akiniCleanSpecialBubbles(root) {
       try {
-        var list = (root || document).querySelectorAll(".bubble.transfer-bubble.tr-finished");
-        for (var i = 0; i < list.length; i++) list[i].style.removeProperty("background");
+        var list = (root || document).querySelectorAll(".bubble.transfer-bubble, .bubble.shop-card-bubble, .bubble.survey-bubble");
+        for (var i = 0; i < list.length; i++) {
+          var b = list[i];
+          b.style.removeProperty("background");
+          b.style.removeProperty("background-color");
+          b.style.removeProperty("color");
+          b.style.removeProperty("backdrop-filter");
+          b.style.removeProperty("-webkit-backdrop-filter");
+          b.style.backgroundColor = "#ffffff";
+          b.style.color = "#1a1a1a";
+        }
       } catch (e) {}
+    }
+    function __akiniCleanFinishedTransferInline(root) {
+      __akiniCleanSpecialBubbles(root);
     }
     function __akiniProcessMsgMeta(row) {
       if (!row || row.nodeType !== 1) return;
@@ -2891,6 +2903,15 @@ document.addEventListener("DOMContentLoaded", function () {
       var isSystem = row.classList.contains("system");
       if (isSystem) return; // 系统消息不显示时间戳和已读回执
       if (!isMe && !isOther) return;
+
+      // 清洗转账、商店、问卷卡片的历史残留深色内联背景
+      if (typeof __akiniCleanSpecialBubbles === "function") __akiniCleanSpecialBubbles(row);
+
+      // 问卷卡片已自带标准 avatar-col 和 bubble-wrap 结构，直接跳过拆解重构，防止头像错位悬空
+      if (row.querySelector(".survey-bubble")) {
+        row.setAttribute("data-meta-v", "10");
+        return;
+      }
       // v6：时间戳在头像正下方；已读回执包在 bubble-wrap 内固定于聊天气泡/引用正下方
       if (row.getAttribute("data-meta-v") === "10") {
         var _missTs = __akiniToggleOn("timestampToggle") && !row.querySelector(":scope .msg-ts");
@@ -9382,9 +9403,12 @@ document.addEventListener("DOMContentLoaded", function () {
         if (bn > 0) {
           backBadge.textContent = bn > 99 ? "99+" : String(bn);
           backBadge.style.display = "inline-flex";
+          backBadge.setAttribute("data-count", String(bn));
           if (backBtn) backBtn.classList.add("has-unread");
         } else {
           backBadge.style.display = "none";
+          backBadge.textContent = "";
+          backBadge.setAttribute("data-count", "0");
           if (backBtn) backBtn.classList.remove("has-unread");
         }
       } catch(e) {}
@@ -23594,6 +23618,8 @@ document.addEventListener("DOMContentLoaded", function () {
       b = document.createElement("span");
       b.className = "home-badge";
       b.style.cssText = "display:none;position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#fff;color:#1a1a1a;font-size:11px;font-weight:600;line-height:16px;text-align:center;box-sizing:border-box;border:1px solid rgba(0,0,0,.1);box-shadow:0 1px 4px rgba(0,0,0,.18);pointer-events:none;z-index:5;";
+      b.setAttribute("data-count", "0");
+      b.textContent = "";
       wrap.appendChild(b);
     }
     return b;
@@ -23606,8 +23632,11 @@ document.addEventListener("DOMContentLoaded", function () {
       b.style.alignItems = "center";
       b.style.justifyContent = "center";
       b.textContent = n > 99 ? "99+" : String(n);
+      b.setAttribute("data-count", String(n));
     } else {
       b.style.display = "none";
+      b.textContent = "";
+      b.setAttribute("data-count", "0");
     }
   }
   window.__updateHomeBadges = function () {
@@ -23691,9 +23720,12 @@ document.addEventListener("DOMContentLoaded", function () {
             if (badgeEl) {
               badgeEl.textContent = itemUnread > 99 ? "99+" : String(itemUnread);
               badgeEl.style.display = "inline-flex";
+              badgeEl.setAttribute("data-count", String(itemUnread));
             }
           } else if (badgeEl) {
             badgeEl.style.display = "none";
+            badgeEl.textContent = "";
+            badgeEl.setAttribute("data-count", "0");
           }
         });
       }
@@ -23704,15 +23736,20 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!b) return;
     var n = _getNotifs(app).filter(function (x) { return !x.read; }).length;
     if (n > 0) {
-      b.style.display = "block";
+      b.style.display = "inline-flex";
+      b.style.alignItems = "center";
+      b.style.justifyContent = "center";
       b.style.background = "#ffffff";
       b.style.color = "#1a1a1a";
       b.style.border = "1px solid rgba(0,0,0,.1)";
       b.style.boxShadow = "0 1px 4px rgba(0,0,0,.18)";
       b.style.fontWeight = "600";
       b.textContent = n > 99 ? "99+" : String(n);
+      b.setAttribute("data-count", String(n));
     } else {
       b.style.display = "none";
+      b.textContent = "";
+      b.setAttribute("data-count", "0");
     }
   }
   /* zzzm：信箱角标仅在点进未读信件详情时才消失，进入信箱列表不再清空角标 */

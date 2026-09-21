@@ -3067,22 +3067,47 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
 
   /* 将常见气泡选择器映射到本应用结构，并加 .chat-body 前缀提升权重；排除转账与表情包气泡，同时无缝覆盖设置页实时预览框 */
   function translateSelectors(css){
-    var meSel="#app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #bubbleCssPreview .msg-row.me .bubble, #bubbleCssPreview .bubble.me";
-    var otherSel="#app-chat .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #bubbleCssPreview .msg-row.other .bubble, #bubbleCssPreview .bubble.other";
-    var anySel="#app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #app-chat .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble), #bubbleCssPreview .bubble";
-    /* 先清理已有前缀，避免正则多次嵌套产生 .chat-body .chat-body */
-    var cleaned = (css || "")
-      .replace(/\.chat-body\s*/g, " ")
-      .replace(/#app-chat\s*/g, " ")
-      .replace(/#bubbleCssPreview\s*/g, " ")
-      .replace(/\.msg-row\s*/g, " ")
-      .replace(/\.bubble-wrap\s*/g, " ");
-    /* 允许针对双方、我方、对方分别定义 */
-    return cleaned.replace(/\.message\.message-sent|\.message\.message-received|\.bubble\.me(?![\w-])|\.bubble\.other(?![\w-])|\.message-sent|\.message-received|_bubble(?![\w-])|\.msg-bubble(?![\w-])|\.chat-bubble(?![\w-])|\.bubble(?![\w-])|\.bom(?![\w-])|\.message(?![\w-])/g,function(m){
-      if(m===".message.message-sent" || m===".message-sent" || m===".bubble.me") return meSel;
-      if(m===".message.message-received" || m===".message-received" || m===".bubble.other") return otherSel;
-      return anySel;
-    });
+    if (!css) return "";
+    var meBases = [
+      "#app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)",
+      "#app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)",
+      "#bubbleCssPreview .msg-row.me .bubble"
+    ];
+    var otherBases = [
+      "#app-chat .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)",
+      "#app-chat .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)",
+      "#app-chat .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)",
+      "#bubbleCssPreview .msg-row.other .bubble"
+    ];
+    var anyBases = [
+      "#app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)",
+      "#app-chat .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble)",
+      "#bubbleCssPreview .bubble"
+    ];
+
+    try {
+      return css.replace(/([^{}]+)\{([^{}]+)\}/g, function(_, selectors, body){
+        var selList = selectors.split(",");
+        var newSelList = [];
+        for (var i = 0; i < selList.length; i++) {
+          var s = selList[i].trim();
+          if (!s) continue;
+          var isMe = /\.message\.message-sent|\.message-sent|\.bubble\.me/.test(s);
+          var isOther = /\.message\.message-received|\.message-received|\.bubble\.other/.test(s);
+          var bases = isMe ? meBases : (isOther ? otherBases : anyBases);
+          var cleaned = s.replace(/(\.chat-body|#app-chat|#bubbleCssPreview|\.msg-row|\.bubble-wrap)\s*/g, "")
+                         .replace(/(\.message\.message-sent|\.message\.message-received|\.bubble\.me|\.bubble\.other|\.message-sent|\.message-received|_bubble|\.msg-bubble|\.chat-bubble|\.bubble|\.bom|\.message)/g, "")
+                         .trim();
+          var suffix = (cleaned && !cleaned.startsWith(":") && !cleaned.startsWith(".")) ? (" " + cleaned) : cleaned;
+          for (var b = 0; b < bases.length; b++) {
+            newSelList.push(bases[b] + suffix);
+          }
+        }
+        return (newSelList.length ? newSelList.join(", ") : selectors) + " {" + body + "}";
+      });
+    } catch(e) {
+      return css;
+    }
   }
 
   function applyCss(css){
@@ -3092,12 +3117,8 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
       /* 开启 CSS 美化时，彻底清除磨砂液态玻璃，完全交给自定义样式接管（严格排除特殊功能卡片） */
       final="\nbody.bubble-css-on #app-chat .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }\n";
       final+=addImportant(translateSelectors(raw));
-      /* 自动保护：防止文本越出气泡，同时保留自定义宽高和内边距，锁死水平排版防单字竖排 */
-      final+="\n.chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),#app-chat .chat-body .msg-row .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),#bubbleCssPreview .msg-row .bubble{writing-mode:horizontal-tb !important;text-orientation:mixed !important;min-width:36px !important;width:auto !important;max-width:100% !important;box-sizing:border-box !important;overflow-wrap:break-word !important;word-break:break-word !important;white-space:pre-wrap !important;text-align:left !important;display:inline-block !important;flex-direction:row !important;pointer-events:auto !important;}\n";
-      /* v559 终极保障：防止任何用户 CSS 污染转账/商店/问卷原生白底黑字卡片 */
+      /* v560 终极保障：防止任何用户 CSS 污染转账/商店/问卷原生白底黑字卡片 */
       final+="\nhtml body #app-chat .bubble.transfer-bubble,html body #app-chat .bubble.shop-card-bubble,html body #app-chat .bubble.survey-bubble{background:#ffffff !important;background-color:#ffffff !important;color:#1a1a1a !important;border:1px solid #e8e8e8 !important;box-shadow:0 4px 14px rgba(0,0,0,0.07) !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}\nhtml body #app-chat .bubble.transfer-bubble *,html body #app-chat .bubble.shop-card-bubble *,html body #app-chat .bubble.survey-bubble *{text-shadow:none !important;}\nhtml body #app-chat .bubble.transfer-bubble .tr-amount{color:#1a1a1a !important;}\nhtml body #app-chat .bubble.transfer-bubble .tr-note{color:#666666 !important;}\nhtml body #app-chat .bubble.transfer-bubble .tr-type{color:#888888 !important;}\nhtml body #app-chat .bubble.transfer-bubble .tr-claim-tip{color:#666666 !important;}\nhtml body #app-chat .bubble.shop-card-bubble .shop-card-bubble-title,html body #app-chat .bubble.shop-card-bubble .shop-card-bubble-item{color:#1a1a1a !important;}\nhtml body #app-chat .bubble.survey-bubble .survey-bubble-title{color:#1a1a1a !important;}\nhtml body #app-chat .bubble.survey-bubble .survey-bubble-sub{color:#666666 !important;}\nhtml body #app-chat .bubble.survey-bubble .survey-bubble-count{color:#888888 !important;}\n";
-      /* v559 终极保障：防止外层容器被极度挤压导致单字竖排 */
-      final+="\nhtml body #app-chat .chat-body .msg-row .msg-content-line > .bubble-wrap{display:flex !important;flex-direction:column !important;min-width:48px !important;max-width:calc(100% - 75px) !important;flex-shrink:1 !important;width:fit-content !important;}\n";
     }
     styleEl.textContent=final;
     /* 有自定义气泡 CSS 时给 body 打标：自带气泡底色/阴影整体停用，美化样式完全接管 */
@@ -3109,7 +3130,6 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     try{window.reRenderAll&&window.reRenderAll();}catch(e){}
     /* 刷新美化页预览区域 */
     try{updateBubblePreview();}catch(e){}
-    /* 轻量触发重绘，避免对每个气泡做强制 reflow 造成卡顿 */
     requestAnimationFrame(function(){
       window.dispatchEvent(new CustomEvent("akini:bubble-css-updated"));
     });
@@ -4595,6 +4615,8 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       var senderName = isReply ? (member ? member.name : (target ? target.name : "对方")) : (localStorage.getItem("akini_my_name") || "我");
       var row = document.createElement("div");
       row.className = "msg-row " + (isReply ? "other" : "me");
+      row.setAttribute("data-meta-v", "10");
+      row.setAttribute("data-ts", String(Date.now()));
       var avatar = isReply ? (window.getTaAvatar ? window.getTaAvatar(memberId || chatId) : window.__akAvatarPH||"") : (window.getMyAvatar ? window.getMyAvatar() : "🐱");
       var now = new Date();
       var hh = String(now.getHours()).padStart(2, "0");
@@ -4602,13 +4624,12 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       var ss = String(now.getSeconds()).padStart(2, "0");
       var timeStr = hh + ":" + mm + ":" + ss;
       var tsHtml = '<div class="msg-ts">' + timeStr + '</div>';
-      var avatarCol = '<div class="avatar-col" style="display:flex!important;flex-direction:column!important;align-items:center!important;flex-shrink:0!important;width:38px!important;"><div class="msg-avatar">' + avatar + '</div>' + tsHtml + '</div>';
-      var bMargin = isReply ? "margin:0 0 0 0!important;margin-right:auto!important;" : "margin:0 0 0 0!important;margin-left:auto!important;";
-      var bubbleHtml = '<div class="bubble-wrap" style="flex-shrink:0!important;width:240px!important;min-width:240px!important;max-width:240px!important;' + bMargin + '"><div class="bubble survey-bubble" style="width:240px!important;max-width:240px!important;box-sizing:border-box!important;margin:0!important;" data-survey-id="' + survey.id + '" data-survey-reply="' + (isReply ? "1" : "0") + '"' + (isReply && memberId ? ' data-member-id="' + memberId + '"' : "") + ">"
+      var avatarCol = '<div class="avatar-col" style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:38px;"><div class="msg-avatar">' + avatar + '</div>' + tsHtml + '</div>';
+      var bubbleHtml = '<div class="bubble-wrap" style="flex-shrink:0;width:240px;min-width:240px;max-width:240px;"><div class="bubble survey-bubble" style="width:240px;max-width:240px;box-sizing:border-box;margin:0;" data-survey-id="' + survey.id + '" data-survey-reply="' + (isReply ? "1" : "0") + '"' + (isReply && memberId ? ' data-member-id="' + memberId + '"' : "") + ">'
         + buildSurveyCardHtml(survey, isReply, statusText)
         + '</div></div>';
       var lineJustify = isReply ? "flex-start" : "flex-end";
-      var content = '<div class="msg-content-line" style="display:flex!important;flex-wrap:nowrap!important;align-items:flex-start!important;justify-content:' + lineJustify + '!important;gap:8px!important;width:100%!important;box-sizing:border-box!important;">'
+      var content = '<div class="msg-content-line" style="display:flex;align-items:flex-start;justify-content:' + lineJustify + ';gap:8px;width:100%;box-sizing:border-box;">'
         + (isReply ? (avatarCol + bubbleHtml) : (bubbleHtml + avatarCol))
         + '</div>';
       row.innerHTML = content;
