@@ -2073,6 +2073,7 @@ var last=0;document.addEventListener("click",function(e){var t=e.target;var now=
 </script>
 <script id="chat-preview-module">
 (function(){
+  try{["akini_preview_bubble_left","akini_preview_bubble_right"].forEach(function(k){var _v=localStorage.getItem(k);if(_v==="null"||_v==="undefined")localStorage.removeItem(k);});}catch(e){}
   const KEY = "akini_preview_contact_id";
   const BUBBLE_LEFT_KEY = "akini_preview_bubble_left";
   const BUBBLE_RIGHT_KEY = "akini_preview_bubble_right";
@@ -2162,8 +2163,8 @@ function it(t,e){if(e=e||"",!t||"string"!=typeof t)return __akiniAvOrLine(e);t=t
     }
     return false;
   }
-  function cleanPreviewText(v){return (v||"").replace(/[\r\n]+/g,"").slice(0,8);}
-  function updatePreviewBubbles(){var leftB=$("previewBubbleLeft");var rightB=$("previewBubbleRight");if(leftB){var v=localStorage.getItem(BUBBLE_LEFT_KEY);if(v)leftB.textContent=cleanPreviewText(v);else if(!leftB.textContent.trim())leftB.textContent=DEFAULT_LEFT;}if(rightB){var v2=localStorage.getItem(BUBBLE_RIGHT_KEY);if(v2)rightB.textContent=cleanPreviewText(v2);else if(!rightB.textContent.trim())rightB.textContent=DEFAULT_RIGHT;}applyPreviewWrap(leftB);applyPreviewWrap(rightB);}
+  function cleanPreviewText(v){if(!v||v==="null"||v==="undefined")return "";return String(v).replace(/[\r\n]+/g,"").slice(0,8);}
+  function updatePreviewBubbles(){var leftB=$("previewBubbleLeft");var rightB=$("previewBubbleRight");if(leftB){var v=localStorage.getItem(BUBBLE_LEFT_KEY);if(v==="null"||v==="undefined"){try{localStorage.removeItem(BUBBLE_LEFT_KEY);}catch(e){}v=null;}leftB.textContent=cleanPreviewText(v);if(!leftB.textContent.trim())leftB.textContent=DEFAULT_LEFT;}if(rightB){var v2=localStorage.getItem(BUBBLE_RIGHT_KEY);if(v2==="null"||v2==="undefined"){try{localStorage.removeItem(BUBBLE_RIGHT_KEY);}catch(e){}v2=null;}rightB.textContent=cleanPreviewText(v2);if(!rightB.textContent.trim())rightB.textContent=DEFAULT_RIGHT;}applyPreviewWrap(leftB);applyPreviewWrap(rightB);}
   function updateLyricCard(){var t=$("lyricTitle");var a=$("lyricArtist");var q=$("lyricQuote");if(t){var v=localStorage.getItem(LYRIC_TITLE_KEY);t.textContent=v||LYRIC_TITLE_DEFAULT;}if(a){var v=localStorage.getItem(LYRIC_ARTIST_KEY);a.textContent=v||LYRIC_ARTIST_DEFAULT;}if(q){var v=localStorage.getItem(LYRIC_QUOTE_KEY);q.textContent=v||LYRIC_QUOTE_DEFAULT;}}
   function saveLyricCard(){var t=$("lyricTitle");var a=$("lyricArtist");var q=$("lyricQuote");try{if(t)localStorage.setItem(LYRIC_TITLE_KEY,t.textContent.trim());if(a)localStorage.setItem(LYRIC_ARTIST_KEY,a.textContent.trim());if(q)localStorage.setItem(LYRIC_QUOTE_KEY,q.textContent.trim());}catch(e){}}
   function resetLyricCard(){try{localStorage.removeItem(LYRIC_TITLE_KEY);localStorage.removeItem(LYRIC_ARTIST_KEY);localStorage.removeItem(LYRIC_QUOTE_KEY);}catch(e){}updateLyricCard();}
