@@ -16969,7 +16969,6 @@ document.addEventListener("DOMContentLoaded", function () {
         .map(function (s) { return s.trim().replace(/[。！!？?]+$/, ""); });
       return sentences.join("。");
     }
-    }
     (Mn,
       Ln,
       Tn(),
