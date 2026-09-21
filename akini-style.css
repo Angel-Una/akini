@@ -7570,8 +7570,8 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 }
 
 /* 5. 联系人默认气泡：磨砂半透明液态玻璃感 (非自定义气泡主题时，仅限对方，绝不覆盖我方气泡) */
-#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
-#app-chat .msg-row.ta:not(.bubble-css-on) .bubble {
+html body:not(.bubble-css-on) #app-chat .msg-row.other .bubble,
+html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble {
   background: rgba(255, 255, 255, 0.65) !important;
   backdrop-filter: blur(12px) saturate(140%) !important;
   -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
@@ -7857,11 +7857,11 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
 }
 
 /* 6. 统一气泡样式：我的默认气泡为iOS蓝实色，联系人默认气泡更透明，液态玻璃更通透 */
-/* 联系人默认气泡：更透明更通透的液态磨砂质感 */
-.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-.chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
-#app-chat .msg-row.ta:not(.bubble-css-on) .bubble {
+/* 联系人默认气泡：更透明更通透的液态磨砂质感（美化开启时完全让位给自定义气泡CSS） */
+html body:not(.bubble-css-on) .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body:not(.bubble-css-on) #app-chat .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: rgba(255, 255, 255, 0.42) !important;
   backdrop-filter: blur(16px) saturate(160%) !important;
   -webkit-backdrop-filter: blur(16px) saturate(160%) !important;
@@ -7970,9 +7970,9 @@ body:not(.bubble-css-on)
 body:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 body:not(.bubble-css-on) .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-#app-chat .msg-row.me:not(.bubble-css-on) .bubble,
-#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
-#app-chat .msg-row.ta:not(.bubble-css-on) .bubble,
+html body:not(.bubble-css-on) #app-chat .msg-row.me .bubble,
+html body:not(.bubble-css-on) #app-chat .msg-row.other .bubble,
+html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble,
 #companionMsgs .msg-row.me .bubble,
 #companionMsgs .msg-row.other .bubble,
 #companionMsgs .msg-row.ta .bubble,
@@ -7983,10 +7983,10 @@ body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):no
 }
 
 /* 2. 液态玻璃去掉所有描边（包括气泡、顶部按钮、输入框、昵称药丸条） */
-.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-.chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
-#app-chat .msg-row.ta:not(.bubble-css-on) .bubble,
+body:not(.bubble-css-on) .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body:not(.bubble-css-on) #app-chat .msg-row.other .bubble,
+html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble,
 #companionMsgs .msg-row.other .bubble,
 #companionMsgs .msg-row.ta .bubble,
 #watchChatBody .msg-row.other .bubble,
@@ -8042,26 +8042,30 @@ body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):no
    v528: 彻底消除系统消息白色色块 + 全局液态玻璃零白色描边/零内高光
    ========================================================================== */
 
-/* 1. 系统消息彻底干净：无伪元素、无方块、无白色描边、半透明微灰胶囊 */
+/* 1. 系统消息彻底干净：轻盈精致小微胶囊，上下间距与所有消息统一 */
 .chat-body .msg-row.system,
 #app-chat .chat-body .msg-row.system {
   display: flex !important;
   justify-content: center !important;
-  margin: 6px 0 !important;
+  margin-top: 5px !important;
+  margin-bottom: 5px !important;
 }
-.chat-body .msg-row.system .bubble,
-#app-chat .chat-body .msg-row.system .bubble {
-  background: rgba(0, 0, 0, 0.22) !important;
-  color: rgba(255, 255, 255, 0.85) !important;
-  backdrop-filter: blur(10px) !important;
-  -webkit-backdrop-filter: blur(10px) !important;
-  border-radius: 999px !important;
+html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble),
+html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
+  background: rgba(0, 0, 0, 0.16) !important;
+  color: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border-radius: 12px !important;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
-  padding: 3px 12px !important;
-  font-size: 11px !important;
+  padding: 2px 8px !important;
+  font-size: 10px !important;
+  line-height: 1.4 !important;
   position: relative !important;
+  max-width: 80% !important;
+  text-align: center !important;
 }
 .chat-body .msg-row.system .bubble::before,
 .chat-body .msg-row.system .bubble::after,
@@ -8080,10 +8084,10 @@ body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):no
 
 /* 2. 所有液态玻璃元素：彻底禁止任何 border、outline 以及 inset 带有白色的内高光阴影 */
 /* 包括：对方气泡、加号按钮、输入框、顶栏按钮等 */
-.chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-.chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
-#app-chat .msg-row.other:not(.bubble-css-on) .bubble,
-#app-chat .msg-row.ta:not(.bubble-css-on) .bubble,
+body:not(.bubble-css-on) .chat-body .msg-row.other .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body:not(.bubble-css-on) #app-chat .msg-row.other .bubble,
+html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble,
 #companionMsgs .msg-row.other .bubble,
 #companionMsgs .msg-row.ta .bubble,
 #watchChatBody .msg-row.other .bubble,
@@ -8877,7 +8881,7 @@ body.hide-send-btn .chat-input-bar .input-wrap {
 .msg-row.ta .bubble.sticker-bubble,
 .msg-row.group .bubble.sticker-bubble,
 body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
-#app-chat .msg-row:not(.bubble-css-on) .bubble.sticker-bubble,
+html body:not(.bubble-css-on) #app-chat .msg-row .bubble.sticker-bubble,
 .bubble:has(> img.comment-sticker-img),
 .bubble:has(> img[data-sticker="1"]),
 .bubble:has(> img.default-emoji-img) {
@@ -9410,8 +9414,11 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
 
 .bubble.survey-bubble .survey-bubble-status {
   font-size: 12px !important;
-  color: #576b95 !important;
+  color: #1a1a1a !important;
   font-weight: 500 !important;
+  background: rgba(0, 0, 0, 0.06) !important;
+  border-radius: 999px !important;
+  padding: 3px 10px !important;
 }
 
 
@@ -9485,9 +9492,9 @@ html body .chat-body.bubble-css-preview .msg-content-line {
    v552: 彻底消灭强制液态玻璃气泡、自选颜色与CSS美化100%生效、输入栏紧贴底端
    ========================================================================== */
 
-/* 1. 自选气泡颜色高权重保障：直接挂在 #app-chat 之上，消除液态玻璃（严格排除所有特殊卡片与表情包，绝不染色！） */
-#app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
-#app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
+/* 1. 自选气泡颜色高权重保障：直接挂在 html body:not(.bubble-css-on) 之上（美化开启时完全让位给自定义气泡 CSS） */
+html body:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+html body:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #007aff !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9496,8 +9503,8 @@ html body .chat-body.bubble-css-preview .msg-content-line {
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
 }
 
-body.bubble-blue #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
-body.bubble-blue #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
+html body.bubble-blue:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+html body.bubble-blue:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #007aff !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9506,8 +9513,8 @@ body.bubble-blue #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:no
   box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
 }
 
-body.bubble-pink #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
-body.bubble-pink #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
+html body.bubble-pink:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+html body.bubble-pink:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #ffd1dc !important;
   color: #111111 !important;
   backdrop-filter: none !important;
@@ -9516,8 +9523,8 @@ body.bubble-pink #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:no
   box-shadow: 0 2px 8px rgba(255, 209, 220, 0.4) !important;
 }
 
-body.bubble-green #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
-body.bubble-green #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
+html body.bubble-green:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+html body.bubble-green:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #4cd964 !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9526,8 +9533,8 @@ body.bubble-green #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:n
   box-shadow: 0 2px 8px rgba(76, 217, 100, 0.3) !important;
 }
 
-body.bubble-black #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
-body.bubble-black #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
+html body.bubble-black:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+html body.bubble-black:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #1c1c1e !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
@@ -9536,8 +9543,8 @@ body.bubble-black #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:n
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
 }
 
-body.bubble-gray #app-chat .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
-body.bubble-gray #app-chat .chat-body .msg-row.me:not(.bubble-css-on) .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
+html body.bubble-gray:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
+html body.bubble-gray:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
   background: #e5e5ea !important;
   color: #111111 !important;
   backdrop-filter: none !important;
@@ -10076,18 +10083,24 @@ html body #bubbleCssPreview .msg-row.other .bubble-wrap {
   box-sizing: border-box !important;
 }
 
-/* 无内容、display:none、或data-count="0"时绝对隐藏，彻底杜绝无未读时的白点或空角标 */
+/* 聊天界面所有消息统一上下间距：普通消息、系统消息、时间戳统一为上下各 5px（相邻消息间距严格统一为 10px） */
+.chat-body .msg-row,
+#app-chat .chat-body .msg-row,
+#app-chat .chat-body .msg-row.me,
+#app-chat .chat-body .msg-row.other,
+#app-chat .chat-body .msg-row.ta,
+#app-chat .chat-body .msg-row.system,
+#app-chat .chat-body .timestamp-row {
+  margin-top: 5px !important;
+  margin-bottom: 5px !important;
+}
+
+/* 无内容或data-count="0"时隐藏，彻底杜绝无未读时的白点；禁止用 style*="display:none" 属性选择器误杀动态显示 */
 .home-badge:empty,
-.home-badge[style*="display: none"],
-.home-badge[style*="display:none"],
 .home-badge[data-count="0"],
 .cli-unread-badge:empty,
-.cli-unread-badge[style*="display: none"],
-.cli-unread-badge[style*="display:none"],
 .cli-unread-badge[data-count="0"],
 #chatBackUnreadBadge:empty,
-#chatBackUnreadBadge[style*="display: none"],
-#chatBackUnreadBadge[style*="display:none"],
 #chatBackUnreadBadge[data-count="0"] {
   display: none !important;
 }

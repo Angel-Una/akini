@@ -2191,19 +2191,20 @@ document.addEventListener("DOMContentLoaded", function () {
           }
         }
         for (var a in e) e.hasOwnProperty(a) && (i[a] = e[a]);
-        // zza：未读数变化时实时刷新首页微信角标、聊天返回键徽标与会话列表角标
+        // 内存中保留 messagesHTML 用于即时渲染，但不随 sessions 写入 localStorage
+        var memHtml = __akiniStripTypingRows(i.messagesHTML);
+        delete i.messagesHTML;
+        n[t] = i;
+        _(n);
+        i.messagesHTML = memHtml;
+        // zza：未读数变化时实时刷新首页微信角标、聊天返回键徽标与会话列表角标（在 n[t] 更新持久化后执行，确保读到最新数据）
         if (e && typeof e.unread !== "undefined") {
           try { window.__akiniNotifyUnreadChanged && window.__akiniNotifyUnreadChanged(); } catch (e2) {}
           try { window.__akiniUpdateChatBackBadge && window.__akiniUpdateChatBackBadge(); } catch (e2) {}
           try { window.__akiniRefreshChatListBadges && window.__akiniRefreshChatListBadges(); } catch (e2) {}
+          try { window.__updateHomeBadges && window.__updateHomeBadges(); } catch (e2) {}
         }
-        // 内存中保留 messagesHTML 用于即时渲染，但不随 sessions 写入 localStorage
-        var memHtml = __akiniStripTypingRows(i.messagesHTML);
-        delete i.messagesHTML;
         return (
-          (n[t] = i),
-          _(n),
-          (i.messagesHTML = memHtml),
           htmlToSave &&
             htmlToSave.trim().length > 0 &&
             "function" == typeof C &&
@@ -2885,8 +2886,9 @@ document.addEventListener("DOMContentLoaded", function () {
           b.style.removeProperty("color");
           b.style.removeProperty("backdrop-filter");
           b.style.removeProperty("-webkit-backdrop-filter");
-          b.style.backgroundColor = "#ffffff";
-          b.style.color = "#1a1a1a";
+          b.style.setProperty("background", "#ffffff", "important");
+          b.style.setProperty("background-color", "#ffffff", "important");
+          b.style.setProperty("color", "#1a1a1a", "important");
         }
       } catch (e) {}
     }
@@ -7566,7 +7568,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         })
                       : "",
                     n = t.displayAvatar || t.avatar,
-                    i = t.unread ? '<span class="cli-unread-badge">' + (t.unread > 99 ? "99+" : String(t.unread)) + "</span>" : "",
+                    i = t.unread ? '<span class="cli-unread-badge" data-count="' + t.unread + '" style="display:inline-flex !important;">' + (t.unread > 99 ? "99+" : String(t.unread)) + "</span>" : "",
                     a = t.pinned
                       ? '<span class="chat-pin-badge">置顶</span>'
                       : "",
@@ -23642,13 +23644,13 @@ document.addEventListener("DOMContentLoaded", function () {
     var b = _ensureBadge(btnId);
     if (!b) return;
     if (n > 0) {
-      b.style.display = "inline-flex";
+      b.style.setProperty("display", "inline-flex", "important");
       b.style.alignItems = "center";
       b.style.justifyContent = "center";
       b.textContent = n > 99 ? "99+" : String(n);
       b.setAttribute("data-count", String(n));
     } else {
-      b.style.display = "none";
+      b.style.setProperty("display", "none", "important");
       b.textContent = "";
       b.setAttribute("data-count", "0");
     }
@@ -23695,11 +23697,11 @@ document.addEventListener("DOMContentLoaded", function () {
         if (bn > 0) {
           backBtn.classList.add("has-unread");
           backBadge.textContent = bn > 99 ? "99+" : String(bn);
-          backBadge.style.display = "inline-flex";
+          backBadge.style.setProperty("display", "inline-flex", "important");
         } else {
           backBtn.classList.remove("has-unread");
           backBadge.textContent = "";
-          backBadge.style.display = "none";
+          backBadge.style.setProperty("display", "none", "important");
         }
       }
     } catch (e) {}
@@ -23733,11 +23735,11 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             if (badgeEl) {
               badgeEl.textContent = itemUnread > 99 ? "99+" : String(itemUnread);
-              badgeEl.style.display = "inline-flex";
+              badgeEl.style.setProperty("display", "inline-flex", "important");
               badgeEl.setAttribute("data-count", String(itemUnread));
             }
           } else if (badgeEl) {
-            badgeEl.style.display = "none";
+            badgeEl.style.setProperty("display", "none", "important");
             badgeEl.textContent = "";
             badgeEl.setAttribute("data-count", "0");
           }
@@ -23750,7 +23752,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!b) return;
     var n = _getNotifs(app).filter(function (x) { return !x.read; }).length;
     if (n > 0) {
-      b.style.display = "inline-flex";
+      b.style.setProperty("display", "inline-flex", "important");
       b.style.alignItems = "center";
       b.style.justifyContent = "center";
       b.style.background = "#ffffff";
@@ -23761,7 +23763,7 @@ document.addEventListener("DOMContentLoaded", function () {
       b.textContent = n > 99 ? "99+" : String(n);
       b.setAttribute("data-count", String(n));
     } else {
-      b.style.display = "none";
+      b.style.setProperty("display", "none", "important");
       b.textContent = "";
       b.setAttribute("data-count", "0");
     }
