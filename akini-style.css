@@ -7749,22 +7749,16 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
   max-width: 340px !important;
 }
 
-/* 2. 聊天记录往上滑下面的余白太多问题：消除底部巨大无效空白，贴合输入栏 */
-.chat-body,
+/* 2. 聊天记录往上滑下面的余白太多问题：消除底部巨大无效空白，贴合输入栏（仅限主微信聊天窗口） */
 #app-chat .chat-body,
-#companionMsgs.chat-body,
-#watchChatBody.chat-body {
+#app-chat #chatBody {
   padding-bottom: 24px !important;
   padding-top: 82px !important;
 }
 
-/* 3. 最下面那一栏的白色底图去掉（输入栏本身透明透出背景图，但保留聊天背景图） */
-.chat-input-bar-area,
-.chat-input-bar,
+/* 3. 最下面那一栏的白色底图去掉（微信聊天输入栏透明透出背景图，观影页保留独立底色） */
 #app-chat .chat-input-bar-area,
-#app-chat .chat-input-bar,
-#watchInputBar,
-#companionPickerView > div:last-child {
+#app-chat .chat-input-bar {
   background: transparent !important;
   background-color: transparent !important;
   border-top: none !important;
@@ -8026,7 +8020,6 @@ body:not(.bubble-css-on) .chat-body .msg-row.ta .bubble:not(.transfer-bubble):no
 .chat-input-bar,
 #app-chat .chat-input-bar-area,
 #app-chat .chat-input-bar,
-#watchInputBar,
 #companionPickerView > div:last-child {
   background: transparent !important;
   background-color: transparent !important;
@@ -8147,7 +8140,6 @@ body:not(.bubble-css-on) #app-chat .chat-body .msg-row .bubble::after {
 /* 1. 输入栏容器对齐与间距统一 */
 .chat-input-bar,
 #app-chat .chat-input-bar,
-#watchInputBar,
 #companionPickerView > div:last-child {
   display: flex !important;
   align-items: center !important;
@@ -9067,9 +9059,7 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
 }
 
 #app-chat .chat-body,
-.chat-body,
-#companionMsgs.chat-body,
-#watchChatBody.chat-body {
+#app-chat #chatBody {
   position: absolute !important;
   top: 0 !important;
   bottom: 0 !important;
@@ -9086,6 +9076,84 @@ body:not(.bubble-css-on) .chat-body .msg-row .bubble.sticker-bubble,
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
   z-index: 1 !important;
+}
+
+/* 观影页面与小说陪伴专用弹性布局：严禁被全局绝对定位误伤 */
+#watchArea {
+  display: none;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  height: 100dvh !important;
+  background: #f5f5f5 !important;
+  z-index: 100003 !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+#watchVideoBox {
+  position: relative !important;
+  width: 100% !important;
+  background: #000 !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
+}
+
+#watchChatBody,
+#watchChatBody.chat-body {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  z-index: 1 !important;
+  padding: 10px 12px 14px !important;
+  box-sizing: border-box !important;
+  background: #f5f5f5 !important;
+}
+
+#watchInputBar {
+  position: relative !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  flex-shrink: 0 !important;
+  z-index: 10 !important;
+  background: #f7f7f7 !important;
+  background-color: #f7f7f7 !important;
+  border-top: 1px solid #e0e0e0 !important;
+  box-shadow: 0 -1px 4px rgba(0,0,0,0.04) !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+}
+
+#companionMsgs,
+#companionMsgs.chat-body {
+  position: relative !important;
+  top: auto !important;
+  bottom: auto !important;
+  left: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  height: auto !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  z-index: 1 !important;
+  padding: 10px 12px !important;
+  box-sizing: border-box !important;
 }
 
 #app-chat .chat-input-bar-area,
