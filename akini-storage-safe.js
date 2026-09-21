@@ -189,10 +189,25 @@
     return lsGet(k);
   }
   // 核心数据资产键：非显式清除操作下一律拒绝被空数组覆盖（彻底解决后台/切回/随机时间数据丢失）
-  var _GUARD_KEYS2 = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1 };
+  var _GUARD_KEYS2 = {
+    akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1,
+    akini_start_date: 1, akini_day_label: 1, akini_meaningful_numbers: 1, akini_signature: 1, akini_friends_signature: 1,
+    akini_bubble_color: 1, akini_swap_avatar_pos: 1, akini_last_page_state: 1, akini_wb_groups: 1,
+    akini_shop_orders: 1, akini_shop_products: 1, akini_surveys: 1
+  };
+  var _GUARD_PREFIXES2 = ['akini_settings_', 'akini_toggle_', 'akini_num_', 'akini_chat_history_', 'akini_stickers_'];
+  function _isGuardKey(k) {
+    if (!k) return false;
+    if (_GUARD_KEYS2[k]) return true;
+    var ks = String(k);
+    for (var i = 0; i < _GUARD_PREFIXES2.length; i++) {
+      if (ks.indexOf(_GUARD_PREFIXES2[i]) === 0) return true;
+    }
+    return false;
+  }
   function akiniSet(k, v, cb) {
     if (typeof v !== 'string') v = String(v);
-    if ((v === '[]' || v === '{}') && _GUARD_KEYS2[k] && !window.__akiniWiping && !window._akiniAllowRemove) {
+    if ((v === '[]' || v === '{}') && _isGuardKey(k) && !window.__akiniWiping && !window._akiniAllowRemove) {
       var _gp = memGet(k);
       if (_gp == null) _gp = lsGet(k);
       if (_gp && _gp !== '[]' && _gp !== '{}' && _gp.length > 2) {
@@ -395,12 +410,27 @@
         } catch (e) { return null; }
       };
       // 核心数据资产键：非显式清除操作下一律拒绝被空数组覆盖（安卓/鸿蒙/iOS慢机切回与后台GC高发防护）
-      var _GUARD_KEYS = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1 };
+      var _GUARD_KEYS = {
+        akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1,
+        akini_start_date: 1, akini_day_label: 1, akini_meaningful_numbers: 1, akini_signature: 1, akini_friends_signature: 1,
+        akini_bubble_color: 1, akini_swap_avatar_pos: 1, akini_last_page_state: 1, akini_wb_groups: 1,
+        akini_shop_orders: 1, akini_shop_products: 1, akini_surveys: 1
+      };
+      var _GUARD_PREFIXES = ['akini_settings_', 'akini_toggle_', 'akini_num_', 'akini_chat_history_', 'akini_stickers_'];
+      function _isGuardKeyProto(k) {
+        if (!k) return false;
+        if (_GUARD_KEYS[k]) return true;
+        var ks = String(k);
+        for (var i = 0; i < _GUARD_PREFIXES.length; i++) {
+          if (ks.indexOf(_GUARD_PREFIXES[i]) === 0) return true;
+        }
+        return false;
+      }
       lsProto.setItem = function (k, v) {
         // 清除数据期间：akini_ 键一律拒写（含原始 LS 层），杜绝清完复活
         if (window.__akiniWiping && k && String(k).indexOf('akini_') === 0) return;
         var sv = String(v);
-        if ((sv === '[]' || sv === '{}') && _GUARD_KEYS[k] && !window.__akiniWiping && !window._akiniAllowRemove) {
+        if ((sv === '[]' || sv === '{}') && _isGuardKeyProto(k) && !window.__akiniWiping && !window._akiniAllowRemove) {
           try {
             var _gp = self.memGet(k);
             if (_gp == null) _gp = self.origGet ? self.origGet.call(this, k) : null;

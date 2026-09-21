@@ -5417,9 +5417,19 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     ((Storage.prototype.setItem = function (t, e) {
       // 永久防御：非显式清除操作下一律拒绝被空数组/空对象覆盖核心数据
-      var _GUARD_KEYS_CORE = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1 };
+      var _GUARD_KEYS_CORE = { akini_contacts: 1, akini_mail_sent: 1, akini_mail_received: 1, akini_posts: 1, akini_icity_diaries: 1, akini_wordbank: 1, akini_start_date: 1, akini_day_label: 1, akini_meaningful_numbers: 1, akini_signature: 1, akini_friends_signature: 1, akini_bubble_color: 1, akini_swap_avatar_pos: 1, akini_last_page_state: 1, akini_wb_groups: 1, akini_shop_orders: 1, akini_shop_products: 1, akini_surveys: 1 };
+      var _GUARD_PREFIXES_CORE = ["akini_settings_", "akini_toggle_", "akini_num_", "akini_chat_history_", "akini_stickers_"];
+      function _isGuardKeyCore(k) {
+        if (!k) return false;
+        if (_GUARD_KEYS_CORE[k]) return true;
+        var ks = String(k);
+        for (var i = 0; i < _GUARD_PREFIXES_CORE.length; i++) {
+          if (ks.indexOf(_GUARD_PREFIXES_CORE[i]) === 0) return true;
+        }
+        return false;
+      }
       var sv = String(e);
-      if ((sv === "[]" || sv === "{}") && _GUARD_KEYS_CORE[t] && !window.__akiniWiping && !window._akiniAllowRemove) {
+      if ((sv === "[]" || sv === "{}") && _isGuardKeyCore(t) && !window.__akiniWiping && !window._akiniAllowRemove) {
         try {
           var _gp = null;
           if (window.akiniStore && window.akiniStore.memoryGet) _gp = window.akiniStore.memoryGet(t);
@@ -7568,7 +7578,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         })
                       : "",
                     n = t.displayAvatar || t.avatar,
-                    i = t.unread ? '<span class="cli-unread-badge" data-count="' + t.unread + '" style="display:inline-flex !important;">' + (t.unread > 99 ? "99+" : String(t.unread)) + "</span>" : "",
+                    i = t.unread ? '<span class="cli-unread-badge" data-count="' + t.unread + '" style="display:inline-flex;visibility:visible;opacity:1;">' + (t.unread > 99 ? "99+" : String(t.unread)) + "</span>" : "",
                     a = t.pinned
                       ? '<span class="chat-pin-badge">置顶</span>'
                       : "",
@@ -23633,7 +23643,6 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!b) {
       b = document.createElement("span");
       b.className = "home-badge";
-      b.style.cssText = "display:none;position:absolute;top:-6px;right:-10px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#fff;color:#1a1a1a;font-size:11px;font-weight:600;line-height:16px;text-align:center;box-sizing:border-box;border:1px solid rgba(0,0,0,.1);box-shadow:0 1px 4px rgba(0,0,0,.18);pointer-events:none;z-index:5;";
       b.setAttribute("data-count", "0");
       b.textContent = "";
       wrap.appendChild(b);
@@ -23644,15 +23653,19 @@ document.addEventListener("DOMContentLoaded", function () {
     var b = _ensureBadge(btnId);
     if (!b) return;
     if (n > 0) {
-      b.style.setProperty("display", "inline-flex", "important");
-      b.style.alignItems = "center";
-      b.style.justifyContent = "center";
       b.textContent = n > 99 ? "99+" : String(n);
       b.setAttribute("data-count", String(n));
+      b.style.setProperty("display", "inline-flex", "important");
+      b.style.setProperty("visibility", "visible", "important");
+      b.style.setProperty("opacity", "1", "important");
+      b.style.alignItems = "center";
+      b.style.justifyContent = "center";
     } else {
-      b.style.setProperty("display", "none", "important");
       b.textContent = "";
       b.setAttribute("data-count", "0");
+      b.style.setProperty("display", "none", "important");
+      b.style.setProperty("visibility", "hidden", "important");
+      b.style.setProperty("opacity", "0", "important");
     }
   }
   window.__updateHomeBadges = function () {
@@ -23697,11 +23710,17 @@ document.addEventListener("DOMContentLoaded", function () {
         if (bn > 0) {
           backBtn.classList.add("has-unread");
           backBadge.textContent = bn > 99 ? "99+" : String(bn);
+          backBadge.setAttribute("data-count", String(bn));
           backBadge.style.setProperty("display", "inline-flex", "important");
+          backBadge.style.setProperty("visibility", "visible", "important");
+          backBadge.style.setProperty("opacity", "1", "important");
         } else {
           backBtn.classList.remove("has-unread");
           backBadge.textContent = "";
+          backBadge.setAttribute("data-count", "0");
           backBadge.style.setProperty("display", "none", "important");
+          backBadge.style.setProperty("visibility", "hidden", "important");
+          backBadge.style.setProperty("opacity", "0", "important");
         }
       }
     } catch (e) {}
@@ -23735,13 +23754,17 @@ document.addEventListener("DOMContentLoaded", function () {
             }
             if (badgeEl) {
               badgeEl.textContent = itemUnread > 99 ? "99+" : String(itemUnread);
-              badgeEl.style.setProperty("display", "inline-flex", "important");
               badgeEl.setAttribute("data-count", String(itemUnread));
+              badgeEl.style.setProperty("display", "inline-flex", "important");
+              badgeEl.style.setProperty("visibility", "visible", "important");
+              badgeEl.style.setProperty("opacity", "1", "important");
             }
           } else if (badgeEl) {
-            badgeEl.style.setProperty("display", "none", "important");
             badgeEl.textContent = "";
             badgeEl.setAttribute("data-count", "0");
+            badgeEl.style.setProperty("display", "none", "important");
+            badgeEl.style.setProperty("visibility", "hidden", "important");
+            badgeEl.style.setProperty("opacity", "0", "important");
           }
         });
       }
@@ -23752,7 +23775,11 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!b) return;
     var n = _getNotifs(app).filter(function (x) { return !x.read; }).length;
     if (n > 0) {
+      b.textContent = n > 99 ? "99+" : String(n);
+      b.setAttribute("data-count", String(n));
       b.style.setProperty("display", "inline-flex", "important");
+      b.style.setProperty("visibility", "visible", "important");
+      b.style.setProperty("opacity", "1", "important");
       b.style.alignItems = "center";
       b.style.justifyContent = "center";
       b.style.background = "#ffffff";
@@ -23760,12 +23787,12 @@ document.addEventListener("DOMContentLoaded", function () {
       b.style.border = "1px solid rgba(0,0,0,.1)";
       b.style.boxShadow = "0 1px 4px rgba(0,0,0,.18)";
       b.style.fontWeight = "600";
-      b.textContent = n > 99 ? "99+" : String(n);
-      b.setAttribute("data-count", String(n));
     } else {
-      b.style.setProperty("display", "none", "important");
       b.textContent = "";
       b.setAttribute("data-count", "0");
+      b.style.setProperty("display", "none", "important");
+      b.style.setProperty("visibility", "hidden", "important");
+      b.style.setProperty("opacity", "0", "important");
     }
   }
   /* zzzm：信箱角标仅在点进未读信件详情时才消失，进入信箱列表不再清空角标 */

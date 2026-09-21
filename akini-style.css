@@ -1289,35 +1289,36 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #999;
 }
 .shop-card-bubble {
-  min-width: 224px;
-  max-width: 258px;
-  width: fit-content !important;
-  padding: 13px !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  padding: 13px 14px !important;
   background: #ffffff !important;
-  border: 1px solid #e8e8e8;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07) !important;
   color: #1a1a1a !important;
   border-radius: 16px !important;
   cursor: pointer;
   user-select: none;
   overflow: hidden;
+  box-sizing: border-box;
 }
 .shop-card-bubble-inner {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
 }
 .shop-card-bubble .shop-card-bubble-img {
-  width: 58px;
-  height: 58px;
-  border-radius: 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: 11px;
   background: #f2f4fa;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 .shop-card-bubble .shop-card-bubble-img img {
   width: 100%;
@@ -1338,6 +1339,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #1a1a1a;
   letter-spacing: 0.2px;
   margin-bottom: 2px;
+  line-height: 1.35;
 }
 .shop-card-bubble-name {
   font-size: 12px;
@@ -1345,6 +1347,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 142px;
 }
 .shop-card-signature {
   color: #ff6b6b;
@@ -1357,8 +1360,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 10px;
+  padding-top: 8px;
   border-top: 1px solid #f0f0f0;
 }
 .shop-card-bubble-status {
@@ -1908,14 +1911,14 @@ body:not(.bubble-css-on)
   outline: none !important;
 }
 .chat-body .msg-row .bubble.survey-bubble {
-  width: 250px;
-  min-width: 250px;
-  max-width: 250px;
-  padding: 0 !important;
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+  padding: 13px 14px !important;
   border-radius: 16px !important;
   background: #ffffff !important;
   border: 1px solid #e8e8e8 !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07) !important;
   color: #1a1a1a !important;
   overflow: hidden;
   cursor: pointer;
@@ -1931,12 +1934,12 @@ body:not(.bubble-css-on)
 .survey-bubble-inner {
   display: flex;
   gap: 10px;
-  padding: 12px;
+  padding: 0;
 }
 .survey-bubble-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: 13px;
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
   background: #ffffff;
   border: 1px solid #ececec;
   display: flex;
@@ -1957,6 +1960,7 @@ body:not(.bubble-css-on)
   font-weight: 600;
   color: #1a1a1a;
   letter-spacing: 0.2px;
+  line-height: 1.35;
 }
 .survey-bubble-q {
   font-size: 12px;
@@ -1965,15 +1969,15 @@ body:not(.bubble-css-on)
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 170px;
+  max-width: 142px;
 }
 .survey-bubble-divider {
   height: 1px;
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.09), rgba(0, 0, 0, 0.02));
-  margin: 0 14px;
+  margin: 10px 0 8px;
 }
 .survey-bubble-footer {
-  padding: 8px 12px;
+  padding: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2138,14 +2142,14 @@ body:not(.bubble-css-on)
 .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   background: rgba(200, 200, 200, 0.35) !important;
   color: #888 !important;
-  font-size: 12px !important;
-  padding: 3px 10px !important;
-  border-radius: 20px !important;
-  max-width: 90% !important;
+  font-size: 14px !important;
+  padding: 2px 8px !important;
+  border-radius: 12px !important;
+  max-width: 70% !important;
   text-align: center !important;
   box-shadow: none !important;
   font-weight: normal !important;
-  line-height: 1.6 !important;
+  line-height: 1.5 !important;
 }
 .timestamp-row {
   display: flex;
@@ -5724,8 +5728,10 @@ button.back-btn[type="button"] {
 .chat-body .msg-row .msg-content-line > .bubble-wrap > .bubble {
   max-width: 100% !important;
 }
-/* 转账卡/表情包有固定内联宽度，不受容器 65% 限制 */
+/* 转账卡/问卷卡/商店卡/表情包有固定内联宽度，不受容器 65% 限制 */
 .chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .transfer-bubble),
+.chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .survey-bubble),
+.chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .shop-card-bubble),
 .chat-body .msg-row .msg-content-line > .bubble-wrap:has(> .sticker-bubble) {
   max-width: none;
 }
@@ -8050,7 +8056,6 @@ html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble,
   margin-top: 5px !important;
   margin-bottom: 5px !important;
 }
-html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble),
 html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   background: rgba(0, 0, 0, 0.16) !important;
   color: rgba(255, 255, 255, 0.82) !important;
@@ -8061,10 +8066,10 @@ html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.
   outline: none !important;
   box-shadow: none !important;
   padding: 2px 8px !important;
-  font-size: 10px !important;
-  line-height: 1.4 !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
   position: relative !important;
-  max-width: 80% !important;
+  max-width: 70% !important;
   text-align: center !important;
 }
 .chat-body .msg-row.system .bubble::before,
@@ -10104,6 +10109,8 @@ html body #bubbleCssPreview .msg-row.other .bubble-wrap {
 #chatBackUnreadBadge[data-count="0"] {
   display: none !important;
 }
+
+/* v572: 角标显隐统一由 JS 内联 display!important 控制，不再使用辅助类 */
 
 /* === v560: 转账卡片、商店卡片、问卷卡片全模式最高优先级白底黑字防污染 === */
 html body .chat-body .bubble.transfer-bubble,
