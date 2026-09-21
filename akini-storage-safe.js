@@ -272,10 +272,12 @@
             if (!_restored) {
               _restored = true;
               // 启动期暂缓的写入落盘：强制写回 IndexedDB，确保用户数据落盘
+              // v573 关键修复：空值（'[]'/'{}'/'null'）一律不落盘——防止任何遗漏路径把
+              // 启动默认空值写回 IDB 覆盖真实数据（数据丢失双保险之二）
               try {
                 Object.keys(_preRestorePending).forEach(function (k) {
                   var pv = _preRestorePending[k];
-                  if (pv != null && pv !== '') {
+                  if (pv != null && pv !== '' && pv !== '[]' && pv !== '{}' && pv !== 'null') {
                     queueIdbWrite(k, pv);
                   }
                 });
@@ -294,6 +296,10 @@
               try {
                 if (v != null && v !== '') {
                   _reconciledKeys[k] = 1;
+                  // v573 关键修复：该键已在 IDB 有真实数据并完成对账 → 立即丢弃启动期暂存的
+                  // 程序性默认值（'[]'等），否则恢复完成后 pending 落盘会把空值写回 IDB，
+                  // 污染刚回填的真实数据——这正是"字卡库/设置/纪念日被清空"的根因
+                  try { if (_preRestorePending && Object.prototype.hasOwnProperty.call(_preRestorePending, k)) { delete _preRestorePending[k]; } } catch (e2) {}
                   // 对账策略（standard 同款）：localStorage 有值且【不在脏键集合】且非恢复前程序性写入 → 以 LS 为准并回写 IDB；
                   // LS 丢失 / LS 是脏键（上次写失败残留旧值）/ 恢复完成前的启动默认值 → 一律信 IDB 镜像回填，杜绝旧数据回滚
                   // 【安卓/鸿蒙加固】空值永不覆盖非空：IDB 异步落盘滞后/写失败时易残留旧空值（'[]'/'{}'），

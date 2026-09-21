@@ -1019,7 +1019,8 @@ document.addEventListener("DOMContentLoaded", function () {
               if (!k || k.indexOf("akini_") !== 0 || k.indexOf("akini_app_icon_") === 0 || isSnapKey(k)) continue;
               try {
                 var v = localStorage.getItem(k);
-                if (!isEmpty(v)) data[k] = v;
+                // v574: 大键（聊天记录/图片，>32KB）不进聚合快照，避免全量 stringify 数 MB 字符串卡顿/闪退
+                if (!isEmpty(v) && v.length <= 32768) data[k] = v;
               } catch (t) {}
             }
             caches
@@ -6846,7 +6847,10 @@ document.addEventListener("DOMContentLoaded", function () {
             if (window.akiniContacts && window.akiniContacts.backupToIDB) {
               window.akiniContacts.backupToIDB("akini_contacts", window.akiniContacts.getContacts());
               window.akiniContacts.backupToIDB("akini_groups", window.akiniContacts.getGroups());
-              window.akiniContacts.backupToIDB("akini_chat_sessions", window.akiniContacts.getSessions());
+              // v574: sessions 含完整 messagesHTML，直接 stringify 会达数十 MB → slim 后再备份
+              var _vSess = window.akiniContacts.getSessions();
+              var _vSlim = (typeof window.__akiniSlimSessions === "function") ? window.__akiniSlimSessions(_vSess) : _vSess;
+              window.akiniContacts.backupToIDB("akini_chat_sessions", _vSlim);
             }
           } catch (err) {
             console.warn("[Akini] debounced backup error", err);
@@ -7050,6 +7054,8 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     // 关键数据从 IDB 异步恢复完成后，强制刷新所有界面（联系人/聊天/iCity/预览），
     // 确保启动竞态期间读到空/缺头像快照后，恢复完成时能重新读到完整数据
+    // v573: 新增字卡库/纪念日/设置开关/邮箱/商店刷新——这些界面此前恢复完成后不重渲染，
+    // 启动竞态期间显示的空/默认值会被用户操作固化为真实写入，导致"数据丢失"
     window.__akiniOnCriticalRestored = function () {
       try { if (window.__akiniVaultRecover) window.__akiniVaultRecover(function () {}); } catch (e) {}
       try { setTimeout(__akiniRestorePendingReply, 3000); } catch (e) {}
@@ -7059,6 +7065,58 @@ document.addEventListener("DOMContentLoaded", function () {
       try { if (typeof window._renderIcity === 'function') window._renderIcity(); } catch (e) {}
       try { if (typeof window.updatePreview === 'function') window.updatePreview(); } catch (e) {}
       try { if (typeof window.__akiniFixHistoryAvatars === 'function') window.__akiniFixHistoryAvatars(); } catch (e) {}
+      // v573-1: 字卡库界面若打开着，用恢复后的真实数据重渲染
+      try {
+        if (typeof window.renderWordbank === 'function') {
+          var _wbOverlay = document.getElementById('wordbankOverlay');
+          if (_wbOverlay && _wbOverlay.style && _wbOverlay.style.display !== 'none') window.renderWordbank();
+        }
+      } catch (e) {}
+      // v573-2: 纪念日数字/标签用恢复后的真实数据重渲染（akini_start_date/akini_day_label）
+      try {
+        var _dn = document.getElementById('dayNumber');
+        if (_dn) {
+          var _sd = localStorage.getItem('akini_start_date');
+          var _days = 0;
+          if (_sd) {
+            var _diff = Math.floor((new Date() - new Date(_sd)) / 864e5);
+            _days = _diff > 0 ? _diff : 0;
+          }
+          _dn.innerText = _days;
+        }
+        var _dl = document.getElementById('dayLabel');
+        var _dlv = localStorage.getItem('akini_day_label');
+        if (_dl && _dlv) _dl.innerText = _dlv;
+      } catch (e) {}
+      // v573-3: 设置页所有开关/输入框用恢复后的真实数据重同步（akini_toggle_/akini_num_/akini_settings_）
+      try {
+        document.querySelectorAll('.toggle-switch[id]').forEach(function (sw) {
+          try {
+            var on = (localStorage.getItem('akini_toggle_' + sw.id) === '1');
+            if (sw.classList) {
+              if (on) sw.classList.add('on'); else sw.classList.remove('on');
+            }
+            try { sw.setAttribute('aria-pressed', on ? 'true' : 'false'); } catch (e2) {}
+          } catch (e2) {}
+        });
+        ['pinyinCardMin','pinyinCardMax','replyDelayMin','replyDelayMax','mailDelayMin','mailDelayMax','activeMsgMin','activeMsgMax','activeMailMin','activeMailMax','friendsPostMin','friendsPostMax','icityPostMin','icityPostMax','commentCountMin','commentCountMax'].forEach(function (nid) {
+          try {
+            var el = document.getElementById(nid);
+            if (!el) return;
+            var v = localStorage.getItem('akini_num_' + nid);
+            if (v != null && v !== '') el.value = v;
+          } catch (e2) {}
+        });
+        try {
+          var _mni = document.getElementById('meaningfulNumbersInput');
+          if (_mni) {
+            var _mnv = localStorage.getItem('akini_meaningful_numbers');
+            if (_mnv != null && _mnv !== '') _mni.value = _mnv;
+          }
+        } catch (e2) {}
+      } catch (e) {}
+      // v573-4: 首页角标恢复后立即同步（未读数也可能来自恢复的会话数据）
+      try { if (typeof window.__updateHomeBadges === 'function') window.__updateHomeBadges(); } catch (e) {}
     };
 
     /* ===== 历史消息默认头像修正器 =====
@@ -7190,11 +7248,12 @@ document.addEventListener("DOMContentLoaded", function () {
         try {
           // 超大键（图片/表情包 dataURL）由各自模块独立备份到 IDB，
           // 全量快照跳过它们，避免周期性 stringify 大字符串造成内存峰值（iOS 随机闪退根因之一）
+          // v574: 阈值由 256KB 收紧到 32KB，聊天记录/图片等大键一律不进聚合快照（已有逐键备份兜底）
           for (var t = {}, e = 0; e < localStorage.length; e++) {
             var n = localStorage.key(e);
             if (!n) continue;
             var _v = localStorage.getItem(n);
-            if (_v && _v.length > 262144) continue;
+            if (_v && _v.length > 32768) continue;
             t[n] = _v;
           }
           var _snapStr = JSON.stringify(t);
@@ -7214,7 +7273,9 @@ document.addEventListener("DOMContentLoaded", function () {
             ),
             window.akiniContacts.backupToIDB(
               "akini_chat_sessions",
-              window.akiniContacts.getSessions(),
+              (typeof window.__akiniSlimSessions === "function")
+                ? window.__akiniSlimSessions(window.akiniContacts.getSessions())
+                : window.akiniContacts.getSessions(),
             ));
           var _wb = i("akini_wordbank", []);
           window.akiniContacts.backupToIDB("akini_wordbank", _wb);
@@ -7238,25 +7299,30 @@ document.addEventListener("DOMContentLoaded", function () {
           localStorage.length > 0
         )
           window._akiniCacheStore.backupAll();
+        /* v574 闪退卡崩根因修复（对齐 milk/syy）：
+           原代码在此处对「整个 localStorage」做 JSON.stringify(snapshot) 连续两次，
+           localStorage 含聊天记录/图片可达数 MB~数十 MB，每次 stringify 分配数倍临时字符串，
+           在 visibilitychange(hidden)/pagehide 这种「系统只给极短 CPU 时间 + 严格内存上限」的时机
+           同步执行 → 直接 OOM 闪退或被 Watchdog 超时杀进程。这就是「好多机型闪退卡崩」的元凶。
+           修复：聚合快照只收 ≤100KB 的小键（设置/开关/小数据），大键（聊天记录/图片）已有
+           backupAll 逐键写入 IDB 兜底，绝不在此做全量 stringify。 */
         var snapshot = {};
         for (var e = 0; e < localStorage.length; e++) {
           var key = localStorage.key(e);
-          key && (snapshot[key] = localStorage.getItem(key));
+          if (!key) continue;
+          var val = localStorage.getItem(key);
+          if (!val || val.length > 100000) continue; // 大键不进聚合快照
+          snapshot[key] = val;
         }
         /* 空快照禁止覆盖：localStorage 被系统清空/未恢复时，保留 IDB 里的好备份 */
         if (Object.keys(snapshot).length === 0) {
           console.warn("[Akini] flushAllData: 空快照，跳过覆盖 IDB 备份");
           return;
         }
+        var snapJson = JSON.stringify(snapshot);
         if (window._idbStore && window._idbStore.set) {
-          window._idbStore.set(
-            "akini_localstorage_snapshot",
-            JSON.stringify(snapshot),
-          );
-          window._idbStore.set(
-            "akini_localstorage_snapshot_backup",
-            JSON.stringify(snapshot),
-          );
+          window._idbStore.set("akini_localstorage_snapshot", snapJson);
+          window._idbStore.set("akini_localstorage_snapshot_backup", snapJson);
         }
         if (window.akiniContacts && window.akiniContacts.backupToIDB) {
           window.akiniContacts.backupToIDB(
@@ -7268,7 +7334,11 @@ document.addEventListener("DOMContentLoaded", function () {
             window.akiniContacts.getGroups(),
           );
           var sessions = window.akiniContacts.getSessions();
-          window.akiniContacts.backupToIDB("akini_chat_sessions", sessions);
+          // v574: sessions 含完整 messagesHTML（内存中保留用于渲染），直接 stringify 会达数十 MB
+          // → 用 slim 剔除 messagesHTML 后再备份（messagesHTML 已由下方逐会话独立写入 IDB）
+          var slimSessions = (typeof window.__akiniSlimSessions === "function")
+            ? window.__akiniSlimSessions(sessions) : sessions;
+          window.akiniContacts.backupToIDB("akini_chat_sessions", slimSessions);
           for (var sid in sessions) {
             var sess = sessions[sid];
             if (sess && sess.messagesHTML && "" !== sess.messagesHTML.trim()) {
@@ -9429,7 +9499,7 @@ document.addEventListener("DOMContentLoaded", function () {
         var backBadge = document.getElementById("chatBackUnreadBadge");
         if (!backBadge) return;
         if (!window.akiniContacts || !window.akiniContacts.getSessions) {
-          backBadge.style.display = "none";
+          backBadge.style.setProperty("display", "none", "important");
           if (backBtn) backBtn.classList.remove("has-unread");
           return;
         }
@@ -9443,11 +9513,15 @@ document.addEventListener("DOMContentLoaded", function () {
         });
         if (bn > 0) {
           backBadge.textContent = bn > 99 ? "99+" : String(bn);
-          backBadge.style.display = "inline-flex";
+          backBadge.style.setProperty("display", "inline-flex", "important");
+          backBadge.style.setProperty("visibility", "visible", "important");
+          backBadge.style.setProperty("opacity", "1", "important");
           backBadge.setAttribute("data-count", String(bn));
           if (backBtn) backBtn.classList.add("has-unread");
         } else {
-          backBadge.style.display = "none";
+          backBadge.style.setProperty("display", "none", "important");
+          backBadge.style.setProperty("visibility", "hidden", "important");
+          backBadge.style.setProperty("opacity", "0", "important");
           backBadge.textContent = "";
           backBadge.setAttribute("data-count", "0");
           if (backBtn) backBtn.classList.remove("has-unread");

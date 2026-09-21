@@ -1289,9 +1289,10 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #999;
 }
 .shop-card-bubble {
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: 220px !important;
+  /* v573: 商店卡片与转账卡片尺寸形状完全统一（width auto/min200/max250、全16px圆角） */
+  width: auto !important;
+  min-width: 200px !important;
+  max-width: 250px !important;
   padding: 13px 14px !important;
   background: #ffffff !important;
   border: 1px solid #e8e8e8 !important;
@@ -1357,18 +1358,19 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   font-weight: 600;
 }
 .shop-card-bubble-footer {
+  /* v573: 分割线节奏对齐转账卡（margin 6px 0 4px 节奏） */
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid #f0f0f0;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid #ececec;
 }
 .shop-card-bubble-status {
   font-size: 12px;
   color: #1a1a1a !important;
   font-weight: 500;
-  padding: 3px 10px;
+  padding: 3px 12px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.06) !important;
   display: inline-flex;
@@ -1910,10 +1912,11 @@ body:not(.bubble-css-on)
   border: none !important;
   outline: none !important;
 }
+/* v573: 问卷卡片与转账卡片尺寸形状完全统一（width auto/min200/max250、全16px圆角、无小尖角） */
 .chat-body .msg-row .bubble.survey-bubble {
-  width: 220px !important;
-  min-width: 220px !important;
-  max-width: 220px !important;
+  width: auto !important;
+  min-width: 200px !important;
+  max-width: 250px !important;
   padding: 13px 14px !important;
   border-radius: 16px !important;
   background: #ffffff !important;
@@ -1924,12 +1927,12 @@ body:not(.bubble-css-on)
   cursor: pointer;
   box-sizing: border-box;
 }
-.chat-body .msg-row.me .bubble.survey-bubble {
-  border-top-right-radius: 2px !important;
-}
-.chat-body .msg-row.other .bubble.survey-bubble,
-.chat-body .msg-row.ta .bubble.survey-bubble {
-  border-top-left-radius: 2px !important;
+/* v573: 彻底删除问卷卡 me/other 小尖角，与转账卡同款全圆角 */
+html body .chat-body .msg-row.me .bubble.survey-bubble,
+html body .chat-body .msg-row.other .bubble.survey-bubble,
+html body .chat-body .msg-row.ta .bubble.survey-bubble {
+  border-top-right-radius: 16px !important;
+  border-top-left-radius: 16px !important;
 }
 .survey-bubble-inner {
   display: flex;
@@ -1974,7 +1977,7 @@ body:not(.bubble-css-on)
 .survey-bubble-divider {
   height: 1px;
   background: linear-gradient(90deg, rgba(0, 0, 0, 0.09), rgba(0, 0, 0, 0.02));
-  margin: 10px 0 8px;
+  margin: 6px 0 4px;
 }
 .survey-bubble-footer {
   padding: 0;
@@ -1991,7 +1994,7 @@ body:not(.bubble-css-on)
   font-size: 12px;
   color: #1a1a1a;
   font-weight: 500;
-  padding: 3px 10px;
+  padding: 3px 12px;
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.06);
   display: inline-flex;
@@ -2142,14 +2145,15 @@ body:not(.bubble-css-on)
 .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   background: rgba(200, 200, 200, 0.35) !important;
   color: #888 !important;
-  font-size: 14px !important;
-  padding: 2px 8px !important;
-  border-radius: 12px !important;
+  /* v573: 系统消息文字改回原大小12px，胶囊背景缩小 */
+  font-size: 12px !important;
+  padding: 1px 7px !important;
+  border-radius: 8px !important;
   max-width: 70% !important;
   text-align: center !important;
   box-shadow: none !important;
   font-weight: normal !important;
-  line-height: 1.5 !important;
+  line-height: 1.4 !important;
 }
 .timestamp-row {
   display: flex;
@@ -6713,7 +6717,7 @@ body.dark-mode #wbGroupFilter { background: rgba(255,255,255,.08) !important; }
 /* 字卡库工具栏：图标聚集靠最右（覆盖旧 4 列均分网格） */
 /* zzc：恢复两行四列布局（用户要求），6241 行规则生效 */
 .wb-toolbar .left-group, .wb-toolbar .right-group { display: contents; }
-html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { font-size: 11px !important; padding: 2px 8px !important; line-height: 1.5 !important; }
+html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) { font-size: 12px !important; padding: 1px 7px !important; line-height: 1.4 !important; }
 /* 输入栏防挤压：保证表情/发送/加号按钮在所有界面完整显示 */
 .chat-input-bar { width: 100%; box-sizing: border-box; }
 .chat-input-bar .input-wrap { min-width: 0; flex: 1 1 0; }
@@ -6965,14 +6969,12 @@ input[type="file"].akini-file-offscreen {
   cursor: pointer;
 }
 
-/* ====== zzzk：微信聊天界面系统消息底图恢复小巧胶囊（横竖屏/美化CSS开关全场景生效） ====== */
-/* zzzi 引入的 akini-bubble-force 内联样式 border-radius:999px!important 让系统提示恢复成大胶囊，
-   此处以 html body 前缀 + 更长选择器压过内联块中同优先级规则，仅作用于系统行，不影响普通消息气泡 */
+/* ====== zzzk：系统消息胶囊 v573 统一：文字12px原大小 + 胶囊背景缩小 ====== */
 html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  font-size: 11px !important;
-  padding: 2px 10px !important;
-  line-height: 1.5 !important;
-  border-radius: 16px !important;
+  font-size: 12px !important;
+  padding: 1px 7px !important;
+  line-height: 1.4 !important;
+  border-radius: 8px !important;
   max-width: 86% !important;
   background: rgba(200, 200, 200, 0.35) !important;
   box-shadow: none !important;
@@ -7448,12 +7450,12 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   padding-bottom: 86px !important;
 }
 
-/* ===== v518: 系统消息胶囊缩小 ===== */
+/* ===== v518→v573: 系统消息胶囊统一：文字12px + 胶囊背景缩小 ===== */
 html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  font-size: 10px !important;
-  padding: 1px 8px !important;
-  line-height: 1.5 !important;
-  border-radius: 12px !important;
+  font-size: 12px !important;
+  padding: 1px 7px !important;
+  line-height: 1.4 !important;
+  border-radius: 8px !important;
   max-width: 84% !important;
   background: rgba(200, 200, 200, 0.32) !important;
   box-shadow: none !important;
@@ -8061,13 +8063,14 @@ html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.
   color: rgba(255, 255, 255, 0.82) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
-  border-radius: 12px !important;
+  /* v573: 系统消息文字改回原大小12px，胶囊背景缩小 */
+  border-radius: 8px !important;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
-  padding: 2px 8px !important;
-  font-size: 14px !important;
-  line-height: 1.5 !important;
+  padding: 1px 7px !important;
+  font-size: 12px !important;
+  line-height: 1.4 !important;
   position: relative !important;
   max-width: 70% !important;
   text-align: center !important;
@@ -10110,7 +10113,7 @@ html body #bubbleCssPreview .msg-row.other .bubble-wrap {
   display: none !important;
 }
 
-/* v572: 角标显隐统一由 JS 内联 display!important 控制，不再使用辅助类 */
+* v573: 角标显隐统一由 JS 内联 display!important 控制，不再使用辅助类 */
 
 /* === v560: 转账卡片、商店卡片、问卷卡片全模式最高优先级白底黑字防污染 === */
 html body .chat-body .bubble.transfer-bubble,
@@ -10226,4 +10229,59 @@ html body.bubble-css-on .chat-body .bubble.sticker-bubble {
   margin-left: 0 !important;
   margin-right: 0 !important;
   flex-shrink: 0 !important;
+}
+
+/* ================= v573 终极统一区块 ================= */
+
+/* --- v573-1: 角标显隐终极兜底（与 appBtnMail 等其他首页功能角标完全同款机制） ---
+   原理：data-count>0 时无论 JS 内联样式是否被某处清掉，CSS 最高特异性规则强制显示；
+   data-count=0 或空时维持隐藏。微信首页角标/聊天窗列表角标/返回键未读标三处同款。 */
+html body .home-badge[data-count]:not([data-count="0"]),
+html body .home-badge[data-count]:not([data-count="0"]):not(:empty),
+html body .cli-unread-badge[data-count]:not([data-count="0"]),
+html body .cli-unread-badge[data-count]:not([data-count="0"]):not(:empty),
+html body #chatBackBtn #chatBackUnreadBadge[data-count]:not([data-count="0"]),
+html body #chatBackBtn #chatBackUnreadBadge[data-count]:not([data-count="0"]):not(:empty),
+html body #chatBackBtn.has-unread #chatBackUnreadBadge:not(:empty) {
+  display: inline-flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* --- v573-2: 系统消息胶囊终极兜底（文字12px原大小+胶囊背景缩小，全模式生效） --- */
+html body .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body #app-chat .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-css-on #app-chat .chat-body .msg-row.system .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  font-size: 12px !important;
+  padding: 1px 7px !important;
+  line-height: 1.4 !important;
+  border-radius: 8px !important;
+  max-width: 74% !important;
+  box-shadow: none !important;
+}
+
+/* --- v573-3: 问卷/商店卡片与转账卡完全同款尺寸形状（覆盖历史消息里的旧内联220px） --- */
+html body .chat-body .msg-row .bubble.survey-bubble,
+html body .chat-body .msg-row .bubble.shop-card-bubble,
+html body .chat-body .msg-row .msg-content-line .bubble.survey-bubble,
+html body .chat-body .msg-row .msg-content-line .bubble.shop-card-bubble {
+  width: auto !important;
+  min-width: 200px !important;
+  max-width: 250px !important;
+  border-radius: 16px !important;
+  border-top-right-radius: 16px !important;
+  border-top-left-radius: 16px !important;
+  padding: 13px 14px !important;
+}
+html body .chat-body .msg-row.me .bubble.survey-bubble,
+html body .chat-body .msg-row.other .bubble.survey-bubble,
+html body .chat-body .msg-row.ta .bubble.survey-bubble,
+html body .chat-body .msg-row.me .bubble.shop-card-bubble,
+html body .chat-body .msg-row.other .bubble.shop-card-bubble,
+html body .chat-body .msg-row.ta .bubble.shop-card-bubble {
+  border-top-right-radius: 16px !important;
+  border-top-left-radius: 16px !important;
 }
