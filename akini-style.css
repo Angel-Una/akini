@@ -5127,27 +5127,23 @@ a,
 
 
 
-/* === 统一返回按钮样式：与通话键一致的圆形磨砂底图 === */
+/* === v597: 通用返回按钮（非聊天/非字卡库界面）：透明无底图 === */
 .back-btn,
 button.back-btn,
 .back-btn[type="button"],
-button.back-btn[type="button"],
-#app-chat .chat-top-bar .back-btn,
-#app-chat .chat-top-bar .back-btn:active,
-html body #app-chat .chat-top-bar #chatBackBtn,
-html body #app-chat .chat-top-bar #chatBackBtn:active {
-  width: 42px !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  min-height: 42px !important;
-  border-radius: 50% !important;
-  background: rgba(255, 255, 255, 0.22) !important;
-  background-color: rgba(255, 255, 255, 0.22) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-  backdrop-filter: blur(20px) saturate(180%) !important;
+button.back-btn[type="button"] {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
   color: #1a1a1a !important;
   border: none !important;
-  padding: 0 !important;
+  padding: 0 8px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
@@ -5156,7 +5152,7 @@ html body #app-chat .chat-top-bar #chatBackBtn:active {
   line-height: 1 !important;
   text-align: center !important;
   cursor: pointer !important;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+  box-shadow: none !important;
   -webkit-tap-highlight-color: transparent !important;
   outline: none !important;
   transform: none !important;
@@ -8135,8 +8131,8 @@ html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble,
 html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   background: rgba(0, 0, 0, 0.16) !important;
   color: rgba(255, 255, 255, 0.82) !important;
-  backdrop-filter: blur(8px) !important;
-  -webkit-backdrop-filter: blur(8px) !important;
+  backdrop-filter: none!important;
+  -webkit-backdrop-filter: none!important;
   /* v573: 系统消息文字改回原大小12px，胶囊背景缩小 */
   border-radius: 8px !important;
   border: none !important;
@@ -11081,4 +11077,91 @@ html body #app-chat .chat-top-bar #chatBackBtn .back-arrow-icon,
   color: #1a1a1a !important;
   font-size: 24px !important;
   line-height: 1 !important;
+}
+
+/* === v597: 仅微信聊天界面与字卡库返回键保留与通话键一致的圆形磨砂底图，其余界面无底图 === */
+html body #app-chat .chat-wrapper .chat-top-bar #chatBackBtn,
+html body #app-chat .chat-wrapper .chat-top-bar button.back-btn#chatBackBtn,
+html body #chatBackBtn,
+#chatBackBtn,
+#chatBackBtn:active,
+.wordbank-header .back-btn,
+.wb-modal-header .back-btn {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.22) !important;
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  color: #1a1a1a !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  font-size: 24px !important;
+  line-height: 1 !important;
+  text-align: center !important;
+  cursor: pointer !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  outline: none !important;
+  transform: none !important;
+  flex-shrink: 0 !important;
+}
+
+
+/* === v597: 其余所有界面返回键明确恢复透明无底图（覆盖任何历史磨砂残留） === */
+#settingsBackBtn,
+#shopBackBtn,
+#beautifyBackBtn,
+#mailBackBtn,
+#friendsBackBtn,
+#friendsNotifBack,
+#icityBackBtn,
+#icityDetailBack,
+#icityNotifBack,
+#icityProfileEditBack,
+#icityTaProfileBack,
+#addContactBackBtn,
+#contactDetailBackBtn,
+#createGroupBackBtn,
+#chatListBackBtn,
+#companionBackBtn,
+#companionMainBackBtn,
+#novelBackBtn,
+#novelReaderBackBtn,
+#surveyListBackBtn,
+#surveyCreatedListBackBtn,
+#musicPickerBackBtn,
+.mail-detail-header .back-btn,
+.settings-header .back-btn,
+.beautify-header .back-btn,
+.friends-header .back-btn,
+.content-header .back-btn,
+.icity-header .back-btn {
+  background: transparent !important;
+  background-color: transparent !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 8px !important;
+  font-size: 24px !important;
+  color: #1a1a1a !important;
+  transform: none !important;
+}
+
+/* === 性能优化：消息行硬件加速与独立渲染边界（防重绘级联，彻底消除滚动卡顿与GPU崩溃） === */
+.chat-body .msg-row,
+#app-chat .chat-body .msg-row {
+  contain: layout style;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }

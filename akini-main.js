@@ -8,11 +8,20 @@ if (typeof window.rt !== 'function') { window.rt = window.esc; }
    根治内存爆炸：老数据打开会话保存时自动瘦身迁移，新数据发送时直接入池 */
 window.__akiniMedia = (function () {
   var MEM = {};
+  var MEM_ORDER = []; // 记录入池顺序，用于 LRU 淘汰
+  var MEM_SIZE = 0;   // 当前内存占用字节数估算
+  var MEM_BUDGET = 60 * 1024 * 1024; // 内存池上限 60MB，超过则 LRU 淘汰最早条目，防 OOM 崩溃
   var PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
   function hash(s) {
     var h = 5381;
     for (var i = 0; i < s.length; i += 7) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
     return "m" + (h >>> 0).toString(36) + "_" + s.length;
+  }
+  function evict() {
+    while (MEM_SIZE > MEM_BUDGET && MEM_ORDER.length > 0) {
+      var old = MEM_ORDER.shift();
+      if (old && MEM[old]) { MEM_SIZE -= MEM[old].length; delete MEM[old]; }
+    }
   }
   return {
     PLACEHOLDER: PLACEHOLDER,
@@ -22,6 +31,9 @@ window.__akiniMedia = (function () {
       var h = hash(dataUrl);
       if (!MEM[h]) {
         MEM[h] = dataUrl;
+        MEM_ORDER.push(h);
+        MEM_SIZE += dataUrl.length;
+        evict(); // 超预算时 LRU 淘汰，防内存无限增长崩溃
         try { window._idbStore && window._idbStore.set("akini_media_" + h, dataUrl); } catch (e) {}
       }
       return h;
@@ -4961,11 +4973,13 @@ window.akiniContacts = {
       /* zzzn：切换会话/重进时清理旧时间戳回填游标（改用行位置推断后按行独立计算，无需全局游标，此处仅兜底清残留） */
       try { delete window.__akiniChatBackfillTs; } catch (e) {}
       var total = __akiniCountMsgRowsFast(cleanHTML);
-      if (total <= AKINI_CHAT_BATCH_SIZE) {
-        U.innerHTML = cleanHTML;
-      } else {
-        var batchHTML = __akiniSliceLastMsgRows(cleanHTML, AKINI_CHAT_BATCH_SIZE);
-        U.innerHTML = batchHTML;
+      // v596: 给图片加懒加载，减少首屏解码/内存峰值，防卡崩
+      var _lazyHTML = (total <= AKINI_CHAT_BATCH_SIZE) ? cleanHTML : __akiniSliceLastMsgRows(cleanHTML, AKINI_CHAT_BATCH_SIZE);
+      if (_lazyHTML.indexOf('<img') >= 0) {
+        _lazyHTML = _lazyHTML.replace(/<img(?![^>]*\sloading=)([^>]*)>/g, '<img loading="lazy" decoding="async"$1>');
+      }
+      U.innerHTML = _lazyHTML;
+      if (total > AKINI_CHAT_BATCH_SIZE) {
         __akiniBindPullLoad(chatId);
       }
       try {
