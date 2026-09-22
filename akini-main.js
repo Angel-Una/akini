@@ -1,4 +1,15 @@
 function escapeHtmlSafe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+/* v608 性能减负：激活 .low-mem 低端机自动降级（CSS 减负规则早已就绪但此前从未启用——纯死代码）。
+   deviceMemory<=4GB 或 核心数<=4 判定为低端机：关闭全部循环装饰动画与残余 backdrop-filter，
+   修复低端安卓/微信内置浏览器长时间使用后 GPU 显存耗尽导致的卡崩闪退。 */
+(function(){
+  try{
+    var dm = navigator.deviceMemory || 0;
+    var hc = navigator.hardwareConcurrency || 0;
+    var isLow = (dm > 0 && dm <= 4) || (hc > 0 && hc <= 4);
+    if (isLow) document.documentElement.classList.add("low-mem");
+  }catch(e){}
+})();
 /* [Akini] 所有数据仅保存在本地设备（localStorage/IndexedDB），不联网、不同步。 */
 /* zzzg：表情包引用崩溃根治——esc/rt 全局兜底。引用表情包的引用条与气泡缩略图 4 处调用点（ctxQuote 13019、回复渲染 3460/3559/4344）所在闭包缺失局部定义，裸调用抛 ReferenceError 导致整个引用流程静默死亡 */
 if (typeof window.esc !== 'function') { window.esc = function (s) { return String(s == null ? '' : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }; }
@@ -77,6 +88,101 @@ function __akiniStripMedia(html) {
     return '<img data-mh="' + h + '"' + pre + ' src="' + window.__akiniMedia.PLACEHOLDER + '"' + post + ">";
   });
 }
+/* 深度安全模式首批渲染减半：少解码图片，降低崩溃风险 */
+var AKINI_CHAT_BATCH_SIZE = 25; // 参考 milk 与 syy：更保守控制单次挂载 25 条，极大降低 DOM 过载与内存溢出卡崩闪退
+function __akiniStripTypingRows(html) {
+  if (!html || "string" != typeof html) return html || "";
+  var hasTyping =
+    html.indexOf('typingBubbleRow_') !== -1 ||
+    html.indexOf('typing-bubble') !== -1;
+  var hasLoadMore = html.indexOf("加载更多聊天记录") !== -1;
+  if (!hasTyping && !hasLoadMore) return html;
+  var div = document.createElement("div");
+  div.innerHTML = html;
+  div.querySelectorAll('[id^="typingBubbleRow_"]').forEach(function (el) {
+    el.remove();
+  });
+  // 清理历史版本遗留的"加载更多聊天记录"提示行（已持久化在聊天记录里）
+  if (hasLoadMore) {
+    var all = div.querySelectorAll("*");
+    var targets = [];
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (
+        el.children.length === 0 &&
+        el.textContent &&
+        el.textContent.indexOf("加载更多聊天记录") !== -1
+      ) {
+        var row = el.closest
+          ? el.closest(".msg-row") || el.closest('[class*="load"]') || el
+          : el;
+        if (targets.indexOf(row) === -1) targets.push(row);
+      }
+    }
+    targets.forEach(function (el) {
+      el.remove();
+    });
+  }
+  return div.innerHTML;
+}
+window.__akiniStripTypingRows = __akiniStripTypingRows;
+
+/* zzt 性能版：纯正则计数（不做 DOM 解析），热点路径专用；typing 行（id=typingBubbleRow_）扣除，两侧口径一致，相对比较结果与精确版一致 */
+function __akiniCountMsgRowsFast(html) {
+  if (!html) return 0;
+  var m = html.match(/<div[^>]*class="msg-row/g);
+  var c = m ? m.length : 0;
+  var tp = html.match(/id="typingBubbleRow_/g);
+  if (tp) c -= tp.length;
+  return c < 0 ? 0 : c;
+}
+window.__akiniCountMsgRowsFast = __akiniCountMsgRowsFast;
+
+/* v609/v610 卡顿根治：增量清洗缓存（全局作用域声明，供 I / C / doSave 及全局共享） */
+function __akiniIncTyping(html, cid) {
+  if (!html) return html || "";
+  var C0 = (window.__akiniIncCache = window.__akiniIncCache || {});
+  var c = (C0[cid] = C0[cid] || {});
+  if (c.srcTyping && html.length > c.srcTyping.length && html.indexOf(c.srcTyping) === 0) {
+    return c.cleanTyping + __akiniStripTypingRows(html.slice(c.srcTyping.length));
+  }
+  var out = __akiniStripTypingRows(html);
+  c.srcTyping = html; c.cleanTyping = out;
+  return out;
+}
+window.__akiniIncTyping = __akiniIncTyping;
+
+function __akiniIncMedia(html, cid) {
+  if (!html) return html || "";
+  var C0 = (window.__akiniIncCache = window.__akiniIncCache || {});
+  var c = (C0[cid] = C0[cid] || {});
+  if (c.srcMedia && html.length > c.srcMedia.length && html.indexOf(c.srcMedia) === 0) {
+    return c.cleanMedia + __akiniStripMedia(html.slice(c.srcMedia.length));
+  }
+  var out = __akiniStripMedia(html);
+  c.srcMedia = html; c.cleanMedia = out;
+  return out;
+}
+window.__akiniIncMedia = __akiniIncMedia;
+
+/* lane 两条独立计数链：'typing'=I 内对 strip 后串计数；'clean'=doSave 对 StripMedia 后串计数 */
+function __akiniIncCount(html, cid, lane) {
+  if (!html) return 0;
+  var C0 = (window.__akiniIncCache = window.__akiniIncCache || {});
+  var c = (C0[cid] = C0[cid] || {});
+  var sf = "srcCount_" + lane, rf = "rows_" + lane;
+  if (c[sf] === html) return c[rf];
+  if (c[sf] && html.length > c[sf].length && html.indexOf(c[sf]) === 0) {
+    c[rf] = (c[rf] || 0) + __akiniCountMsgRowsFast(html.slice(c[sf].length));
+    c[sf] = html;
+    return c[rf];
+  }
+  var r = __akiniCountMsgRowsFast(html);
+  c[sf] = html; c[rf] = r;
+  return r;
+}
+window.__akiniIncCount = __akiniIncCount;
+
 /* 图片压缩：所有 FileReader 读取的图片统一压缩，避免 base64 过大撑爆 localStorage 配额导致数据丢失 */
 (function () {
   if (window.__akiniFRCompress) return;
@@ -2172,7 +2278,7 @@ document.addEventListener("DOMContentLoaded", function () {
           e[t]
         );
       }
-      function I(t, e) {
+    function I(t, e) {
         var n = k(),
           i = b(t);
         // 关键修复：messagesHTML 不再写入 sessions 的 localStorage（避免大对象超配额失败、
@@ -2185,7 +2291,8 @@ document.addEventListener("DOMContentLoaded", function () {
           "string" == typeof e.messagesHTML
         ) {
           // 清理输入动态残留：输入动态不应被持久化，否则重进聊天会出现多个“...”
-          e.messagesHTML = __akiniStripTypingRows(e.messagesHTML);
+          // v609: 增量清洗——纯追加只处理尾部，不再每次全量正则扫描整个记录
+          e.messagesHTML = __akiniIncTyping(e.messagesHTML, t);
           htmlToSave = e.messagesHTML;
           // 聊天记录只增不减：防止陈旧会话数据用短的 messagesHTML 覆盖内存中的完整记录
           // 内存没有时从持久化的 chat_history 读旧值对比（否则旧值为空时任何覆盖都会放行=记录丢失）
@@ -2197,9 +2304,9 @@ document.addEventListener("DOMContentLoaded", function () {
             } catch (e0) {}
           }
           if (__oldHtml) {
-            i.messagesHTML = __akiniStripTypingRows(__oldHtml);
-            var newRows = __akiniCountMsgRowsFast(e.messagesHTML);
-            var oldRows = __akiniCountMsgRowsFast(i.messagesHTML);
+            i.messagesHTML = __akiniIncTyping(__oldHtml, t);
+            var newRows = __akiniIncCount(e.messagesHTML, t, "typing");
+            var oldRows = __akiniIncCount(i.messagesHTML, t, "typing");
             if (newRows < oldRows) {
               console.warn("[I] 拒绝用更短的聊天记录更新会话：" + t + " (" + newRows + " < " + oldRows + ")");
               delete e.messagesHTML;
@@ -2209,7 +2316,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         for (var a in e) e.hasOwnProperty(a) && (i[a] = e[a]);
         // 内存中保留 messagesHTML 用于即时渲染，但不随 sessions 写入 localStorage
-        var memHtml = __akiniStripTypingRows(i.messagesHTML);
+        var memHtml = __akiniIncTyping(i.messagesHTML, t);
         delete i.messagesHTML;
         n[t] = i;
         _(n);
@@ -3738,6 +3845,22 @@ window.akiniContacts = {
       K.removeAttribute("data-quote-sticker");
       K.placeholder = "iMessage信息";
       if (zt) zt.classList.remove("show");
+      // v605: 提前计算目标与回复行为，在构建/追加消息 DOM 之前就立即点亮输入动态（最早时机）
+      var r = window.akiniContacts.getActiveChatId(),
+        c = window.akiniContacts.getChatTarget(r);
+      const __bh = _();
+      var __sendMemberId =
+        "group" === (c && c.type) ? (c.memberIds || [])[0] : null;
+      // 用户要求：发送后立即显示输入动态（跳过已读回执等待时间），逻辑与普通回消息一致
+      // 在发送瞬间、追加消息之前直接点亮输入动态，确保"点了就显示"，不依赖任何延迟
+      if (__bh && "none" !== __bh.type && r === window.akiniContacts.getActiveChatId()) {
+        try {
+          var _tiNow = document.getElementById("typingIndicator");
+          if (_tiNow) _tiNow.style.display = "block";
+          showTypingBubble(r, __sendMemberId);
+          console.log("[TYPING] 发送瞬间点亮 ts=" + Date.now() + " chat=" + r + " bh=" + __bh.type);
+        } catch (_te) { console.warn("[TYPING] 发送瞬间显示失败:", _te); }
+      }
       const o = document.createElement("div");
       o.setAttribute("data-ts", String(Date.now()));
       ((o.className = "msg-row me"),
@@ -3753,8 +3876,6 @@ window.akiniContacts = {
               "</div>"
             : "") +
           d("right")));
-      var r = window.akiniContacts.getActiveChatId(),
-        c = window.akiniContacts.getChatTarget(r);
       (__akiniAppendMessageHTML(r, o.outerHTML, {
         lastMsg: t,
         lastSenderAvatar: f(),
@@ -3765,13 +3886,6 @@ window.akiniContacts = {
         (K.value = ""));
       // TA的手机：按概率自动收藏用户发送的聊天消息
       try { if (window.akiniTaPhoneCollectChat && r) window.akiniTaPhoneCollectChat(r, t, Date.now()); } catch (e) {}
-      const __bh = _();
-      const __sendTarget = window.akiniContacts.getChatTarget(r);
-      // 输入状态：先显示已读，再显示输入动态（连发消息只回复一次）
-      var __sendMemberId =
-        "group" === (__sendTarget && __sendTarget.type)
-          ? (__sendTarget.memberIds || [])[0]
-          : null;
       // 对齐 core：行为在发送时判定一次并贯穿整条时间线（已读 → 输入动态 → 打字 → 回复），
       // 到点不再二次判定；连发清空上一轮全部定时器重新计时（debounce），到点回复一轮
       __akiniScheduleReply(r, __sendMemberId, undefined, __bh);
@@ -3802,6 +3916,7 @@ window.akiniContacts = {
         el.innerHTML = '<div class="akcp-typing"><span class="wt-dot"></span><span class="wt-dot"></span><span class="wt-dot"></span></div>';
       }
       el.style.display = "flex";
+      console.log("[TYPING] paint 显示 ts=" + Date.now() + " activeChat=" + t + " map有=" + (m ? "Y" : "N"));
       if (chatBody) {
         chatBody.classList.add("typing-on");
         // 仅在用户本就停留在底部附近时才跟随滚动，上滑翻阅历史时不拽回
@@ -3812,13 +3927,21 @@ window.akiniContacts = {
     window.__akiniPaintTypingFloat = __akiniPaintTypingFloat;
     function showTypingBubble(t, memberId) {
       window.__akiniTypingMap = window.__akiniTypingMap || {};
-      var target =
-        window.akiniContacts && window.akiniContacts.getChatTarget(t);
+      // v605 关键修复：头像计算（getChatTarget/getContactById/nt）必须容错——
+      // 若其中任一步抛异常，原代码会中断、typingMap[t] 不会被设置，输入动态就延迟到
+      // typingTimer 阶段（已读延迟后）才显示，用户感觉"点了好久才显示"。
+      // 现在异常时以空头像兜底，确保 typingMap 必定设置、悬浮层立即显示。
       var avatar = "";
-      if (memberId && window.akiniContacts) {
-        var member = window.akiniContacts.getContactById(memberId);
-        if (member) avatar = nt(member.avatar, 38);
-      } else if (target) avatar = nt(target.avatar, 38);
+      try {
+        var target =
+          window.akiniContacts && window.akiniContacts.getChatTarget(t);
+        if (memberId && window.akiniContacts) {
+          var member = window.akiniContacts.getContactById(memberId);
+          if (member) avatar = nt(member.avatar, 38);
+        } else if (target) avatar = nt(target.avatar, 38);
+      } catch (e) {
+        avatar = "";
+      }
       var m = window.__akiniTypingMap[t];
       if (m && m.timer) clearTimeout(m.timer);
       // 只记录状态（头像 + 兜底计时器），悬浮层由 __akiniPaintTypingFloat 统一绘制。
@@ -3836,6 +3959,7 @@ window.akiniContacts = {
           hideTypingBubble(t);
         }, __watchMs),
       };
+      console.log("[TYPING] showTypingBubble 设置 ts=" + Date.now() + " chat=" + t + " avatar=" + (avatar ? "Y" : "N"));
       __akiniPaintTypingFloat();
       /* v516: 部分浏览器在 DOM 写入后不会立即重绘，延迟一帧再次刷新保证输入动态实时显示 */
       try {
@@ -4004,7 +4128,16 @@ window.akiniContacts = {
         } catch (err) {}
       }
 
-      // 已读与输入动态：已读点亮时立即展示输入动态，输入动态持续到回复到达那一刻
+      // 对齐 milk：发送后立即展示输入动态（仅当会回复时），不再等待已读延迟——用户反馈"秒显示"
+      if ("none" !== n.type && chatId === window.akiniContacts.getActiveChatId()) {
+        try {
+          var _ti = document.getElementById("typingIndicator");
+          if (_ti) _ti.style.display = "block";
+          showTypingBubble(chatId, __member);
+        } catch (_te) {}
+      }
+
+      // 已读回执：到点亮已读（输入动态已在发送瞬间展示，持续到回复到达那一刻）
       pending.readTimer = setTimeout(function () {
         pending.readTimer = null;
         try { __lightReadReceipts(); } catch (e) {}
@@ -4025,13 +4158,6 @@ window.akiniContacts = {
           } catch (e2) {}
           return;
         }
-
-        // 核心对齐：已读回执一旦点亮，立刻进入输入动态，不再额外延迟！
-        if (chatId === window.akiniContacts.getActiveChatId()) {
-          var l = document.getElementById("typingIndicator");
-          if (l) l.style.display = "block";
-          showTypingBubble(chatId, __member);
-        }
       }, __readDelay);
 
       if ("none" === n.type) return; // 已读不回：不排回复
@@ -4048,7 +4174,24 @@ window.akiniContacts = {
           __akiniOnReplyComplete(chatId);
         }
       }, __replyDelay);
+      pending.dueAt = Date.now() + __replyDelay; // v605: 记录回复到期时刻
     }
+    // v605: 微信内置浏览器后台会冻结/挂起定时器——回前台时若回复已到期但 timer 还挂着（被冻结跳过），
+    // 立即结算兑现回复，杜绝"切后台回来联系人不回消息"
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) return;
+      try {
+        var __pm = window.__akiniPendingReplyMap || {};
+        Object.keys(__pm).forEach(function (cid) {
+          var __p = __pm[cid];
+          if (__p && __p.timer && __p.dueAt && Date.now() >= __p.dueAt) {
+            clearTimeout(__p.timer);
+            __p.timer = null;
+            try { b(cid); } catch (e) {}
+          }
+        });
+      } catch (e) {}
+    });
     function b(t) {
       if (we && we.active) return;
       if (!window.akiniContacts) return;
@@ -4174,13 +4317,16 @@ window.akiniContacts = {
               _fx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "5");
           if (!(_fm > 0)) _fm = 3;
           if (!(_fx >= _fm)) _fx = Math.max(_fm, 5);
-          // 已读后按设置的「消息回复延迟」回复；输入动态在回复前最后一段打字时长弹出
+          // 已读后按设置的「消息回复延迟」回复
           var _fReply = _fRead + 1e3 * (_rm + Math.random() * (_rx - _rm));
-          var _fType = Math.max(
-            _fRead + 400 + Math.random() * 500,
-            _fReply - 1e3 * (_fm + Math.random() * (_fx - _fm))
-          );
           var _fMember = "group" === _ft.type ? (_ft.memberIds || [])[0] : null;
+          // 点击「继续说」瞬间立即点亮顶部输入中动态与浮动气泡，不再等待 6 秒
+          try {
+            var _tiNow = document.getElementById("typingIndicator");
+            if (_tiNow) _tiNow.style.display = "block";
+            showTypingBubble(_fc, _fMember);
+            console.log("[TYPING] 继续说瞬间点亮 ts=" + Date.now() + " chat=" + _fc);
+          } catch (_te) { console.warn("[TYPING] 继续说瞬间显示失败:", _te); }
           setTimeout(function () {
             try {
               var cb = document.getElementById("chatBody");
@@ -4190,9 +4336,6 @@ window.akiniContacts = {
               });
             } catch (err) {}
           }, _fRead);
-          setTimeout(function () {
-            try { showTypingBubble(_fc, _fMember); } catch (err) {}
-          }, _fType);
           setTimeout(function () {
             window.__akiniForceReplyInFlight = false;
             try { window.I(_fc, _ft, null, true); } catch (e0) {}
@@ -4832,54 +4975,7 @@ window.akiniContacts = {
         }
       }
     }
-    /* 深度安全模式首批渲染减半：少解码图片，降低崩溃风险 */
-    var AKINI_CHAT_BATCH_SIZE = 25; // 参考 milk 与 syy：更保守控制单次挂载 25 条，极大降低 DOM 过载与内存溢出卡崩闪退
-    function __akiniStripTypingRows(html) {
-      if (!html || "string" != typeof html) return html || "";
-      var hasTyping =
-        html.indexOf('typingBubbleRow_') !== -1 ||
-        html.indexOf('typing-bubble') !== -1;
-      var hasLoadMore = html.indexOf("加载更多聊天记录") !== -1;
-      if (!hasTyping && !hasLoadMore) return html;
-      var div = document.createElement("div");
-      div.innerHTML = html;
-      div.querySelectorAll('[id^="typingBubbleRow_"]').forEach(function (el) {
-        el.remove();
-      });
-      // 清理历史版本遗留的"加载更多聊天记录"提示行（已持久化在聊天记录里）
-      if (hasLoadMore) {
-        var all = div.querySelectorAll("*");
-        var targets = [];
-        for (var i = 0; i < all.length; i++) {
-          var el = all[i];
-          if (
-            el.children.length === 0 &&
-            el.textContent &&
-            el.textContent.indexOf("加载更多聊天记录") !== -1
-          ) {
-            var row = el.closest
-              ? el.closest(".msg-row") || el.closest('[class*="load"]') || el
-              : el;
-            if (targets.indexOf(row) === -1) targets.push(row);
-          }
-        }
-        targets.forEach(function (el) {
-          el.remove();
-        });
-      }
-      return div.innerHTML;
-    }
     window.__akiniCountMsgRows = __akiniCountMsgRows;
-    /* zzt 性能版：纯正则计数（不做 DOM 解析），热点路径专用；typing 行（id=typingBubbleRow_）扣除，两侧口径一致，相对比较结果与精确版一致 */
-    function __akiniCountMsgRowsFast(html) {
-      if (!html) return 0;
-      var m = html.match(/<div[^>]*class="msg-row/g);
-      var c = m ? m.length : 0;
-      var tp = html.match(/id="typingBubbleRow_/g);
-      if (tp) c -= tp.length;
-      return c < 0 ? 0 : c;
-    }
-    window.__akiniCountMsgRowsFast = __akiniCountMsgRowsFast;
     function __akiniCountMsgRows(html) {
       if (!html) return 0;
       var clean = __akiniStripTypingRows(html);
@@ -5045,7 +5141,8 @@ window.akiniContacts = {
       var cleanNew = __akiniStampMsgRows(__akiniStripTypingRows(html));
       if (!cleanNew) return;
       var sess = window.akiniContacts.getSession(chatId) || {};
-      var fullHTML = __akiniStripTypingRows(sess.messagesHTML || "") + cleanNew;
+      // v609: 增量清洗——sess.messagesHTML 即上次缓存原文，命中零正则；非追加场景自动全量回退
+      var fullHTML = __akiniIncTyping(sess.messagesHTML || "", chatId) + cleanNew;
       var isCurActive = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(chatId) : false);
       var updatePayload = Object.assign({
         messagesHTML: fullHTML,
@@ -5083,7 +5180,8 @@ window.akiniContacts = {
     function C(t, e) {
       if (!t || "string" != typeof e) return;
       // 内存权威缓存立即更新（同步更新，任何内存读取即刻生效，绝不滞后）
-      var clean = __akiniStripMedia(__akiniStripTypingRows(e));
+      // v609: 增量清洗——typing 已在 I 内处理过且同串（缓存零成本），media 只处理新增尾部
+      var clean = __akiniIncMedia(__akiniIncTyping(e, t), t);
       E[t] = clean;
       
       // 参考 milk/syy 防卡死机制：物理写盘（IDB/localStorage）实行 300ms 防抖合并
@@ -5106,6 +5204,9 @@ window.akiniContacts = {
             clearTimeout(window.__akiniSaveDebounceTimers[cid]);
             delete window.__akiniSaveDebounceTimers[cid];
             if (E && E[cid]) {
+              // v605: 同步写 localStorage 热备——切后台冻结窗口内 IndexedDB 异步事务可能不 commit，
+              // 同步 LS 写是唯一可靠落盘（milk 模式）；配额满则 catch 跳过，IDB 仍作第二兜底
+              try { localStorage.setItem("akini_chat_history_" + cid, E[cid]); } catch(eLS) {}
               try { _idbStore.set("akini_chat_history_" + cid, E[cid]); } catch(e){}
             }
           });
@@ -5114,22 +5215,33 @@ window.akiniContacts = {
     };
     window.addEventListener("pagehide", function() { try { window.__akiniFlushPendingSaves(); } catch(e){} });
     window.addEventListener("beforeunload", function() { try { window.__akiniFlushPendingSaves(); } catch(e){} });
+    // v605: 微信内置浏览器切后台往往只触发 visibilitychange（无 pagehide）——
+    // 300ms 防抖窗口内切后台必丢，必须在 hidden 瞬间同步 flush（仅刷待写队列，轻量、不卡）
+    document.addEventListener("visibilitychange", function() {
+      if (document.hidden) { try { window.__akiniFlushPendingSaves(); } catch(e){} }
+    });
 
     function _doPhysicalSave(t, clean) {
       if (!t || "string" != typeof clean) return;
-      // 持久化前清理输入动态残留
-      var clean = __akiniStripMedia(__akiniStripTypingRows(e));
+      // v605 关键修复：原代码此处误用未定义变量 e 重新计算 clean（__akiniStripTypingRows(undefined)
+      // 返回空串），导致 newRows 恒为 0、永远触发"拒绝用更短的记录覆盖"——聊天记录从未真正落盘，
+      // 重进/刷新后全部丢失的根因。传入的 clean 在 C() 内已完成 StripMedia/StripTypingRows 清理，直接使用。
       var key = "akini_chat_history_" + t;
       var backup = "akini_chat_history_backup_" + t;
       // 关键防护：如果新记录比现有记录短，不覆盖任何备份，防止恢复时选错源导致数据被截断
       // 注意：大记录(>60KB)只存 IDB 不存 localStorage，因此必须同时对比内存 E[t] 与 localStorage
+      // v609: 行数全部走增量计数链 + 已落盘行数缓存（__akiniSavedRows），不再每次同步 getItem 大字符串再全量正则
+      var newRows = __akiniIncCount(clean, t, "clean");
       var existingRows = 0;
       try {
-        existingRows = __akiniCountMsgRowsFast(localStorage.getItem(key) || "");
+        if (window.__akiniSavedRows && typeof window.__akiniSavedRows[t] === "number") {
+          existingRows = window.__akiniSavedRows[t];
+        } else {
+          existingRows = __akiniIncCount(localStorage.getItem(key) || "", t, "clean");
+        }
       } catch (err) {}
-      var memRows = E[t] ? __akiniCountMsgRowsFast(E[t]) : 0;
+      var memRows = ("string" == typeof E[t] && E[t] !== clean) ? __akiniIncCount(E[t], t, "clean") : newRows;
       if (memRows > existingRows) existingRows = memRows;
-      var newRows = __akiniCountMsgRowsFast(clean);
       if (newRows < existingRows) {
         console.warn("[C] 拒绝用更短的聊天记录覆盖：" + key + " (" + newRows + " < " + existingRows + ")");
         return;
@@ -5140,7 +5252,7 @@ window.akiniContacts = {
         // zzt 陈旧异步写防护：内存 E[t] 是权威——若回调执行时内存已比本快照短（如刚被用户清除/裁剪），放弃本次旧快照写回
         try {
           var _memNow = "string" == typeof E[t] ? E[t] : "";
-          if (__akiniCountMsgRowsFast(clean) > __akiniCountMsgRowsFast(_memNow)) {
+          if (newRows > __akiniIncCount(_memNow, t, "clean")) {
             console.warn("[C] 跳过陈旧写回：" + key);
             return;
           }
@@ -5152,10 +5264,13 @@ window.akiniContacts = {
           try { _idbStore.set(key, clean); } catch (err) {}
           try { localStorage.setItem(key, clean); } catch (i) {}
         }
+        // v609: 记录本次成功落盘行数，下次保存免 getItem+全量计数
+        window.__akiniSavedRows = window.__akiniSavedRows || {};
+        window.__akiniSavedRows[t] = newRows;
       };
       try {
         _idbStore.get(key, function (idbExisting) {
-          var idbRows = idbExisting ? __akiniCountMsgRowsFast(String(idbExisting)) : 0;
+          var idbRows = idbExisting ? __akiniIncCount(String(idbExisting), t, "clean") : 0;
           if (newRows >= idbRows) {
             doWrite();
           } else {
@@ -5189,6 +5304,10 @@ window.akiniContacts = {
       var done = 0;
       ids.forEach(function (id) {
         if (!id) return;
+        /* v609: 清数据必须同步失效增量清洗缓存与已落盘行数缓存——
+           否则旧缓存行数残留会让"拒绝更短覆盖"守卫误拒清空后的新记录 */
+        try { if (window.__akiniIncCache) delete window.__akiniIncCache[id]; } catch (e) {}
+        try { if (window.__akiniSavedRows) delete window.__akiniSavedRows[id]; } catch (e) {}
         var keys = ["akini_chat_history_" + id, "akini_chat_history_backup_" + id, "akini_chat_critical_" + id];
         keys.forEach(function (k) {
           /* 实例级 localStorage.removeItem 对部分 akini_ 键会静默失败（内存镜像残留），akiniStore.remove 为全链路验证有效路径，优先使用 */
@@ -7124,7 +7243,7 @@ window.akiniContacts = {
       // 空、emoji、昵称首字等一律视为默认占位，不再出现 emoji 或文字头像
       if (!t || "string" != typeof t) return !0;
       var s = String(t).trim();
-      if (!s) return !0;
+      if (!s || s === "null" || s === "undefined") return !0;
       if (/^(data:|https?:|blob:|\/|<img)/i.test(s)) return !1;
       return !0;
     };
@@ -22833,9 +22952,20 @@ window.akiniContacts = {
     }
   })();
 
-  // 数据自动兜底保护：每 20 秒备份一次，切后台/关闭前也立即备份
+  // 数据自动兜底保护：每 180 秒备份一次，切后台/关闭前也立即备份
   try {
+    // 卡崩修复：visibilitychange/pagehide 触发的即时备份与云备份、localStorage 拦截备份会
+    // 在同一时刻叠加，同步执行多轮大体积 stringify 直接撑爆低端机内存导致闪退。
+    // 用节流 + 延迟到下一事件循环执行，避免阻塞事件回调、分散内存峰值。
+    var _immediateBackupToken = null;
     function _akiniImmediateBackup() {
+      if (_immediateBackupToken) return; // 节流：180s 内只跑一次即时备份
+      _immediateBackupToken = setTimeout(function () {
+        _immediateBackupToken = null;
+        _doImmediateBackup();
+      }, 0);
+    }
+    function _doImmediateBackup() {
       // 先把内存中所有聊天记录同步刷到 IDB/localStorage，防止页面被系统回收时丢失
       // 注意：DOM 只渲染最近 100 条（防卡顿），严禁用 U.innerHTML 覆盖完整历史
       // 必须从 session.messagesHTML（内存全量）保存，与 core 的内存数据源一致
@@ -22862,10 +22992,16 @@ window.akiniContacts = {
       } catch (e) {}
     }
     setInterval(_akiniImmediateBackup, 180000);
+    var _akiniHideDirty = false;
     document.addEventListener("visibilitychange", function () {
-      if (document.hidden) _akiniImmediateBackup();
+      if (document.hidden) {
+        _akiniHideDirty = true; // v604: 后台冻结窗口内不跑全量刷写（长任务会被系统强杀=切后台闪退根因），仅标记
+      } else if (_akiniHideDirty) {
+        _akiniHideDirty = false;
+        setTimeout(_akiniImmediateBackup, 2500); // 回前台 2.5s 补跑（错开云备份的 2s，避免内存峰值叠加）
+      }
     });
-    window.addEventListener("pagehide", _akiniImmediateBackup);
+    // v604: pagehide 不再触发全量刷写——每条消息操作已即时落盘 akiniStore(IndexedDB)，冻结窗口内重写入正是被杀原因
 
     // ===== core 核心防丢机制：页面重新可见时，对比备份与内存数据，备份更完整则自动恢复 =====
     // 防止移动端系统回收内存后（微信内置浏览器长时间后台），内存数据被清空导致聊天记录丢失

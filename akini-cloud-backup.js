@@ -155,7 +155,10 @@
         }).catch(function () { _backingUp = false; });
       } catch (e) { _backingUp = false; }
     };
-    if (immediate) run();
+    // 卡崩修复：即时备份（切后台/关闭页面前）不再同步执行 collectAll+stringify 大负载，
+    // 改为微任务延迟到下一轮事件循环，避免与 _akiniImmediateBackup / localStorage 拦截的 pagehide
+    // 备份在同一时刻叠加触发，造成低端机 OOM 闪退
+    if (immediate) setTimeout(run, 0);
     else _backupTimer = setTimeout(run, 3000);
   }
 
@@ -302,11 +305,20 @@
   }
 
   // ---- 钩子 ----
+  // v604: 切后台/关闭页面绝不执行 collectAll+JSON.stringify(可达数MB) ——
+  // 后台冻结窗口内跑长任务会被系统强杀（=切后台闪退的根因），对齐 milk/syy：后台零工作。
+  // 数据安全：akiniStore 每次写操作已即时落盘本地 IndexedDB（不丢），回前台后延迟补跑云备份即可。
+  var _pendingHideBackup = false;
   document.addEventListener("visibilitychange", function () {
-    if (document.hidden) backup(true);
+    if (document.hidden) {
+      _pendingHideBackup = true; // 仅做标记，回前台补跑
+    } else if (_pendingHideBackup) {
+      _pendingHideBackup = false;
+      setTimeout(function () { backup(false); }, 2000); // 回前台 2s 后补跑，避开 UI 恢复高峰
+    }
   });
-  window.addEventListener("pagehide", function () { backup(true); });
-  window.addEventListener("beforeunload", function () { backup(true); });
+  // pagehide / beforeunload 不再触发备份：冻结窗口内的重序列化正是被杀原因；
+  // 本地 IDB 已即时持久化，下次打开页面后 150s 周期内自动补上云端。
   // 每 150 秒周期检测（有变化才上传；切后台/关闭页面前仍有即时备份）
   // zzzy：60s 全量 collectAll+stringify 是主线程卡顿/掉帧大户，恢复 150s；后台时 backup(false) 内部已跳过
   setInterval(function () { backup(false); }, 150000);

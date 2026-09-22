@@ -2185,7 +2185,7 @@ body:not(.bubble-css-on)
 }
 .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
   background: rgba(200, 200, 200, 0.35) !important;
-  color: #888 !important;
+  color: #1a1a1a !important;
   /* v573: 系统消息文字改回原大小12px，胶囊背景缩小 */
   font-size: 12px !important;
   padding: 1px 7px !important;
@@ -8004,9 +8004,9 @@ html body.bubble-gray:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.tr
   color: #1a1a1a !important;
 }
 
-/* 8. 微信、观影、陪伴消息气泡样式全界面通用 */
-body:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble,
-body:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble {
+/* 8. 微信、观影、陪伴消息气泡样式全界面通用（v604: 选实色气泡时本条不再命中，交给下方四色规则） */
+html body:not(.bubble-css-on):not(.bubble-pink):not(.bubble-blue):not(.bubble-green):not(.bubble-black) #companionMsgs .msg-row.me .bubble,
+html body:not(.bubble-css-on):not(.bubble-pink):not(.bubble-blue):not(.bubble-green):not(.bubble-black) #watchChatBody .msg-row.me .bubble {
   background: rgba(255, 255, 255, 0.42) !important;
   backdrop-filter: blur(28px) saturate(180%) !important;
   -webkit-backdrop-filter: blur(28px) saturate(180%) !important;
@@ -8016,6 +8016,55 @@ body:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble {
   border-bottom-right-radius: 4px !important;
   padding: 11px 15px !important;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04) !important;
+}
+/* v604: 陪伴/观影我方气泡颜色跟随「微信聊天气泡颜色」选择（液态/浅粉/iOS蓝/微信绿/酷黑 五选同步全界面） */
+html body.bubble-blue:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-blue:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background: #007aff !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  border-radius: 18px !important;
+  border-bottom-right-radius: 4px !important;
+  padding: 11px 15px !important;
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.25) !important;
+}
+html body.bubble-pink:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-pink:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background: #ffd1dc !important;
+  color: #111111 !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  border-radius: 18px !important;
+  border-bottom-right-radius: 4px !important;
+  padding: 11px 15px !important;
+  box-shadow: 0 2px 8px rgba(255, 180, 200, 0.28) !important;
+}
+html body.bubble-green:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-green:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background: #07c160 !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  border-radius: 18px !important;
+  border-bottom-right-radius: 4px !important;
+  padding: 11px 15px !important;
+  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.25) !important;
+}
+html body.bubble-black:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
+html body.bubble-black:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
+  background: #111111 !important;
+  color: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: none !important;
+  border-radius: 18px !important;
+  border-bottom-right-radius: 4px !important;
+  padding: 11px 15px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25) !important;
 }
 body:not(.bubble-css-on) #companionMsgs .msg-row.other .bubble,
 body:not(.bubble-css-on) #companionMsgs .msg-row.ta .bubble,
@@ -8129,8 +8178,8 @@ html body:not(.bubble-css-on) #app-chat .msg-row.ta .bubble,
   margin-bottom: 5px !important;
 }
 html body #app-chat .chat-body .msg-row.system .bubble:not(.survey-bubble):not(.shop-card-bubble) {
-  background: rgba(0, 0, 0, 0.16) !important;
-  color: rgba(255, 255, 255, 0.82) !important;
+  background: rgba(200, 200, 200, 0.35) !important;
+  color: #1a1a1a !important;
   backdrop-filter: none!important;
   -webkit-backdrop-filter: none!important;
   /* v573: 系统消息文字改回原大小12px，胶囊背景缩小 */
