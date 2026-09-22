@@ -54,6 +54,10 @@ window.__akiniMedia = (function () {
 })();
 /* 字符串级瘦身：把 HTML 里 >8KB 的 base64 图抽离入池，替换为 data-mh 引用（行数不变） */
 function __akiniStripMedia(html) {
+  if (html == null) return "";
+  if (typeof html !== "string") {
+    try { html = String(html); } catch (e) { return ""; }
+  }
   if (!html || html.indexOf("data:image") < 0 || !window.__akiniMedia) return html;
   return html.replace(/<img([^>]*?)src="(data:image\/[^"]{8000,})"([^>]*)>/g, function (m, pre, url, post) {
     var h = window.__akiniMedia.put(url);
@@ -3938,19 +3942,35 @@ window.akiniContacts = {
       if (pending.readTimer) { clearTimeout(pending.readTimer); pending.readTimer = null; }
       if (pending.typingTimer) { clearTimeout(pending.typingTimer); pending.typingTimer = null; }
 
-      var baseWait = typeof delayOverride === "number" ? delayOverride : 0;
-      // 敏捷即时：发送后约 600~1000ms 亮起已读并即时进入输入动态，无需重进聊天页
-      var __readDelay = baseWait + 600 + Math.random() * 400;
-      var _rm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
-          _rx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "4");
-      if (!(_rm > 0)) _rm = 2;
-      if (!(_rx >= _rm)) _rx = Math.max(_rm, 4);
-      var _fm = parseFloat(localStorage.getItem("akini_num_typingDelayMin") || "1.5"),
-          _fx = parseFloat(localStorage.getItem("akini_num_typingDelayMax") || "3");
-      if (!(_fm > 0)) _fm = 1.5;
-      if (!(_fx >= _fm)) _fx = Math.max(_fm, 3);
-      var __typingDelay = Math.max(200, __readDelay + 100 + Math.random() * 200);
-      var __replyDelay = __typingDelay + 1e3 * (_fm + Math.random() * (_fx - _fm));
+      // 对齐 milk 回复延迟核心：严格在用户设置的最低和最高之间随机生成回复总时长
+      var _rm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+          _rx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+      if (!(_rm > 0)) _rm = 3;
+      if (!(_rx >= _rm)) _rx = Math.max(_rm, 7);
+      // 优先支持当前联系人对象的独立回复延迟配置
+      if (target) {
+        if (target.replyDelayMin && parseFloat(target.replyDelayMin) > 0) _rm = parseFloat(target.replyDelayMin);
+        if (target.replyDelayMax && parseFloat(target.replyDelayMax) > 0) _rx = parseFloat(target.replyDelayMax);
+        if (target.replyDelay && parseFloat(target.replyDelay) > 0) {
+          _rm = parseFloat(target.replyDelay);
+          _rx = Math.max(_rm, _rx);
+        }
+      }
+
+      // milk 公式：randomDelay = replyDelayMin + Math.random() * (replyDelayMax - replyDelayMin)
+      var delayRangeSec = Math.max(0, _rx - _rm);
+      var randomDelaySec = _rm + Math.random() * delayRangeSec;
+      var __replyDelay = Math.max(500, Math.round(randomDelaySec * 1000));
+      if (typeof delayOverride === "number" && delayOverride > 0) {
+        __replyDelay = delayOverride;
+      }
+
+      // 已读延迟：在回复之前点亮（确保已读在回复到达前亮起，如600~1000ms，或不超过回复时长的一半）
+      var __readDelay = Math.min(600 + Math.random() * 400, Math.max(200, Math.round(__replyDelay * 0.35)));
+      if (__readDelay >= __replyDelay) {
+        __readDelay = Math.max(100, __replyDelay - 300);
+      }
+
       var __isGroup = "group" === target.type;
       var __member = pending.memberId || (__isGroup ? (target.memberIds || [])[0] : null);
 
@@ -3972,7 +3992,7 @@ window.akiniContacts = {
         } catch (err) {}
       }
 
-      // 已读：无论是否回复都延迟点亮（core 已读不回也只亮已读）
+      // 已读与输入动态：已读点亮时立即展示输入动态，输入动态持续到回复到达那一刻
       pending.readTimer = setTimeout(function () {
         pending.readTimer = null;
         try { __lightReadReceipts(); } catch (e) {}
@@ -3991,22 +4011,20 @@ window.akiniContacts = {
             )
               window.__akiniMarkLastRead(chatId);
           } catch (e2) {}
+          return;
         }
-      }, __readDelay);
 
-      if ("none" === n.type) return; // 已读不回：不排输入动态与回复
-
-      // 输入动态：已读亮起后再弹出（仅当前激活会话可见）
-      pending.typingTimer = setTimeout(function () {
-        pending.typingTimer = null;
+        // 核心对齐：已读回执一旦点亮，立刻进入输入动态，不再额外延迟！
         if (chatId === window.akiniContacts.getActiveChatId()) {
           var l = document.getElementById("typingIndicator");
           if (l) l.style.display = "block";
           showTypingBubble(chatId, __member);
         }
-      }, __typingDelay);
+      }, __readDelay);
 
-      // 回复：输入动态持续打字时长后到达
+      if ("none" === n.type) return; // 已读不回：不排回复
+
+      // 回复：严格在用户设置的 [最低, 最高] 之间到达！到达时渲染消息并隐藏输入动态
       pending.timer = setTimeout(function () {
         pending.timer = null;
         try {
@@ -4055,13 +4073,15 @@ window.akiniContacts = {
       const a = t === window.akiniContacts.getActiveChatId();
       a &&
         showTypingBubble(t, "group" === e.type ? (e.memberIds || [])[0] : null);
-      const o = parseFloat(
-          localStorage.getItem("akini_num_replyDelayMin") || "2",
-        ),
-        r = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5"),
-        c = 1e3 * o,
-        l = 1e3 * r,
-        s = c + Math.random() * Math.max(0, l - c);
+      var _bMin = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+        _bMax = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+      if (!(_bMin > 0)) _bMin = 3;
+      if (!(_bMax >= _bMin)) _bMax = Math.max(_bMin, 7);
+      if (e) {
+        if (e.replyDelayMin && parseFloat(e.replyDelayMin) > 0) _bMin = parseFloat(e.replyDelayMin);
+        if (e.replyDelayMax && parseFloat(e.replyDelayMax) > 0) _bMax = parseFloat(e.replyDelayMax);
+      }
+      var s = 1e3 * (_bMin + Math.random() * Math.max(0, _bMax - _bMin));
       function replyAction() {
         if (!window.AKR.isInTimeRange("reply")) {
           hideTypingBubble(t);
@@ -4801,7 +4821,7 @@ window.akiniContacts = {
       }
     }
     /* 深度安全模式首批渲染减半：少解码图片，降低崩溃风险 */
-    var AKINI_CHAT_BATCH_SIZE = document.documentElement.classList.contains("akini-deep-safe") ? 60 : 200;
+    var AKINI_CHAT_BATCH_SIZE = 25; // 参考 milk 与 syy：更保守控制单次挂载 25 条，极大降低 DOM 过载与内存溢出卡崩闪退
     function __akiniStripTypingRows(html) {
       if (!html || "string" != typeof html) return html || "";
       var hasTyping =
@@ -4959,6 +4979,18 @@ window.akiniContacts = {
       [120, 400, 900].forEach(function (_ms) {
         setTimeout(function () { try { U.scrollTop = U.scrollHeight; } catch (e) {} }, _ms);
       });
+      // v594 防卡崩：保持聊天 DOM 节点上限，超限时移除最早的消息
+      try {
+        var _maxRows = AKINI_CHAT_BATCH_SIZE + 10;
+        var _rows = U.querySelectorAll('.msg-row');
+        if (_rows.length > _maxRows) {
+          var _excess = _rows.length - _maxRows;
+          for (var _ri = 0; _ri < _excess; _ri++) {
+            var _old = _rows[_ri];
+            if (_old && _old.parentNode) _old.parentNode.removeChild(_old);
+          }
+        }
+      } catch (e) {}
       __akiniSetupChatMetaObserver();
       /* v516: 每次聊天 body 重绘后刷新 typing 悬浮层，避免发送消息后输入动态不显示 */
       try {
@@ -4971,7 +5003,7 @@ window.akiniContacts = {
       var fullHTML = sess.messagesHTML || "";
       var total = __akiniCountMsgRowsFast(fullHTML);
       var currentRows = U.querySelectorAll('.msg-row').length;
-      var newCount = Math.min(total, currentRows + AKINI_CHAT_BATCH_SIZE);
+      var newCount = Math.min(total, currentRows + 25);
       if (newCount <= currentRows) return;
       var newHTML = __akiniSliceLastMsgRows(fullHTML, newCount);
       // 记录旧高度，避免加载后滚动位置跳到底部
@@ -5036,6 +5068,41 @@ window.akiniContacts = {
     }
     function C(t, e) {
       if (!t || "string" != typeof e) return;
+      // 内存权威缓存立即更新（同步更新，任何内存读取即刻生效，绝不滞后）
+      var clean = __akiniStripMedia(__akiniStripTypingRows(e));
+      E[t] = clean;
+      
+      // 参考 milk/syy 防卡死机制：物理写盘（IDB/localStorage）实行 300ms 防抖合并
+      // 彻底消除短时间内连续发送/接收多条消息时频繁同步序列化与写盘造成的阻塞与掉帧卡崩
+      window.__akiniSaveDebounceTimers = window.__akiniSaveDebounceTimers || {};
+      if (window.__akiniSaveDebounceTimers[t]) {
+        clearTimeout(window.__akiniSaveDebounceTimers[t]);
+      }
+      var _execSave = function() {
+        delete window.__akiniSaveDebounceTimers[t];
+        _doPhysicalSave(t, clean);
+      };
+      window.__akiniSaveDebounceTimers[t] = setTimeout(_execSave, 300);
+    }
+    
+    window.__akiniFlushPendingSaves = function() {
+      try {
+        if (window.__akiniSaveDebounceTimers) {
+          Object.keys(window.__akiniSaveDebounceTimers).forEach(function(cid) {
+            clearTimeout(window.__akiniSaveDebounceTimers[cid]);
+            delete window.__akiniSaveDebounceTimers[cid];
+            if (E && E[cid]) {
+              try { _idbStore.set("akini_chat_history_" + cid, E[cid]); } catch(e){}
+            }
+          });
+        }
+      } catch(e) {}
+    };
+    window.addEventListener("pagehide", function() { try { window.__akiniFlushPendingSaves(); } catch(e){} });
+    window.addEventListener("beforeunload", function() { try { window.__akiniFlushPendingSaves(); } catch(e){} });
+
+    function _doPhysicalSave(t, clean) {
+      if (!t || "string" != typeof clean) return;
       // 持久化前清理输入动态残留
       var clean = __akiniStripMedia(__akiniStripTypingRows(e));
       var key = "akini_chat_history_" + t;
@@ -8776,10 +8843,10 @@ window.akiniContacts = {
           });
 
           // core 核心：在所有批量消息全部发出后（queue.length * 300 + randomDelay），触发一轮回复（1~3句）
-          var o = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
-              r = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
-          if (!(o >= 0)) o = 2;
-          if (!(r >= o)) r = Math.max(o, 5);
+          var o = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+              r = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+          if (!(o >= 0)) o = 3;
+          if (!(r >= o)) r = Math.max(o, 7);
           var randomDelay = 1e3 * o + Math.random() * Math.max(0, 1e3 * (r - o));
           var totalWait = queue.length * 300 + randomDelay;
           __akiniScheduleReply(chatId, null, totalWait);
@@ -19210,10 +19277,10 @@ window.akiniContacts = {
         return Math.floor(Math.random() * (e - t + 1)) + t;
       }
       function getReplyDelayMs() {
-        var min = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2");
-        var max = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
-        if (isNaN(min)) min = 2;
-        if (isNaN(max) || max < min) max = min;
+        var min = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3");
+        var max = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+        if (isNaN(min)) min = 3;
+        if (isNaN(max) || max < min) max = Math.max(min, 7);
         return Math.floor(1e3 * (min + Math.random() * Math.max(0, max - min)));
       }
       function n() {
@@ -19832,14 +19899,14 @@ window.akiniContacts = {
             var text = idx >= 0 && idx < b.length ? b[idx].text : "";
             var d = Math.abs(pos - 2);
             /* 网易云质感五行渐变：最上最下极浅渐显，中间高亮发光 */
-            var fs = isCurrent ? "17px" : d === 1 ? "14px" : "12.5px";
+            var fs = isCurrent ? "17px" : d === 1 ? "14.5px" : "13px";
             var col = isCurrent
               ? "#ffffff"
               : d === 1
-                ? "rgba(255,255,255,0.60)"
-                : "rgba(255,255,255,0.22)";
+                ? "rgba(255,255,255,0.85)"
+                : "rgba(255,255,255,0.55)";
             var fw = isCurrent ? "600" : "400";
-            var op = isCurrent ? "1" : d === 1 ? "0.55" : "0.18";
+            var op = isCurrent ? "1" : d === 1 ? "0.80" : "0.50";
             var shadow = isCurrent
               ? "text-shadow:0 0 16px rgba(255,255,255,0.45);"
               : "";
@@ -23199,10 +23266,10 @@ window.akiniContacts = {
     watchPendingCount++;
     if (partnerReplyTimer) return; // 已有待回复的一轮：连发只累加计数，统一一轮回复（同微信聊天）
     // 与微信聊天回复完全同节奏：读取设置页"回复延迟范围"（默认 2~5 秒），延迟到点才发，绝不秒发
-    var dMin = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "2"),
-        dMax = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "5");
-    if (!(dMin >= 0)) dMin = 2;
-    if (!(dMax >= dMin)) dMax = Math.max(dMin, 5);
+    var dMin = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+        dMax = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+    if (!(dMin >= 0)) dMin = 3;
+    if (!(dMax >= dMin)) dMax = Math.max(dMin, 7);
     var delayMs = 1e3 * (dMin + Math.random() * (dMax - dMin));
     showWatchTyping(); // 回复延迟期间显示"对方正在输入"
     partnerReplyTimer = setTimeout(function () {

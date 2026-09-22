@@ -222,15 +222,19 @@
   const originalRemoveItem = localStorage.removeItem.bind(localStorage);
 
   localStorage.setItem = function (key, value) {
-    // 关键：同步更新内存缓存，保证即使 localStorage 写满也能读到最新值
-    // （本层覆盖了 akini-storage-safe.js 的 setItem，必须手动维护内存缓存）
     try {
       if (window.akiniStore && window.akiniStore.memorySet && key && String(key).indexOf('akini_') === 0) {
         window.akiniStore.memorySet(key, String(value));
       }
     } catch (e) {}
-    originalSetItem(key, value);
-    syncAkiniKeyTocompat(key, value);
+    try {
+      originalSetItem(key, value);
+    } catch (e) {
+      // 捕获所有 QuotaExceededError 或写入失败，确保绝不向外冒泡
+    }
+    try {
+      syncAkiniKeyTocompat(key, value);
+    } catch (e) {}
   };
   localStorage.removeItem = function (key) {
     try {
@@ -238,8 +242,16 @@
         window.akiniStore.memoryRemove(key);
       }
     } catch (e) {}
-    originalRemoveItem(key);
-    syncAkiniKeyRemove(key);
+    try {
+      originalRemoveItem(key);
+    } catch (e) {
+      console.warn('[akini-compat-bridge] localStorage 删除失败', key, e);
+    }
+    try {
+      syncAkiniKeyRemove(key);
+    } catch (e) {
+      console.warn('[akini-compat-bridge] 同步删除到 compat 失败', key, e);
+    }
   };
 
   function syncAkiniKeyTocompat(key, value) {
@@ -519,9 +531,15 @@
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    setTimeout(init, 500);
-  }
+  try {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        try { init(); } catch (e) {}
+      });
+    } else {
+      setTimeout(function() {
+        try { init(); } catch (e) {}
+      }, 500);
+    }
+  } catch (e) {}
 })();
