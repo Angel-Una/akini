@@ -2198,13 +2198,11 @@ document.addEventListener("DOMContentLoaded", function () {
         n[t] = i;
         _(n);
         i.messagesHTML = memHtml;
-        // zza：未读数变化时实时刷新首页微信角标、聊天返回键徽标与会话列表角标（在 n[t] 更新持久化后执行，确保读到最新数据）
-        if (e && typeof e.unread !== "undefined") {
-          try { window.__akiniNotifyUnreadChanged && window.__akiniNotifyUnreadChanged(); } catch (e2) {}
-          try { window.__akiniUpdateChatBackBadge && window.__akiniUpdateChatBackBadge(); } catch (e2) {}
-          try { window.__akiniRefreshChatListBadges && window.__akiniRefreshChatListBadges(); } catch (e2) {}
-          try { window.__updateHomeBadges && window.__updateHomeBadges(); } catch (e2) {}
-        }
+        // zza：任何 session 更新或未读数变化时实时刷新首页微信角标、聊天返回键徽标与会话列表角标
+        try { window.__akiniNotifyUnreadChanged && window.__akiniNotifyUnreadChanged(); } catch (e2) {}
+        try { window.__akiniUpdateChatBackBadge && window.__akiniUpdateChatBackBadge(); } catch (e2) {}
+        try { window.__akiniRefreshChatListBadges && window.__akiniRefreshChatListBadges(); } catch (e2) {}
+        try { window.__updateHomeBadges && window.__updateHomeBadges(); } catch (e2) {}
         return (
           htmlToSave &&
             htmlToSave.trim().length > 0 &&
@@ -2260,7 +2258,33 @@ document.addEventListener("DOMContentLoaded", function () {
         }
         return out.join("\n");
       };
-      window.akiniContacts = {
+      
+window.__akiniIsChatActive = function (chatId) {
+  try {
+    if (!chatId) return false;
+    if (document.hidden) return false;
+    var chatEl = document.getElementById("app-chat");
+    if (!chatEl) return false;
+    var isVisible = false;
+    if (chatEl.classList.contains("show")) isVisible = true;
+    else if (chatEl.style.display && chatEl.style.display !== "none") isVisible = true;
+    else {
+      var cs = window.getComputedStyle ? window.getComputedStyle(chatEl) : null;
+      if (cs && cs.display !== "none" && cs.visibility !== "hidden") isVisible = true;
+    }
+    if (!isVisible) return false;
+    if (chatEl.getAttribute("aria-hidden") === "true") return false;
+
+    var actStrict = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null;
+    var act = actStrict || (window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null);
+    if (!act || String(act) !== String(chatId)) return false;
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
+window.akiniContacts = {
         generateId: s,
         getContacts: f,
         saveContacts: g,
@@ -3696,7 +3720,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }
       K.removeAttribute("data-quote");
       K.removeAttribute("data-quote-sticker");
-      K.placeholder = "输入消息...";
+      K.placeholder = "iMessage信息";
       if (zt) zt.classList.remove("show");
       const o = document.createElement("div");
       o.setAttribute("data-ts", String(Date.now()));
@@ -4208,7 +4232,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return nt("", s);
           })
         )(e.avatar, 38),
-        a = t === window.akiniContacts.getActiveChatId(),
+        a = (typeof window.__akiniIsChatActive === 'function' ? window.__akiniIsChatActive(t) : false),
         o = localStorage.getItem("akini_my_name") || "我",
         r = "contact" === e.type ? e.id : null;
       var ex = n.extra || {};
@@ -4378,6 +4402,18 @@ document.addEventListener("DOMContentLoaded", function () {
           };
           ("group" === e.type && (s.groupName = e.name),
             window.showInAppNotif(s));
+          try {
+            if (t && (!window.__akiniIsChatActive || !window.__akiniIsChatActive(t))) {
+              if (window.akiniContacts && window.akiniContacts.getSession && window.akiniContacts.updateSession) {
+                var _sess = window.akiniContacts.getSession(t);
+                if (_sess && Number(_sess.unread || 0) <= 0) {
+                  window.akiniContacts.updateSession(t, { unread: 1 });
+                }
+              }
+              if (typeof window.__akiniNotifyUnreadChanged === "function") window.__akiniNotifyUnreadChanged();
+              if (typeof window.__updateHomeBadges === "function") window.__updateHomeBadges();
+            }
+          } catch(eNotif) {}
         }
       }
       function doCall() {
@@ -4964,13 +5000,19 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!cleanNew) return;
       var sess = window.akiniContacts.getSession(chatId) || {};
       var fullHTML = __akiniStripTypingRows(sess.messagesHTML || "") + cleanNew;
-      window.akiniContacts.updateSession(chatId, Object.assign({
+      var isCurActive = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(chatId) : false);
+      var updatePayload = Object.assign({
         messagesHTML: fullHTML,
         lastTime: Date.now()
-      }, meta || {}));
+      }, meta || {});
+      if (!isCurActive && !updatePayload.hasOwnProperty('unread')) {
+        updatePayload.unread = (Number(sess.unread) || 0) + 1;
+      }
+      window.akiniContacts.updateSession(chatId, updatePayload);
+      try { window.__akiniNotifyUnreadChanged && window.__akiniNotifyUnreadChanged(); } catch (e) {}
       C(chatId, fullHTML);
       // 若当前正在看该聊天，把新消息追加到 DOM（新消息刚生成、必然不在已渲染批次中，直接追加安全）
-      if (U && window.akiniContacts.getActiveChatId() === chatId) {
+      if (isCurActive && U) {
         var temp = document.createElement('div'); temp.innerHTML = cleanNew;
         while (temp.firstChild) {
           U.appendChild(temp.firstChild);
@@ -8408,7 +8450,7 @@ document.addEventListener("DOMContentLoaded", function () {
           K &&
             (K.removeAttribute("data-quote"),
               K.removeAttribute("data-quote-sticker"),
-              (K.placeholder = "输入消息...")),
+              (K.placeholder = "iMessage信息")),
           zt && zt.classList.remove("show"));
       }),
       X &&
@@ -9495,12 +9537,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     window.__akiniUpdateChatBackBadge = function() {
       try {
-        var backBtn = document.getElementById("chatBackBtn");
         var backBadge = document.getElementById("chatBackUnreadBadge");
         if (!backBadge) return;
         if (!window.akiniContacts || !window.akiniContacts.getSessions) {
           backBadge.style.setProperty("display", "none", "important");
-          if (backBtn) backBtn.classList.remove("has-unread");
           return;
         }
         var ss = window.akiniContacts.getSessions();
@@ -9516,19 +9556,15 @@ document.addEventListener("DOMContentLoaded", function () {
           backBadge.style.setProperty("display", "inline-flex", "important");
           backBadge.style.setProperty("visibility", "visible", "important");
           backBadge.style.setProperty("opacity", "1", "important");
-          backBadge.setAttribute("data-count", String(bn));
-          if (backBtn) backBtn.classList.add("has-unread");
         } else {
           backBadge.style.setProperty("display", "none", "important");
           backBadge.style.setProperty("visibility", "hidden", "important");
           backBadge.style.setProperty("opacity", "0", "important");
           backBadge.textContent = "";
-          backBadge.setAttribute("data-count", "0");
-          if (backBtn) backBtn.classList.remove("has-unread");
         }
       } catch(e) {}
     };
-    (me(null, false),
+    (e(null, false),
       (function () {
         let t = "main",
           e = "",
@@ -17242,7 +17278,7 @@ document.addEventListener("DOMContentLoaded", function () {
       }),
       (function () {
         function t(t) {
-          ((t = t || "blue"),
+          ((t = t || "gray"),
             document.body.classList.remove(
               "bubble-gray",
               "bubble-pink",
@@ -17256,7 +17292,15 @@ document.addEventListener("DOMContentLoaded", function () {
               .querySelectorAll(".bubble-color-option")
               .forEach(function (e) {
                 e.classList.toggle("active", e.dataset.color === t);
-              }));
+              }),
+            (function(){
+              try {
+                if (window.akiniContacts && window.akiniContacts.getActiveChatId && window.openChat) {
+                  var actId = window.akiniContacts.getActiveChatId();
+                  if (actId) window.openChat(actId, true);
+                }
+              } catch(e) {}
+            })());
         }
         (document
           .querySelectorAll(".bubble-color-option")
@@ -17266,6 +17310,21 @@ document.addEventListener("DOMContentLoaded", function () {
                 ev.stopPropagation();
                 ev.preventDefault();
               }
+              /* 切换默认气泡颜色时，自动停用自定义 CSS 气泡美化，确保所选气泡颜色立即生效 */
+              try {
+                if (document.body) document.body.classList.remove("bubble-css-on");
+                localStorage.removeItem("akini_bubble_css");
+                localStorage.removeItem("akini_bubble_css_backup");
+                if (window._idbStore && window._idbStore.delete) {
+                  window._idbStore.delete("akini_bubble_css");
+                  window._idbStore.delete("akini_bubble_css_backup");
+                }
+                var cssInput = document.getElementById("bubbleCssInput");
+                if (cssInput) cssInput.value = "";
+                var dynStyle = document.getElementById("akini-dynamic-bubble-css");
+                if (dynStyle) dynStyle.textContent = "";
+              } catch(err) {}
+
               t(this.dataset.color);
               window.__akiniBubbleJustChanged = true;
               setTimeout(function () {
@@ -23773,23 +23832,32 @@ document.addEventListener("DOMContentLoaded", function () {
       _setBadge("appBtnIcity", _getNotifs("icity").filter(function (n) { return !n.read; }).length);
     } catch (e) {}
 
-    /* 4. 聊天页左上角返回按钮：胶囊展开与未读数（除当前会话外的未读总数） */
+    /* 4. 聊天页返回按钮：独立悬浮未读数角标（除当前会话外的未读总数） */
     try {
-      var backBtn = document.getElementById("chatBackBtn");
       var backBadge = document.getElementById("chatBackUnreadBadge");
-      if (backBtn && backBadge) {
-        var activeChatId = (window.akiniContacts && window.akiniContacts.getActiveChatId) ? window.akiniContacts.getActiveChatId() : "";
+      if (backBadge) {
+        var curActive = "";
+        if (typeof window.__akiniIsChatActive === "function") {
+          var act = (window.akiniContacts && window.akiniContacts.getActiveChatIdStrict) ? window.akiniContacts.getActiveChatIdStrict() : ((window.akiniContacts && window.akiniContacts.getActiveChatId) ? window.akiniContacts.getActiveChatId() : "");
+          if (act && window.__akiniIsChatActive(act)) {
+            curActive = String(act);
+          }
+        }
         var bn = 0;
-        Object.keys(ss).forEach(function (k) { if (k !== activeChatId) bn += Number(ss[k].unread || 0); });
+        Object.keys(ss).forEach(function (k) {
+          if (curActive) {
+            if (String(k) !== curActive) bn += Number(ss[k].unread || 0);
+          } else {
+            bn += Number(ss[k].unread || 0);
+          }
+        });
         if (bn > 0) {
-          backBtn.classList.add("has-unread");
           backBadge.textContent = bn > 99 ? "99+" : String(bn);
           backBadge.setAttribute("data-count", String(bn));
           backBadge.style.setProperty("display", "inline-flex", "important");
           backBadge.style.setProperty("visibility", "visible", "important");
           backBadge.style.setProperty("opacity", "1", "important");
         } else {
-          backBtn.classList.remove("has-unread");
           backBadge.textContent = "";
           backBadge.setAttribute("data-count", "0");
           backBadge.style.setProperty("display", "none", "important");
@@ -24085,11 +24153,11 @@ document.addEventListener("DOMContentLoaded", function () {
   } else {
     _bind();
   }
-  /* 角标刷新：首次 + 每 3 秒轻量轮询（仅数字变化才动 DOM）+ 回前台刷新 */
+  /* 角标刷新：防卡顿节流，回前台或周期检测时仅在数字变动时更新 DOM */
   var _badgeTimer = setInterval(function () {
     _syncMailSeen();
-    window.__updateHomeBadges();
-  }, 5000);
+    if (window.__updateHomeBadges) window.__updateHomeBadges();
+  }, 3000);
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
       _syncMailSeen();
@@ -25211,12 +25279,61 @@ window.__akiniNowTs = function () {
 
 
 // v559: 全局消息未读联动广播，触发首页角标、聊天列表角标与返回键未读数实时显示
+// v586: 全局消息未读联动广播，收到消息瞬间即时更新三处角标（桌面微信图标、会话列表角标、单聊返回键角标）
 window.__akiniNotifyUnreadChanged = function() {
-  try { window.__updateHomeBadges && window.__updateHomeBadges(); } catch(e){}
-  try { window.__akiniUpdateChatBackBadge && window.__akiniUpdateChatBackBadge(); } catch(e){}
-  try { window.__akiniRefreshChatListBadges && window.__akiniRefreshChatListBadges(); } catch(e){}
-  try { if (window.akiniContacts && window.akiniContacts.renderChatList) window.akiniContacts.renderChatList(); } catch(e){}
+  try { if (typeof window.__updateHomeBadges === 'function') window.__updateHomeBadges(); } catch(e){}
+  try { if (typeof window.__akiniUpdateChatBackBadge === 'function') window.__akiniUpdateChatBackBadge(); } catch(e){}
+  try { if (typeof window.__akiniRefreshChatListBadges === 'function') window.__akiniRefreshChatListBadges(); } catch(e){}
+  // 同步直接刷新 DOM 上的会话列表角标（不等任何定时器）
+  try {
+    var ss = (window.akiniContacts && window.akiniContacts.getSessions) ? (window.akiniContacts.getSessions() || {}) : {};
+    var chatItems = document.querySelectorAll(".chat-list-item");
+    if (chatItems && chatItems.length) {
+      chatItems.forEach(function (item) {
+        var cid = item.getAttribute("data-id") || item.getAttribute("data-chat-id");
+        if (!cid) return;
+        var itemSess = ss[cid] || {};
+        var itemUnread = Number(itemSess.unread || 0);
+        var badgeEl = item.querySelector(".cli-unread-badge");
+        if (itemUnread > 0) {
+          if (!badgeEl) {
+            var wrap = item.querySelector(".cli-avatar-wrap") || item.querySelector(".cli-avatar");
+            if (wrap) {
+              wrap.style.position = "relative";
+              wrap.style.overflow = "visible";
+              badgeEl = document.createElement("span");
+              badgeEl.className = "cli-unread-badge";
+              wrap.appendChild(badgeEl);
+            }
+          }
+          if (badgeEl) {
+            badgeEl.textContent = itemUnread > 99 ? "99+" : String(itemUnread);
+            badgeEl.setAttribute("data-count", String(itemUnread));
+            badgeEl.style.setProperty("display", "inline-flex", "important");
+            badgeEl.style.setProperty("visibility", "visible", "important");
+            badgeEl.style.setProperty("opacity", "1", "important");
+          }
+        } else if (badgeEl) {
+          badgeEl.textContent = "";
+          badgeEl.setAttribute("data-count", "0");
+          badgeEl.style.setProperty("display", "none", "important");
+          badgeEl.style.setProperty("visibility", "hidden", "important");
+          badgeEl.style.setProperty("opacity", "0", "important");
+        }
+      });
+    }
+  } catch (err) {}
 };
+
+// 周期性轻量自动纠偏刷新角标（1.5秒），通过轻量比较防抖，杜绝递归与高频计算导致的闪退卡顿
+if (!window.__akiniUnreadTickerStarted) {
+  window.__akiniUnreadTickerStarted = true;
+  setInterval(function () {
+    try {
+      if (window.__updateHomeBadges) window.__updateHomeBadges();
+    } catch(e) {}
+  }, 1500);
+}
 
 
 /* ===== v576: 首页纵向自适应——矮屏/带浏览器工具栏设备上等比缩小上方模块，
