@@ -4691,7 +4691,7 @@ body {
 .wordbank-overlay,
 .call-mini-window,
 #app-music {
-  max-width: none;
+  max-width: 430px;
   left: 0;
   right: 0;
   margin: 0 auto;
