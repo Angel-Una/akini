@@ -377,6 +377,12 @@
     memorySet: memSet,
     memoryRemove: memRemove,
     memoryKeys: function () { return Object.keys(memoryCache); },
+    // v612 直写通道：绕过拦截层的原始 LS 写（配额满返回 false），专供聊天记录切后台热备——
+    // 拦截层对 >200KB 大键只删不写，v605 的"同步 LS 热备"对图片聊天记录完全失效（记录丢失元凶）
+    rawLSSet: function (k, v) {
+      try { if (origSet) origSet.call(rawLS, k, v); else rawLS.setItem(k, v); return true; }
+      catch (e) { return false; }
+    },
     // 清除数据专用：清空内存镜像 + IDB 待写队列 + 启动前暂存 + 脏键集合，
     // 防止清除后内存/队列里的旧数据在刷新前的间隙被重新落盘
     wipeMemory: function () {

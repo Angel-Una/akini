@@ -3000,8 +3000,10 @@ window.akiniContacts = {
       var mm = String(e.getMinutes()).padStart(2, "0");
       return hh + ":" + mm;
     };
-    function __akiniToggleOn(id) {
-      return window.__akiniToggleOn ? window.__akiniToggleOn(id, false) : localStorage.getItem("akini_toggle_" + id) === "1";
+    function __akiniToggleOn(id, def) {
+      /* v612 修复：透传 defaultOn。原版把 defaultOn 硬编码 false，L4307 等裸调用点
+         传的 true 被吞——用户从未显式设置开关时（LS 键缺失）被误判为关，联系人不回消息 */
+      return window.__akiniToggleOn ? window.__akiniToggleOn(id, def === true) : localStorage.getItem("akini_toggle_" + id) === "1";
     }
     window.__akiniProcessMsgMeta = __akiniProcessMsgMeta; // 导出：观影聊天区复用同一套气泡元数据（时间戳/已读回执/自定义CSS）
     // 已读回执按气泡实际底部定位（短气泡时 content-line 被头像列撑高，不能用 top:100%）
@@ -3690,8 +3692,9 @@ window.akiniContacts = {
                 H +
                 "</div></div>",
               R =
-                __akiniStampMsgRows(((G = window.akiniContacts.getSession(t)).messagesHTML || "") +
-                O);
+                /* v612: 只给新增段盖时间戳——旧段早已 stamped，全量正则对长记录每次转账都卡 */
+                ((G = window.akiniContacts.getSession(t)).messagesHTML || "") +
+                __akiniStampMsgRows(O);
             (window.akiniContacts.updateSession(t, {
               messagesHTML: R,
               lastMsg: "转账：" + L,
@@ -4193,7 +4196,13 @@ window.akiniContacts = {
       } catch (e) {}
     });
     function b(t) {
-      if (we && we.active) return;
+      /* v612: 通话残留自愈——超过 10 分钟的 active 是闪退/强杀残留（真实通话最长 10 分钟内会挂断清零），
+         闸死回复链会让"联系人不回消息"，这里检测到即复位放行 */
+      if (we && we.active) {
+        if (we.__akiniCallStartTs && Date.now() - we.__akiniCallStartTs > 600000) {
+          try { we.active = !1; we.answered = !1; we.isMinimized = !1; we.__akiniCallStartTs = 0; } catch (e) {}
+        } else { return; }
+      }
       if (!window.akiniContacts) return;
       t = t || window.akiniContacts.getActiveChatId();
       // 幽灵任务闸：该聊天没有"用户已发未回"的 pending 消息时，回复链一律不跑
@@ -4448,8 +4457,9 @@ window.akiniContacts = {
               '_status">待收款</span></div></div></div></div>' +
               "",
             tR =
-              __akiniStampMsgRows(((tG = window.akiniContacts.getSession(t)).messagesHTML || "") +
-              tO);
+              /* v612: 只给新增段盖时间戳——旧段早已 stamped，全量正则对长记录每次转账都卡 */
+              ((tG = window.akiniContacts.getSession(t)).messagesHTML || "") +
+              __akiniStampMsgRows(tO);
           (window.akiniContacts.updateSession(t, {
             messagesHTML: tR,
             lastMsg: "【转账】" + tL,
@@ -5204,10 +5214,23 @@ window.akiniContacts = {
             clearTimeout(window.__akiniSaveDebounceTimers[cid]);
             delete window.__akiniSaveDebounceTimers[cid];
             if (E && E[cid]) {
-              // v605: 同步写 localStorage 热备——切后台冻结窗口内 IndexedDB 异步事务可能不 commit，
-              // 同步 LS 写是唯一可靠落盘（milk 模式）；配额满则 catch 跳过，IDB 仍作第二兜底
-              try { localStorage.setItem("akini_chat_history_" + cid, E[cid]); } catch(eLS) {}
+              /* v612 关键修复（重进记录全丢元凶）：
+                 ① 原来的 localStorage.setItem 会被存储安全层拦截：>200KB 大键只删不写，
+                    图片聊天记录的"同步 LS 热备"对大记录完全失效（v605 设计被架空）；
+                 ② _idbStore.set 是异步事务，微信切后台 IDB 事务经常不 commit。
+                 修复顺序：先 akiniStore.set（入内存镜像+IDB 队列，大键会清 LS 残留）→
+                 立即 flushIdb 强制落盘 IDB → 最后 rawLSSet 绕过拦截直写 LS 热备，
+                 三层各就各位，任何一层活着都能找回记录 */
+              try { window.akiniStore && window.akiniStore.set && window.akiniStore.set("akini_chat_history_" + cid, E[cid]); } catch(e){}
+              try { window.akiniStore && window.akiniStore.flushIdb && window.akiniStore.flushIdb(); } catch(e){}
               try { _idbStore.set("akini_chat_history_" + cid, E[cid]); } catch(e){}
+              try {
+                if (window.akiniStore && window.akiniStore.rawLSSet) {
+                  window.akiniStore.rawLSSet("akini_chat_history_" + cid, E[cid]);
+                } else {
+                  localStorage.setItem("akini_chat_history_" + cid, E[cid]);
+                }
+              } catch(eLS) {}
             }
           });
         }
@@ -7113,15 +7136,17 @@ window.akiniContacts = {
       var longest = t.reduce(function (a, b) {
         return a.length >= b.length ? a : b;
       });
-      if (longest.length > 300000 || __akiniCountMsgRows(longest) > 2000) {
+      if (longest.length > 300000 || __akiniCountMsgRowsFast(longest) > 2000) {
         return longest;
       }
       // 聊天记录一条都不能丢：不再跨来源合并去重，直接选择消息行数最多的完整来源
       // 用户连续发送的相同内容消息 outerHTML 完全相同，合并去重会误删为一条
+      // v612: 换纯正则快速计数——DOM 版对数 MB 记录做 createElement+innerHTML 全量解析，
+      // 每次进聊天对 5 个候选源各跑一次 = 几十~几百 ms 主线程阻塞（点进聊天卡顿元凶）
       var best = t[0],
-        bestRows = __akiniCountMsgRows(best);
+        bestRows = __akiniCountMsgRowsFast(best);
       for (var i = 1; i < t.length; i++) {
-        var rows = __akiniCountMsgRows(t[i]);
+        var rows = __akiniCountMsgRowsFast(t[i]);
         if (rows > bestRows) {
           best = t[i];
           bestRows = rows;
@@ -7628,16 +7653,17 @@ window.akiniContacts = {
                 if (sessHtml.trim()) __akiniRenderChatBody(__akiniDeduplicateChatHTML(sessHtml), e);
               } else {
                 /* core 式：切回前台对比消息行数，会话/IDB 备份比 UI 多则自动恢复（防后台吞消息） */
-                var uiRows = __akiniCountMsgRows(U.innerHTML || "");
-                if (__akiniCountMsgRows(sessHtml) > uiRows) {
+                /* v612: 快速正则计数——切前台是高频时机，DOM 版对大记录全量解析会卡顿掉帧 */
+                var uiRows = __akiniCountMsgRowsFast(U.innerHTML || "");
+                if (__akiniCountMsgRowsFast(sessHtml) > uiRows) {
                   __akiniRenderChatBody(__akiniDeduplicateChatHTML(sessHtml), e);
                 } else if (window._idbStore && window._idbStore.get) {
                   window._idbStore.get("akini_chat_history_" + e, function (bak) {
                     try {
                       if (!bak) return;
                       var curSess = window.akiniContacts.getSession(e);
-                      var curRows = __akiniCountMsgRows((curSess && curSess.messagesHTML) || "");
-                      if (__akiniCountMsgRows(bak) > curRows) {
+                      var curRows = __akiniCountMsgRowsFast((curSess && curSess.messagesHTML) || "");
+                      if (__akiniCountMsgRowsFast(bak) > curRows) {
                         window.akiniContacts.updateSession(e, { messagesHTML: bak });
                         __akiniRenderChatBody(__akiniDeduplicateChatHTML(bak), e);
                         console.warn("[Akini] 切回前台检测到更多备份消息，已自动恢复");
@@ -8090,7 +8116,8 @@ window.akiniContacts = {
             var o = tt(window.akiniContacts.getSession(t).messagesHTML || r, "", a || "", lsCrit);
             // 仅在消息行数真正变多时才重绘：U.innerHTML 经 meta 处理后恒长于 r，
             // 旧的长度比较会让每次进聊天都多刷一遍，导致消息和输入动态闪烁
-            if (o && __akiniCountMsgRows(o) > __akiniCountMsgRows(r || ""))
+            // v612: 快速正则计数，大记录不做 DOM 全量解析（进聊天卡顿元凶之一）
+            if (o && __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(r || ""))
               return (
                 window.akiniContacts.updateSession(t, { messagesHTML: o }),
                 void l(o)
@@ -8098,7 +8125,7 @@ window.akiniContacts = {
             _idbStore.get("akini_chat_history_backup_" + t, function (a) {
               if (window.akiniContacts.getActiveChatId() !== t) return;
               (o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", a || "", lsCrit)) &&
-                __akiniCountMsgRows(o) > __akiniCountMsgRows(r || "") &&
+                __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(r || "") &&
                 (window.akiniContacts.updateSession(t, { messagesHTML: o }),
                 l(o));
               var c = window.akiniContacts.getSession(t);
@@ -12382,6 +12409,10 @@ window.akiniContacts = {
               ? (l.innerHTML = nt(i[0].avatar, 58))
               : (l.innerHTML = nt(o, 58))),
         (we.active = !0),
+        /* v612: 通话状态自愈——闪退/强杀后 we.active 恒 true 会把 b()（联系人回复链）永久闸死，
+           表现为"联系人不回消息"。最长通话 10 分钟后自动复位（真实通话挂断时会正常清零，
+           这里只兜异常残留） */
+        (we.__akiniCallStartTs = Date.now()),
         (we.answered = !1),
         (we.isMinimized = !1),
         (we.isMyCalling = e),
