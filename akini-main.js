@@ -2707,14 +2707,32 @@ window.akiniContacts = {
               if (idb.hasOwnProperty(k)) {
                 if (!merged[k]) merged[k] = idb[k];
                 else {
-                  // 同一会话：聊天记录取更长的一方，其他元数据保留较新
+                  /* v615 关键修复：IDB 更长时不再无条件采纳——先比"最后一条消息时间戳"。
+                     旧行为只看长度：IDB 里几十个版本前的污染长记录（旧版截断 bug 时代被
+                     "更短不覆盖"防护冻结、此后从未更新）每次冷启动/挂后台切回都被选中，
+                     把会话覆盖回旧样子（用户反馈"回退到几十个版本前"的根因）。
+                     守卫规则：IDB 版最后消息 ts >= 当前版最后消息 ts 才采纳 IDB 版
+                     （吞消息恢复场景成立：IDB 尾部更新或相同）；否则 IDB 版是陈旧分支，
+                     保留当前（更短但更新），并用当前内容自愈写回 IDB 解冻污染键 */
                   var cH = (merged[k].messagesHTML || "").length;
                   var iH = (idb[k].messagesHTML || "").length;
                   if (iH > cH) {
-                    var longer = idb[k].messagesHTML;
-                    var newer = (idb[k].lastTime || 0) >= (merged[k].lastTime || 0) ? idb[k] : merged[k];
-                    merged[k] = newer;
-                    merged[k].messagesHTML = longer;
+                    var curTs = __akiniLastMsgTs(merged[k].messagesHTML || "");
+                    var idbTs = __akiniLastMsgTs(idb[k].messagesHTML || "");
+                    if (idbTs >= curTs) {
+                      var longer = idb[k].messagesHTML;
+                      var newer = (idb[k].lastTime || 0) >= (merged[k].lastTime || 0) ? idb[k] : merged[k];
+                      merged[k] = newer;
+                      merged[k].messagesHTML = longer;
+                    } else {
+                      console.warn("[restore] 拒绝陈旧 IDB 长记录覆盖会话 " + k + " (idbTs=" + idbTs + " < curTs=" + curTs + ")，已自愈写回");
+                      try {
+                        if (window._idbStore && window._idbStore.set) {
+                          window._idbStore.set("akini_chat_history_" + k, merged[k].messagesHTML || "");
+                          window._idbStore.set("akini_chat_history_backup_" + k, merged[k].messagesHTML || "");
+                        }
+                      } catch (eHeal) {}
+                    }
                   }
                 }
               }
@@ -3253,6 +3271,21 @@ window.akiniContacts = {
         if (wrapT) wrapT.appendChild(rr); else row.appendChild(rr);
       }
     }
+    /* v615: 提取聊天记录最后一条消息的 data-ts（毫秒）。
+       用于"恢复/合并守卫"：两份记录比新旧不再只看长度——
+       IDB 备份的最后一条消息早于当前会话的最后一条 → 它是删减/截断前的陈旧分支，绝不采纳，
+       根治"挂后台切回回退到几十个版本前"（旧长记录被 mergeSessions/切回恢复误选）。
+       无 data-ts 的极老记录返回 0，由调用方按退化规则处理 */
+    function __akiniLastMsgTs(html) {
+      try {
+        var s = String(html || "");
+        var re = /<div class="msg-row (?:me|other)(?:"|[^>]*?")[^>]*data-ts="(\d+)"/g;
+        var m, last = 0;
+        while ((m = re.exec(s)) !== null) { var v = parseInt(m[1], 10) || 0; if (v > last) last = v; }
+        return last;
+      } catch (e) { return 0; }
+    }
+    window.__akiniLastMsgTs = __akiniLastMsgTs;
     /* v614: 渲染后按 readMark 恢复已读回执——纯 DOM 增量点亮，不重绘不落盘，
        首帧即已读态，彻底消除"点进聊天已读回执消失再出现" */
     function __akiniApplyReadMark(chatId) {
@@ -7757,11 +7790,27 @@ window.akiniContacts = {
                     try {
                       if (!bak) return;
                       var curSess = window.akiniContacts.getSession(e);
-                      var curRows = __akiniCountMsgRowsFast((curSess && curSess.messagesHTML) || "");
+                      var curHtml = (curSess && curSess.messagesHTML) || "";
+                      var curRows = __akiniCountMsgRowsFast(curHtml);
                       if (__akiniCountMsgRowsFast(bak) > curRows) {
-                        window.akiniContacts.updateSession(e, { messagesHTML: bak });
-                        __akiniRenderChatBody(__akiniDeduplicateChatHTML(bak), e);
-                        console.warn("[Akini] 切回前台检测到更多备份消息，已自动恢复");
+                        /* v615 同 mergeSessions 守卫：IDB 备份的最后一条消息早于当前会话
+                           → 是删减/截断前的陈旧分支，绝不覆盖（挂后台切回"回退到几十个
+                           版本前"的根因之一）；确认陈旧后顺手自愈写回，解冻污染键 */
+                        var curTs = __akiniLastMsgTs(curHtml);
+                        var bakTs = __akiniLastMsgTs(bak);
+                        if (bakTs >= curTs) {
+                          window.akiniContacts.updateSession(e, { messagesHTML: bak });
+                          __akiniRenderChatBody(__akiniDeduplicateChatHTML(bak), e);
+                          console.warn("[Akini] 切回前台检测到更多备份消息，已自动恢复");
+                        } else {
+                          console.warn("[Akini] 切回前台拒绝陈旧备份覆盖会话 " + e + " (bakTs=" + bakTs + " < curTs=" + curTs + ")，已自愈写回");
+                          try {
+                            if (window._idbStore && window._idbStore.set) {
+                              window._idbStore.set("akini_chat_history_" + e, curHtml);
+                              window._idbStore.set("akini_chat_history_backup_" + e, curHtml);
+                            }
+                          } catch (e3) {}
+                        }
                       }
                     } catch (e2) {}
                   });
