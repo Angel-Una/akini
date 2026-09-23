@@ -3221,20 +3221,25 @@ window.akiniContacts = {
                row.querySelector(":scope > .msg-content-line .msg-rr");
       if (rr) {
         rr.style.visibility = "visible";
-        // 显示后持久化（600ms 防抖合并，批量点亮时只存一次，避免卡顿）
+        /* v614 关键修复：已读持久化改为轻量 readMark（chatId→最大已读 data-ts），对齐 syy 数据层思路。
+           旧方案用 chatBody.innerHTML 覆盖 session：① chatBody 只含当前渲染的≤25条，全量记录被截断；
+           ② 下次进聊天 tt() 五源合并时，旧全量(无已读标记)行数更多被选中 → 已读回执消失再出现；
+           ③ ct() 的 IDB 行数比较恒成立 → 每次进聊天都二次全量重绘（进聊天卡顿元凶）。 */
         try {
-          if (window.__akiniRrSaveTimer) clearTimeout(window.__akiniRrSaveTimer);
-          window.__akiniRrSaveTimer = setTimeout(function () {
-            try {
-              var _cid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
-              var _cb = document.getElementById("chatBody");
-              if (_cid && _cb && window.akiniContacts.updateSession) {
-                var _html = _cb.innerHTML;
-                window.akiniContacts.updateSession(_cid, { messagesHTML: _html });
-                if (typeof C === "function") C(_cid, _html);
+          var _rmTs = parseInt(row.getAttribute("data-ts"), 10);
+          if (_rmTs > 0) {
+            var _rmCid = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
+            if (_rmCid) {
+              var _rmOld = 0;
+              try { _rmOld = parseInt(localStorage.getItem("akini_readmark_" + _rmCid) || "0", 10) || 0; } catch (e0) {}
+              if (_rmTs > _rmOld) {
+                if (window.__akiniRrSaveTimer) clearTimeout(window.__akiniRrSaveTimer);
+                window.__akiniRrSaveTimer = setTimeout(function () {
+                  try { localStorage.setItem("akini_readmark_" + _rmCid, String(_rmTs)); } catch (e1) {}
+                }, 600);
               }
-            } catch (e) {}
-          }, 600);
+            }
+          }
         } catch (e) {}
         return;
       }
@@ -3248,6 +3253,23 @@ window.akiniContacts = {
         if (wrapT) wrapT.appendChild(rr); else row.appendChild(rr);
       }
     }
+    /* v614: 渲染后按 readMark 恢复已读回执——纯 DOM 增量点亮，不重绘不落盘，
+       首帧即已读态，彻底消除"点进聊天已读回执消失再出现" */
+    function __akiniApplyReadMark(chatId) {
+      try {
+        if (!U || !chatId) return;
+        var mark = parseInt(localStorage.getItem("akini_readmark_" + chatId) || "0", 10) || 0;
+        if (!mark) return;
+        U.querySelectorAll(".msg-row.me[data-ts]").forEach(function (row) {
+          if (row.getAttribute("data-had-read-receipt") === "1") return;
+          var ts = parseInt(row.getAttribute("data-ts"), 10) || 0;
+          if (ts && ts <= mark) {
+            try { __akiniShowReadReceipt(row); } catch (e) {}
+          }
+        });
+      } catch (e) {}
+    }
+    window.__akiniApplyReadMark = __akiniApplyReadMark;
     function __akiniInsertTimestampSeparators() {
       var chatBody = document.getElementById("chatBody");
       if (!chatBody) return;
@@ -4930,6 +4952,17 @@ window.akiniContacts = {
         __readDelay + 400,
         __replyDelay - 1e3 * (_tm + Math.random() * (_tx - _tm))
       );
+      /* v614 对齐 __akiniScheduleReply 与 syy：调用瞬间（表情包/卡片刚发出）立即点亮输入动态。
+         旧时序 typing 排在 __typingDelay（最晚已读后 4s+ 才显示）——用户反馈
+         "已读回执都显示了但输入动态等好久"的根因；typing 持续到回复到达，
+         由 showTypingBubble 自带兜底计时器收尾 */
+      if (isActive) {
+        try {
+          var _ti0 = document.getElementById("typingIndicator");
+          if (_ti0) _ti0.style.display = "block";
+          showTypingBubble(t, "group" === e.type ? (e.memberIds || [])[0] : null);
+        } catch (err0) {}
+      }
       setTimeout(function () {
         var cb = document.getElementById("chatBody");
         if (!cb) return;
@@ -4944,6 +4977,8 @@ window.akiniContacts = {
       }, __readDelay);
       setTimeout(function () {
         if (!isActive) return;
+        // v614: 调用瞬间已显示过则跳过（此定时器仅作异常兜底）
+        if (window.__akiniTypingMap && window.__akiniTypingMap[t]) return;
         var l = document.getElementById("typingIndicator");
         if (l) l.style.display = "block";
         try { showTypingBubble(t, "group" === e.type ? (e.memberIds || [])[0] : null); } catch (err) {}
@@ -5066,10 +5101,9 @@ window.akiniContacts = {
     function __akiniRenderChatBody(fullHTML, chatId) {
       if (!U) return;
       var cleanHTML = __akiniStripTypingRows(fullHTML);
-      // v613: 渲染前先把默认占位头像换成真实头像，避免进聊天时先闪默认头像
-      if (cleanHTML.indexOf("data:image/svg") >= 0 && typeof __akiniFixMsgAvatarHTML === "function") {
-        cleanHTML = __akiniFixMsgAvatarHTML(cleanHTML, chatId);
-      }
+      /* v614: 头像修复挪到切片后执行——v613 在全量 cleanHTML 上跑 DOMParser 全量同步解析
+         （数 MB 记录每次进聊天都解析一遍），是进聊天卡顿元凶；实际只挂载≤25条，
+         修这 25 条即可，全量缓存里的旧 SVG 留待 pull-load 切片时再修 */
       // 防闪烁：同一聊天且内容未变化时跳过重绘（openChat/IDB 恢复会多次触发本函数）
       var _rk = String(chatId || "") + "|" + cleanHTML.length + "|" + cleanHTML.slice(-128);
       var _domRows = U.querySelectorAll('.msg-row').length;
@@ -5085,6 +5119,10 @@ window.akiniContacts = {
       var total = __akiniCountMsgRowsFast(cleanHTML);
       // v596: 给图片加懒加载，减少首屏解码/内存峰值，防卡崩
       var _lazyHTML = (total <= AKINI_CHAT_BATCH_SIZE) ? cleanHTML : __akiniSliceLastMsgRows(cleanHTML, AKINI_CHAT_BATCH_SIZE);
+      // v613→v614: 默认占位头像换成真实头像（只在≤25条切片上跑，避免全量 DOMParser 卡顿）
+      if (_lazyHTML.indexOf("data:image/svg") >= 0 && typeof __akiniFixMsgAvatarHTML === "function") {
+        _lazyHTML = __akiniFixMsgAvatarHTML(_lazyHTML, chatId);
+      }
       if (_lazyHTML.indexOf('<img') >= 0) {
         _lazyHTML = _lazyHTML.replace(/<img(?![^>]*\sloading=)([^>]*)>/g, '<img loading="lazy" decoding="async"$1>');
       }
@@ -5100,7 +5138,9 @@ window.akiniContacts = {
       } catch (e) {}
       try { window.__akiniMedia && window.__akiniMedia.resolve(U); } catch (e) {}
       U.scrollTop = U.scrollHeight;
-      [120, 400, 900].forEach(function (_ms) {
+      /* v614: 每次 scrollTop=scrollHeight 都触发强制同步布局；图片多时一次 reflow 就贵，
+         砍掉 120/900 两次只留 500ms 一次兜底（rAF 滚动已在前面），对齐 syy 只滚一次的思路 */
+      [500].forEach(function (_ms) {
         setTimeout(function () { try { U.scrollTop = U.scrollHeight; } catch (e) {} }, _ms);
       });
       // v594 防卡崩：保持聊天 DOM 节点上限，超限时移除最早的消息
@@ -5116,6 +5156,8 @@ window.akiniContacts = {
         }
       } catch (e) {}
       __akiniSetupChatMetaObserver();
+      /* v614: 渲染后按 readMark 恢复已读回执（纯 DOM 增量，首帧即已读态，防消失再出现） */
+      try { __akiniApplyReadMark(chatId); } catch (e) {}
       /* v516: 每次聊天 body 重绘后刷新 typing 悬浮层，避免发送消息后输入动态不显示 */
       try {
         typeof __akiniPaintTypingFloat === "function" && __akiniPaintTypingFloat();
@@ -5130,12 +5172,18 @@ window.akiniContacts = {
       var newCount = Math.min(total, currentRows + 25);
       if (newCount <= currentRows) return;
       var newHTML = __akiniSliceLastMsgRows(fullHTML, newCount);
+      // v614: 头像修复在切片上跑（≤50条），不做全量 DOMParser
+      if (newHTML.indexOf("data:image/svg") >= 0 && typeof __akiniFixMsgAvatarHTML === "function") {
+        try { newHTML = __akiniFixMsgAvatarHTML(newHTML, chatId); } catch (e) {}
+      }
       // 记录旧高度，避免加载后滚动位置跳到底部
       var oldHeight = U.scrollHeight, oldTop = U.scrollTop;
       U.innerHTML = newHTML;
       try { window.__akiniMedia && window.__akiniMedia.resolve(U); } catch (e) {}
       U.scrollTop = oldTop + (U.scrollHeight - oldHeight);
       __akiniSetupChatMetaObserver();
+      // v614: 加载出的历史行同样按 readMark 恢复已读回执
+      try { __akiniApplyReadMark(chatId); } catch (e) {}
     }
     window.__akiniAppendMessageHTML = __akiniAppendMessageHTML;
     /* zzzn：新消息时间戳持久化——给字符串/元素形式的 msg-row 补 data-ts，重进网站后时间不再被 Date.now 覆盖 */
