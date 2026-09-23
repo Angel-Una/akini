@@ -2405,7 +2405,7 @@ body:not(.x) .chat-body .msg-row.ta .msg-content-line .bubble.transfer-bubble.ta
   border-top: 1px solid rgba(255, 255, 255, 0.35);
   position: relative;
   z-index: 10;
-  padding-bottom: calc(env(safe-area-inset-bottom) + 4px);
+  padding-bottom: calc(env(safe-area-inset-bottom) + 7px);
 }
 .chat-quote-bar .quote-text img.quote-sticker-thumb {
   width: 26px !important;
@@ -4691,7 +4691,7 @@ body {
 .wordbank-overlay,
 .call-mini-window,
 #app-music {
-  max-width: 430px;
+  max-width: none;
   left: 0;
   right: 0;
   margin: 0 auto;
@@ -7171,7 +7171,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 .chat-input-bar {
   gap: 8px;
   padding: 4px 10px 4px 10px !important;
-  margin-bottom: 0 !important;
+  margin-bottom: 3px !important;
 }
 .chat-input-bar .plus-btn#plusMenuBtn {
   width: 36px;

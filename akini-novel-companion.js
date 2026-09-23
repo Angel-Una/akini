@@ -292,14 +292,18 @@
     /* 该联系人专属表情包（与观影 watchStickerPool 同数据源 getContactStickersSync） */
     var out = [];
     try {
-      var own = typeof window.getContactStickersSync === 'function' ? window.getContactStickersSync(cid) : [];
-      (Array.isArray(own) ? own : []).forEach(function (it) {
-        var s2 = '';
-        if (typeof it === 'string') s2 = it;
-        else if (it && typeof it.s === 'string') s2 = it.s;
-        var blocked = it && typeof it === 'object' && (it.b === 1 || it.b === true || it.b === '1');
-        if (!blocked && /^data:image\//.test(s2)) out.push(s2);
-      });
+      if (typeof window.__akiniStickerSrcs === 'function') {
+        out = window.__akiniStickerSrcs(cid);
+      } else {
+        var own = typeof window.getContactStickersSync === 'function' ? window.getContactStickersSync(cid) : [];
+        (Array.isArray(own) ? own : []).forEach(function (it) {
+          var s2 = '';
+          if (typeof it === 'string') s2 = it;
+          else if (it && typeof it.s === 'string') s2 = it.s;
+          var blocked = it && typeof it === 'object' && (it.b === 1 || it.b === true || it.b === '1');
+          if (!blocked && /^data:image\//.test(s2)) out.push(s2);
+        });
+      }
     } catch (e) {}
     return out;
   }
@@ -331,11 +335,9 @@
       hideCompanionTyping();
       var cur = companionState();
       if (!cur) return;
-      /* 表情包：概率与微信聊天一致（contactEmojiToggle 开关 + AKR.getProb('emoji')），仅限该联系人专属收藏，裸图无气泡 */
-      var stkOn = false;
-      try { stkOn = localStorage.getItem('akini_toggle_contactEmojiToggle') === '1'; } catch (e) {}
-      var stkProb = (stkOn && window.AKR && typeof window.AKR.getProb === 'function') ? window.AKR.getProb('emoji') : 0;
-      if (stkProb > 0 && Math.random() < stkProb) {
+      /* 表情包：概率与 syy 聊天一致（20%，无开关），仅限该联系人专属收藏，裸图无气泡 */
+      var stkProb = 0.2;
+      if (Math.random() < stkProb) {
         var pool = companionStickerPool(cur.cid);
         if (pool.length) {
           cur.msgs = cur.msgs || [];

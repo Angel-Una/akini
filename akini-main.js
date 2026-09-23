@@ -502,11 +502,6 @@ window.AKR = (function () {
       pokeOn = localStorage.getItem("akini_toggle_contactPokeToggle") === "1";
     } catch (e) {}
 
-    var stickerOn = false;
-    try {
-      stickerOn = localStorage.getItem("akini_toggle_contactEmojiToggle") === "1";
-    } catch (e) {}
-
     var transferOn = false;
     try {
       transferOn = localStorage.getItem("akini_toggle_contactTransferToggle") === "1";
@@ -520,7 +515,7 @@ window.AKR = (function () {
     var extra = {
       poke: pokeOn && Math.random() < getProb("poke"),
       quote: quoteOn && Math.random() < getProb("quote"),
-      sticker: stickerOn && Math.random() < getProb("emoji"),
+      sticker: Math.random() < 0.2,
       transfer: transferOn && Math.random() < getProb("taTransfer"),
       emojiMix: emojiMixOn
     };
@@ -2303,7 +2298,7 @@ document.addEventListener("DOMContentLoaded", function () {
                           localStorage.getItem("akini_chat_history_backup_" + t) || "";
             } catch (e0) {}
           }
-          if (__oldHtml) {
+          if (__oldHtml && !e.allowShrink) {
             i.messagesHTML = __akiniIncTyping(__oldHtml, t);
             var newRows = __akiniIncCount(e.messagesHTML, t, "typing");
             var oldRows = __akiniIncCount(i.messagesHTML, t, "typing");
@@ -3765,7 +3760,7 @@ window.akiniContacts = {
         // compat 逻辑：固定概率 1/2/3 条，每条作为独立消息发送
         var replyCount = window.AKR.getReplyCount();
         var msgArr = [];
-        if (Math.random() < window.AKR.getProb("sticker") && m.length > 0) {
+        if (Math.random() < 0.2 && m.length > 0) {
           msgArr.push({
             html:
               '<img src="' +
@@ -4915,7 +4910,7 @@ window.akiniContacts = {
       function runExtras() {
         var list = [];
         if (ex.transfer && window.__akiniToggleOn("contactTransferToggle", false)) list.push(doTransfer);
-        if (ex.sticker && window.__akiniToggleOn("contactEmojiToggle", false)) list.push(doSticker);
+        if (ex.sticker) list.push(doSticker);
         if (ex.poke && "group" !== e.type && window.__akiniToggleOn("contactPokeToggle", false)) list.push(doPoke);
         if (ex.call && window.__akiniToggleOn("contactActiveMsgToggle", false)) list.push(doCall);
         if (0 === list.length) return;
@@ -5350,9 +5345,13 @@ window.akiniContacts = {
       } catch (err) {}
       var memRows = ("string" == typeof E[t] && E[t] !== clean) ? __akiniIncCount(E[t], t, "clean") : newRows;
       if (memRows > existingRows) existingRows = memRows;
-      if (newRows < existingRows) {
+      var allowShrink = !!(window.__akiniAllowShrinkMap && window.__akiniAllowShrinkMap[t]);
+      if (newRows < existingRows && !allowShrink) {
         console.warn("[C] 拒绝用更短的聊天记录覆盖：" + key + " (" + newRows + " < " + existingRows + ")");
         return;
+      }
+      if (allowShrink && window.__akiniAllowShrinkMap) {
+        delete window.__akiniAllowShrinkMap[t];
       }
       E[t] = clean;
       // IDB 复核：先读 IDB 现有记录，行数更多时不覆盖，防止陈旧会话数据截断完整记录
@@ -5379,7 +5378,7 @@ window.akiniContacts = {
       try {
         _idbStore.get(key, function (idbExisting) {
           var idbRows = idbExisting ? __akiniIncCount(String(idbExisting), t, "clean") : 0;
-          if (newRows >= idbRows) {
+          if (newRows >= idbRows || allowShrink) {
             doWrite();
           } else {
             console.warn("[C] IDB 复核拒绝覆盖：" + key + " (" + newRows + " < " + idbRows + ")");
@@ -14239,10 +14238,19 @@ window.akiniContacts = {
                       if (removed) fullHTML = tmp.innerHTML;
                     }
                   }
-                  window.akiniContacts.updateSession(activeId, { messagesHTML: fullHTML });
+                  window.__akiniAllowShrinkMap = window.__akiniAllowShrinkMap || {};
+                  window.__akiniAllowShrinkMap[activeId] = true;
+                  try { if (window.__akiniSavedRows) window.__akiniSavedRows[activeId] = __akiniIncCount(fullHTML, activeId, "clean"); } catch (e) {}
+                  try { if (window.__akiniIncCache) delete window.__akiniIncCache[activeId]; } catch (e) {}
+                  window.akiniContacts.updateSession(activeId, { messagesHTML: fullHTML, allowShrink: true });
                   E[activeId] = fullHTML;
                   if (typeof C === "function") C(activeId, fullHTML);
-                  try { _idbStore.set("akini_chat_history", fullHTML); } catch (e) {}
+                  var kAct = "akini_chat_history_" + activeId;
+                  var kBk = "akini_chat_history_backup_" + activeId;
+                  var kCrit = "akini_chat_critical_" + activeId;
+                  try { if (window.akiniStore && window.akiniStore.set) { window.akiniStore.set(kAct, fullHTML); window.akiniStore.set(kBk, fullHTML); } } catch (e) {}
+                  try { if (window._idbStore && window._idbStore.set) { _idbStore.set(kAct, fullHTML); _idbStore.set(kBk, fullHTML); _idbStore.set(kCrit, fullHTML); } } catch (e) {}
+                  try { localStorage.setItem(kAct, fullHTML); localStorage.setItem(kBk, fullHTML); localStorage.setItem(kCrit, fullHTML); } catch (e) {}
                 }
               }
             } catch (e) {}
@@ -18241,8 +18249,9 @@ window.akiniContacts = {
                   comments: [],
                 };
                 window.__akiniPostLog && __akiniPostLog("friends", "已发布：" + String(a || "").slice(0, 20));
-                // 联系人发朋友圈/iCity时，20% 概率附带用户给该联系人添加的表情包（与评论表情包概率一致）
-                if (Math.random() < 0.2) {
+                // 联系人发朋友圈/iCity时，10% 概率附带该联系人专属表情包
+                var _stkProbPost = 0.1;
+                if (Math.random() < _stkProbPost) {
                   var stickers = window.getContactStickersSync
                     ? window.__akiniStickerSrcs(e.id)
                     : [];
@@ -18329,8 +18338,9 @@ window.akiniContacts = {
                     } else {
                       ((e.comments = e.comments || []),
                         (function () {
+                          var _stkAProb = 0.2;
                           var _stkA =
-                            Math.random() < 0.2 && window.getContactStickersSync
+                            Math.random() < _stkAProb && window.getContactStickersSync
                               ? window.__akiniStickerSrcs(myId)
                               : [];
                           var _cmtA = {
@@ -18367,8 +18377,9 @@ window.akiniContacts = {
                   } else {
                     ((e.comments = e.comments || []),
                       (function () {
+                        var _stkBProb = 0.2;
                         var _stkB =
-                          Math.random() < 0.2 && window.getContactStickersSync
+                          Math.random() < _stkBProb && window.getContactStickersSync
                             ? window.__akiniStickerSrcs(myId)
                             : [];
                         var _cmtB = {
@@ -18461,8 +18472,9 @@ window.akiniContacts = {
                   var p = replyOnContactPosts[Math.floor(Math.random() * replyOnContactPosts.length)],
                     v = l.indexOf(p);
                   if (v >= 0) {
+                    var _stkCProb = 0.2;
                     var _stkC =
-                      Math.random() < 0.2 && window.getContactStickersSync
+                      Math.random() < _stkCProb && window.getContactStickersSync
                         ? window.__akiniStickerSrcs(myId)
                         : [];
                     var _cmtC = {
@@ -19005,7 +19017,6 @@ window.akiniContacts = {
         t("readNoReplyToggle", !1),
         t("pinyinCardToggle", !1),
         t("emojiMixToggle", !1),
-        t("contactEmojiToggle", !1),
         t("contactPokeToggle", !1),
         t("contactTransferToggle", !1),
         (function(){
@@ -19751,8 +19762,9 @@ window.akiniContacts = {
                       s = interactor.avatar;
                     ((n.comments = n.comments || []),
                       (function () {
+                        var _stkDProb = 0.2;
                         var _stkD =
-                          Math.random() < 0.2 && window.getContactStickersSync
+                          Math.random() < _stkDProb && window.getContactStickersSync
                             ? window.__akiniStickerSrcs(interactor.id)
                             : [];
                         var _cmtD = {
@@ -19821,9 +19833,10 @@ window.akiniContacts = {
                 if (!g) break;
                 ((f.repliedByTa = !0),
                   (function () {
+                    var _stkEProb = 0.2;
                     var _stkE =
-                      Math.random() < 0.2 && window.getContactStickersSync
-                        ? window.getContactStickersSync(n.authorId)
+                      Math.random() < _stkEProb && window.getContactStickersSync
+                        ? (window.__akiniStickerSrcs ? window.__akiniStickerSrcs(n.authorId) : window.getContactStickersSync(n.authorId))
                         : [];
                     var _cmtE = {
                       id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
@@ -23537,15 +23550,19 @@ window.akiniContacts = {
   function watchStickerPool(cid) {
     var out = [];
     try {
-      var own = typeof window.getContactStickersSync === "function" ? window.getContactStickersSync(cid) : [];
-      (Array.isArray(own) ? own : []).forEach(function (it) {
-        var s = "";
-        if (typeof it === "string") s = it;
-        else if (it && typeof it.s === "string") s = it.s;
-        else if (it && (it.url || it.src || it.data)) s = String(it.url || it.src || it.data);
-        var blocked = it && typeof it === "object" && (it.b === 1 || it.b === true || it.b === "1");
-        if (!blocked && /^data:image\//.test(s)) out.push(s);
-      });
+      if (typeof window.__akiniStickerSrcs === "function") {
+        out = window.__akiniStickerSrcs(cid);
+      } else {
+        var own = typeof window.getContactStickersSync === "function" ? window.getContactStickersSync(cid) : [];
+        (Array.isArray(own) ? own : []).forEach(function (it) {
+          var s = "";
+          if (typeof it === "string") s = it;
+          else if (it && typeof it.s === "string") s = it.s;
+          else if (it && (it.url || it.src || it.data)) s = String(it.url || it.src || it.data);
+          var blocked = it && typeof it === "object" && (it.b === 1 || it.b === true || it.b === "1");
+          if (!blocked && /^data:image\//.test(s)) out.push(s);
+        });
+      }
     } catch (e) {}
     return out;
   }
@@ -23606,12 +23623,10 @@ window.akiniContacts = {
       // 与微信聊天一致：一轮回复 1~3 条（75%/20%/5% 同 AKR.getReplyCount），逐条间隔发出
       var r = Math.random();
       var replyCount = r < 0.75 ? 1 : r < 0.95 ? 2 : 3;
-      /* 表情包：概率与微信聊天一致（同款 contactEmojiToggle 开关 + AKR.getProb('emoji')），仅限该联系人字卡库收藏，裸图无气泡 */
+      /* 表情包：概率与 syy 聊天一致（20%，无开关），仅限该联系人字卡库收藏，裸图无气泡 */
       var c0 = watchPartners[Math.floor(Math.random() * watchPartners.length)];
-      var stkOn = true;
-      try { stkOn = localStorage.getItem("akini_toggle_contactEmojiToggle") === "1"; } catch (e) {}
-      var stkProb = (stkOn && window.AKR && typeof window.AKR.getProb === "function") ? window.AKR.getProb("emoji") : 0;
-      if (c0 && stkProb > 0 && Math.random() < stkProb) {
+      var stkProb = 0.2;
+      if (c0 && Math.random() < stkProb) {
         var _pool = watchStickerPool(c0.id);
         if (_pool.length) {
           appendPartnerMsg(c0, "", _pool[Math.floor(Math.random() * _pool.length)]);
