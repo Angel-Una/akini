@@ -5066,6 +5066,10 @@ window.akiniContacts = {
     function __akiniRenderChatBody(fullHTML, chatId) {
       if (!U) return;
       var cleanHTML = __akiniStripTypingRows(fullHTML);
+      // v613: 渲染前先把默认占位头像换成真实头像，避免进聊天时先闪默认头像
+      if (cleanHTML.indexOf("data:image/svg") >= 0 && typeof __akiniFixMsgAvatarHTML === "function") {
+        cleanHTML = __akiniFixMsgAvatarHTML(cleanHTML, chatId);
+      }
       // 防闪烁：同一聊天且内容未变化时跳过重绘（openChat/IDB 恢复会多次触发本函数）
       var _rk = String(chatId || "") + "|" + cleanHTML.length + "|" + cleanHTML.slice(-128);
       var _domRows = U.querySelectorAll('.msg-row').length;
@@ -7398,6 +7402,49 @@ window.akiniContacts = {
       var m = html.match(/src="([^"]*)"/);
       return m && m[1] ? m[1] : "";
     }
+    /* v613: 把消息 HTML 字符串里的默认占位头像替换为真实头像（进入聊天前调用，避免闪默认头像） */
+    function __akiniFixMsgAvatarHTML(html, chatId) {
+      try {
+        if (!html || html.indexOf("data:image/svg") < 0) return html;
+        if (!window.akiniContacts) return html;
+        var mySrc = "";
+        try { mySrc = __akiniExtractImgSrc(window.getMyAvatar ? window.getMyAvatar() : ""); } catch (e) {}
+        var myOk = mySrc && !__akiniIsLineAvatarSrc(mySrc) ? mySrc : "";
+        var contactAv = {};
+        try {
+          var cs = window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+          cs.forEach(function (c) {
+            if (!c || !c.name) return;
+            var av = "";
+            if (c.avatar && /^(data:|https?:|blob:)/.test(String(c.avatar))) av = String(c.avatar);
+            if (av && !__akiniIsLineAvatarSrc(av)) contactAv[String(c.name)] = av;
+          });
+        } catch (e) {}
+        var taSrc = "";
+        try { taSrc = __akiniExtractImgSrc(window.getTaAvatar ? window.getTaAvatar() : ""); } catch (e) {}
+        if (taSrc && __akiniIsLineAvatarSrc(taSrc)) taSrc = "";
+        if (!myOk && !Object.keys(contactAv).length && !taSrc) return html;
+        var isGroup = false;
+        try { var tgt = window.akiniContacts.getChatTarget(chatId); isGroup = !!(tgt && tgt.type === "group"); } catch (e) {}
+        var doc = new DOMParser().parseFromString(html, "text/html");
+        var changed = false;
+        if (myOk) {
+          doc.querySelectorAll('.msg-row.me .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
+            img.setAttribute("src", myOk);
+            changed = true;
+          });
+        }
+        doc.querySelectorAll('.msg-row.other .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
+          var box = img.closest ? img.closest(".msg-avatar") : null;
+          var name = box ? (box.getAttribute("data-sender-name") || "") : "";
+          var real = (name && contactAv[name]) || (!isGroup ? taSrc : "") || "";
+          if (real) { img.setAttribute("src", real); changed = true; }
+        });
+        return changed ? doc.body.innerHTML : html;
+      } catch (e) { return html; }
+    }
+    window.__akiniFixMsgAvatarHTML = __akiniFixMsgAvatarHTML;
+
     window.__akiniFixHistoryAvatars = function () {
       try {
         if (!window.akiniContacts || !window.akiniContacts.getSessions) return;
