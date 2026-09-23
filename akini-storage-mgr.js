@@ -76,18 +76,31 @@
         /* getSessions() 返回对象 {id: session}；名称/类型取 chatTarget */
         var sessMap = (window.akiniContacts && window.akiniContacts.getSessions)
           ? window.akiniContacts.getSessions() : {};
+        var dirty = false;
         Object.keys(sessMap || {}).forEach(function (id) {
           var target = null;
           try {
             target = window.akiniContacts.getChatTarget
               ? window.akiniContacts.getChatTarget(id) : null;
           } catch (e) {}
-          rows.push({
-            id: id,
-            name: (target && (target.name || target.nickname)) || id,
-            isGroup: !!(target && (target.type === "group" || target.isGroup))
-          });
+          // 仅展示实际存在的有效联系人或群聊；若联系人/群聊已删除（孤儿历史会话），不展示并自动清理脏数据
+          if (target && (target.name || target.nickname)) {
+            rows.push({
+              id: id,
+              name: target.name || target.nickname,
+              isGroup: !!(target.type === "group" || target.isGroup)
+            });
+          } else {
+            // 自动清理不存在的残留孤儿 session
+            try {
+              delete sessMap[id];
+              dirty = true;
+            } catch (err) {}
+          }
         });
+        if (dirty && window.akiniContacts && window.akiniContacts.saveSessions) {
+          try { window.akiniContacts.saveSessions(sessMap); } catch (err) {}
+        }
       } catch (e) {}
       var overlay = document.createElement("div");
       overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000005;display:flex;align-items:flex-end;";
