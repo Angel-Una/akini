@@ -46,6 +46,8 @@ window.__akiniMedia = (function () {
         MEM_SIZE += dataUrl.length;
         evict(); // 超预算时 LRU 淘汰，防内存无限增长崩溃
         try { window._idbStore && window._idbStore.set("akini_media_" + h, dataUrl); } catch (e) {}
+        // v627: 立即尝试 flush，降低切后台/刷新导致媒体池未落盘丢图概率
+        try { window._idbStore && window._idbStore.flush && window._idbStore.flush(); } catch (e) {}
       }
       return h;
     },
@@ -69,6 +71,7 @@ window.__akiniMedia = (function () {
           if (!h || img.__mhDone) return;
           self.get(h, function (url) {
             if (url) { img.src = url; img.__mhDone = true; }
+            else { img.classList.add("akini-media-missing"); img.alt = "图片丢失"; }
           });
         })(imgs[i]);
       }
@@ -82,7 +85,9 @@ function __akiniStripMedia(html) {
     try { html = String(html); } catch (e) { return ""; }
   }
   if (!html || html.indexOf("data:image") < 0 || !window.__akiniMedia) return html;
+  // v627: sticker 表情包直接内联保存，避免媒体池丢失导致气泡"小部件消失"
   return html.replace(/<img([^>]*?)src="(data:image\/[^"]{8000,})"([^>]*)>/g, function (m, pre, url, post) {
+    if (pre.indexOf("data-preserve-inline") >= 0 || post.indexOf("data-preserve-inline") >= 0) return m;
     var h = window.__akiniMedia.put(url);
     if (!h) return m;
     return '<img data-mh="' + h + '"' + pre + ' src="' + window.__akiniMedia.PLACEHOLDER + '"' + post + ">";
@@ -4594,7 +4599,7 @@ window.akiniContacts = {
           (_mh ? 'data-mh="' + _mh + '" ' : "") +
           'src="' +
           picked +
-          '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;"></div></div></div>' +
+          '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" data-preserve-inline="1"></div></div></div>' +
           "";
         if (a && U) {
           const i = document.createElement("div");
@@ -9130,7 +9135,7 @@ window.akiniContacts = {
       e.innerHTML =
         '<div class="msg-content-line"><div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;"><img src="' +
         dataUrl +
-        '" style="max-width:160px;max-height:200px;border-radius:10px;display:block;"></div><div class="msg-avatar">' +
+        '" style="max-width:160px;max-height:200px;border-radius:10px;display:block;" data-preserve-inline="1"></div><div class="msg-avatar">' +
         f() +
         "</div></div>" +
         d("right");
@@ -9928,7 +9933,7 @@ window.akiniContacts = {
                      旧代码只 appendChild 到 DOM，S() 保存的是 session 旧内容，退出重进表情包消息丢失 */
                   var n = window.akiniContacts.getActiveChatId();
                   var _rowHtml =
-                    '<div class="msg-row me" data-ts="' + Date.now() + '"><div class="msg-content-line"><div class="bubble sticker-bubble" style="background:transparent;box-shadow:none;padding:0;"><img src="' + t + '" style="max-width:120px;max-height:120px;border-radius:8px;"></div><div class="msg-avatar">' + f() + '</div></div>' +
+                    '<div class="msg-row me" data-ts="' + Date.now() + '"><div class="msg-content-line"><div class="bubble sticker-bubble" style="background:transparent;box-shadow:none;padding:0;"><img data-preserve-inline="1" src="' + t + '" style="max-width:120px;max-height:120px;border-radius:8px;"></div><div class="msg-avatar">' + f() + '</div></div>' +
                     d("right") + '</div>';
                   window.__akiniAppendMessageHTML(n, _rowHtml, {
                     lastMsg: "【表情包】",
@@ -23758,7 +23763,7 @@ window.akiniContacts = {
     row.setAttribute("data-ts", String(Date.now()));
     /* 表情包消息：裸图无气泡（与微信一致）；文字消息保持原气泡 */
     var bubbleHtml = img
-      ? '<div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;border:none;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/></div>'
+      ? '<div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;border:none;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/ data-preserve-inline="1"></div>'
       : '<div class="bubble">' + esc(text) + '</div>';
     row.innerHTML =
       '<div class="msg-content-line"><div class="msg-avatar">' + partnerAvatarHtml(c.avatar) + '</div>' +
@@ -24012,7 +24017,7 @@ window.akiniContacts = {
     row.className = "msg-row me";
     row.setAttribute("data-ts", String(Date.now()));
     var bubbleHtml = img
-      ? '<div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;border:none;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/></div>'
+      ? '<div class="bubble sticker-bubble" style="background:transparent;padding:0;box-shadow:none;border:none;"><img src="' + img + '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" alt=""/ data-preserve-inline="1"></div>'
       : '<div class="bubble">' + esc(text) + '</div>';
     row.innerHTML =
       '<div class="msg-content-line">' + bubbleHtml +
