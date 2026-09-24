@@ -11214,3 +11214,20 @@ html body #chatBackBtn,
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
 }
+
+/* ==========================================================================
+   v624: 信箱顶部 "寄出的信"/"收到的信" Tab 按钮防遮挡修复
+   ========================================================================== */
+#app-mail .content-header {
+  padding-top: max(16px, calc(env(safe-area-inset-top, 0px) + 10px)) !important;
+  padding-bottom: 12px !important;
+  box-sizing: border-box !important;
+}
+#app-mail .content-body {
+  padding-top: calc(74px + env(safe-area-inset-top, 0px)) !important;
+  box-sizing: border-box !important;
+}
+#app-mail .mail-tab {
+  position: relative !important;
+  z-index: 1 !important;
+}

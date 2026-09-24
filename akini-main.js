@@ -8353,7 +8353,9 @@ window.akiniContacts = {
             var o = tt(window.akiniContacts.getSession(t).messagesHTML || r, "", cleanA || "", lsCrit);
             if (o && typeof window.__akiniFilterDeletedMsgs === "function") o = window.__akiniFilterDeletedMsgs(t, o);
             // 仅在消息行数真正变多时才重绘
-            if (o && __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(r || ""))
+            var rTs = (typeof __akiniLastMsgTs === "function") ? __akiniLastMsgTs(r || "") : 0;
+            var oTs = (typeof __akiniLastMsgTs === "function") ? __akiniLastMsgTs(o || "") : 0;
+            if (o && __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(r || "") && (rTs === 0 || oTs >= rTs || (rTs - oTs < 60000)))
               return (
                 window.akiniContacts.updateSession(t, { messagesHTML: o, allowShrink: true }),
                 void l(o)
@@ -8364,6 +8366,7 @@ window.akiniContacts = {
               (o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", cleanBk || "", lsCrit)) &&
                 (o = (typeof window.__akiniFilterDeletedMsgs === "function" ? window.__akiniFilterDeletedMsgs(t, o) : o)) &&
                 __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(r || "") &&
+                (rTs === 0 || (typeof __akiniLastMsgTs === "function" && __akiniLastMsgTs(o) >= rTs) || ((typeof __akiniLastMsgTs === "function") && rTs - __akiniLastMsgTs(o) < 60000)) &&
                 (window.akiniContacts.updateSession(t, { messagesHTML: o, allowShrink: true }),
                 l(o));
               var c = window.akiniContacts.getSession(t);
@@ -11719,7 +11722,10 @@ window.akiniContacts = {
             }),
           m(),
           f(),
-          (window.renderWordbank = f),
+          (window.renderWordbank = function () {
+            try { m(); } catch (eM) {}
+            try { f(); } catch (eF) {}
+          }),
           (window.renderGroupFilter = m));
       })());
     (function () {
@@ -17137,7 +17143,7 @@ window.akiniContacts = {
                       (((l = document.createElement("div")).id =
                         "mailDetailReplyArea"),
                       (l.style.cssText =
-                        "margin:16px 16px 20px;padding-top:14px;border-top:1px dashed #e8e2d9;"),
+                        "margin:0;padding:16px;background:#fff;border:1px solid #e8e8e8;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.04);flex-shrink:0;box-sizing:border-box;"),
                       /* zzzk 修复：旧代码 yn.querySelector("div > div") 拿到的是标题栏（含关闭按钮，flex 容器），
                          回复区被塞进顶栏且 flex-shrink:0 顶栏把内容挤出 max-height 溢出裁剪，来信永远看不到回复模块。
                          现在插到信卡外层滚动容器（mailDetailScrollWrap）末尾，任何来信都稳定显示在信卡下方 */
