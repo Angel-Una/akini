@@ -3193,7 +3193,6 @@ window.akiniContacts = {
                     row.querySelector(":scope > .quote-bubble") ||
                     (_bubEl && _bubEl.querySelector(":scope > .quote-bubble"));
           if (qEl) {
-            qEl.removeAttribute("style"); // 清内联，样式统一走 CSS（胶囊+对齐+省略号）
             wrap0.appendChild(qEl);
             if (qWrap && !qWrap.querySelector(".quote-bubble") && !qWrap.innerHTML.trim()) qWrap.remove();
           }
@@ -3665,14 +3664,17 @@ window.akiniContacts = {
             i.innerHTML = n;
             var a = Array.from(i.querySelectorAll(".msg-row.me")),
               items = [];
-            for (var o = a.length - 1; o >= 0; o--) {
-              var r = a[o].querySelector(".bubble");
+            for (var _wi = a.length - 1; _wi >= 0; _wi--) {
+              var r = a[_wi].querySelector(".bubble");
               if (r && !r.classList.contains("transfer-bubble")) {
-                var img = r.querySelector("img");
-                if (img && img.src) {
-                  items.push({ text: "【表情包】", sticker: img.src });
+                var img = r.querySelector("img:not(.quote-sticker-thumb)");
+                var _src = img ? (img.getAttribute("src") || img.src) : "";
+                if (img && _src) {
+                  items.push({ text: "【表情包】", sticker: _src });
                 } else {
-                  var c = r.textContent.trim();
+                  var _qInBub = r.querySelector(".quote-bubble");
+                  var c = (r.textContent || "").trim();
+                  if (_qInBub) c = c.replace((_qInBub.textContent || "").trim(), "").trim();
                   if (c) items.push({ text: c, sticker: "" });
                 }
               }
@@ -3796,7 +3798,7 @@ window.akiniContacts = {
             J = _.slice(0, 40) + (_.length > 40 ? "…" : "");
           /* zzz：引用表情包显示小缩略图，文字则省略 */
           var quoteInner = _quoteSticker
-            ? rt(W) + '：<img src="' + esc(_quoteSticker) + '" class="quote-sticker-thumb" alt="表情"/>'
+            ? rt(W) + '：<img src="' + esc(_quoteSticker) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>'
             : rt(W) + "：" + rt(J);
           $ =
             '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;max-width:70%!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-block!important;">' +
@@ -3897,7 +3899,7 @@ window.akiniContacts = {
       let a = "";
       if (n && i) {
         var quoteContent = stk
-          ? rt(i.replace(/：.*/, '：')) + '<img src="' + esc(stk) + '" class="quote-sticker-thumb" alt="表情"/>'
+          ? rt(i.replace(/：.*/, '：')) + '<img src="' + esc(stk) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>'
           : rt(i);
         a =
           '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;max-width:70%!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-block!important;">' +
@@ -4713,23 +4715,8 @@ window.akiniContacts = {
           var _one = window.pickWordCards ? window.pickWordCards(1, e && e.id) : "";
           if (_one && _one.trim()) {
             var rawText = _one.trim();
-            // 智能断句：如果单条文本很长（超过28字）且内部包含明确句末标点（。/！/？），自动拆成多个独立分句气泡发送！
-            if (rawText.length > 28 && /[。！？!?]/.test(rawText)) {
-              var splitSentences = rawText.split(/([。！？!?]+)/).filter(Boolean);
-              var recombined = [];
-              for (var si = 0; si < splitSentences.length; si += 2) {
-                var sPart = splitSentences[si] ? splitSentences[si].trim() : "";
-                var pPart = splitSentences[si + 1] ? splitSentences[si + 1].trim() : "";
-                if (sPart) recombined.push(sPart + pPart);
-              }
-              if (recombined.length > 1) {
-                messages.push.apply(messages, recombined);
-              } else {
-                messages.push(rawText);
-              }
-            } else {
-              messages.push(rawText);
-            }
+            /* v633: 严禁将单张完整字卡拆句！一整张字卡无论多长、包含多少标点符号，必须作为完整单条气泡整体发送 */
+            messages.push(rawText);
           }
         }
       }
@@ -4751,14 +4738,17 @@ window.akiniContacts = {
               i.innerHTML = n;
               var a = Array.from(i.querySelectorAll(".msg-row.me")),
                 items = [];
-              for (var o = a.length - 1; o >= 0; o--) {
-                var r = a[o].querySelector(".bubble");
+              for (var _oi = a.length - 1; _oi >= 0; _oi--) {
+                var r = a[_oi].querySelector(".bubble");
                 if (r && !r.classList.contains("transfer-bubble")) {
-                  var img = r.querySelector("img");
-                  if (img && img.src) {
-                    items.push({ text: "【表情包】", sticker: img.src });
+                  var img = r.querySelector("img:not(.quote-sticker-thumb)");
+                  var _src = img ? (img.getAttribute("src") || img.src) : "";
+                  if (img && _src) {
+                    items.push({ text: "【表情包】", sticker: _src });
                   } else {
-                    var c = r.textContent.trim();
+                    var _qInBub = r.querySelector(".quote-bubble");
+                    var c = (r.textContent || "").trim();
+                    if (_qInBub) c = c.replace((_qInBub.textContent || "").trim(), "").trim();
                     if (c) items.push({ text: c, sticker: "" });
                   }
                 }
@@ -4779,11 +4769,13 @@ window.akiniContacts = {
               i.innerHTML = n;
               var a = Array.from(i.querySelectorAll(".msg-row.me")),
                 texts = [];
-              for (var o = a.length - 1; o >= 0; o--) {
-                var r = a[o].querySelector(".bubble");
+              for (var _oi2 = a.length - 1; _oi2 >= 0; _oi2--) {
+                var r = a[_oi2].querySelector(".bubble");
                 if (r && !r.classList.contains("transfer-bubble"))
-                  if (!r.querySelector("img")) {
-                    var c = r.textContent.trim();
+                  if (!r.querySelector("img:not(.quote-sticker-thumb)")) {
+                    var _qInBub2 = r.querySelector(".quote-bubble");
+                    var c = (r.textContent || "").trim();
+                    if (_qInBub2) c = c.replace((_qInBub2.textContent || "").trim(), "").trim();
                     if (c) texts.push(c);
                   }
               }
@@ -4793,7 +4785,7 @@ window.akiniContacts = {
         }
         if (y) {
           var _qContent = _quoteStk
-            ? rt(o) + '：<img src="' + esc(_quoteStk) + '" class="quote-sticker-thumb" alt="表情"/>'
+            ? rt(o) + '：<img src="' + esc(_quoteStk) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>'
             : rt(o) + "：" + rt(y.slice(0, 40) + (y.length > 40 ? "…" : ""));
           g =
             '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;max-width:70%!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-block!important;">' +
@@ -5015,7 +5007,7 @@ window.akiniContacts = {
       }, __readDelay);
       setTimeout(function () {
         if (!isActive) return;
-        // v614: 调用瞬间已显示过则跳过（此定时器仅作异常兜底）
+        // 调用瞬间已显示过则跳过（此定时器仅作异常兜底）
         if (window.__akiniTypingMap && window.__akiniTypingMap[t]) return;
         var l = document.getElementById("typingIndicator");
         if (l) l.style.display = "block";
@@ -14340,7 +14332,7 @@ window.akiniContacts = {
             }
             if (m && f) {
               if (stickerUrl) {
-                f.innerHTML = esc(c) + '：<img src="' + esc(stickerUrl) + '" class="quote-sticker-thumb" alt="表情"/>';
+                f.innerHTML = esc(c) + '：<img src="' + esc(stickerUrl) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
               } else {
                 f.textContent = d;
               }
@@ -17555,7 +17547,15 @@ window.akiniContacts = {
                   (window._callState && window._callState.active) ||
                   (k.textContent = a));
               const _ = document.getElementById("chatTaAvatar");
-              _ && (_.innerHTML = o);
+              if (_) {
+                if (o && o.trim()) {
+                  _.style.visibility = "";
+                  _.innerHTML = o;
+                } else if (!_.innerHTML || !_.innerHTML.trim()) {
+                  _.style.visibility = "hidden";
+                  _.innerHTML = "";
+                }
+              }
               const b = document.getElementById("avatarLeft"),
                 I = document.getElementById("avatarRight");
               (b && setHtmlKeepInput(b, u.avatar),
@@ -24675,7 +24675,7 @@ window.akiniContacts = {
         for (var j = 0; j < posts.length; j++) {
           if (String(posts[j] && posts[j].id) === String(momentId)) {
             var p = posts[j];
-            return { img: (p.images && p.images[0]) || "", text: (p.text || p.content || "").trim() };
+            return { img: p.img || (p.images && p.images[0]) || "", text: (p.text || p.content || "").trim() };
           }
         }
       }
