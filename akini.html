@@ -5218,7 +5218,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
 /* ===== PWA / Service Worker 注册 ===== */
 /* zzzl：应用内不再做任何版本强制重置/强制刷新——更新只在用户下次自然打开时生效 */
 window.__akiniRegisterSW = function(){
-  /* v627：彻底终结 SW 缓存回退噩梦
+  /* v632：彻底终结 SW 缓存回退噩梦
      根因：旧版 SW 缓存里存着几十个版本前的页面，其 fetch 拦截 + 自动 reload
      会让用户一进站就被回退到远古版本（iMessage 占位符即那个时代代码）并卡死。
      本版本策略：
@@ -5233,7 +5233,7 @@ window.__akiniRegisterSW = function(){
       (regs||[]).forEach(function(reg){
         try{ jobs.push(reg.unregister()); }catch(e){}
       });
-      if(jobs.length) console.log('[Akini] v627 已硬注销 '+jobs.length+' 个旧 Service Worker');
+      if(jobs.length) console.log('[Akini] v632 已硬注销 '+jobs.length+' 个旧 Service Worker');
       return Promise.all(jobs);
     }).then(function(){
       if(window.caches && caches.keys){
@@ -5241,7 +5241,7 @@ window.__akiniRegisterSW = function(){
           return Promise.all((keys||[]).filter(function(k){
             return k !== 'akini-vault-v1';
           }).map(function(k){
-            console.log('[Akini] v627 清除旧缓存:', k);
+            console.log('[Akini] v632 清除旧缓存:', k);
             return caches.delete(k);
           }));
         });

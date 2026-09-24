@@ -335,7 +335,7 @@
       hideCompanionTyping();
       var cur = companionState();
       if (!cur) return;
-      /* 表情包：概率与 syy 聊天一致（20%，无开关），仅限该联系人专属收藏，裸图无气泡 */
+      /* 表情包：概率与 syy 聊天一致（20%），仅用该联系人自己的专属收藏，裸图无气泡 */
       var stkProb = 0.2;
       if (Math.random() < stkProb) {
         var pool = companionStickerPool(cur.cid);
@@ -344,6 +344,7 @@
           cur.msgs.push({ side: 'ta', img: pool[Math.floor(Math.random() * pool.length)], ts: Date.now() });
           saveCompanionState(cur);
           renderCompanionMsgs(true);
+          __notifyCompanionMsg(cur.cid, '[表情包]');
           return;
         }
       }
@@ -356,7 +357,28 @@
       cur.msgs.push({ side: 'ta', text: t, ts: Date.now() });
       saveCompanionState(cur);
       renderCompanionMsgs(true);
+      __notifyCompanionMsg(cur.cid, t);
     }, delayMs);
+  }
+  /* v630：用户不在陪伴界面时，联系人消息触发局内通知（内部自动处理后台系统通知），与微信聊天一致 */
+  function __notifyCompanionMsg(cid, msg) {
+    try {
+      var mv = $('companionMainView');
+      if (!mv || mv.style.display !== 'none') return; /* 界面可见时无需通知 */
+      if (typeof window.showInAppNotif !== 'function') return;
+      var cc = getContactById(cid);
+      window.showInAppNotif({
+        app: '陪伴',
+        appIcon: '🎧',
+        avatar: (cc && cc.avatar) || '',
+        name: (cc && cc.name) || '陪伴对象',
+        fullContent: true,
+        msg: msg || '',
+        onTap: function () {
+          try { window.__openCompanion && window.__openCompanion(); } catch (e0) {}
+        }
+      });
+    } catch (e) {}
   }
   function sendCompanionMsg(imgUrl) {
     var st = companionState();

@@ -412,7 +412,7 @@ window.__akiniToggleOn = function (key, defaultOn) {
 window.AKR = (function () {
   /* 概率默认值（可用 localStorage 覆盖：akini_prob_<name>，范围 0-100） */
   var DEFAULT_PROBS = {
-    meaningfulNumber: 0.4,
+    meaningfulNumber: 0.15, /* v631：与设置页文案一致：15% 概率使用有意义数字 */
     quote: 0.3,
     taTransfer: 0.08,
     groupTransferMe: 0.08,
@@ -1649,23 +1649,28 @@ document.addEventListener("DOMContentLoaded", function () {
       }));
     const t = [520, 1314, 9999, 10001, 13140, 5200, 52e3];
     function e() {
-      if (Math.random() < window.AKR.getProb("meaningfulNumber")) {
-        var e = (function () {
-          var e = (
-            localStorage.getItem("akini_meaningful_numbers") || "520,1314,9999"
-          )
-            .split(/[,，]/)
-            .map(function (t) {
-              return parseFloat(t.trim());
-            })
-            .filter(function (t) {
-              return !isNaN(t) && t > 0;
-            });
-          return e.length ? e : t;
-        })();
-        return e[Math.floor(Math.random() * e.length)];
+      /* v631：转账金额默认完全随机；仅当用户在设置里添加了有意义数字，
+         才按 meaningfulNumber 概率（默认 15%）随机抽取有意义数字使用 */
+      var _mn = [];
+      try {
+        _mn = String(localStorage.getItem("akini_meaningful_numbers") || "")
+          .split(/[,，]/)
+          .map(function (x) {
+            return parseFloat(x.trim());
+          })
+          .filter(function (x) {
+            return !isNaN(x) && x > 0;
+          });
+      } catch (err) {}
+      if (_mn.length && Math.random() < window.AKR.getProb("meaningfulNumber")) {
+        return _mn[Math.floor(Math.random() * _mn.length)];
       }
-      return 1 * (99999.99 * Math.random() + 0.01).toFixed(2);
+      /* v632：转账随机金额 0～无上限：先随机数量级（0~11 位，最高万亿级），量级内再均匀随机；
+         极小值兜底 0.01~1 元，保证金额永远有效 */
+      var _mag = Math.floor(Math.random() * 12);
+      var _v = Math.pow(10, _mag) * Math.random();
+      if (!(_v >= 0.01)) _v = 0.01 + Math.random() * 0.99;
+      return 1 * _v.toFixed(2);
     }
     function n(contactId) {
       let t = i("akini_wordbank", []).filter(
@@ -17786,9 +17791,10 @@ window.akiniContacts = {
         }
         const c = n.name;
         try {
-          const a = i("akini_wordbank", []).filter(
-              (t) => "pat" === t.tab || "pat" === t.type,
-            ),
+          const a = (window.__wbRead
+              ? window.__wbRead("akini_wordbank", [])
+              : i("akini_wordbank", [])
+            ).filter((t) => "pat" === t.tab || "pat" === t.type),
             o =
               a.length > 0
                 ? a[Math.floor(Math.random() * a.length)]
@@ -18441,13 +18447,12 @@ window.akiniContacts = {
                 // 联系人发朋友圈/iCity时，10% 概率附带该联系人专属表情包
                 var _stkProbPost = 0.1;
                 if (Math.random() < _stkProbPost) {
-                  var stickers = window.getContactStickersSync
+                  var stickers = typeof window.__akiniStickerSrcs === "function"
                     ? window.__akiniStickerSrcs(e.id)
                     : [];
                   if (stickers.length > 0) {
                     post.img = stickers[Math.floor(Math.random() * stickers.length)];
                   }
-                  // 无表情包则不带图，绝不私自添加任何图片
                 }
                 (l.unshift(post),
                   R(l),
@@ -18529,8 +18534,8 @@ window.akiniContacts = {
                         (function () {
                           var _stkAProb = 0.2;
                           var _stkA =
-                            Math.random() < _stkAProb && window.getContactStickersSync
-                              ? window.__akiniStickerSrcs(myId)
+                            Math.random() < _stkAProb && typeof window.__akiniStickerSrcs === "function"
+                              ? window.__akiniStickerSrcs(r().id)
                               : [];
                           var _cmtA = {
                             id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
@@ -18568,8 +18573,8 @@ window.akiniContacts = {
                       (function () {
                         var _stkBProb = 0.2;
                         var _stkB =
-                          Math.random() < _stkBProb && window.getContactStickersSync
-                            ? window.__akiniStickerSrcs(myId)
+                          Math.random() < _stkBProb && typeof window.__akiniStickerSrcs === "function"
+                            ? window.__akiniStickerSrcs(r().id)
                             : [];
                         var _cmtB = {
                           id: "c_" + Math.random().toString(36).slice(2) + "_" + Date.now(),
@@ -19309,7 +19314,7 @@ window.akiniContacts = {
         {
           id: "meaningfulNumbersInput",
           key: "akini_meaningful_numbers",
-          def: "520,1314,9999",
+          def: "",
         },
       ].forEach(function (t) {
         const e = document.getElementById(t.id);
@@ -19555,25 +19560,38 @@ window.akiniContacts = {
       }),
       (window.getContactStickersSync = function (t) {
         var e = "akini_stickers_" + t;
-        if (window.__csCache && window.__csCache[e]) return window.__csCache[e];
-        var n = localStorage.getItem(e);
-        if (n)
-          try {
-            var p = JSON.parse(n);
-            ((window.__csCache = window.__csCache || {}),
-              (window.__csCache[e] = p));
-            return p;
-          } catch (t) {
-            return [];
+        if (window.__csCache && window.__csCache[e] && window.__csCache[e].length) return window.__csCache[e];
+        // v628: 多层穿透读取：先读 akiniStore 内存镜像，再读 __wbRead，再读 localStorage
+        var p = null;
+        try {
+          if (window.akiniStore && window.akiniStore.memoryGet) {
+            var m = window.akiniStore.memoryGet(e);
+            if (m) p = typeof m === "string" ? JSON.parse(m) : m;
           }
+        } catch (e1) {}
+        if (!p && typeof window.__wbRead === "function") {
+          try { p = window.__wbRead(e, null); } catch (e2) {}
+        }
+        if (!p) {
+          try {
+            var n = localStorage.getItem(e);
+            if (n) p = JSON.parse(n);
+          } catch (e3) {}
+        }
+        if (Array.isArray(p) && p.length) {
+          window.__csCache = window.__csCache || {};
+          window.__csCache[e] = p;
+          return p;
+        }
         return [];
       }));
       /* zzy：表情包源归一化——库存储是 {s,g,b} 对象，直接当 <img src> 会变成 [object Object] 破图。
          这里统一抽取可用 data:image 字符串并过滤屏蔽项（与聊天/观影 watchStickerPool 同款逻辑） */
       window.__akiniStickerSrcs = function (cid) {
+        /* 每个联系人只使用自己的专属表情包（akini_stickers_<cid>），绝不借用全局/我方/其他联系人的库 */
         var out = [];
         try {
-          var own = typeof window.getContactStickersSync === "function" ? window.getContactStickersSync(cid) : [];
+          var own = cid && typeof window.getContactStickersSync === "function" ? window.getContactStickersSync(cid) : [];
           (Array.isArray(own) ? own : []).forEach(function (it) {
             var s = "";
             if (typeof it === "string") s = it;
@@ -19953,7 +19971,7 @@ window.akiniContacts = {
                       (function () {
                         var _stkDProb = 0.2;
                         var _stkD =
-                          Math.random() < _stkDProb && window.getContactStickersSync
+                          Math.random() < _stkDProb && typeof window.__akiniStickerSrcs === "function"
                             ? window.__akiniStickerSrcs(interactor.id)
                             : [];
                         var _cmtD = {
@@ -23772,6 +23790,23 @@ window.akiniContacts = {
     try { if (typeof window.__akiniProcessMsgMeta === "function") window.__akiniProcessMsgMeta(row); } catch (e) {}
     body.scrollTop = body.scrollHeight;
     if (isFullscreen() && !img) fireDanmaku((c.name ? c.name + "：" : "") + text);
+    /* v630：用户不在观影界面时，联系人消息触发局内通知（内部自动处理 document.hidden 时的后台系统通知） */
+    try {
+      var _waN = $("watchArea");
+      if (_waN && _waN.style.display === "none" && typeof window.showInAppNotif === "function") {
+        window.showInAppNotif({
+          app: "观影",
+          appIcon: "🎬",
+          avatar: (c && c.avatar) || "",
+          name: (c && c.name) || "观影伙伴",
+          fullContent: true,
+          msg: img ? "[表情包]" : text,
+          onTap: function () {
+            try { window.__akiniOpenWatch && window.__akiniOpenWatch(); } catch (e0) {}
+          },
+        });
+      }
+    } catch (eN) {}
   }
   // 观影聊天输入动态：与微信聊天一致的"对方正在输入"三点气泡，悬浮在输入栏左下角/左上方
   function showWatchTyping() {
@@ -23808,11 +23843,12 @@ window.akiniContacts = {
       watchPendingCount = 0;
       hideWatchTyping();
       var wa = $("watchArea");
-      if (!wa || wa.style.display === "none") return;
+      /* v630：用户不在观影界面时绝不丢弃联系人回复——消息照常追加（DOM 保留+会话不清），
+         由 appendPartnerMsg 在界面隐藏时触发局内通知+后台系统通知（与微信聊天一致） */
       // 与微信聊天一致：一轮回复 1~3 条（75%/20%/5% 同 AKR.getReplyCount），逐条间隔发出
       var r = Math.random();
       var replyCount = r < 0.75 ? 1 : r < 0.95 ? 2 : 3;
-      /* 表情包：概率与 syy 聊天一致（20%，无开关），仅限该联系人字卡库收藏，裸图无气泡 */
+      /* 表情包：概率与 syy 聊天一致（20%），仅用该联系人自己的专属表情包，裸图无气泡 */
       var c0 = watchPartners[Math.floor(Math.random() * watchPartners.length)];
       var stkProb = 0.2;
       if (c0 && Math.random() < stkProb) {

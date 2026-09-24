@@ -45,14 +45,30 @@
     return contact.avatar || '🐰';
   }
 
-  // 读取该联系人的专属表情包（akini_stickers_<contactId>）
+  // 读取该联系人自己的专属表情包（每个联系人只能用自己的库，绝不回退全局/别人）
   function getContactStickers(contactId) {
     if (!contactId) return [];
     try {
+      if (typeof window.__akiniStickerSrcs === 'function') {
+        var srcs = window.__akiniStickerSrcs(contactId);
+        if (Array.isArray(srcs) && srcs.length) return srcs;
+      }
+      if (typeof window.getContactStickersSync === 'function') {
+        var syncs = window.getContactStickersSync(contactId);
+        if (Array.isArray(syncs) && syncs.length) {
+          return syncs.map(function (it) {
+            if (typeof it === 'string') return it;
+            return (it && (it.s || it.url || it.src)) || '';
+          }).filter(Boolean);
+        }
+      }
       var raw = localStorage.getItem('akini_stickers_' + contactId);
       if (raw) {
         var arr = JSON.parse(raw);
-        if (Array.isArray(arr)) return arr.filter(function (s) { return s && String(s).trim(); });
+        if (Array.isArray(arr)) return arr.map(function (it) {
+          if (typeof it === 'string') return it;
+          return (it && (it.s || it.url || it.src)) || '';
+        }).filter(Boolean);
       }
     } catch (e) {}
     return [];
@@ -223,14 +239,8 @@
     var name = getContactName(contact, app);
     var avatar = getContactAvatar(contact, app);
 
-    // compat 逻辑：20% 概率发表情包（优先该联系人专属库，回退全局库）
+    // compat 逻辑：20% 概率发表情包（仅用该联系人自己的专属库，对齐 syy 朋友圈评论概率）
     var stickers = getContactStickers(contact.id);
-    if (!stickers.length) {
-      try {
-        var g = JSON.parse(localStorage.getItem('akini_stickers') || '[]');
-        if (Array.isArray(g)) stickers = g.filter(function (s) { return s && String(s).trim(); });
-      } catch (e0) {}
-    }
     if (stickers.length && Math.random() < 0.2) {
       var st = pickRandom(stickers);
       var scomment = {
@@ -352,12 +362,12 @@
     return min + Math.floor(Math.random() * (max - min + 1));
   }
 
-  // ========== 联系人自己发朋友圈/iCity 时，20% 概率带表情包（同评论表情包概率） ==========
+  // ========== 联系人自己发朋友圈/iCity 时，10% 概率带表情包 ==========
 
   function maybeAttachSticker(contactId) {
     var stickers = getContactStickers(contactId);
     if (!stickers.length) return null;
-    if (Math.random() >= 0.2) return null;
+    if (Math.random() >= 0.1) return null;
     return pickRandom(stickers);
   }
 
