@@ -5218,54 +5218,36 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
 /* ===== PWA / Service Worker 注册 ===== */
 /* zzzl：应用内不再做任何版本强制重置/强制刷新——更新只在用户下次自然打开时生效 */
 window.__akiniRegisterSW = function(){
-  /* v509：低内存/iOS 设备先保证能进页面，SW 注册挪到用户首次交互后再尝试，避免启动期同时解析 1MB JS + 缓存大文件 */
-  if(window.__akiniLowMem || /iPad|iPhone|iPod/.test(navigator.userAgent)){
-    if(window.__akiniSWRegistered) return;
-    window.__akiniSWRegistered = true;
-    setTimeout(function(){
-      if('serviceWorker' in navigator){
-        navigator.serviceWorker.register('./service-worker.js', {updateViaCache:'none'}).then(function(reg){
-          console.log('[Akini] SW registered (deferred)', reg.scope);
-           try { reg.update(); if (reg.waiting && !sessionStorage.getItem('akini_sw_updated')) { sessionStorage.setItem('akini_sw_updated', '1'); window.location.reload(); } } catch(e) {}
-        }).catch(function(err){ console.warn('[Akini] SW registration failed', err); });
-      }
-    }, 12000);
-    return;
-  }
-  if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('./service-worker.js', {updateViaCache:'none'}).then(function(reg){
-      console.log('[Akini] SW registered', reg.scope);
-      // v625: 优化 SW 更新机制，严禁在用户正在使用时突兀自动重载引发页面跳变
-      try {
-        reg.update();
-        if (reg.waiting && !sessionStorage.getItem('akini_sw_updated')) {
-          sessionStorage.setItem('akini_sw_updated', '1');
-          window.location.reload();
-        }
-        reg.addEventListener('updatefound', function(){
-          var nw = reg.installing;
-          if (nw) nw.addEventListener('statechange', function(e){
-            if (e.target.state === 'activated' && !sessionStorage.getItem('akini_sw_updated')) {
-              sessionStorage.setItem('akini_sw_updated', '1');
-              window.location.reload();
-            }
-          });
+  /* v626：彻底终结 SW 缓存回退噩梦
+     根因：旧版 SW 缓存里存着几十个版本前的页面，其 fetch 拦截 + 自动 reload
+     会让用户一进站就被回退到远古版本（iMessage 占位符即那个时代代码）并卡死。
+     本版本策略：
+     1. 永不自动 location.reload()——任何更新只在用户下次自然打开时生效
+     2. 进入页面立即硬注销全部旧 Service Worker，并清空全部 HTTP 缓存
+        （仅保留数据保险箱 akini-vault-v1，它是 LS/IDB 被系统清理后的最后兜底）
+     3. 之后不再注册任何新 SW，从根源上杜绝缓存回退 */
+  if(!('serviceWorker' in navigator)) return;
+  try{
+    navigator.serviceWorker.getRegistrations().then(function(regs){
+      var jobs = [];
+      (regs||[]).forEach(function(reg){
+        try{ jobs.push(reg.unregister()); }catch(e){}
+      });
+      if(jobs.length) console.log('[Akini] v626 已硬注销 '+jobs.length+' 个旧 Service Worker');
+      return Promise.all(jobs);
+    }).then(function(){
+      if(window.caches && caches.keys){
+        return caches.keys().then(function(keys){
+          return Promise.all((keys||[]).filter(function(k){
+            return k !== 'akini-vault-v1';
+          }).map(function(k){
+            console.log('[Akini] v626 清除旧缓存:', k);
+            return caches.delete(k);
+          }));
         });
-      } catch(e) {}
-      // v547~v579: periodicSync 后台同步兜底保持暂停（v576 曾短暂恢复，v579 按用户要求撤回）
-      // try{
-      //   if('periodicSync' in reg && ('Notification' in window) && Notification.permission === 'granted'){
-      //     navigator.permissions && navigator.permissions.query({name:'periodic-background-sync'}).then(function(st){
-      //       if(st && st.state === 'granted'){
-      //         reg.periodicSync.register('akini-bg-check', {minInterval: 30*60*1000}).catch(function(){});
-      //       }
-      //     }).catch(function(){});
-      //   }
-      // }catch(e){}
-    }).catch(function(err){
-      console.warn('[Akini] SW registration failed', err);
-    });
-  }
+      }
+    }).catch(function(e){ console.warn('[Akini] SW 清理失败', e); });
+  }catch(e){ console.warn('[Akini] SW 清理异常', e); }
   if('Notification' in window && Notification.permission === 'default'){
     Notification.requestPermission().then(function(status){
       console.log('[Akini] Notification permission', status);

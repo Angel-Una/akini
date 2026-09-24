@@ -3896,7 +3896,7 @@ window.akiniContacts = {
       }
       K.removeAttribute("data-quote");
       K.removeAttribute("data-quote-sticker");
-      K.placeholder = "iMessage信息";
+      K.placeholder = "发送消息...";
       if (zt) zt.classList.remove("show");
       // v605: 提前计算目标与回复行为，在构建/追加消息 DOM 之前就立即点亮输入动态（最早时机）
       var r = window.akiniContacts.getActiveChatId(),
@@ -7173,14 +7173,20 @@ window.akiniContacts = {
             _idbStore.get("akini_chat_history_" + e, function (t) {
               if (window.akiniContacts.getActiveChatId() !== e) return;
               var n = tt(i, a, t || "", lsCrit);
-              n && n.length > (r ? r.length : 0)
-                ? o(n)
-                : _idbStore.get("akini_chat_history_backup_" + e, function (t) {
-                    if (window.akiniContacts.getActiveChatId() !== e) return;
-                    (n = tt(i, a, t || "", lsCrit)) && n.length > (r ? r.length : 0)
-                      ? o(n)
-                      : r || o("");
-                  });
+              // v626: 同代才换源——IDB 版本若比当前展示记录陈旧 6h+，直接保留当前，防止回退
+              var nFresh = typeof __akiniLastMsgTs === "function" ? __akiniLastMsgTs(n) : 0;
+              var rFresh = typeof __akiniLastMsgTs === "function" ? __akiniLastMsgTs(r) : 0;
+              if (n && (rFresh === 0 || nFresh === 0 || nFresh + 21600000 >= rFresh) && n.length > (r ? r.length : 0))
+                o(n);
+              else
+                _idbStore.get("akini_chat_history_backup_" + e, function (t) {
+                  if (window.akiniContacts.getActiveChatId() !== e) return;
+                  n = tt(i, a, t || "", lsCrit);
+                  var bFresh = typeof __akiniLastMsgTs === "function" ? __akiniLastMsgTs(n) : 0;
+                  if (n && (rFresh === 0 || bFresh === 0 || bFresh + 21600000 >= rFresh) && n.length > (r ? r.length : 0))
+                    o(n);
+                  else r || o("");
+                });
             });
           })(function (t) {
             if (t) {
@@ -7294,8 +7300,32 @@ window.akiniContacts = {
       }
       if (0 === t.length) return "";
       if (1 === t.length) return t[0];
+      // v626 终极防回退守卫（v624 的补丁因脚本中断从未写盘，本次真正落地）：
+      // 时间戳同代优先——几十个版本前冻结的陈旧污染源（最后消息时间早于全局最新 6 小时以上）
+      // 一律出局，绝不允许仅凭"行数多"复活远古版本。6 小时阈值确保同一天内的正常
+      // 主存/备份双源不会互相误杀，而陈旧污染源（至少隔了几个版本/几天）必被淘汰。
+      var STALE_MS = 21600000;
+      var tsList = [];
+      var maxTs = 0;
+      for (var ti = 0; ti < t.length; ti++) {
+        var tv = 0;
+        try { tv = (typeof __akiniLastMsgTs === "function") ? __akiniLastMsgTs(t[ti]) : 0; } catch (eT) { tv = 0; }
+        tsList.push(tv);
+        if (tv > maxTs) maxTs = tv;
+      }
+      var alive = [];
+      for (var ti2 = 0; ti2 < t.length; ti2++) {
+        if (maxTs > 0 && tsList[ti2] > 0 && maxTs - tsList[ti2] > STALE_MS) {
+          try { console.warn("[akini] 防回退守卫：淘汰陈旧源 ts=" + tsList[ti2] + " (最新 " + maxTs + ")"); } catch (eW) {}
+          continue;
+        }
+        alive.push(t[ti2]);
+      }
+      if (alive.length === 1) return alive[0];
+      if (alive.length === 0) return t[0];
+      // —— 以下择优仅在"时间戳同代存活源"之间进行 ——
       // 数据量过大时直接返回最长记录
-      var longest = t.reduce(function (a, b) {
+      var longest = alive.reduce(function (a, b) {
         return a.length >= b.length ? a : b;
       });
       if (longest.length > 300000 || __akiniCountMsgRowsFast(longest) > 2000) {
@@ -7305,12 +7335,12 @@ window.akiniContacts = {
       // 用户连续发送的相同内容消息 outerHTML 完全相同，合并去重会误删为一条
       // v612: 换纯正则快速计数——DOM 版对数 MB 记录做 createElement+innerHTML 全量解析，
       // 每次进聊天对 5 个候选源各跑一次 = 几十~几百 ms 主线程阻塞（点进聊天卡顿元凶）
-      var best = t[0],
+      var best = alive[0],
         bestRows = __akiniCountMsgRowsFast(best);
-      for (var i = 1; i < t.length; i++) {
-        var rows = __akiniCountMsgRowsFast(t[i]);
+      for (var i = 1; i < alive.length; i++) {
+        var rows = __akiniCountMsgRowsFast(alive[i]);
         if (rows > bestRows) {
-          best = t[i];
+          best = alive[i];
           bestRows = rows;
         }
       }
@@ -8918,7 +8948,7 @@ window.akiniContacts = {
           K &&
             (K.removeAttribute("data-quote"),
               K.removeAttribute("data-quote-sticker"),
-              (K.placeholder = "iMessage信息")),
+              (K.placeholder = "发送消息...")),
           zt && zt.classList.remove("show"));
       }),
       X &&
