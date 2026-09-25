@@ -9234,8 +9234,23 @@ window.akiniContacts = {
         f() +
         "</div></div>" +
         d("right");
+      /* v642：图片消息持久化——原先只挂 DOM 从未写入会话存储，重进聊天图片即消失 */
+      var _imgActive = false;
+      try {
+        _imgActive =
+          typeof window.__akiniIsChatActive === "function"
+            ? window.__akiniIsChatActive(chatId)
+            : true;
+      } catch (_ie) {
+        _imgActive = true;
+      }
+      if (!_imgActive && U) U.appendChild(e);
+      __akiniAppendMessageHTML(chatId, e.outerHTML, {
+        lastMsg: "[图片]",
+        lastSenderAvatar: f(),
+        lastSenderName: g() || "我",
+      });
       if (U) {
-        U.appendChild(e);
         U.scrollTop = U.scrollHeight;
         S();
         V();
