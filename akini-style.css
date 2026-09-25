@@ -11246,3 +11246,63 @@ img.akini-media-missing {
   display: block !important;
   object-fit: contain !important;
 }
+
+/* === v641 转账卡片样式与头像保护 === */
+html body .chat-body .msg-row.me .msg-content-line.transfer-line,
+html body .chat-body .msg-row.other .msg-content-line.transfer-line,
+html body .chat-body .msg-row.ta .msg-content-line.transfer-line {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: flex-start !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  gap: 8px !important;
+}
+html body .chat-body .msg-row.me .msg-content-line.transfer-line {
+  justify-content: flex-end !important;
+}
+html body .chat-body .msg-row.other .msg-content-line.transfer-line,
+html body .chat-body .msg-row.ta .msg-content-line.transfer-line {
+  justify-content: flex-start !important;
+}
+html body .chat-body .msg-row.me .msg-content-line.transfer-line > .bubble.transfer-bubble,
+html body .chat-body .msg-row.other .msg-content-line.transfer-line > .bubble.transfer-bubble,
+html body .chat-body .msg-row.ta .msg-content-line.transfer-line > .bubble.transfer-bubble {
+  flex-shrink: 0 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  border: 1px solid #e8e8e8 !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07) !important;
+}
+html body .chat-body .msg-row.me .msg-content-line.transfer-line > .msg-avatar {
+  order: 1 !important;
+  flex-shrink: 0 !important;
+  margin-left: 0 !important;
+}
+html body .chat-body .msg-row.me .msg-content-line.transfer-line > .bubble-wrap + .msg-avatar {
+  order: 1 !important;
+}
+html body .chat-body .msg-row.other .msg-content-line.transfer-line > .msg-avatar,
+html body .chat-body .msg-row.ta .msg-content-line.transfer-line > .msg-avatar {
+  flex-shrink: 0 !important;
+  margin-right: 0 !important;
+}
+html body .chat-body .msg-row.me .msg-content-line.transfer-line > .bubble-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  max-width: none !important;
+  margin-left: auto !important;
+}
+html body .chat-body .msg-row .bubble.transfer-bubble .tr-title,
+html body .chat-body .msg-row .bubble.transfer-bubble .tr-note {
+  font-size: 15px !important;
+  font-weight: 600 !important;
+  line-height: 1.35 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: 100% !important;
+  display: block !important;
+}

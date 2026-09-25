@@ -2415,22 +2415,38 @@ window.__akiniIsChatActive = function (chatId) {
   try {
     if (!chatId) return false;
     if (document.hidden) return false;
-    var chatEl = document.getElementById("app-chat");
-    if (!chatEl) return false;
-    var isVisible = false;
-    if (chatEl.classList.contains("show")) isVisible = true;
-    else if (chatEl.style.display && chatEl.style.display !== "none") isVisible = true;
-    else {
-      var cs = window.getComputedStyle ? window.getComputedStyle(chatEl) : null;
-      if (cs && cs.display !== "none" && cs.visibility !== "hidden") isVisible = true;
-    }
-    if (!isVisible) return false;
-    if (chatEl.getAttribute("aria-hidden") === "true") return false;
 
     var actStrict = window.akiniContacts && window.akiniContacts.getActiveChatIdStrict ? window.akiniContacts.getActiveChatIdStrict() : null;
     var act = actStrict || (window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null);
-    if (!act || String(act) !== String(chatId)) return false;
-    return true;
+    var isSameChat = act && String(act) === String(chatId);
+
+    // 1. 聊天界面处于可见状态且是当前会话
+    var chatEl = document.getElementById("app-chat");
+    if (chatEl) {
+      var isVisible = false;
+      if (chatEl.classList.contains("show")) isVisible = true;
+      else if (chatEl.style.display && chatEl.style.display !== "none") isVisible = true;
+      else {
+        var cs = window.getComputedStyle ? window.getComputedStyle(chatEl) : null;
+        if (cs && cs.display !== "none" && cs.visibility !== "hidden") isVisible = true;
+      }
+      if (isVisible && chatEl.getAttribute("aria-hidden") !== "true" && isSameChat) {
+        return true;
+      }
+    }
+
+    // 2. 详情界面（联系人详情/群设置等）处于可见状态且对应当前会话
+    var detailEl = document.getElementById("app-contact-detail");
+    if (detailEl && (detailEl.classList.contains("show") || (detailEl.style.display && detailEl.style.display !== "none"))) {
+      var detailTarget = (window.akiniContacts && window.akiniContacts.getChatTarget) ? window.akiniContacts.getChatTarget(chatId) : null;
+      var detailNameEl = document.getElementById("contactDetailName");
+      var dName = detailNameEl ? (detailNameEl.textContent || "").trim() : "";
+      if (isSameChat || (detailTarget && detailTarget.name && dName === detailTarget.name)) {
+        return true;
+      }
+    }
+
+    return false;
   } catch (e) {
     return false;
   }
@@ -3797,7 +3813,7 @@ window.akiniContacts = {
               messagesHTML: R,
               lastMsg: "转账：" + L,
               lastTime: Date.now(),
-              unread: (G.unread || 0) + 1,
+              unread: __akiniIsChatActive(t) ? (G.unread || 0) : ((G.unread || 0) + 1),
               lastSenderAvatar: c.avatar,
               lastSenderName: c.name,
             }),
@@ -3839,7 +3855,7 @@ window.akiniContacts = {
           } else if (_ === "【表情包】") {
             quoteInner = rt(W) + "：[表情包]";
           } else {
-            var J = _.slice(0, 40) + (_.length > 40 ? "…" : "");
+            var J = _.slice(0, 15) + (_.length > 15 ? "…" : "");
             quoteInner = rt(W) + "：" + rt(J);
           }
           $ =
@@ -3892,7 +3908,7 @@ window.akiniContacts = {
               messagesHTML: _R,
               lastMsg: item.text.replace(/^【转账】/, "转账："),
               lastTime: Date.now(),
-              unread: (_G.unread || 0) + 1,
+              unread: __akiniIsChatActive(t) ? (_G.unread || 0) : ((_G.unread || 0) + 1),
               lastSenderAvatar: c.avatar,
               lastSenderName: c.name,
             });
@@ -4575,7 +4591,7 @@ window.akiniContacts = {
             messagesHTML: tR,
             lastMsg: "【转账】" + tL,
             lastTime: Date.now(),
-            unread: (tG.unread || 0) + 1,
+            unread: __akiniIsChatActive(t) ? (tG.unread || 0) : ((tG.unread || 0) + 1),
             lastSenderAvatar: e.avatar,
             lastSenderName: e.name,
           }),
@@ -4851,7 +4867,7 @@ window.akiniContacts = {
           } else if (y === "【表情包】") {
             _qContent = rt(o) + "：[表情包]";
           } else {
-            var _yTxt = y.slice(0, 40) + (y.length > 40 ? "…" : "");
+            var _yTxt = y.slice(0, 15) + (y.length > 15 ? "…" : "");
             _qContent = rt(o) + "：" + rt(_yTxt);
           }
           g =
@@ -4903,7 +4919,8 @@ window.akiniContacts = {
         if (idx === 0 && window.__pendingQuote) {
           var pq = window.__pendingQuote;
           window.__pendingQuote = null;
-          quoteHtml = '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-flex!important;align-items:center!important;max-width:90%!important;overflow:hidden!important;">' + pq.name + '：' + pq.text + '</div>';
+          var _pqShort = pq.text.length > 15 ? pq.text.slice(0, 15) + '…' : pq.text;
+          quoteHtml = '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-flex!important;align-items:center!important;max-width:90%!important;overflow:hidden!important;">' + pq.name + '：' + _pqShort + '</div>';
         }
         const p =
           '<div class="msg-row other" data-ts="' + Date.now() + '"><div class="msg-content-line"><div class="msg-avatar">' +
@@ -14001,9 +14018,10 @@ window.akiniContacts = {
               "</div></div>" +
               ""
             : "me" === t
-              ? `<div class="msg-content-line">${A}${h}</div>${d("right")}`
-              : `<div class="msg-content-line">${h}${A}</div>${d("left")}`),
+              ? `<div class="msg-content-line transfer-line"><div class="bubble-wrap" style="display:flex;flex-direction:column;align-items:flex-end;max-width:none;">${A}</div>${h}</div>${d("right")}`
+              : `<div class="msg-content-line transfer-line">${h}${A}</div>${d("left")}`),
         U.appendChild(p),
+        __akiniProcessMsgMeta(p),
         __akiniPersistMsgRow(o, p),
         (window._transferStates[v] = {
           uid: v,
@@ -14037,6 +14055,7 @@ window.akiniContacts = {
             ((o.className = "msg-row system"),
               (o.innerHTML = `<div class="bubble">${rt(x)}${e ? "已退回转账" : "已收款"}</div>`),
               U.appendChild(o),
+              __akiniProcessMsgMeta(o),
               __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
               S(),
               (U.scrollTop = U.scrollHeight),
@@ -14057,6 +14076,7 @@ window.akiniContacts = {
             ((o.className = "msg-row system"),
               (o.innerHTML = `<div class="bubble">${e ? l + "已退回转账" : l + "已收款"}</div>`),
               U.appendChild(o),
+              __akiniProcessMsgMeta(o),
               __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
               S(),
               (U.scrollTop = U.scrollHeight),
@@ -14423,7 +14443,8 @@ window.akiniContacts = {
                 s = s.substring(l[t].length);
                 break;
               }
-            const d = c + "：" + s,
+            const _qShort = s.length > 15 ? s.slice(0, 15) + "…" : s;
+            const d = c + "：" + _qShort,
               u = document.getElementById("msgInput"),
               m = document.getElementById("chatQuoteBar"),
               f = document.getElementById("quoteText");
@@ -18373,6 +18394,21 @@ window.akiniContacts = {
               })()
             )
               return;
+            // v641: 当前在聊天界面或对应联系人详情界面时，不弹应用内通知
+            if (i.chatId && window.akiniContacts) {
+              var _cid = String(i.chatId);
+              var _chatApp = document.getElementById("app-chat");
+              if (_chatApp && _chatApp.style.display !== "none" && String(window.akiniContacts.getActiveChatId()) === _cid) return;
+              var _detailApp = document.getElementById("app-contact-detail");
+              if (_detailApp && _detailApp.style.display !== "none") {
+                var _detailTarget = (window.akiniContacts.getChatTarget && window.akiniContacts.getChatTarget(_cid)) || {};
+                var _detailName = document.getElementById("contactDetailName");
+                if (_detailName) {
+                  var _dn = (_detailName.textContent || "").trim();
+                  if (_dn && (_dn === i.name || _dn === _detailTarget.name)) return;
+                }
+              }
+            }
             var r = document.getElementById("inAppNotifBanner");
             if (!r) {
               r = document.createElement("div");
