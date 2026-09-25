@@ -985,7 +985,14 @@ document.addEventListener("DOMContentLoaded", function () {
                     snap[lsItems[si].k] = lsItems[si].v;
                   }
                   snap.__ts = _now;
-                  inst.setItem("akini_idb_full_snapshot", JSON.stringify(snap)).then(done, done);
+                  /* v640 对齐 milk：快照 stringify/setItem 移入空闲时段，不占交互帧 */
+                  var _snapStr = JSON.stringify(snap);
+                  var _idleSnap = function () {
+                    try { inst.setItem("akini_idb_full_snapshot", _snapStr).then(done, done); }
+                    catch (e1) { done(); }
+                  };
+                  if (window.requestIdleCallback) window.requestIdleCallback(_idleSnap, { timeout: 4000 });
+                  else setTimeout(_idleSnap, 60);
                 } catch (e0) { done(); }
                 return;
               }
@@ -1026,10 +1033,20 @@ document.addEventListener("DOMContentLoaded", function () {
             }).then(function () {
               /* 深度安全模式：跳过快照兜底的全量 JSON.parse（内存峰值大），逐键恢复已够 */
               if (document.documentElement.classList.contains("akini-deep-safe")) { done(); return; }
-              // 兜底：全量快照回填空键（覆盖逐键恢复之外的缺失场景，如 IDB 键被单独清理）
+              // v640 对齐 milk 启动轻量化：全量快照 JSON.parse 有数 MB 内存峰值，
+              // 只在检测到关键键确实缺失时才 parse 兜底（逐键恢复正常时零成本）
               inst.getItem("akini_idb_full_snapshot").then(function (snapRaw) {
                 try {
-                  var snap = snapRaw ? JSON.parse(snapRaw) : null;
+                  if (!snapRaw || snapRaw.length < 8) { done(); return; }
+                  var _missKey = !1;
+                  try {
+                    for (var _mk = 0; _mk < 30; _mk++) {
+                      var _kn = localStorage.key(_mk);
+                      if (_kn && _kn.indexOf("akini_") === 0 && _kn.indexOf("akini_chat_history_") !== 0) { _missKey = !0; break; }
+                    }
+                  } catch (eProbe) {}
+                  if (!_missKey) { done(); return; }
+                  var snap = JSON.parse(snapRaw);
                   if (snap && typeof snap === "object") {
                     for (var sk in snap) {
                       if (!snap.hasOwnProperty(sk) || sk === "__ts") continue;
@@ -1937,8 +1954,13 @@ document.addEventListener("DOMContentLoaded", function () {
           Tn()),
         "music" === t &&
           ("function" == typeof syncAvatars && syncAvatars(),
-          "function" == typeof window.applyChatBackground &&
-            window.applyChatBackground()),
+          /* v639：聊天背景大图解码延后 300ms，避免进入云音乐时同步解码撑爆主线程 */
+          setTimeout(function () {
+            try {
+              "function" == typeof window.applyChatBackground &&
+                window.applyChatBackground();
+            } catch (e) {}
+          }, 300)),
         !t)
       ) {
         ("function" == typeof window.reapplyAvatarSwap &&
@@ -3538,11 +3560,13 @@ window.akiniContacts = {
         var _aid = id || window.akiniContacts.getActiveChatId();
         var ct = window.akiniContacts.getChatTarget(_aid);
         if (ct) {
-          if (ct.avatar && ct.avatar.trim()) {
+          /* v639：仅当 ct.avatar 是真实图片时才直接用——emoji/文字 token 时先取
+             内存/LS 里的真实图片头像，避免消息行先渲染浅灰默认头像（闪灰） */
+          if (ct.avatar && ct.avatar.trim() && !window.__akiniIsDefaultAvatarToken(ct.avatar)) {
             window.__akiniAvatarCache.ta = ct.avatar;
             return it(ct.avatar, "");
           }
-          // 联系人对象无头像时，回退到内存缓存/本地保存的对方头像，避免直接显示 emoji 兜底
+          // 联系人对象无头像（或仅为 emoji 占位）时，回退到内存缓存/本地保存的对方头像，避免直接显示 emoji 兜底
           var _lsTa =
             _memGet("akini_ta_avatar") ||
             _memGet("akini_icity_ta_avatar") ||
@@ -8521,6 +8545,16 @@ window.akiniContacts = {
             localStorage.getItem("akini_ta_avatar") ||
             localStorage.getItem("akini_icity_ta_avatar") ||
             "";
+          /* v639 修复闪灰：_curAv 为 emoji/文字等非图片 token 时，nt() 会先渲染浅灰线条默认头像，
+             随后 IDB 异步回填真实图再刷新——用户看到"先浅灰后正确"。
+             此时优先从启动时已回填的内存缓存取真实图片，同步渲染，避免第一拍灰图 */
+          if (window.__akiniIsDefaultAvatarToken(_curAv)) {
+            var _memTa = "";
+            try { if (window.akiniStore && window.akiniStore.memoryGet) _memTa = window.akiniStore.memoryGet("akini_ta_avatar") || ""; } catch (_e0) {}
+            if (!_memTa) { try { _memTa = window.akiniStore.memoryGet("akini_icity_ta_avatar") || ""; } catch (_e0) {} }
+            if (!_memTa && window.__akiniAvatarCache) _memTa = window.__akiniAvatarCache.ta || "";
+            if (_memTa && !window.__akiniIsDefaultAvatarToken(_memTa)) _curAv = _memTa;
+          }
           /* 无头像时不渲染默认 🐰，用透明占位，避免先闪默认头像 */
           if (!_curAv) {
             n && ((n.style.visibility = "hidden"), (n.innerHTML = ""));
@@ -8544,11 +8578,12 @@ window.akiniContacts = {
               }
             }
           } catch (_e) {}
-          /* 头像仍为空时异步从 IDB 恢复后重绘 */
-          if (!_curAv && window._idbStore && window._idbStore.get) {
+          /* 头像仍为空（或仍是 emoji 等非图片占位）时异步从 IDB 恢复后重绘 */
+          if (window.__akiniIsDefaultAvatarToken(_curAv) && window._idbStore && window._idbStore.get) {
             _idbStore.get("akini_ta_avatar", function (_av) {
               if (
                 _av &&
+                !window.__akiniIsDefaultAvatarToken(_av) &&
                 window.akiniContacts.getActiveChatId() === t.id &&
                 (localStorage.getItem("akini_ta_avatar") || "") !== _av
               ) {
@@ -14494,14 +14529,18 @@ window.akiniContacts = {
                   } catch (e) {}
 
                   try {
+                    /* v640 对齐 milk：大串同步写 LS 是卡顿/配额炸点。
+                       主/备记录改走 akiniStore 大键通道（内存+IDB 队列，自动跳 LS）；
+                       LS 仅保留 200 条截断应急副本 */
+                    if (window.akiniStore && window.akiniStore.set) {
+                      window.akiniStore.set(kAct, fullHTML);
+                      window.akiniStore.set(kBk, fullHTML);
+                      if (window.akiniStore.flushIdb) window.akiniStore.flushIdb();
+                    }
                     if (window.akiniStore && window.akiniStore.rawLSSet) {
-                      window.akiniStore.rawLSSet(kAct, fullHTML);
-                      window.akiniStore.rawLSSet(kBk, fullHTML);
                       window.akiniStore.rawLSSet(kCrit, compactCrit);
                     } else {
-                      localStorage.setItem(kAct, fullHTML);
-                      localStorage.setItem(kBk, fullHTML);
-                      localStorage.setItem(kCrit, compactCrit);
+                      try { localStorage.setItem(kCrit, compactCrit); } catch (eLS) {}
                     }
                   } catch (e) {}
 
@@ -17529,6 +17568,21 @@ window.akiniContacts = {
       bn("sent"));
     var Cn = null,
       Bn = void 0;
+    window.__akiniPatchAvatarCell = function (cell, html) {
+      try {
+        if (!cell || !html) return;
+        var mNew = /src="([^"]*)"/.exec(html || "");
+        var img = cell.querySelector("img");
+        if (img) {
+          var cur = img.getAttribute("src") || "";
+          if (mNew && cur === mNew[1]) return; /* 已一致，跳过 */
+          if (mNew) { img.setAttribute("src", mNew[1]); return; }
+        }
+        var curHtml = cell.innerHTML || "";
+        if (curHtml === html) return;
+        cell.innerHTML = html;
+      } catch (e) {}
+    };
     function Tn(t) {
       ((Bn = t),
         Cn && clearTimeout(Cn),
@@ -17649,16 +17703,18 @@ window.akiniContacts = {
               window.renderHomeAvatarPreviews &&
                 window.renderHomeAvatarPreviews();
               const C = document.getElementById("chatBody");
+              /* v640：消息头像只改 src 不同的 img，内容一致时跳过，
+                 避免 25+ 行头像整片 innerHTML 重排导致滚动中掉帧 */
               (C &&
                 (C.querySelectorAll(".msg-row.me .msg-avatar").forEach(
                   function (t) {
-                    t.innerHTML = n;
+                    __akiniPatchAvatarCell(t, n);
                   },
                 ),
                 (i && "group" === i.type) ||
                   C.querySelectorAll(".msg-row.other .msg-avatar").forEach(
                     function (t) {
-                      t.innerHTML = o;
+                      __akiniPatchAvatarCell(t, o);
                     },
                   )),
                 [
@@ -17689,28 +17745,56 @@ window.akiniContacts = {
                     }
                   },
                 ),
-                "function" == typeof window._renderIcity &&
-                  window._renderIcity(),
-                "function" == typeof window._renderPosts &&
-                  window._renderPosts(),
-                "function" == typeof window.renderIcityProfileDiaries &&
-                  (window.renderIcityProfileDiaries(
-                    "icityMyProfileDiaries",
-                    "me",
-                  ),
-                  window.renderIcityProfileDiaries(
-                    "icityTaProfileDiaries",
-                    "ta",
-                  )),
-                "function" == typeof renderIcityContactSelector &&
-                  renderIcityContactSelector(),
-                "function" == typeof renderIcityContactProfiles &&
-                  renderIcityContactProfiles(),
-                "function" == typeof window.renderHomeAvatarContacts &&
-                  window.renderHomeAvatarContacts(),
-                "function" == typeof window.renderBeautifyContacts &&
-                  window.renderBeautifyContacts(),
-                xt(),
+                /* v640 对齐 milk/syy：全量重渲染仅在其界面可见时执行——
+                   Tn 在每条消息/开关头像后都可能触发，隐藏界面的重排是纯浪费，
+                   长会话+大朋友圈时是持续掉帧主源之一 */
+                (function () {
+                  var _vis = function (id) {
+                    var el = document.getElementById(id);
+                    if (!el) return false;
+                    var st = window.getComputedStyle(el);
+                    if (st.display === "none" || st.visibility === "hidden") return false;
+                    var r = el.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0;
+                  };
+                  var _icityOn = _vis("icityArea");
+                  if (_icityOn) {
+                    if ("function" == typeof window._renderIcity) window._renderIcity();
+                    if ("function" == typeof window.renderIcityProfileDiaries) {
+                      window.renderIcityProfileDiaries("icityMyProfileDiaries", "me");
+                      window.renderIcityProfileDiaries("icityTaProfileDiaries", "ta");
+                    }
+                    if ("function" == typeof renderIcityContactSelector) renderIcityContactSelector();
+                  }
+                  var _postsOn = _vis("app-friends") || _vis("postsScreen");
+                  if (_postsOn && "function" == typeof window._renderPosts) window._renderPosts();
+                })(),
+                /* v640：icity 联系人档案属 icity 界面组——icity 关闭时只刷新首页头像列表 */
+                (function () {
+                  var _p2 = document.getElementById("icityArea");
+                  var _icityOpen2 = !1;
+                  try {
+                    if (_p2) {
+                      var _st2 = window.getComputedStyle(_p2);
+                      _icityOpen2 = _st2.display !== "none" && _st2.visibility !== "hidden";
+                    }
+                  } catch (e) {}
+                  if (_icityOpen2 && "function" == typeof renderIcityContactProfiles) renderIcityContactProfiles();
+                  if ("function" == typeof window.renderHomeAvatarContacts) window.renderHomeAvatarContacts();
+                  if ("function" == typeof window.renderBeautifyContacts) window.renderBeautifyContacts();
+                })(),
+                /* v640：通讯录列表只在聊天主界面可见时刷新，避免切后台/其他界面时白白全量重建 */
+                (function () {
+                  var _cl = document.getElementById("contactsScreen");
+                  var _clOn = !0;
+                  try {
+                    if (_cl) {
+                      var _st3 = window.getComputedStyle(_cl);
+                      _clOn = _st3.display !== "none";
+                    }
+                  } catch (e) {}
+                  if (_clOn) xt();
+                })(),
                 "function" == typeof ot && ot(),
                 "function" == typeof window._akiniApplyPreview &&
                   window._akiniApplyPreview());
@@ -17727,7 +17811,7 @@ window.akiniContacts = {
               }
             })(Bn),
             (Bn = void 0));
-        }, 16)));
+        }, 250)));
     }
     const Mn = document.getElementById("inputTaName"),
       Ln = document.getElementById("inputMyName");
@@ -20601,27 +20685,48 @@ window.akiniContacts = {
                   J(t.name || "对方") +
                   "</div>"),
                 a.addEventListener("click", function () {
-                  (!(function (t) {
+                  var _selNow = !(function (t) {
                     var e = T.findIndex(function (e) {
                       return e.id === t.id;
                     });
                     if (e >= 0) {
                       // 再点同一人：取消选择
                       T.splice(e, 1);
+                      return false;
                     } else {
                       // 多选上限 2 人：选 1 人双人模式，选 2 人三人模式
                       if (T.length >= 2) {
                         alert("最多选 2 个人哦，你 + 两个 TA 就是三人一起听啦");
+                        return null; // 上限提示，勾选状态不变
                       } else {
                         T.push({ id: t.id, name: t.name, avatar: t.avatar });
+                        return true;
                       }
                     }
-                    saveMusicContacts();
-                  })(t),
-                    zt(),
-                    Ot());
-                  // 点选后立即刷新顶部头像，所见即所得
-                  try { "function" == typeof syncAvatars && syncAvatars(); } catch (e) {}
+                  })(t);
+                  if (_selNow !== null) {
+                    try { saveMusicContacts(); } catch (eS) {}
+                    /* v639 修复点选卡顿：不再全量重建联系人列表（几十人×大 base64 头像
+                       innerHTML 重解析每次点击都卡），只更新本行勾选样式 */
+                    try {
+                      var _row = e.contactList.querySelector('[data-cid="' + (t && t.id) + '"]');
+                      if (_row && _row.firstChild) {
+                        var _cb = _row.firstChild;
+                        if (_selNow) {
+                          _cb.style.borderColor = "#1a1a1a";
+                          _cb.style.background = "#1a1a1a";
+                          _cb.innerHTML = "✓";
+                        } else {
+                          _cb.style.borderColor = "#ddd";
+                          _cb.style.background = "#fff";
+                          _cb.innerHTML = "";
+                        }
+                      }
+                    } catch (eM) {}
+                    Ot();
+                    // 点选后立即刷新顶部头像，所见即所得
+                    try { "function" == typeof syncAvatars && syncAvatars(); } catch (e) {}
+                  }
                 }),
                 e.contactList.appendChild(a));
             }),
@@ -21161,9 +21266,12 @@ window.akiniContacts = {
                 exited = localStorage.getItem("akini_music_exited") === "1";
               } catch (e) {}
               if (isListening || (!exited && hasContacts)) {
+                /* v639：o("music") 内部已调用 syncAvatars()，此处去重；
+                   U()(背景大图 IDB 读取) 延迟一拍，先让页面完成首帧渲染再拉背景 */
                 o("music");
-                if ("function" == typeof syncAvatars) syncAvatars();
-                U();
+                setTimeout(function () {
+                  try { U(); } catch (eU) {}
+                }, 0);
               } else {
                 try {
                   localStorage.removeItem("akini_music_exited");
@@ -22863,7 +22971,15 @@ window.akiniContacts = {
           return E && vt(E, i ? "fetch-retry" : "fetch"), Promise.resolve();
         }
         var o = t + "/song/url?id=" + encodeURIComponent(String(e.id)) + "&br=999000&cookie=" + encodeURIComponent(a || "") + "&realIP=" + encodeURIComponent((window._neteaseRealIp || "223.5.5.5"));
-        return fetch(o)
+        /* v639：fetch 无超时——代理慢/挂时界面"正在加载"永不结束（用户感知卡死）。8s 超时后走备用地址 */
+        var _suAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+        var _suTimer = _suAbort ? setTimeout(function () { try { _suAbort.abort(); } catch (eS) {} }, 8000) : null;
+        var _suFetch = fetch(o, _suAbort ? { signal: _suAbort.signal } : undefined);
+        _suFetch = Promise.race([
+          _suFetch,
+          new Promise(function (_, rej) { setTimeout(function () { rej(new Error("song url timeout")); }, 8500); })
+        ]);
+        return _suFetch
           .then(function (t) {
             return t.json().catch(function () {
               return {};
@@ -23015,16 +23131,25 @@ window.akiniContacts = {
             // 优先使用当前歌曲 ID（网易云外链导入时 id 就是歌曲 ID）
             console.log("[Akini lyric] loading id", e);
             var lyricCookie = "";
-          return fetch(
-            t +
-            "/lyric?id=" +
-            encodeURIComponent(String(e)) +
-            "&cookie=" +
-            encodeURIComponent(lyricCookie) +
-            "&realIP=" +
-            encodeURIComponent(window._neteaseRealIp || "223.5.5.5")
-          )
+            /* v639：歌词加载加 6s 超时，代理慢时不再拖住音乐页 */
+            var _lyAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
+            var _lyTimer = _lyAbort ? setTimeout(function () { try { _lyAbort.abort(); } catch (eL) {} }, 6000) : null;
+            var _lyFetch = fetch(
+              t +
+              "/lyric?id=" +
+              encodeURIComponent(String(e)) +
+              "&cookie=" +
+              encodeURIComponent(lyricCookie) +
+              "&realIP=" +
+              encodeURIComponent(window._neteaseRealIp || "223.5.5.5"),
+              _lyAbort ? { signal: _lyAbort.signal } : undefined
+            );
+            return Promise.race([
+              _lyFetch,
+              new Promise(function (_, rej) { setTimeout(function () { rej(new Error("lyric timeout")); }, 6500); })
+            ])
               .then(function (t) {
+                if (_lyTimer) clearTimeout(_lyTimer);
                 return t.json();
               })
               .then(function (t) {
@@ -23435,6 +23560,12 @@ window.akiniContacts = {
       }, 0);
     }
     function _doImmediateBackup() {
+      /* v639 修复回前台卡崩：全量刷写（多会话大 HTML 同步写 LS+IDB）是长任务，
+         iOS 上叠加 IDB backupAll 遍历极易被 jetsam 强杀。加 60s 真节流——
+         回前台补跑若距上次全量刷写不足 60s 直接跳过（180s 周期任务不受影响） */
+      var _nowFlush = Date.now();
+      if (window.__akiniLastFullFlush && _nowFlush - window.__akiniLastFullFlush < 60000) return;
+      window.__akiniLastFullFlush = _nowFlush;
       // 先把内存中所有聊天记录同步刷到 IDB/localStorage，防止页面被系统回收时丢失
       // 注意：DOM 只渲染最近 100 条（防卡顿），严禁用 U.innerHTML 覆盖完整历史
       // 必须从 session.messagesHTML（内存全量）保存，与 core 的内存数据源一致
@@ -23448,9 +23579,13 @@ window.akiniContacts = {
               C(activeId, sess.messagesHTML);
             }
           }
-          Object.keys(E).forEach(function (k) {
-            if (E[k] && typeof E[k] === "string") C(k, E[k]);
-          });
+          /* v639：逐会话分片写，每条让出事件循环，避免一次性同步写全部会话阻塞 UI */
+          var _keys = Object.keys(E).filter(function (k) { return E[k] && typeof E[k] === "string"; });
+          (function _flushNext(i) {
+            if (i >= _keys.length) return;
+            try { C(_keys[i], E[_keys[i]]); } catch (e) {}
+            setTimeout(function () { _flushNext(i + 1); }, 0);
+          })(0);
         }
       } catch (e) {}
       try {
