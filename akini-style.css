@@ -4088,6 +4088,10 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   justify-content: flex-start !important;
   gap: 8px !important;
   cursor: pointer !important;
+  touch-action: none !important;
+}
+.call-mini-shrunk:active {
+  transform: scale(0.96) !important;
 }
 .call-mini-shrunk .call-avatar {
   width: 36px !important;
@@ -6605,7 +6609,8 @@ body:not(.bubble-css-on) .msg-row { content-visibility: auto; contain-intrinsic-
 
 /* ===== v20260909n-quote 引用胶囊：气泡正下方、同侧边缘对齐、过长省略号 ===== */
 .chat-body .msg-row .quote-bubble {
-  display: inline-block !important;
+  display: inline-flex !important;
+  align-items: center !important;
   background: #fff !important;
   color: #333 !important;
   border: none !important;

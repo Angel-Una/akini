@@ -3559,8 +3559,12 @@ function initAppIcons(){
           if(ei){ei.value='';}
         }
       };
+      r.onerror=function(){ alert('图片读取失败，请重新选择图片'); try{fi.value='';}catch(_e){} };
       r.readAsDataURL(f);
-      this.value='';
+      /* v638 修复：iOS Safari/微信内置浏览器中，readAsDataURL 后同步清空 input 会中断
+         文件读取（onload 永不触发），导致预览不更新、保存永远不生效。改为延迟清空：
+         读取完成后再重置，既保证能重选同一张图，又不打断读取。 */
+      setTimeout(function(){ try{ fi.value=''; }catch(_e){} }, 1200);
     });
   }
   var rb=G('akiniAppIconResetBtn');
@@ -3598,6 +3602,11 @@ function initAppIcons(){
             if(sp){AKINI_PENDING_VAL=(sp.textContent||'').trim();}
           }
         }
+      }
+      /* v638：没有可保存的值时明确提示，不再静默无反应（用户感知为"保存不了"） */
+      if(!AKINI_PENDING_VAL){
+        alert('请先上传图片或输入 Emoji，并等预览显示新图标后再点保存');
+        return;
       }
       if(AKINI_PENDING_VAL){
         var key='akini_app_icon_'+AKINI_EDITING_ID;
@@ -3639,6 +3648,9 @@ function initAppIcons(){
           }catch(e){}
         }
         // 4) 无论 localStorage 是否成功，都写入 IndexedDB 作为兜底
+        // v638：墓碑必须无条件清除——否则存储紧张(LS写失败)时墓碑残留，下次启动 loadAppIcons
+        // 走墓碑分支把 IDB 里的新图标删掉，用户感知为"保存了但永远是默认图标"
+        try{localStorage.removeItem('akini_app_icon_tomb_'+AKINI_EDITING_ID);}catch(e){}
         try{if(window._idbStore&&window._idbStore.set){window._idbStore.set(key,AKINI_PENDING_VAL);}}catch(e){}
         applyAppIcon(AKINI_EDITING_ID,AKINI_PENDING_VAL);
         updateIconGridCell(AKINI_EDITING_ID,AKINI_PENDING_VAL);
