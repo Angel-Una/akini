@@ -5304,13 +5304,28 @@ window.akiniContacts = {
     function __akiniStampMsgRows(html, ts) {
       try {
         var t = ts || Date.now();
+        /* v645: 修复v623截断bug——原slice(0,-1)把me→m、other→othe且引号错乱，
+           坏行innerHTML解析时吞掉后续内容，造成DOM与历史行数错位、删除消息误删相邻行 */
         return String(html).replace(
-          /<div class="msg-row (me|other)(?![^>]*data-ts)/g,
-          function (m) { return m.slice(0, -1) + ' data-ts="' + t + '"'; }
+          /<div class="msg-row (me|other)"(?![^>]*data-ts)/g,
+          function (m) { return m + ' data-ts="' + t + '"'; }
         );
       } catch (e) { return html; }
     }
     window.__akiniStampMsgRows = __akiniStampMsgRows;
+    /* v645: 消毒v623截断bug坏行——msg-row me/other被截成m/othe且引号错乱，
+       坏行使innerHTML解析吞行，是"删卡片却删掉文字消息、卡片复活"的根因；幂等可重复执行 */
+    function __akiniRepairStampedRows(html) {
+      if (!html || typeof html !== "string") return html || "";
+      if (html.indexOf('msg-row m data-ts=') < 0 && html.indexOf('msg-row othe data-ts=') < 0) return html;
+      return html.replace(
+        /<div class="msg-row (m|othe) data-ts="(\d+)"">/g,
+        function (m0, g1, g2) {
+          return '<div class="msg-row ' + (g1 === "m" ? "me" : "other") + '" data-ts="' + g2 + '">';
+        }
+      );
+    }
+    window.__akiniRepairStampedRows = __akiniRepairStampedRows;
     /* v623: 从完整聊天 HTML 中彻底精准剔除被用户删除的消息行 */
     function __akiniRemoveMsgRow(fullHTML, delTs, revIdx, textSnippet) {
       if (!fullHTML || typeof fullHTML !== "string") return fullHTML || "";
@@ -5344,7 +5359,13 @@ window.akiniContacts = {
       if (targetIdx === -1 && typeof revIdx === "number" && revIdx >= 0) {
         var candidate = rows.length - 1 - revIdx;
         if (candidate >= 0 && candidate < rows.length) {
-          targetIdx = candidate;
+          /* v645: 候选行文本必须与被长按行吻合才允许删除，防止行数错位时盲配误删相邻消息 */
+          var _candText = String(rows[candidate].html).replace(/<[^>]+>/g, "").trim();
+          var _wantText = String(textSnippet || "").trim();
+          var _ok2 = !_wantText || _wantText.length < 4 ||
+            _candText.indexOf(_wantText.slice(0, 10)) >= 0 ||
+            _wantText.indexOf(_candText.slice(0, 10)) >= 0;
+          if (_ok2) targetIdx = candidate;
         }
       }
       // 策略 3: 文本特征匹配
@@ -8436,6 +8457,10 @@ window.akiniContacts = {
           ls2,
           lsCrit,
         );
+        /* v645: 消毒v623时间戳截断坏行，修复消息结构错乱/删除错位/卡片复活 */
+        if (r && typeof window.__akiniRepairStampedRows === "function") {
+          try { r = window.__akiniRepairStampedRows(r); } catch (eRp) {}
+        }
         // v623: 过滤已被用户删除的消息，防止残留旧备份复活已删消息
         if (r && typeof window.__akiniFilterDeletedMsgs === "function") {
           var filteredR = window.__akiniFilterDeletedMsgs(t, r);
@@ -14498,6 +14523,10 @@ window.akiniContacts = {
                 var sess = window.akiniContacts.getSession(activeId) || {};
                 var fullHTML = sess.messagesHTML || E[activeId] || "";
                 if (fullHTML) {
+                  /* v645: 删除前先消毒v623坏行，防止DOM与历史行数错位导致误删相邻消息 */
+                  if (typeof window.__akiniRepairStampedRows === "function") {
+                    try { fullHTML = window.__akiniRepairStampedRows(fullHTML); } catch (eR) {}
+                  }
                   // 1. 获取被长按行节点的特征（data-ts、逆序索引、气泡摘要）
                   var delTs = n.getAttribute("data-ts") || (n.dataset ? n.dataset.ts : null);
                   var domRows = U ? Array.from(U.querySelectorAll(".msg-row:not([id^='typingBubbleRow_'])")) : [];
@@ -24060,6 +24089,8 @@ window.akiniContacts = {
     try {
       var _waN = $("watchArea");
       if (_waN && _waN.style.display === "none" && typeof window.showInAppNotif === "function") {
+        /* v645: 不在观影界面时计未读角标 */
+        try { window.__akiniIncrFeatureUnread && window.__akiniIncrFeatureUnread("watch"); } catch (eU) {}
         window.showInAppNotif({
           app: "观影",
           appIcon: "🎬",
@@ -24557,6 +24588,8 @@ window.akiniContacts = {
   }
   window.__akiniOpenWatch = function () {
     try {
+      /* v645: 进入观影即清未读角标 */
+      try { window.__akiniClearFeatureUnread && window.__akiniClearFeatureUnread("watch"); } catch (eW) {}
       initWatch();
       try {
         if (typeof window.applyBubbleCss === "function")
@@ -24699,6 +24732,24 @@ window.akiniContacts = {
       b.style.setProperty("opacity", "0", "important");
     }
   }
+  /* v645: 观影/陪伴功能未读角标数据源与读写工具 */
+  function _featureUnread(app) {
+    try { return Math.max(0, parseInt(localStorage.getItem("akini_" + app + "_unread") || "0", 10) || 0); } catch (e) { return 0; }
+  }
+  window.__akiniIncrFeatureUnread = function (app, n) {
+    try {
+      var k = "akini_" + app + "_unread";
+      var v = Math.max(0, parseInt(localStorage.getItem(k) || "0", 10) || 0) + (n || 1);
+      localStorage.setItem(k, String(v));
+      if (window.__updateHomeBadges) window.__updateHomeBadges();
+    } catch (e) {}
+  };
+  window.__akiniClearFeatureUnread = function (app) {
+    try {
+      localStorage.setItem("akini_" + app + "_unread", "0");
+      if (window.__updateHomeBadges) window.__updateHomeBadges();
+    } catch (e) {}
+  };
   window.__updateHomeBadges = function () {
     var ss = {};
     try {
@@ -24729,6 +24780,10 @@ window.akiniContacts = {
     try {
       _setBadge("appBtnIcity", _getNotifs("icity").filter(function (n) { return !n.read; }).length);
     } catch (e) {}
+
+    /* 3.5 v645: 观影 / 陪伴未读角标（数据源 akini_watch_unread / akini_companion_unread） */
+    try { _setBadge("appBtnWatch", _featureUnread("watch")); } catch (e) {}
+    try { _setBadge("appBtnCompanion", _featureUnread("companion")); } catch (e) {}
 
     /* 4. 聊天页返回按钮：独立悬浮未读数角标（除当前会话外的未读总数） */
     try {

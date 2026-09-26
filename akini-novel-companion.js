@@ -367,6 +367,8 @@
       if (!mv || mv.style.display !== 'none') return; /* 界面可见时无需通知 */
       if (typeof window.showInAppNotif !== 'function') return;
       var cc = getContactById(cid);
+      /* v645: 不在陪伴界面时计未读角标 */
+      try { window.__akiniIncrFeatureUnread && window.__akiniIncrFeatureUnread('companion'); } catch (eU) {}
       window.showInAppNotif({
         app: '陪伴',
         appIcon: '🎧',
