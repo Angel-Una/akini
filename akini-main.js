@@ -48,17 +48,46 @@ window.__akiniMedia = (function () {
         try { window._idbStore && window._idbStore.set("akini_media_" + h, dataUrl); } catch (e) {}
         // v627: 立即尝试 flush，降低切后台/刷新导致媒体池未落盘丢图概率
         try { window._idbStore && window._idbStore.flush && window._idbStore.flush(); } catch (e) {}
+        // v646: 双通道镜像——同步写 storage-safe 通道（内存镜像立即生效+IDB 第二副本），
+        // localforage 切后台事务不 commit 时仍有独立副本可恢复，图片消息不再莫名消失
+        try { window.akiniStore && window.akiniStore.set && window.akiniStore.set("akini_media_" + h, dataUrl); } catch (e2) {}
       }
       return h;
     },
     get: function (h, cb) {
       if (MEM[h]) return cb(MEM[h]);
+      /* v646: 三级兜底——MEM → localforage 主库 → storage-safe 镜像（内存/LS/其IDB），
+         任一层存活都能取回真图；取回后回写主库自愈 */
+      var _done = false;
+      var _finish = function (v) {
+        if (_done) return;
+        _done = true;
+        if (v) { MEM[h] = v; }
+        cb(v || null);
+      };
       try {
         window._idbStore.get("akini_media_" + h, function (v) {
-          if (v) MEM[h] = v;
-          cb(v || null);
+          if (v) return _finish(v);
+          try {
+            var _m = window.akiniStore && window.akiniStore.getSync ? window.akiniStore.getSync("akini_media_" + h) : null;
+            if (_m && _m.length > 10) {
+              try { window._idbStore.set("akini_media_" + h, _m); } catch (eR) {}
+              return _finish(_m);
+            }
+            if (window.akiniStore && window.akiniStore.get) {
+              window.akiniStore.get("akini_media_" + h, function (v2) {
+                if (v2 && v2.length > 10) { try { window._idbStore.set("akini_media_" + h, v2); } catch (eR2) {} }
+                _finish(v2 || null);
+              });
+            } else _finish(null);
+          } catch (e1) { _finish(null); }
         });
-      } catch (e) { cb(null); }
+      } catch (e) {
+        try {
+          var _m2 = window.akiniStore && window.akiniStore.getSync ? window.akiniStore.getSync("akini_media_" + h) : null;
+          _finish(_m2 || null);
+        } catch (e2) { cb(null); }
+      }
     },
     /* v637：同步取池内真图（MEM 命中即返回，未命中返回 null 走 resolve 异步回填） */
     getSync: function (h) { return MEM[h] || null; },
@@ -71,10 +100,16 @@ window.__akiniMedia = (function () {
         (function (img) {
           var h = img.getAttribute("data-mh");
           if (!h || img.__mhDone) return;
-          self.get(h, function (url) {
-            if (url) { img.src = url; img.__mhDone = true; }
-            else { img.classList.add("akini-media-missing"); img.alt = "图片丢失"; }
-          });
+          /* v646: 读取失败不再立即判死刑——1.5s/4s 退避重试（覆盖 IDB 异步落盘、
+             镜像水合、恢复窗口期竞态），仍失败才标记 missing，杜绝"发完图刷新就丢" */
+          var attempt = function (n) {
+            self.get(h, function (url) {
+              if (url) { img.src = url; img.__mhDone = true; return; }
+              if (n < 2) { setTimeout(function () { attempt(n + 1); }, n === 0 ? 1500 : 4000); return; }
+              img.classList.add("akini-media-missing"); img.alt = "图片丢失";
+            });
+          };
+          attempt(0);
         })(imgs[i]);
       }
     }
@@ -2327,6 +2362,16 @@ document.addEventListener("DOMContentLoaded", function () {
           // 内存没有时从持久化的 chat_history 读旧值对比（否则旧值为空时任何覆盖都会放行=记录丢失）
           var __oldHtml = "string" == typeof i.messagesHTML ? i.messagesHTML : "";
           if (!__oldHtml) {
+            /* v646: 补充内存权威 E[t] 来源（C() 会话级缓存，跨闭包经 window 访问器获取）——
+               大键(>200KB)不进 localStorage，启动恢复窗口期 getItem 读空会让防线失效 */
+            try {
+              if (typeof window.__akiniGetChatMem === "function") {
+                var _eMem = window.__akiniGetChatMem(t);
+                if (_eMem && "string" == typeof _eMem && _eMem.length) __oldHtml = _eMem;
+              }
+            } catch (eE) {}
+          }
+          if (!__oldHtml) {
             try {
               __oldHtml = localStorage.getItem("akini_chat_history_" + t) ||
                           localStorage.getItem("akini_chat_history_backup_" + t) || "";
@@ -3847,17 +3892,8 @@ window.akiniContacts = {
         // 引用概率在前面已掷中一次，此处直接使用（原先二次掷骰导致 quote² 几乎不出现）
         if (_) {
           var W = b || "我";
-          var quoteInner = "";
-          if (_quoteSticker) {
-            quoteInner = rt(W) + '：<img src="' + esc(_quoteSticker) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-          } else if (_quoteMh && window.__akiniMedia) {
-            quoteInner = rt(W) + '：<img data-mh="' + esc(_quoteMh) + '" src="' + window.__akiniMedia.PLACEHOLDER + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-          } else if (_ === "【表情包】") {
-            quoteInner = rt(W) + "：[表情包]";
-          } else {
-            var J = _.slice(0, 15) + (_.length > 15 ? "…" : "");
-            quoteInner = rt(W) + "：" + rt(J);
-          }
+          /* v647: 引用卡片只显示标题（发送者名），过长自动省略号，不再挤掉内容 */
+          var quoteInner = '<span title="' + esc(W) + '" style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;">' + rt(W) + '</span>';
           $ =
             '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-flex!important;align-items:center!important;max-width:90%!important;overflow:hidden!important;">' +
             quoteInner +
@@ -3957,14 +3993,9 @@ window.akiniContacts = {
         stkMh = K.getAttribute("data-quote-sticker-mh") || "";
       let a = "";
       if (n && i) {
-        var quoteContent = "";
-        if (stk) {
-          quoteContent = rt(i.replace(/：.*/, '：')) + '<img src="' + esc(stk) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-        } else if (stkMh && window.__akiniMedia) {
-          quoteContent = rt(i.replace(/：.*/, '：')) + '<img data-mh="' + esc(stkMh) + '" src="' + window.__akiniMedia.PLACEHOLDER + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-        } else {
-          quoteContent = rt(i);
-        }
+        /* v647: 引用卡片仅显示发送者名，data-quote 中可能带旧内容，只取冒号前名 */
+        var _qNameOnly = (i.replace(/[：:].*/, "")).trim() || i;
+        var quoteContent = '<span title="' + esc(_qNameOnly) + '" style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;">' + rt(_qNameOnly) + '</span>';
         a =
           '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-flex!important;align-items:center!important;max-width:90%!important;overflow:hidden!important;">' +
           quoteContent +
@@ -4859,17 +4890,8 @@ window.akiniContacts = {
             })(t);
         }
         if (y) {
-          var _qContent = "";
-          if (_quoteStk) {
-            _qContent = rt(o) + '：<img src="' + esc(_quoteStk) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-          } else if (_quoteMh && window.__akiniMedia) {
-            _qContent = rt(o) + '：<img data-mh="' + esc(_quoteMh) + '" src="' + window.__akiniMedia.PLACEHOLDER + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-          } else if (y === "【表情包】") {
-            _qContent = rt(o) + "：[表情包]";
-          } else {
-            var _yTxt = y.slice(0, 15) + (y.length > 15 ? "…" : "");
-            _qContent = rt(o) + "：" + rt(_yTxt);
-          }
+          /* v647: 引用卡片只显示发送者名，过长省略 */
+          var _qContent = '<span title="' + esc(o) + '" style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;">' + rt(o) + '</span>';
           g =
             '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-flex!important;align-items:center!important;max-width:90%!important;overflow:hidden!important;">' +
             _qContent +
@@ -4919,8 +4941,8 @@ window.akiniContacts = {
         if (idx === 0 && window.__pendingQuote) {
           var pq = window.__pendingQuote;
           window.__pendingQuote = null;
-          var _pqShort = pq.text.length > 15 ? pq.text.slice(0, 15) + '…' : pq.text;
-          quoteHtml = '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-flex!important;align-items:center!important;max-width:90%!important;overflow:hidden!important;">' + pq.name + '：' + _pqShort + '</div>';
+          /* v647: 引用卡片只显示发送者名 */
+          quoteHtml = '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:4px 10px!important;font-size:11px!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:3px!important;display:inline-flex!important;align-items:center!important;max-width:90%!important;overflow:hidden!important;"><span title="' + esc(pq.name) + '" style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;">' + rt(pq.name) + '</span></div>';
         }
         const p =
           '<div class="msg-row other" data-ts="' + Date.now() + '"><div class="msg-content-line"><div class="msg-avatar">' +
@@ -5469,6 +5491,11 @@ window.akiniContacts = {
       window.__akiniSaveDebounceTimers[t] = setTimeout(_execSave, 300);
     }
     
+    /* v646: 跨闭包暴露内存权威 E[t]（akiniContacts.updateSession 的只增不减防线
+       需要它作为旧值来源，堵住启动恢复窗口期短串放行的漏洞） */
+    window.__akiniGetChatMem = function (cid) {
+      try { return (E && E[cid]) || ""; } catch (e) { return ""; }
+    };
     window.__akiniFlushPendingSaves = function() {
       try {
         if (window.__akiniSaveDebounceTimers) {
@@ -5567,6 +5594,22 @@ window.akiniContacts = {
             doWrite();
           } else {
             console.warn("[C] IDB 复核拒绝覆盖：" + key + " (" + newRows + " < " + idbRows + ")");
+            /* v646: 拒绝覆盖时用 IDB 完整记录回滚内存权威（E[t]+session.messagesHTML），
+               防止启动恢复窗口期的短串污染显示层——重进后消息/表情包"莫名消失"的显示层根因 */
+            try {
+              var _full = (idbExisting && String(idbExisting)) || "";
+              if (_full && typeof __akiniIncTyping === "function") _full = __akiniIncTyping(_full, t);
+              if (_full) {
+                E[t] = _full;
+                window.__akiniSavedRows = window.__akiniSavedRows || {};
+                window.__akiniSavedRows[t] = idbRows;
+                if (window.__akiniIncCache) { try { delete window.__akiniIncCache[t]; } catch (eC) {} }
+                try {
+                  var _sess = window.akiniContacts && window.akiniContacts.getSession ? window.akiniContacts.getSession(t) : null;
+                  if (_sess && (!_sess.messagesHTML || String(_sess.messagesHTML).length < _full.length)) _sess.messagesHTML = _full;
+                } catch (eS) {}
+              }
+            } catch (e0) {}
           }
         });
       } catch (err) {
@@ -12746,17 +12789,30 @@ window.akiniContacts = {
         })(),
         Ae(!0));
     }
+    /* v648: 通话全屏防误触遮罩加固 - 增加 15s 强制超时熔断，且一旦通话结束或非 active 状态强制隐藏 */
+    var __akiniBlockOverlayTimer = null;
     function Be(t) {
       var e = "callBlockOverlay",
         n = document.getElementById(e);
-      t
-        ? (n ||
-            (((n = document.createElement("div")).id = e),
-            (n.style.cssText =
-              "position:fixed;inset:0;background:transparent;z-index:99999998;pointer-events:auto;touch-action:none;"),
-            document.body.appendChild(n)),
-          (n.style.display = "block"))
-        : n && (n.style.display = "none");
+      if (t) {
+        if (!n) {
+          n = document.createElement("div");
+          n.id = e;
+          n.style.cssText = "position:fixed;inset:0;background:transparent;z-index:99999998;pointer-events:auto;touch-action:none;";
+          document.body.appendChild(n);
+        }
+        n.style.display = "block";
+        if (__akiniBlockOverlayTimer) { clearTimeout(__akiniBlockOverlayTimer); }
+        __akiniBlockOverlayTimer = setTimeout(function () {
+          try {
+            var b = document.getElementById("callBlockOverlay");
+            if (b) { b.style.display = "none"; }
+          } catch (_) {}
+        }, 15000);
+      } else {
+        if (__akiniBlockOverlayTimer) { clearTimeout(__akiniBlockOverlayTimer); __akiniBlockOverlayTimer = null; }
+        if (n) { n.style.display = "none"; }
+      }
     }
     function Te(t, e, n) {
       if (((n = n || {}), we.active)) {
@@ -13101,8 +13157,15 @@ window.akiniContacts = {
       (a && (a.style.display = "block"), Be(!1));
     }
     // 兜底守卫：通话未接通且非我主叫时，强制隐藏「最小化」（该位置应为「接通」，接通后才切换为最小化）
+    // v648: 增加全局遮罩与通话状态看门狗，防任何非预期卡死
     setInterval(function () {
       try {
+        if (!we.active) {
+          var b = document.getElementById("callBlockOverlay");
+          if (b && b.style.display !== "none") {
+            b.style.display = "none";
+          }
+        }
         if (!we.active || we.answered || we.isMyCalling) return;
         var v = document.getElementById("callMinimizeBtnFull");
         if (v && v.parentElement && v.parentElement.style.display !== "none") {
@@ -13111,6 +13174,33 @@ window.akiniContacts = {
         }
       } catch (e) {}
     }, 1000);
+
+    /* v648: 全局防卡死救生圈看门狗 (Anti-Freeze Watchdog)
+       定期探测页面是否发生 pointerEvents 锁死或隐藏层遮罩未释放 */
+    (function () {
+      var _lastClickTs = Date.now();
+      window.addEventListener("click", function () { _lastClickTs = Date.now(); }, { passive: true, capture: true });
+      window.addEventListener("touchstart", function () { _lastClickTs = Date.now(); }, { passive: true, capture: true });
+
+      setInterval(function () {
+        try {
+          // 1. 如果通话已不在进行，但 callBlockOverlay 残留阻断交互，强制移除
+          if (!window._callState || !window._callState.active) {
+            var cbo = document.getElementById("callBlockOverlay");
+            if (cbo && cbo.style.display !== "none") {
+              cbo.style.display = "none";
+            }
+          }
+          // 2. 检查 body 的 overflow 是否被未关闭的弹窗永久锁死（如无 modal 开启却 overflow:hidden）
+          if (document.body && document.body.style.overflow === "hidden") {
+            var activeModal = document.querySelector(".akini-center-modal-overlay, #__akiniPromptModal, #__akiniCenterModal, #app-call[style*='flex']");
+            if (!activeModal) {
+              document.body.style.overflow = "";
+            }
+          }
+        } catch (_) {}
+      }, 3000);
+    })();
     window.startCall = function (t, e) {
       Te(t, !0, { callerAvatar: e });
     };
@@ -14503,14 +14593,8 @@ window.akiniContacts = {
               u.focus();
             }
             if (m && f) {
-              if (stickerUrl) {
-                f.innerHTML = esc(c) + '：<img src="' + esc(stickerUrl) + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-              } else if (stickerMh && window.__akiniMedia) {
-                f.innerHTML = esc(c) + '：<img data-mh="' + esc(stickerMh) + '" src="' + window.__akiniMedia.PLACEHOLDER + '" class="quote-sticker-thumb" style="width:24px;height:24px;object-fit:cover;border-radius:4px;vertical-align:middle;display:inline-block;" alt="表情"/>';
-                try { window.__akiniMedia.resolve(m); } catch (_me) {}
-              } else {
-                f.textContent = d;
-              }
+              /* v647: 输入区引用预览仅显示发送者名，过长省略 */
+              f.innerHTML = '<span title="' + esc(c) + '" style="display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;">' + rt(c) + '</span>';
               m.classList.add("show");
             }
             a();
