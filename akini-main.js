@@ -8412,6 +8412,9 @@ window.akiniContacts = {
         }
         (window.akiniContacts.setActiveChatId(t),
           window.akiniContacts.updateSession(t, { unread: 0 }));
+        if (typeof window.loadSurveys === "function") {
+          try { window.loadSurveys(t); } catch(e){}
+        }
         bt();
         // 优先合并内存会话、本地 localStorage 备份和内存缓存，取最长非空聊天记录
         var ls1 = "",
@@ -8516,14 +8519,16 @@ window.akiniContacts = {
                   .querySelectorAll(".bubble.survey-bubble[data-survey-id]")
                   .forEach(function (b) {
                     var sid = b.getAttribute("data-survey-id");
+                    var s = null;
                     if (window.surveys && Array.isArray(window.surveys)) {
-                      var s = window.surveys.find(function (x) {
-                        return x.id === sid;
-                      });
-                      if (s && s.replied) {
-                        var st = b.querySelector(".survey-bubble-status");
-                        if (st) st.textContent = "已回答";
-                      }
+                      s = window.surveys.find(function (x) { return x.id === sid; });
+                    }
+                    if (!s && window.__akiniAllSurveys && window.__akiniAllSurveys[sid]) {
+                      s = window.__akiniAllSurveys[sid];
+                    }
+                    if (s && s.replied) {
+                      var st = b.querySelector(".survey-bubble-status");
+                      if (st) st.textContent = "已回答";
                     }
                     if (!b.getAttribute("data-click-bound")) {
                       b.setAttribute("data-click-bound", "1");
@@ -23916,14 +23921,15 @@ window.akiniContacts = {
   else bindIOSTutorial();
 
 
-  /* 一起听界面锁定：app-music 显示时，除播放列表/联系人列表/菜单面板外禁止触摸滑动 */
+  /* 一起听界面锁定：app-music 显示时，仅在播放器背景非滚动区域阻止滑动，绝不影响其他功能 */
   document.addEventListener("touchmove", function (ev) {
     try {
       var mm = document.getElementById("app-music");
-      if (!mm || mm.style.display === "none") return;
+      if (!mm || mm.style.display === "none" || !mm.classList.contains("show")) return;
       var t = ev.target;
-      if (t && t.closest && t.closest("#musicPlaylistContainer,#musicContactList,#musicMenuPanel,#musicChatModal")) return;
-      if (mm.contains(t)) ev.preventDefault();
+      if (!t || !mm.contains(t)) return;
+      if (t.closest && t.closest("#musicPlaylistContainer,#musicContactList,#musicMenuPanel,#musicChatModal,.music-scrollable,input,textarea,button")) return;
+      ev.preventDefault();
     } catch (e) {}
   }, { passive: false });
 })();
