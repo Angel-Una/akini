@@ -7,6 +7,7 @@
  */
 (function () {
   'use strict';
+  try {
 
   // 防止重复注入
   if (window.__akinicompatBridgeReady) return;
@@ -218,24 +219,59 @@
   }
 
   /* ========== 3. 拦截 Akini 的 localStorage 写操作，同步到 compat ========== */
-  const originalSetItem = localStorage.setItem.bind(localStorage);
-  const originalRemoveItem = localStorage.removeItem.bind(localStorage);
+  try {
+    const originalSetItem = localStorage.setItem.bind(localStorage);
+    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
 
-  localStorage.setItem = function (key, value) {
+    localStorage.setItem = function (key, value) {
+      try {
+        if (window.akiniStore && window.akiniStore.memorySet && key && String(key).indexOf('akini_') === 0) {
+          window.akiniStore.memorySet(key, String(value));
+        }
+      } catch (e) {}
+      var strKey = String(key || '');
+      var strVal = String(value == null ? '' : value);
+      try {
+        originalSetItem(strKey, strVal);
+      } catch (e) {
+        // v664: 彻底捕获 QuotaExceededError。尝试清理大 key 后重试一次；仍失败则绝对静默，依赖 IDB/内存，绝不向外抛错
+        if (e && (e.name === 'QuotaExceededError' || /quota/i.test(e.message || ''))) {
+          try {
+            __akiniEvictLocalStorageLargeKeys(strVal.length);
+            originalSetItem(strKey, strVal);
+          } catch (e2) {
+            // 静默失败，避免中断全局执行
+          }
+        }
+      }
+      try {
+        syncAkiniKeyTocompat(key, value);
+      } catch (e) {}
+    };
+  } catch (errWrapper) {
+    console.warn('[akini-compat-bridge] 包装 localStorage.setItem 失败，跳过拦截', errWrapper);
+  }
+
+  /* v663: 当 localStorage 配额满时，按大小排序清理旧的大 key（优先清理历史记录/媒体缓存），
+     保留联系人、设置、书架索引等关键小 key */
+  function __akiniEvictLocalStorageLargeKeys(needBytes) {
+    if (!localStorage) return;
     try {
-      if (window.akiniStore && window.akiniStore.memorySet && key && String(key).indexOf('akini_') === 0) {
-        window.akiniStore.memorySet(key, String(value));
+      var keys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf('akini_') !== 0) continue;
+        if (/contacts$|_books$|_settings$|_config$|_current/.test(k)) continue; // 保护关键小 key
+        var v = localStorage.getItem(k) || '';
+        keys.push({ k: k, n: v.length });
+      }
+      keys.sort(function (a, b) { return b.n - a.n; });
+      var freed = 0, target = Math.max(needBytes * 2, 500000);
+      for (var j = 0; j < keys.length && freed < target; j++) {
+        try { localStorage.removeItem(keys[j].k); freed += keys[j].n; } catch (e) {}
       }
     } catch (e) {}
-    try {
-      originalSetItem(key, value);
-    } catch (e) {
-      // 捕获所有 QuotaExceededError 或写入失败，确保绝不向外冒泡
-    }
-    try {
-      syncAkiniKeyTocompat(key, value);
-    } catch (e) {}
-  };
+  }
   localStorage.removeItem = function (key) {
     try {
       if (window.akiniStore && window.akiniStore.memoryRemove && key && String(key).indexOf('akini_') === 0) {
@@ -524,11 +560,17 @@
 
   // 页面加载完成后执行迁移与定时检查
   function init() {
-    migrateAkiniTocompat().then(function () {
-      loadEnvelopeData();
-      setInterval(checkEnvelopeStatus, 30000); // 每 30 秒检查一次回信
-      return restoreFromcompatToAkini();
-    });
+    try {
+      migrateAkiniTocompat().then(function () {
+        try { loadEnvelopeData(); } catch (e) {}
+        try { setInterval(checkEnvelopeStatus, 30000); } catch (e) {} // 每 30 秒检查一次回信
+        try { return restoreFromcompatToAkini(); } catch (e) {}
+      }).catch(function (err) {
+        console.warn('[akini-compat-bridge] init 流程捕获异常', err);
+      });
+    } catch (e) {
+      console.warn('[akini-compat-bridge] init 同步异常', e);
+    }
   }
 
   try {
@@ -542,4 +584,7 @@
       }, 500);
     }
   } catch (e) {}
+} catch (globalBridgeErr) {
+  console.warn('[akini-compat-bridge] 全局执行被捕获保护', globalBridgeErr);
+}
 })();

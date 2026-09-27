@@ -3455,12 +3455,19 @@ window.akiniContacts = {
       __akiniUpgradeSurveyIcons(chatBody);
       __akiniSyncCardStatus(chatBody);
       if (!chatBody.__akiniMetaObserver) {
+        /* v661 性能修复：批量加载历史时每条新增行都会全量跑一次
+           时间戳分隔符扫描（N 条消息 = N 次全聊天扫描）→ 防抖合并为一次 */
+        var _tsDeb = null;
+        var _tsSoon = function () {
+          if (_tsDeb) return;
+          _tsDeb = setTimeout(function () { _tsDeb = null; try { __akiniInsertTimestampSeparators(); } catch (e) {} }, 200);
+        };
         var obs = new MutationObserver(function (mutations) {
           mutations.forEach(function (m) {
             Array.from(m.addedNodes).forEach(function (node) {
               if (node.nodeType === 1 && node.classList && node.classList.contains("msg-row") && !node.classList.contains("timestamp-row")) {
                 try { __akiniProcessMsgMeta(node); } catch (e) {}
-                try { __akiniInsertTimestampSeparators(); } catch (e) {}
+                try { _tsSoon(); } catch (e) {}
                 try { __akiniUpgradeSurveyIcons(node); } catch (e) {}
               }
             });
@@ -7731,25 +7738,38 @@ window.akiniContacts = {
           if (typeof window.__akiniLineAvatarImg !== "function") return;
           if (isBad(root)) { root.innerHTML = window.__akiniLineAvatarImg(); return; }
           if (!root.querySelectorAll) return;
-          var list = root.querySelectorAll("div,span");
+          /* v661 性能修复（全局卡死主源）：旧版对子树内全部 div/span 逐个
+             isBad()（内含 closest() 祖先回溯）——长聊天一次 innerHTML 重建就
+             是数万元素 × 祖先深度次检查，且每 1.5s 全文档扫一遍，任何操作都卡。
+             现在：小注入节点(≤400 元素)保留全扫兼容零散场景；
+             大子树只扫头像类容器，扫描量缩小约百倍。 */
+          var list;
+          try {
+            var probe = root.querySelectorAll("div,span");
+            list = probe.length <= 400 ? probe : root.querySelectorAll('.msg-avatar, [class*="avatar" i], [id*="avatar" i]');
+          } catch (e0) { list = root.querySelectorAll(".msg-avatar"); }
           for (var i = 0; i < list.length; i++) {
             if (isBad(list[i])) list[i].innerHTML = window.__akiniLineAvatarImg();
           }
         } catch (e) {}
       }
-      function sweep() { fixTree(document.body); }
+      function sweep() { window.__akiniAvatarLastSweep = Date.now(); fixTree(document.body); }
       var timer = null;
       function schedule() {
         if (timer) return;
-        timer = setTimeout(function () { timer = null; sweep(); }, 1500);
+        timer = setTimeout(function () {
+          timer = null;
+          /* v661: 全文档扫最短间隔 5s；页面切后台时跳过 */
+          if (Date.now() - (window.__akiniAvatarLastSweep || 0) < 5000) { schedule(); return; }
+          if (document.hidden) { schedule(); return; }
+          sweep();
+        }, 1500);
       }
       function arm() {
         try {
-          new MutationObserver(function (muts) {
-            for (var i = 0; i < muts.length; i++) {
-              var an = muts[i].addedNodes;
-              for (var k = 0; k < an.length; k++) fixTree(an[k]);
-            }
+          /* v661: 不再逐 addedNode 立即 fixTree（大重建时是 O(节点数×closest)），
+             统一 debounce 进 sweep 一次处理 */
+          new MutationObserver(function () {
             schedule();
           }).observe(document.body, { childList: true, subtree: true });
         } catch (e) {}
@@ -26720,7 +26740,8 @@ if (!window.__akiniUnreadTickerStarted) {
     var _t = String(text == null ? "" : text).trim();
     if (_t.length > 10) _t = _t.slice(0, 10) + "…";
     var nameHtml = '<span style="font-weight:600;white-space:nowrap;color:#333;flex-shrink:0;">' + (window.rt ? rt(_n) : _esc(_n)) + "</span>";
-    var textHtml = _t ? '<span style="white-space:nowrap;color:#999;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:80px;">：' + (window.rt ? rt(_t) : _esc(_t)) + "</span>" : "";
+    /* v661: 引用文字与名字同色（#333），不再一深一浅两个颜色 */
+    var textHtml = _t ? '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:80px;">：' + (window.rt ? rt(_t) : _esc(_t)) + "</span>" : "";
     return '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:3px 8px!important;font-size:11px!important;line-height:1.3!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:2px!important;display:inline-flex!important;align-items:center!important;max-width:130px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;box-sizing:border-box!important;">' + nameHtml + textHtml + "</div>";
   };
 
@@ -26968,8 +26989,13 @@ if (!window.__akiniUnreadTickerStarted) {
     var total = 0;
     // senderStats: { name: { count: number, words: { text: count } } }
     var senderStats = {};
+    var skipped = 0;
     data.rows.forEach(function (row) {
       var info = _rowInfo(row);
+      /* v661: 只统计纯文字消息——转账/卡片/表情包/图片/语音等（_rowInfo 产出
+         【转账】【表情包】占位符或空文本的行）全部排除，不计数、不进词频 */
+      var t = (info.text || "").trim();
+      if (!t || t === "【转账】" || t === "【表情包】" || t === "【卡片】" || t === "【图片】" || t === "【语音】" || t === "【红包】" || t.indexOf("【") === 0) { skipped++; return; }
       total++;
       var sName = info.name || (info.isMe ? _myName() : _taName());
       if (!senderStats[sName]) senderStats[sName] = { count: 0, words: {} };

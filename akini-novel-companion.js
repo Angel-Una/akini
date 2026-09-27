@@ -527,13 +527,20 @@
   ];
   var DARK_BG = '#2a2a2e';
 
-  function saveBooks() { idbSet(BOOKS_KEY, JSON.stringify(_books)); }
+  function saveBooks() {
+    var payload = JSON.stringify(_books);
+    /* v663 修复：书架小 JSON 双写；localStorage 配额满时静默失败，IDB 仍可兜底 */
+    try { idbSet(BOOKS_KEY, payload); } catch (e) {}
+    try { window._idbStore && window._idbStore.flush && window._idbStore.flush(); } catch (e) {}
+    try { lsSet(BOOKS_KEY, payload); } catch (e) {
+      /* localStorage 配额已满时，至少保证 IDB 已成功写入，不抛错 */
+    }
+  }
 
   function loadBooks(cb) {
     if (_booksLoaded) { cb(); return; }
-    idbGet(BOOKS_KEY, function (v) {
+    var _done = function (stored) {
       try {
-        var stored = v ? JSON.parse(v) : [];
         if (!Array.isArray(stored)) stored = [];
         /* zzzx：异步读回的是导入前的旧快照，而内存里可能已有刚 push 的新书——
            合并去重而不是直接覆盖，防止"首次导入后书架空白、重启才出现" */
@@ -546,6 +553,19 @@
       } catch (e) { if (!Array.isArray(_books)) _books = []; }
       _booksLoaded = true;
       cb();
+    };
+    idbGet(BOOKS_KEY, function (v) {
+      try {
+        var arr = v ? JSON.parse(v) : null;
+        if (Array.isArray(arr) && arr.length) { _done(arr); return; }
+      } catch (e) {}
+      /* v662: IDB 未读到/为空时，读 localStorage 兜底 */
+      try {
+        var ls = lsGet(BOOKS_KEY, '');
+        var arr2 = ls ? JSON.parse(ls) : null;
+        if (Array.isArray(arr2) && arr2.length) { _done(arr2); return; }
+      } catch (e) {}
+      _done([]);
     });
   }
 
@@ -635,9 +655,18 @@
   /* zzaa 20260919v503：书籍信息里保存/读取章节缓存，切换书籍后章节列表立即可用 */
   var CHAPTER_CACHE_PREFIX = 'akini_novel_chapters_';
   function cacheChapters(bookId, chapters) {
-    try { lsSet(CHAPTER_CACHE_PREFIX + bookId, JSON.stringify(chapters)); } catch (e) {}
+    /* v663：章节缓存只写 IDB，不再写 localStorage（防止大文本爆配额） */
+    try { idbSet(CHAPTER_CACHE_PREFIX + bookId, JSON.stringify(chapters)); } catch (e) {}
+    try { window._idbStore && window._idbStore.flush && window._idbStore.flush(); } catch (e) {}
   }
   function loadCachedChapters(bookId) {
+    try {
+      if (window._idbStore && window._idbStore.getSync) {
+        var v = window._idbStore.getSync(CHAPTER_CACHE_PREFIX + bookId);
+        if (v) return JSON.parse(v);
+      }
+    } catch (e) {}
+    /* 兼容 v662 之前写进 localStorage 的少量缓存 */
     try { var v = lsGet(CHAPTER_CACHE_PREFIX + bookId, ''); return v ? JSON.parse(v) : []; } catch (e) { return []; }
   }
 

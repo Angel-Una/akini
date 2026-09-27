@@ -926,18 +926,177 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   align-items: center;
   justify-content: space-between;
   padding: 0 12px !important;
-  background: rgba(255, 255, 255, 0.55);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+  /* v667: 彻底告别白色渐变，本体纯透明，透出用户精美背景壁纸 */
+  background: transparent !important;
+  border-bottom: none !important;
   z-index: 1000 !important;
-  height: 92px !important;
+  height: calc(env(safe-area-inset-top, 0px) + 82px) !important;
+  padding-top: env(safe-area-inset-top, 0px) !important;
   position: fixed !important;
   top: 0;
   left: 0;
   right: 0;
   width: 100%;
   box-sizing: border-box;
+}
+/* v670: 轻雾阶梯式毛玻璃渐变顶栏（修复"太厚重+成一块无渐变"）
+   核心变化：
+   1. 摒弃依赖 mask 的单点方案——部分 iOS WebKit 会忽略带 backdrop-filter 元素上的 mask，
+      导致整层均匀模糊"成一块"。v670 改为【五层阶梯叠加】：每层小模糊(2~6px)、覆盖高度递减，
+      顶部叠五层≈20px柔雾、中部三层、底部仅剩一层2px且渐隐——天然形成由浓到淡的真实渐变，
+      任何浏览器都有效，绝不依赖 mask；mask 仅作为支持浏览器的平滑增强。
+   2. 每层模糊值很小(2~6px)且去掉 saturate(180%)，观感如一层轻纱薄雾，彻底告别厚重磨砂感。
+   3. 每层保留 0.02~0.04 极微透光(肉眼不可见白色)，确保 iOS WebKit 不丢弃 backdrop-filter 硬件渲染。
+   4. 底板 z-index: 0，稳居返回键/头像/昵称/通话键(z-index: 10~12)之下，绝不遮挡控件。 */
+.chat-top-bar-blur {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: calc(100% + 12px) !important;
+  background: transparent !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden !important;
+}
+
+.chat-top-bar-blur .chat-blur-layer {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  width: 100% !important;
+  pointer-events: none !important;
+}
+
+/* 第 1 层：全高轻纱打底(2px)，向下渐隐至无 */
+.chat-top-bar-blur .chat-blur-l1 {
+  height: 100% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%) !important;
+  -webkit-backdrop-filter: blur(2px) !important;
+  backdrop-filter: blur(2px) !important;
+  -webkit-mask-image: linear-gradient(180deg, black 0%, black 35%, transparent 100%) !important;
+  mask-image: linear-gradient(180deg, black 0%, black 35%, transparent 100%) !important;
+}
+
+/* 第 2 层：84% 高度(3px) */
+.chat-top-bar-blur .chat-blur-l2 {
+  height: 84% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, transparent 100%) !important;
+  -webkit-backdrop-filter: blur(3px) !important;
+  backdrop-filter: blur(3px) !important;
+  -webkit-mask-image: linear-gradient(180deg, black 0%, black 30%, transparent 95%) !important;
+  mask-image: linear-gradient(180deg, black 0%, black 30%, transparent 95%) !important;
+}
+
+/* 第 3 层：68% 高度(4px) */
+.chat-top-bar-blur .chat-blur-l3 {
+  height: 68% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-mask-image: linear-gradient(180deg, black 0%, black 28%, transparent 90%) !important;
+  mask-image: linear-gradient(180deg, black 0%, black 28%, transparent 90%) !important;
+}
+
+/* 第 4 层：52% 高度(5px) */
+.chat-top-bar-blur .chat-blur-l4 {
+  height: 52% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, transparent 100%) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-mask-image: linear-gradient(180deg, black 0%, black 25%, transparent 85%) !important;
+  mask-image: linear-gradient(180deg, black 0%, black 25%, transparent 85%) !important;
+}
+
+/* 第 5 层：38% 高度(6px)，仅顶部状态栏核心区最浓 */
+.chat-top-bar-blur .chat-blur-l5 {
+  height: 38% !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-mask-image: linear-gradient(180deg, black 0%, black 22%, transparent 80%) !important;
+  mask-image: linear-gradient(180deg, black 0%, black 22%, transparent 80%) !important;
+}
+
+/* 兼容兜底伪元素：纯透明、不干扰多层渲染 */
+.chat-top-bar::before {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: transparent !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+/* 暗色模式：极微黑底，同样保证非零 alpha 触发渲染 */
+body.dark-mode .chat-top-bar-blur .chat-blur-l1 {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.10) 0%, transparent 100%) !important;
+}
+body.dark-mode .chat-top-bar-blur .chat-blur-l2 {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, transparent 100%) !important;
+}
+body.dark-mode .chat-top-bar-blur .chat-blur-l3 {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.07) 0%, transparent 100%) !important;
+}
+body.dark-mode .chat-top-bar-blur .chat-blur-l4 {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.06) 0%, transparent 100%) !important;
+}
+body.dark-mode .chat-top-bar-blur .chat-blur-l5 {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, transparent 100%) !important;
+}
+
+/* v667: 核心控件（返回键、头像、昵称条、通话键）全部绝对置于顶层(z-index: 10)，稳稳悬浮在模糊渐变层之上，清晰锐利无任何遮挡模糊 */
+#app-chat .chat-top-bar .back-btn,
+#app-chat .chat-top-bar #chatBackBtn,
+.chat-top-bar .back-btn,
+#chatBackBtn {
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+#app-chat .chat-top-bar .ta-info,
+.chat-top-bar .ta-info {
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 10 !important;
+}
+
+#app-chat .chat-top-bar .ta-info .ta-avatar,
+.chat-top-bar .ta-info .ta-avatar,
+#chatTaAvatar {
+  position: relative !important;
+  z-index: 12 !important;
+}
+
+#app-chat .chat-top-bar .ta-info .ta-name-pill,
+#app-chat .chat-top-bar .ta-name-pill,
+.chat-top-bar .ta-name-pill {
+  position: relative !important;
+  z-index: 11 !important;
+}
+
+#app-chat .chat-top-bar .call-btn,
+#app-chat .chat-top-bar #chatCallBtn,
+.chat-top-bar .call-btn,
+#chatCallBtn {
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+/* v667: 彻底移除 ::after 遮挡带，避免在不同浏览器下出现断层白条 */
+.chat-top-bar::after {
+  display: none !important;
+  content: none !important;
 }
 .chat-top-bar .left-group {
   display: flex;
@@ -2076,8 +2235,8 @@ html body.bubble-green:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #1a1a1a !important;
-  color: #fff !important;
+  background: #95ec69 !important;
+  color: #1a1a1a !important;
 }
 html body.bubble-black:not(.bubble-css-on)
   .chat-body
@@ -4898,8 +5057,13 @@ body.dark-mode .akini-slider-value {
 .chat-input-bar {
   position: relative !important;
 }
-.chat-input-bar body.dark-mode .chat-top-bar {
-  background: rgba(42, 42, 46, 0.92) !important;
+/* v666: 暗色模式磨砂渐变顶栏，同样保持背景纯透明，仅做毛玻璃模糊渐隐 */
+body.dark-mode .chat-top-bar {
+  background: transparent !important;
+}
+body.dark-mode .chat-top-bar::before {
+  background: transparent !important;
+  background-color: transparent !important;
 }
 /* v20260821o: 移除 padding-top:0 覆盖，恢复各页面固定顶栏所需的顶部留白，避免内容被顶栏遮挡导致界面变长 */
 .akini-mic-btn {
@@ -7066,10 +7230,8 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 
 /* iMessage 风格聊天界面覆盖 */
 .chat-top-bar {
-  background: rgba(255, 255, 255, 0.25) !important;
-  backdrop-filter: saturate(180%) blur(20px) !important;
-  -webkit-backdrop-filter: saturate(180%) blur(20px) !important;
-  border-bottom: 0.5px solid rgba(255, 255, 255, 0.35) !important;
+  /* v664：顶栏采用渐变背景，不再全局叠加会导致断层的强模糊 */
+  border-bottom: none !important;
   box-shadow: none !important;
 }
 .chat-top-bar .back-btn {
@@ -7114,6 +7276,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
+  z-index: 10 !important;
 }
 .chat-top-bar .ta-info .ta-avatar {
   width: 56px;
@@ -7430,9 +7593,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 
 /* ===== v518: 聊天界面顶部/底部栏去白色底图 ===== */
 .chat-top-bar {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
+  /* v662：不再把顶栏设为透明，保留默认毛玻璃渐变 */
   border-bottom: none !important;
 }
 .chat-input-bar-area {
@@ -7442,22 +7603,28 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   border-top: none !important;
 }
 
-/* ===== v518: 顶部返回键/通话键放大并上移 ===== */
+/* ===== v662: 顶部返回键/通话键严格同尺寸、同视觉重心 ===== */
 .chat-top-bar .back-btn {
   width: 40px !important;
   height: 40px !important;
-  font-size: 28px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  font-size: 24px !important;
   line-height: 38px !important;
-  margin-top: -4px !important;
+  margin-top: 0 !important;
 }
-.chat-top-bar .call-btn {
+.chat-top-bar .call-btn,
+.chat-top-bar .call-btn#chatCallBtn {
   width: 40px !important;
   height: 40px !important;
-  margin-top: -4px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  margin-top: 0 !important;
 }
-.chat-top-bar .call-btn svg {
-  width: 26px !important;
-  height: 26px !important;
+.chat-top-bar .call-btn svg,
+.chat-top-bar .call-btn#chatCallBtn svg {
+  width: 24px !important;
+  height: 24px !important;
 }
 
 /* ===== v518: 底部输入栏按钮放大 ===== */
@@ -7537,13 +7704,9 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 /* 1. 聊天界面彻底移除上下栏白色底图与生硬边框 */
 #app-chat .chat-top-bar,
 .chat-top-bar {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
+  /* v662：保留毛玻璃渐变，不再强制透明 */
   border-bottom: none !important;
   box-shadow: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
 }
 
 #app-chat .chat-input-bar-area,
@@ -7565,10 +7728,11 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 #app-chat .chat-top-bar #chatCallBtn,
 #app-chat .chat-input-bar #plusMenuBtn,
 #app-chat .chat-input-bar #sendBtn {
-  width: 38px !important;
-  height: 38px !important;
-  min-width: 38px !important;
-  min-height: 38px !important;
+  /* v662：返回键与通话键严格同尺寸，避免视觉上一个大一个小 */
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
   border-radius: 50% !important;
   background: rgba(255, 255, 255, 0.45) !important;
   backdrop-filter: blur(28px) saturate(180%) !important;
@@ -7812,7 +7976,7 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
 #app-chat .chat-body,
 #app-chat #chatBody {
   padding-bottom: 24px !important;
-  padding-top: 82px !important;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 94px) !important;
 }
 
 /* 3. 最下面那一栏的白色底图去掉（微信聊天输入栏透明透出背景图，观影页保留独立底色） */
@@ -7908,16 +8072,17 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
   flex-direction: column !important;
   align-items: center !important;
   gap: 0 !important;
+  z-index: 10 !important;
 }
 .chat-top-bar .ta-info .ta-avatar {
   position: relative !important;
-  z-index: 2 !important;
+  z-index: 12 !important;
   margin-bottom: 0 !important;
 }
 .chat-top-bar .ta-name-pill,
 #app-chat .chat-top-bar .ta-name-pill {
   position: relative !important;
-  z-index: 1 !important;
+  z-index: 11 !important;
   margin-top: -10px !important; /* 向上穿透重叠，被圆形头像底部挡住一部分 */
   transform: none !important;
 }
@@ -7967,10 +8132,10 @@ html body.bubble-pink:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.tr
   box-shadow: 0 2px 8px rgba(255, 180, 200, 0.28) !important;
 }
 html body.bubble-green:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #1a1a1a !important;
-  color: #ffffff !important;
+  background: #95ec69 !important;
+  color: #1a1a1a !important;
   border: none !important;
-  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(149, 236, 105, 0.25) !important;
 }
 html body.bubble-black:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #111111 !important;
@@ -8049,15 +8214,15 @@ html body.bubble-pink:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not
 }
 html body.bubble-green:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body.bubble-green:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #1a1a1a !important;
-  color: #ffffff !important;
+  background: #95ec69 !important;
+  color: #1a1a1a !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   border: none !important;
   border-radius: 18px !important;
   border-bottom-right-radius: 4px !important;
   padding: 11px 15px !important;
-  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(149, 236, 105, 0.25) !important;
 }
 html body.bubble-black:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body.bubble-black:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
@@ -8673,7 +8838,8 @@ button#plusMenuBtn {
   right: 0 !important;
   width: 100% !important;
   height: 100% !important;
-  padding-top: 86px !important;
+  /* v666: 充分避让顶栏控件（返回键/头像/昵称条/通话键），确保最顶部消息绝不与顶栏控件重叠遮挡 */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 94px) !important;
   padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
   box-sizing: border-box !important;
   overflow-y: auto !important;
@@ -9211,7 +9377,8 @@ html body:not(.bubble-css-on) #app-chat .msg-row .bubble.sticker-bubble,
   width: 100% !important;
   height: 100% !important;
   box-sizing: border-box !important;
-  padding-top: 86px !important;
+  /* v666: 充分避让顶栏控件（返回键/头像/昵称条/通话键），确保最顶部消息绝不与顶栏控件重叠遮挡 */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 94px) !important;
   /* v550：恢复 76px 贴底值——v549 改成 60px 后低于输入栏实际总高，
      导致发送消息时最新消息被输入栏遮挡，必须下滑才能看见。
      76px + safe-area 可保证最后一条消息紧贴输入栏上沿 */
@@ -9641,12 +9808,12 @@ html body.bubble-pink:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubb
 
 html body.bubble-green:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
 html body.bubble-green:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
-  background: #1a1a1a !important;
-  color: #ffffff !important;
+  background: #95ec69 !important;
+  color: #1a1a1a !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   border: none !important;
-  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(149, 236, 105, 0.25) !important;
 }
 
 html body.bubble-black:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
