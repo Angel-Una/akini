@@ -112,7 +112,7 @@
           var name = it.name || it.id;
           var isGroup = it.isGroup;
           listHtml += '<label style="display:flex;align-items:center;gap:12px;padding:13px 4px;border-bottom:1px solid #f3f3f3;cursor:pointer;min-height:48px;box-sizing:border-box">' +
-            '<input type="checkbox" class="ak-clear-chat-cb" value="' + String(it.id).replace(/"/g, "&quot;") + '" style="width:20px;height:20px;flex-shrink:0;accent-color:#07c160">' +
+            '<input type="checkbox" class="ak-clear-chat-cb" value="' + String(it.id).replace(/"/g, "&quot;") + '" style="width:20px;height:20px;flex-shrink:0;accent-color:#1a1a1a">' +
             '<span style="flex:1;min-width:0;font-size:15px;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
               String(name).replace(/&/g, "&amp;").replace(/</g, "&lt;") +
               (isGroup ? ' <span style="font-size:11px;color:#999">(群聊)</span>' : "") +

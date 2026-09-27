@@ -522,7 +522,7 @@
   var RENDER_CHUNK = 120;
 
   var COVER_GRADS = [
-    ['#f6d5c3', '#e8a87c'], ['#c3d9f6', '#7ca8e8'], ['#d5f6c3', '#8ce87c'],
+    ['#f6d5c3', '#e8a87c'], ['#c3d9f6', '#7ca8e8'], ['#333333', '#333333'],
     ['#f6c3d9', '#e87ca8'], ['#e6d5f6', '#b07ce8'], ['#f6efc3', '#e8d07c']
   ];
   var DARK_BG = '#2a2a2e';
@@ -764,7 +764,7 @@
     if (row) {
       Array.prototype.forEach.call(row.children, function (el) {
         var c = el.getAttribute('data-color');
-        el.style.boxShadow = (c === s.bgColor && !isImgSrc(s.bg)) ? '0 0 0 2px #07c160' : 'none';
+        el.style.boxShadow = (c === s.bgColor && !isImgSrc(s.bg)) ? '0 0 0 2px #1a1a1a' : 'none';
       });
     }
     /* 翻页方式按钮态 */

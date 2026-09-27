@@ -92,7 +92,7 @@ body.dark-mode .akini-center-modal-panel .akini-modal-btn-cancel {
   color: #e8e8e8 !important;
 }
 body.dark-mode .akini-center-modal-panel .akini-modal-btn-ok {
-  background: #07c160 !important;
+  background: #1a1a1a !important;
   color: #fff !important;
 }
 input[type="file"].file-input-local::-webkit-file-upload-button {
@@ -1204,7 +1204,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   height: 36px;
   border-radius: 18px;
   border: none;
-  background: #07c160;
+  background: #1a1a1a;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -1263,8 +1263,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   background: #fff;
 }
 .shop-picker-item.selected .shop-picker-check {
-  border-color: #07c160;
-  background: #07c160;
+  border-color: #1a1a1a;
+  background: #1a1a1a;
 }
 .shop-picker-check-inner {
   width: 8px;
@@ -1383,7 +1383,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 .shop-card-bubble-status.done {
   color: #1a1a1a;
-  background: rgba(94, 210, 140, 0.16);
+  background: rgba(26, 26, 26, 0.16);
 }
 
 .shop-order-badge {
@@ -1397,8 +1397,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   color: #ffa500;
 }
 .shop-order-badge.badge-gift {
-  background: rgba(7, 193, 96, 0.2);
-  color: #07c160;
+  background: rgba(26, 26, 26, 0.2);
+  color: #1a1a1a;
 }
 .shop-order-meta {
   font-size: 12px;
@@ -1507,7 +1507,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #07c160;
+  background: #1a1a1a;
   z-index: 1;
 }
 .chat-list-actions button {
@@ -1643,7 +1643,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transition: color 0.15s ease;
 }
 .chat-list-tab.active .chat-list-tab-icon {
-  color: #07c160;
+  color: #1a1a1a;
 }
 .chat-list-tab .chat-list-tab-label {
   font-size: 11px;
@@ -1652,7 +1652,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   transition: color 0.15s ease;
 }
 .chat-list-tab.active .chat-list-tab-label {
-  color: #07c160;
+  color: #1a1a1a;
   font-weight: 600;
 }
 .chat-list-tab .chat-list-tab-badge {
@@ -2076,7 +2076,7 @@ html body.bubble-green:not(.bubble-css-on)
   .chat-body
   .msg-row.me
   .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #07c160 !important;
+  background: #1a1a1a !important;
   color: #fff !important;
 }
 html body.bubble-black:not(.bubble-css-on)
@@ -4061,10 +4061,10 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 .call-mini-window .call-actions .answer-btn {
-  background: #34c759;
+  background: #1a1a1a;
   color: #fff;
   font-size: 22px;
-  box-shadow: 0 4px 20px rgba(52, 199, 89, 0.35);
+  box-shadow: 0 4px 20px rgba(26, 26, 26, 0.35);
 }
 .call-mini-window .call-actions .hangup-btn {
   background: #ff3b30;
@@ -4910,7 +4910,7 @@ body.dark-mode .akini-slider-value {
   transform: scale(0.92) !important;
 }
 .akini-mic-btn:hover {
-  color: #07c160;
+  color: #1a1a1a;
 }
 .input-wrap {
   display: flex !important;
@@ -5856,7 +5856,7 @@ button.back-btn[type="button"] {
 .ak-empty { font-size: 12px; color: #bbb; padding: 10px 0; text-align: center; }
 .ak-btn-col { display: flex; flex-direction: column; gap: 8px; }
 .ak-stor-btn { width: 100%; height: 42px; border-radius: 12px; border: 1px solid #e8e8e8; background: #f8f8f8; color: #333; font-size: 14px; cursor: pointer; }
-.ak-stor-btn.primary { background: #07c160; border-color: #07c160; color: #fff; font-weight: 600; }
+.ak-stor-btn.primary { background: #1a1a1a; border-color: #1a1a1a; color: #fff; font-weight: 600; }
 .ak-stor-btn.danger { background: #fff; border-color: #ffd6d3; color: #ff3b30; }
 .ak-stor-btn.danger-solid { background: #ff3b30; border-color: #ff3b30; color: #fff; font-weight: 600; }
 .ak-stor-btn:active { opacity: .8; }
@@ -6167,8 +6167,8 @@ textarea:focus,
 }
 .wb-word-item.selected {
   background: #f0faf4;
-  border: 1.5px solid #07c160;
-  box-shadow: 0 2px 10px rgba(7, 193, 96, 0.14);
+  border: 1.5px solid #1a1a1a;
+  box-shadow: 0 2px 10px rgba(26, 26, 26, 0.14);
 }
 .wb-word-item .wb-word-check {
   border-radius: 50%;
@@ -6177,8 +6177,8 @@ textarea:focus,
   border: 1.5px solid #d4d4d4;
 }
 .wb-word-item.selected .wb-word-check {
-  background: #07c160;
-  border-color: #07c160;
+  background: #1a1a1a;
+  border-color: #1a1a1a;
 }
 .wb-word-item .wb-word-text {
   font-size: 15px;
@@ -6186,8 +6186,8 @@ textarea:focus,
   line-height: 1.5;
 }
 .wb-word-item .wb-word-group {
-  color: #07c160;
-  background: rgba(7, 193, 96, 0.08);
+  color: #1a1a1a;
+  background: rgba(26, 26, 26, 0.08);
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 11px;
@@ -6273,8 +6273,8 @@ body.dark-mode .wb-word-item {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 body.dark-mode .wb-word-item.selected {
-  background: rgba(7, 193, 96, 0.12);
-  border-color: #07c160;
+  background: rgba(26, 26, 26, 0.12);
+  border-color: #1a1a1a;
 }
 body.dark-mode .wb-word-item .wb-word-text {
   color: #e8e8e8;
@@ -6974,7 +6974,7 @@ input[type="file"].akini-file-offscreen {
 .ak-android-step-title {
   font-size: 13.5px;
   font-weight: 700;
-  color: #07c160;
+  color: #1a1a1a;
   margin-bottom: 4px;
   display: flex;
   align-items: center;
@@ -7013,7 +7013,7 @@ input[type="file"].akini-file-offscreen {
   height: 42px;
   border-radius: 10px;
   border: none;
-  background: #07c160;
+  background: #1a1a1a;
   color: #fff;
   font-size: 14px;
   font-weight: 600;
@@ -7967,10 +7967,10 @@ html body.bubble-pink:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.tr
   box-shadow: 0 2px 8px rgba(255, 180, 200, 0.28) !important;
 }
 html body.bubble-green:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #07c160 !important;
+  background: #1a1a1a !important;
   color: #ffffff !important;
   border: none !important;
-  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.25) !important;
 }
 html body.bubble-black:not(.bubble-css-on) .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
   background: #111111 !important;
@@ -8049,7 +8049,7 @@ html body.bubble-pink:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not
 }
 html body.bubble-green:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body.bubble-green:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
-  background: #07c160 !important;
+  background: #1a1a1a !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
@@ -8057,7 +8057,7 @@ html body.bubble-green:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:no
   border-radius: 18px !important;
   border-bottom-right-radius: 4px !important;
   padding: 11px 15px !important;
-  box-shadow: 0 2px 8px rgba(7, 193, 96, 0.25) !important;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.25) !important;
 }
 html body.bubble-black:not(.bubble-css-on) #companionMsgs .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble),
 html body.bubble-black:not(.bubble-css-on) #watchChatBody .msg-row.me .bubble:not(.transfer-bubble):not(.sticker-bubble):not(.survey-bubble):not(.shop-card-bubble) {
@@ -9641,12 +9641,12 @@ html body.bubble-pink:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubb
 
 html body.bubble-green:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),
 html body.bubble-green:not(.bubble-css-on) #app-chat .chat-body .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble) {
-  background: #4cd964 !important;
+  background: #1a1a1a !important;
   color: #ffffff !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   border: none !important;
-  box-shadow: 0 2px 8px rgba(76, 217, 100, 0.3) !important;
+  box-shadow: 0 2px 8px rgba(26, 26, 26, 0.3) !important;
 }
 
 html body.bubble-black:not(.bubble-css-on) #app-chat .msg-row.me .bubble:not(.transfer-bubble):not(.shop-card-bubble):not(.survey-bubble):not(.sticker-bubble):not(.redpacket-bubble),

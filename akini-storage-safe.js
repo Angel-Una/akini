@@ -72,7 +72,7 @@
            （微信切后台 IDB 事务经常不 commit），驱逐它=删掉最后保险；表情包/图片会话
            最先变超大键也最先被驱逐，正是"表情包总是莫名消失"的根因 */
         var _ks = String(k);
-        if (_ks.indexOf('akini_chat_history_') === 0 || _ks.indexOf('akini_media_') === 0 || _ks.indexOf('akini_stickers_') === 0) continue;
+        if (_ks.indexOf('akini_chat_history_') === 0 || _ks.indexOf('akini_media_') === 0 || _ks.indexOf('akini_stickers_') === 0 || _ks.indexOf('akini_favs_') === 0) continue;
         var v = lsGet(k);
         if (v && typeof v === 'string' && v.length > 60000) bigs.push({ k: k, len: v.length });
       }

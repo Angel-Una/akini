@@ -440,17 +440,41 @@
       parseZipBackup(ab, done, errCb);
       return;
     }
+    /* v659 防卡死/闪退（对齐 milk/syy 思路）：
+       1) 分块解码每块之间让出主线程（setTimeout 0），页面保持可响应；
+       2) JSON.parse 后立即释放 text 引用，避免双份巨型字符串同时驻留；
+       3) 大键媒体内联放到 applyBackupToStorage 的分批写入阶段逐条处理。 */
     try {
-      /* zzzx：分块流式解码，避免大备份文件一次性 decode 内存峰值卡崩 */
       var u8 = new Uint8Array(ab);
       var dec = new TextDecoder("utf-8");
-      var CH = 4 * 1024 * 1024, text = "";
-      for (var i = 0; i < u8.length; i += CH) {
-        text += dec.decode(u8.subarray(i, Math.min(i + CH, u8.length)), { stream: true });
+      var CH = 1024 * 1024, text = "";
+      var i = 0;
+      function stepDecode() {
+        try {
+          var end = Math.min(i + CH, u8.length);
+          text += dec.decode(u8.subarray(i, end), { stream: true });
+          i = end;
+          if (i < u8.length) { setTimeout(stepDecode, 0); return; }
+          text += dec.decode();
+          if (text.length && text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+          /* 解析也放异步：巨型 JSON.parse 同样冻结主线程数百毫秒~数秒 */
+          setTimeout(function () {
+            try {
+              var data = JSON.parse(text);
+              text = ""; /* 尽早释放，降低峰值内存 */
+              u8 = null; ab = null;
+              done(data);
+            } catch (e2) {
+              text = ""; u8 = null; ab = null;
+              errCb && errCb("备份解析失败：" + e2.message);
+            }
+          }, 30);
+        } catch (e1) {
+          text = ""; u8 = null; ab = null;
+          errCb && errCb("备份解码失败：" + e1.message);
+        }
       }
-      text += dec.decode();
-      if (text.length && text.charCodeAt(0) === 0xfeff) text = text.slice(1);
-      done(JSON.parse(text));
+      stepDecode();
     } catch (e) {
       errCb && errCb("备份解析失败：" + e.message);
     }
@@ -608,7 +632,9 @@
       }
 
       /* zzzx：分批写入（每批 25 键 + setTimeout 让出主线程），
-         大备份导入时页面保持响应，不再假死/被系统误杀 */
+         大备份导入时页面保持响应，不再假死/被系统误杀
+         v659：含媒体内联时单键处理成本高（几百KB字符串 JSON 往返），
+         自适应降批：单键均值 >60KB 时每批只写 8 键，让出主线程更频繁 */
       var _wkeys = [];
       for (var key in lsRaw) {
         if (Object.prototype.hasOwnProperty.call(lsRaw, key)) _wkeys.push([lsRaw, key]);
@@ -616,9 +642,17 @@
       for (var k2 in idbRaw) {
         if (Object.prototype.hasOwnProperty.call(idbRaw, k2)) _wkeys.push([idbRaw, k2]);
       }
+      var _totalChars = 0;
+      try {
+        _wkeys.forEach(function (p) {
+          var v = p[0][p[1]];
+          _totalChars += typeof v === "string" ? v.length : 200;
+        });
+      } catch (e) {}
+      var _batchSize = _wkeys.length && (_totalChars / _wkeys.length) > 61440 ? 8 : 25;
       var _wi = 0;
       (function step() {
-        var end = Math.min(_wi + 25, _wkeys.length);
+        var end = Math.min(_wi + _batchSize, _wkeys.length);
         for (; _wi < end; _wi++) {
           var src = _wkeys[_wi][0], kk = _wkeys[_wi][1];
           tryWrite(kk, processLocalStorageValueForImport(src[kk], mediaStore));
@@ -656,6 +690,14 @@
 
   function akImportBackup(file) {
     if (!file) return;
+    /* v659: 导入全程进度提示——大文件解析/写入耗时数秒，无提示会被用户当成卡死反复点击 */
+    try {
+      if (window.__akiniCenterModal) {
+        window.__akiniCenterModal("正在导入", "正在读取备份文件（" + (file.size / 1048576 >= 1 ? (file.size / 1048576).toFixed(1) + " MB" : Math.round(file.size / 1024) + " KB") + "），请勿离开页面…");
+      } else {
+        notify("正在导入", "正在读取备份文件，请稍候…", "info");
+      }
+    } catch (e) {}
     var reader = new FileReader();
     reader.onload = function (ev) {
       try {
@@ -664,6 +706,13 @@
           ab,
           function (data) {
             function doImport() {
+              try {
+                if (window.__akiniCenterModal) {
+                  window.__akiniCenterModal("正在导入", "正在写入数据，完成后页面将自动刷新…");
+                } else {
+                  notify("正在导入", "正在写入数据，请稍候…", "info");
+                }
+              } catch (e) {}
               applyBackupToStorage(
                 data,
                 function (count) {
