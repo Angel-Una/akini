@@ -4137,7 +4137,7 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   -webkit-backdrop-filter: blur(40px) saturate(1.8) !important;
   border-radius: 28px;
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.12);
-  z-index: 999999990 !important;
+  z-index: 2147483647 !important;
   display: none;
   flex-direction: column;
   align-items: center;
@@ -4220,10 +4220,10 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 .call-mini-window .call-actions .answer-btn {
-  background: #1a1a1a;
+  background: #2dd36f;
   color: #fff;
   font-size: 22px;
-  box-shadow: 0 4px 20px rgba(26, 26, 26, 0.35);
+  box-shadow: 0 4px 20px rgba(45, 211, 111, 0.35);
 }
 .call-mini-window .call-actions .hangup-btn {
   background: #ff3b30;
@@ -4247,7 +4247,11 @@ body.dark-mode .wb-toolbar .tool-btn:active {
   justify-content: flex-start !important;
   gap: 8px !important;
   cursor: pointer !important;
+  pointer-events: auto !important;
   touch-action: none !important;
+}
+.call-mini-shrunk * {
+  pointer-events: none !important;
 }
 .call-mini-shrunk:active {
   transform: scale(0.96) !important;
@@ -4864,6 +4868,7 @@ body {
   max-width: none;
   left: 50% !important;
   transform: translateX(-50%) !important;
+  z-index: 2147483647 !important;
 }
 
 #__akiniDiag {

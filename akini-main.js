@@ -1622,7 +1622,7 @@ document.addEventListener("DOMContentLoaded", function () {
       if (!msg) return;
       if (!_el) {
         _el = document.createElement("div");
-        _el.style.cssText = "position:fixed;top:calc(14px + var(--ak-sat, 0px));left:50%;transform:translateX(-50%);z-index:10000010;max-width:82%;padding:10px 18px;border-radius:999px;background:rgba(26,26,26,.92);color:#fff;font-size:13px;font-weight:500;line-height:1.4;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transition:opacity .18s;pointer-events:none;white-space:pre-wrap";
+        _el.style.cssText = "position:fixed;top:calc(14px + var(--ak-sat, 0px));left:50%;transform:translateX(-50%);z-index:2147483647;max-width:82%;padding:10px 18px;border-radius:999px;background:rgba(26,26,26,.92);color:#fff;font-size:13px;font-weight:500;line-height:1.4;text-align:center;box-shadow:0 4px 16px rgba(0,0,0,.18);opacity:0;transition:opacity .18s;pointer-events:none;white-space:pre-wrap";
         document.body.appendChild(_el);
       }
       _el.textContent = String(msg);
@@ -1980,7 +1980,7 @@ document.addEventListener("DOMContentLoaded", function () {
           i.classList.contains("call-mini-shrunk") &&
           "none" !== i.style.display &&
           ((i.style.zIndex = "2147483647"),
-          document.body.insertBefore(i, document.body.firstChild)),
+          document.body.appendChild(i)),
         "friends" === t &&
           ("function" == typeof window._renderPosts && window._renderPosts(),
           Tn()),
@@ -2056,7 +2056,7 @@ document.addEventListener("DOMContentLoaded", function () {
         n.classList.contains("call-mini-shrunk") &&
         "none" !== n.style.display &&
         ((n.style.zIndex = "2147483647"),
-        document.body.insertBefore(n, document.body.firstChild));
+        document.body.appendChild(n));
     }
     window.showArea = r;
     !(function () {})();
@@ -4809,7 +4809,7 @@ window.akiniContacts = {
       }
       function doCall() {
         h();
-        if ("function" == typeof window.showInAppNotif) {
+        if (!(we && we.active) && "function" == typeof window.showInAppNotif) {
           var cI = {
             app: "电话",
             appIcon: "📞",
@@ -13044,59 +13044,109 @@ window.akiniContacts = {
           : U.classList.remove("call-expanded"));
     }
     function Ce() {
-      ((we.isMinimized = !1), be());
+      we.isMinimized = !1;
+      be();
       const t = document.getElementById("app-call");
-      (t && ((t.style.display = "flex"), (t.style.zIndex = "99999999")),
-        (ge.style.display = "none"),
-        ge.classList.add("call-mini-shrunk"),
-        (function () {
-          var t = document.getElementById("callAvatarStack");
-          if (t) {
-            t.innerHTML = "";
-            var e = we.isMyCalling,
-              n = we.selectedMembers || [],
-              ceAvatar =
-                we.isGroupCall && we.answered && we.activeMember
-                  ? we.activeMember.avatar || we.callerAvatar
-                  : we.callerAvatar || "";
-            if (e)
-              n.forEach(function (e) {
-                if (!1 !== e.answered) {
-                  var n = document.createElement("div");
-                  ((n.className = "call-avatar"),
-                    n.setAttribute("data-call-member-id", e.id || ""),
-                    (n.style.cssText =
-                      "width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:40px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
-                    (n.innerHTML = nt(e.avatar, 80)),
-                    t.appendChild(n));
-                }
-              });
-            else if (we.isGroupCall && we.answered) {
-              var a = document.getElementById("callNameFull");
-              a &&
-                (a.innerText = we.groupName || we.callerName || "群聊");
-              n.forEach(function (e) {
-                if (!1 !== e.answered) {
-                  var n = document.createElement("div");
-                  ((n.className = "call-avatar"),
-                    n.setAttribute("data-call-member-id", e.id || ""),
-                    (n.style.cssText =
-                      "width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:40px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
-                    (n.innerHTML = nt(e.avatar, 80)),
-                    t.appendChild(n));
-                }
-              });
-            } else {
-              var r = document.createElement("div");
-              ((r.className = "call-avatar"),
-                (r.style.cssText =
-                  "width:100px;height:100px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:50px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
-                (r.innerHTML = nt(ceAvatar, 100)),
-                t.appendChild(r));
-            }
+      if (t) {
+        t.style.display = "flex";
+        t.style.position = "fixed";
+        t.style.top = "0";
+        t.style.left = "50%";
+        t.style.transform = "translateX(-50%)";
+        t.style.width = "100%";
+        t.style.height = "100%";
+        t.style.zIndex = "2147483647";
+        try { document.body.appendChild(t); } catch (e) {}
+      }
+      if (ge) {
+        ge.style.display = "none";
+        ge.classList.add("call-mini-shrunk");
+      }
+      Be(!1);
+      if (we.active) {
+        var statusEl = document.getElementById("callStatusFull");
+        var timeEl = document.getElementById("callTimeDisplayFull");
+        var minWrap = document.getElementById("callMinimizeBtnFullWrap");
+        var minBtn = document.getElementById("callMinimizeBtnFull");
+        var ansBtn = document.getElementById("callAnswerBtnFull");
+        var hangBtn = document.getElementById("callHangupBtnFull");
+        if (we.answered) {
+          statusEl && (statusEl.innerText = "通话中");
+          timeEl && (timeEl.style.display = "block");
+          if (ansBtn) {
+            ansBtn.style.display = "none";
+            ansBtn.parentElement && (ansBtn.parentElement.style.display = "none");
           }
-        })(),
-        Ae(!0));
+          if (minWrap) minWrap.style.display = "flex";
+          if (minBtn) minBtn.style.display = "";
+          if (hangBtn) hangBtn.style.display = "block";
+        } else if (we.isMyCalling) {
+          statusEl && (statusEl.innerText = "正在呼叫…");
+          if (ansBtn) {
+            ansBtn.style.display = "none";
+            ansBtn.parentElement && (ansBtn.parentElement.style.display = "none");
+          }
+          if (minWrap) minWrap.style.display = "flex";
+          if (minBtn) minBtn.style.display = "";
+          if (hangBtn) hangBtn.style.display = "block";
+        } else {
+          statusEl && (statusEl.innerText = "来电中...");
+          if (ansBtn) {
+            ansBtn.style.display = "";
+            ansBtn.parentElement && (ansBtn.parentElement.style.display = "flex");
+          }
+          if (minWrap) minWrap.style.display = "none";
+          if (hangBtn) hangBtn.style.display = "block";
+        }
+      }
+      (function () {
+        var t = document.getElementById("callAvatarStack");
+        if (t) {
+          t.innerHTML = "";
+          var e = we.isMyCalling,
+            n = we.selectedMembers || [],
+            ceAvatar =
+              we.isGroupCall && we.answered && we.activeMember
+                ? we.activeMember.avatar || we.callerAvatar
+                : we.callerAvatar || "";
+          if (e)
+            n.forEach(function (e) {
+              if (!1 !== e.answered) {
+                var n = document.createElement("div");
+                ((n.className = "call-avatar"),
+                  n.setAttribute("data-call-member-id", e.id || ""),
+                  (n.style.cssText =
+                    "width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:40px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
+                  (n.innerHTML = nt(e.avatar, 80)),
+                  t.appendChild(n));
+              }
+            });
+          else if (we.isGroupCall && we.answered) {
+            var a = document.getElementById("callNameFull");
+            a &&
+              (a.innerText = we.groupName || we.callerName || "群聊");
+            n.forEach(function (e) {
+              if (!1 !== e.answered) {
+                var n = document.createElement("div");
+                ((n.className = "call-avatar"),
+                  n.setAttribute("data-call-member-id", e.id || ""),
+                  (n.style.cssText =
+                    "width:80px;height:80px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:40px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
+                  (n.innerHTML = nt(e.avatar, 80)),
+                  t.appendChild(n));
+              }
+            });
+          } else {
+            var r = document.createElement("div");
+            ((r.className = "call-avatar"),
+              (r.style.cssText =
+                "width:100px;height:100px;border-radius:50%;background:rgba(0,0,0,0.05);display:flex;align-items:center;justify-content:center;font-size:50px;border:2px solid rgba(0,0,0,0.08);overflow:hidden;"),
+              (r.innerHTML = nt(ceAvatar, 100)),
+              t.appendChild(r));
+          }
+        }
+      })();
+      Ae(!0);
     }
     /* v648: 通话全屏防误触遮罩加固 - 增加 15s 强制超时熔断，且一旦通话结束或非 active 状态强制隐藏 */
     var __akiniBlockOverlayTimer = null;
@@ -13127,8 +13177,10 @@ window.akiniContacts = {
       if (((n = n || {}), we.active)) {
         if (!e && n.targetId && window.akiniContacts && typeof Me === "function") {
           var busyName = n.callerName || t || "对方";
-          Me(n.targetId, busyName + "正忙");
+          Me(n.targetId, busyName + "正忙，未接来电");
         }
+        if (e && window.__akiniToast)
+          window.__akiniToast("正在通话中，请先挂断当前通话再拨打", 2600);
         return;
       }
       if (n.targetId && window.akiniContacts) {
@@ -13538,7 +13590,7 @@ window.akiniContacts = {
       const t = document.getElementById("app-call");
       (t && (t.style.display = "none"),
         (ge.style.zIndex = "2147483647"),
-        document.body.insertBefore(ge, document.body.firstChild),
+        document.body.appendChild(ge),
         De(function (t) {
           t && "number" == typeof t.top && "number" == typeof t.left
             ? (ge.style.cssText =
@@ -13665,104 +13717,136 @@ window.akiniContacts = {
       ge)
     ) {
       function Oe(t) {
-        if (!we.isMinimized) return;
+        if (!we.active && !we.isMinimized) return;
         if (ge._didDrag) {
           ge._didDrag = !1;
           return;
         }
-        if (t.target && t.target.closest && t.target.closest("button")) return;
+        if (t && t.target && t.target.closest && t.target.closest("button")) return;
         try {
-          if (t.cancelable) t.preventDefault();
-          t.stopPropagation();
+          if (t && t.cancelable) t.preventDefault();
+          if (t && t.stopPropagation) t.stopPropagation();
         } catch (e) {}
         Ce();
       }
       ge.addEventListener("touchend", Oe, { passive: !1 });
       ge.addEventListener("click", Oe);
-      window.__akiniExpandCall = function () { try { Ce(); } catch (e) {} };
+      window.__akiniExpandCall = function (ev) {
+        try {
+          if (ge && ge._didDrag) {
+            ge._didDrag = !1;
+            return;
+          }
+          if (ev && ev.target && ev.target.closest && ev.target.closest("button")) return;
+          Ce();
+        } catch (e) {
+          console.warn("akiniExpandCall error:", e);
+        }
+      };
     }
     function Re(t, e) {
       if (!t) return;
-      let n,
-        i,
-        a,
-        o,
+      let startX = 0,
+        startY = 0,
+        initLeft = 0,
+        initTop = 0,
+        startTs = 0,
         r = !1;
-      function c(t) {
-        return t.touches && t.touches.length
-          ? t.touches[0]
-          : t.changedTouches && t.changedTouches.length
-            ? t.changedTouches[0]
-            : t;
+      function c(e) {
+        return e.touches && e.touches.length
+          ? e.touches[0]
+          : e.changedTouches && e.changedTouches.length
+            ? e.changedTouches[0]
+            : e;
       }
-      function l(e) {
-        if (e.target && e.target.closest && e.target.closest("button")) return;
+      function onStart(ev) {
+        if (ev.target && ev.target.closest && ev.target.closest("button")) return;
         r = !0;
         t._didDrag = !1;
-        const l = c(e);
-        n = l.clientX;
-        i = l.clientY;
-        const s = t.getBoundingClientRect();
-        a = s.left;
-        o = s.top;
-        t.style.transform = "none";
-        t.style.left = a + "px";
-        t.style.top = o + "px";
-        t.style.right = "auto";
+        const pt = c(ev);
+        startX = pt.clientX;
+        startY = pt.clientY;
+        startTs = Date.now();
+        const rect = t.getBoundingClientRect();
+        initLeft = rect.left;
+        initTop = rect.top;
       }
-      function s(e) {
+      function onMove(ev) {
         if (!r) return;
-        const l = c(e),
-          s = l.clientX - n,
-          d = l.clientY - i;
-        if (Math.abs(s) > 8 || Math.abs(d) > 8) {
+        const pt = c(ev),
+          dx = pt.clientX - startX,
+          dy = pt.clientY - startY;
+        /* 抗抖阈值提至 15px，避免手机触屏肉指点击被误判为拖拽 */
+        if (Math.hypot(dx, dy) > 15) {
           t._didDrag = !0;
+          try {
+            if (ev.cancelable) ev.preventDefault();
+          } catch (_) {}
+          t.style.transform = "none";
+          t.style.right = "auto";
           const u = window.innerWidth,
             m = window.innerHeight,
-            f = t.getBoundingClientRect(),
-            g = f.width,
-            y = f.height,
-            p = Math.min(Math.max(a + s, 0), u - g),
-            v = Math.min(Math.max(o + d, 0), m - y);
-          t.style.left = p + "px";
-          t.style.top = v + "px";
+            rect = t.getBoundingClientRect(),
+            w = rect.width,
+            h = rect.height,
+            clampX = Math.min(Math.max(initLeft + dx, 0), u - w),
+            clampY = Math.min(Math.max(initTop + dy, 0), m - h);
+          t.style.left = clampX + "px";
+          t.style.top = clampY + "px";
         }
       }
-      function d() {
-        if (r && ((r = !1), e))
-          try {
-            var n = t.getBoundingClientRect(),
-              i = JSON.stringify({
-                top: n.top,
-                left: n.left,
-                savedAt: Date.now(),
-              });
-            (localStorage.setItem(e, i),
-              window._idbStore &&
-                window._idbStore.set &&
-                window._idbStore.set(e, i));
-          } catch (t) {}
+      function onEnd(ev) {
+        if (!r) return;
+        r = !1;
+        if (t._didDrag) {
+          if (e)
+            try {
+              var rect = t.getBoundingClientRect(),
+                info = JSON.stringify({
+                  top: rect.top,
+                  left: rect.left,
+                  savedAt: Date.now(),
+                });
+              (localStorage.setItem(e, info),
+                window._idbStore &&
+                  window._idbStore.set &&
+                  window._idbStore.set(e, info));
+            } catch (_) {}
+        } else {
+          /* 点击/点按触发：如果未拖拽且目标是悬浮窗 ge，直接展开通话 */
+          if (t === ge && (Date.now() - startTs < 350)) {
+            try {
+              if (ev && ev.cancelable) ev.preventDefault();
+              if (ev && ev.stopPropagation) ev.stopPropagation();
+            } catch (_) {}
+            Ce();
+          }
+        }
       }
-      (t.addEventListener("touchstart", l, { passive: !0 }),
-        t.addEventListener(
-          "touchmove",
-          function (t) {
-            r && (t.preventDefault(), s(t));
-          },
-          { passive: !1 },
-        ),
-        t.addEventListener("touchend", d, { passive: !0 }),
-        t.addEventListener("mousedown", l),
-        t.addEventListener("mousemove", function (t) {
-          r && (t.preventDefault(), s(t));
-        }),
-        t.addEventListener("mouseup", d),
-        t.addEventListener("mouseleave", d));
+      if (window.PointerEvent) {
+        t.addEventListener("pointerdown", onStart);
+        t.addEventListener("pointermove", onMove);
+        t.addEventListener("pointerup", onEnd);
+        t.addEventListener("pointercancel", onEnd);
+      } else {
+        t.addEventListener("touchstart", onStart, { passive: !0 });
+        t.addEventListener("touchmove", onMove, { passive: !1 });
+        t.addEventListener("touchend", onEnd, { passive: !1 });
+        t.addEventListener("mousedown", onStart);
+        t.addEventListener("mousemove", onMove);
+        t.addEventListener("mouseup", onEnd);
+        t.addEventListener("mouseleave", onEnd);
+      }
     }
     const Fe = "akini_call_mini_pos";
     (Re(ge, Fe),
       Re(document.getElementById("app-call"), "akini_call_full_pos"));
     a(document.getElementById("callBtn"), function () {
+      if (we && we.active) {
+        window.__akiniToast &&
+          window.__akiniToast("正在通话中，请先挂断当前通话再拨打", 2600);
+        return;
+      }
       const t = window.akiniContacts
           ? window.akiniContacts.getActiveChatId()
           : null,
@@ -26739,11 +26823,12 @@ if (!window.__akiniUnreadTickerStarted) {
   window.__akiniQuoteCardHtml = function (name, text) {
     var _n = String(name == null ? "" : name).trim() || "我";
     var _t = String(text == null ? "" : text).trim();
-    if (_t.length > 10) _t = _t.slice(0, 10) + "…";
+    /* v677: 引用文本超过 15 字自动截断加省略号 */
+    if (_t.length > 15) _t = _t.slice(0, 15) + "…";
     var nameHtml = '<span style="font-weight:600;white-space:nowrap;color:#333;flex-shrink:0;">' + (window.rt ? rt(_n) : _esc(_n)) + "</span>";
     /* v661: 引用文字与名字同色（#333），不再一深一浅两个颜色 */
-    var textHtml = _t ? '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:80px;">：' + (window.rt ? rt(_t) : _esc(_t)) + "</span>" : "";
-    return '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:3px 8px!important;font-size:11px!important;line-height:1.3!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:2px!important;display:inline-flex!important;align-items:center!important;max-width:130px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;box-sizing:border-box!important;">' + nameHtml + textHtml + "</div>";
+    var textHtml = _t ? '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:150px;">：' + (window.rt ? rt(_t) : _esc(_t)) + "</span>" : "";
+    return '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:3px 8px!important;font-size:11px!important;line-height:1.3!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:2px!important;display:inline-flex!important;align-items:center!important;max-width:210px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;box-sizing:border-box!important;">' + nameHtml + textHtml + "</div>";
   };
 
   /* ---------- 消息解析 ---------- */
@@ -26784,6 +26869,7 @@ if (!window.__akiniUnreadTickerStarted) {
     var text = "";
     if (bub) {
       if (bub.classList.contains("transfer-bubble")) text = "【转账】";
+      else if (bub.classList.contains("survey-bubble") || bub.classList.contains("shop-card-bubble")) text = "【卡片】";
       else if (bub.querySelector("img:not(.quote-sticker-thumb)")) text = "【表情包】";
       else {
         var q = bub.querySelector(".quote-bubble");
@@ -27421,41 +27507,7 @@ if (!window.__akiniUnreadTickerStarted) {
 
   window.__akiniEnterFavSelectMode = _enterFavSelect;
 
-  /* v657: 引用消息（quote-bubble）点击 → 跳转到聊天中被引用的原消息位置 */
-  (function () {
-    if (window.__akiniQuoteJumpBound) return;
-    window.__akiniQuoteJumpBound = true;
-    document.addEventListener("click", function (e) {
-      try {
-        var qb = e.target && e.target.closest ? e.target.closest(".quote-bubble") : null;
-        if (!qb) return;
-        var row = qb.closest ? qb.closest(".msg-row") : null;
-        if (!row || !window.__akiniJumpToChatMsg) return;
-        var chatId = _getChatId ? _getChatId() : "";
-        if (!chatId) return;
-        /* 引用内容格式: <span name>： <span text> —— 拆出名字与文本 */
-        var spans = qb.querySelectorAll("span");
-        var qText = "";
-        var qName = "";
-        if (spans.length >= 1) {
-          qName = (spans[0].textContent || "").trim();
-          if (spans.length >= 2) {
-            var full = (spans[1].textContent || "").trim();
-            if (full.charAt(0) === "：") full = full.slice(1);
-            qText = full;
-          }
-        }
-        var isMe = qName === (_myName ? _myName() : "我");
-        /* 目标 = 被引用的原消息：文本一致 且 作者是引用里写的人 */
-        var ok = window.__akiniJumpToChatMsg(chatId, 0, { text: qText, isMe: isMe, name: qName });
-        if (!ok) {
-          /* 退化: 不限作者再试一次 */
-          ok = window.__akiniJumpToChatMsg(chatId, 0, { text: qText });
-        }
-        if (!ok) _toast("找不到被引用的原始消息");
-      } catch (er) {}
-    }, true);
-  })();
+  /* v676: 引用消息点击跳转已移除，符合 milk 逻辑 */
 })();
 
   
