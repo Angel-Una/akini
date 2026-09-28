@@ -11473,3 +11473,65 @@ html body .chat-body .msg-row .bubble.transfer-bubble .tr-note {
   max-width: 100% !important;
   display: block !important;
 }
+
+/* ===== v671: 收藏/跳转与常规场景已读回执防挤压错位根治 ===== */
+.chat-body .msg-row .avatar-col .msg-rr,
+.avatar-col .msg-rr,
+.msg-row .avatar-col .msg-rr {
+  display: none !important;
+}
+
+.chat-body .msg-row.me .msg-content-line > .bubble-wrap > .msg-rr,
+.chat-body .msg-row.me > .msg-rr {
+  position: static !important;
+  display: block !important;
+  width: 100% !important;
+  text-align: right !important;
+  margin: 3px 0 0 0 !important;
+  padding: 0 4px 0 0 !important;
+  box-sizing: border-box !important;
+  white-space: nowrap !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  flex: none !important;
+}
+
+/* 收藏选择状态下的挤压弹性保护 */
+body.akini-fav-selecting .chat-body .msg-row.me .msg-content-line {
+  max-width: calc(100% - 10px) !important;
+}
+body.akini-fav-selecting .chat-body .msg-row .msg-content-line > .bubble-wrap {
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+}
+
+/* ===== v673: 开屏公告 Logo 与按钮黑白纯净风格加固 ===== */
+#akiniSplash .akini-splash-logo,
+.akini-splash-logo {
+  background: #ffffff !important;
+  border: 1.5px solid #111111 !important;
+  color: #111111 !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+#akiniSplash .akini-splash-logo svg,
+.akini-splash-logo svg {
+  stroke: #111111 !important;
+}
+
+#akiniSplash .akini-splash-enter,
+.akini-splash-enter {
+  background: #111111 !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25) !important;
+  display: block !important;
+  width: min(320px, 88vw) !important;
+  margin: 0 auto !important;
+}
+#akiniSplash .akini-splash-enter:active,
+.akini-splash-enter:active {
+  background: #333333 !important;
+  color: #ffffff !important;
+}

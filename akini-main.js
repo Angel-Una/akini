@@ -2712,7 +2712,7 @@ window.akiniContacts = {
             a = {
               id: s("gp"),
               name: t || "群聊",
-              avatar: e || "👥",
+              avatar: e || "data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23444444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>",
               memberIds: n || [],
               createdAt: Date.now(),
             };
@@ -3206,6 +3206,11 @@ window.akiniContacts = {
         oldRrFrees[rfi].remove();
       }
       // 拆除旧版 avatar-col（保留头像本体），保证重复处理幂等
+      // v671 清除 avatar-col 内误入的已读回执，彻底根治头像正下方挤压错位
+      var strayColRrs = row.querySelectorAll(".avatar-col .msg-rr");
+      for (var sri = 0; sri < strayColRrs.length; sri++) {
+        strayColRrs[sri].remove();
+      }
       var oldCol = row.querySelector(".avatar-col");
       if (oldCol) {
         var av0 = oldCol.querySelector(".msg-avatar");
@@ -7335,12 +7340,8 @@ window.akiniContacts = {
           el.style.pointerEvents = "none";
           el.classList.add("hidden");
           el.style.display = "none";
-          setTimeout(function () {
-            try {
-              if (el && el.parentNode) el.parentNode.removeChild(el);
-              window.__akiniSplashRemoved = !0;
-            } catch (e) {}
-          }, 50);
+          /* v671: 保留开屏公告 DOM 节点，供设置中随时查看 */
+          window.__akiniSplashRemoved = !1;
         }
       } catch (e) {}
     };
@@ -8977,8 +8978,8 @@ window.akiniContacts = {
       if (t && window.akiniContacts) {
         ((dt = []),
           e &&
-            (setHtmlKeepInput(e, nt("👥", 56)),
-            e.setAttribute("data-avatar", "👥")),
+            (setHtmlKeepInput(e, nt("data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23444444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>", 56)),
+            e.setAttribute("data-avatar", "data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23444444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>")),
           n && (n.value = ""));
         var i = window.akiniContacts.getContacts(),
           o = "";
@@ -9044,7 +9045,7 @@ window.akiniContacts = {
                 var t = document.getElementById("createGroupNameInput"),
                   e = document.getElementById("createGroupAvatarPreview"),
                   n = t ? t.value.trim() : "",
-                  i = (e && e.getAttribute("data-avatar")) || "👥";
+                  i = (e && e.getAttribute("data-avatar")) || "data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23444444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>";
                 dt.length < 2
                   ? alert("请至少选择 2 个联系人")
                   : n
@@ -9381,7 +9382,7 @@ window.akiniContacts = {
                 )
               : null;
             if (!t || "group" !== t.type) return [];
-            var e = [{ id: "all", name: "全体成员", avatar: "👥" }];
+            var e = [{ id: "all", name: "全体成员", avatar: "data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23444444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>" }];
             return (
               (t.memberIds || []).forEach(function (t) {
                 var n = window.akiniContacts.getChatTarget(t);
@@ -27456,3 +27457,118 @@ if (!window.__akiniUnreadTickerStarted) {
     }, true);
   })();
 })();
+
+  
+  /* v672: 开屏公告查看与关闭逻辑（稳固保底版，支持随时调起） */
+  window.__akiniOpenSplashNotice = function () {
+    try {
+      var sp = document.getElementById("akiniSplash");
+      if (!sp) {
+        // 如果 DOM 被意外销毁，动态创建白黑极简版结构保底
+        var div = document.createElement("div");
+        div.id = "akiniSplash";
+        div.innerHTML = '<div class="akini-splash-inner">' +
+          '<div class="akini-splash-top">' +
+            '<div class="akini-splash-logo" style="background:#ffffff !important;border:1.5px solid #111111 !important;color:#111111 !important;">' +
+              '<svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
+            '</div>' +
+            '<div class="akini-splash-title">Akini</div>' +
+            '<div class="akini-splash-subtitle">你的出现，是天意，是命运</div>' +
+          '</div>' +
+          '<div class="akini-splash-modules">' +
+            '<div class="akini-splash-module">' +
+              '<div class="akini-splash-module-head">开源作者 & 鸣谢</div>' +
+              '<div class="akini-splash-module-body">' +
+                '<p>抖音：QSL1027CYLOVO</p>' +
+                '<p>小红书：4297298313</p>' +
+                '<p>大部分功能灵感来源于 milk 老师</p>' +
+                '<p>TA 的手机是之缘老师</p>' +
+                '<p>观影是我要学英语老师</p>' +
+                '<p class="akini-splash-thanks">感谢以上老师</p>' +
+                '<hr/>' +
+                '<p>二传标明出处 🈲二改 发视频请打 tag</p>' +
+                '<p>嘴过乙游男主的使用替我挡灾</p>' +
+                '<p>请不要使用我的网站进行对比、拉踩、诋毁，请不要无端造谣</p>' +
+                '<p>网站无 AI 纯概率抽字卡，不存在👻说</p>' +
+                '<p>网站内容功能很简单，自行摸索</p>' +
+              '</div>' +
+            '</div>' +
+            '<div class="akini-splash-module">' +
+              '<div class="akini-splash-module-head">常见问题</div>' +
+              '<div class="akini-splash-module-body">' +
+                '<p><b>网易云歌单导入</b></p>' +
+                '<p>进入网易云 → 点进想要导入的歌单 → 点击分享复制链接 → 进入浏览器删掉文字搜索链接 → 进入界面后点击地址栏出现的长链接导入即可。观影链接步骤同。</p>' +
+                '<hr/>' +
+                '<p><b>MJ 头像在哪里更换/添加</b></p>' +
+                '<p>进入首页 → 微信 → 右上角加号创建 → 确认创建。后续更换名字/头像，进入聊天界面点击昵称条后面的小括号管理弹窗。</p>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<button class="akini-splash-enter" id="akiniSplashEnter" type="button" style="background:#111111 !important; color:#ffffff !important; border-radius:9999px !important; border:none !important; box-shadow:0 4px 16px rgba(0,0,0,0.25) !important;">我已知晓并遵守规则</button>' +
+        '</div>';
+        document.body.appendChild(div);
+        sp = div;
+      }
+      // 彻底重置所有 display / z-index / visibility / opacity 样式
+      sp.classList.remove("hidden");
+      sp.classList.add("loaded");
+      sp.style.removeProperty("display");
+      sp.style.removeProperty("visibility");
+      sp.style.removeProperty("pointer-events");
+      sp.style.removeProperty("z-index");
+      sp.style.removeProperty("opacity");
+      sp.style.setProperty("display", "flex", "important");
+      sp.style.setProperty("visibility", "visible", "important");
+      sp.style.setProperty("pointer-events", "auto", "important");
+      sp.style.setProperty("z-index", "9999999", "important");
+      sp.style.setProperty("opacity", "1", "important");
+
+      var enterBtn = sp.querySelector("#akiniSplashEnter");
+      if (enterBtn) {
+        enterBtn.onclick = function (e) {
+          if (e) e.stopPropagation();
+          window.__akiniCloseSplashNotice();
+        };
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  window.__akiniCloseSplashNotice = function () {
+    try {
+      var sp = document.getElementById("akiniSplash");
+      if (!sp) return;
+      sp.style.setProperty("opacity", "0", "important");
+      sp.style.setProperty("pointer-events", "none", "important");
+      setTimeout(function () {
+        sp.classList.add("hidden");
+        sp.style.setProperty("display", "none", "important");
+        sp.style.setProperty("visibility", "hidden", "important");
+        sp.style.setProperty("z-index", "-99999", "important");
+      }, 260);
+    } catch (e) {}
+  };
+
+  // 绑定设置页卡片点击
+  function __akiniBindSplashEntry() {
+    var btn = document.getElementById("openSplashNoticeBtn");
+    if (btn) {
+      btn.onclick = function (e) {
+        if (e) e.preventDefault();
+        window.__akiniOpenSplashNotice();
+      };
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", __akiniBindSplashEntry);
+  } else {
+    __akiniBindSplashEntry();
+  }
+
+  // v674 终极拦截：凡是旧数据残留的 👥 emoji 头像，统一强制转换为极简双人线条 SVG
+  var __AKINI_USERS_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:58%;height:58%;display:block;margin:auto;"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+  window.__akiniNormalizeAvatar = function (av) {
+    if (!av || av === "👥") return 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%23444444" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+    return av;
+  };
