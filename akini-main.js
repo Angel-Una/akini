@@ -8332,6 +8332,10 @@ window.akiniContacts = {
           if (!e) return;
           var sess = window.akiniContacts.getSession(e);
           var fullHtml = (sess && sess.messagesHTML) || "";
+          /* v680 性能修复：轻量脏检查——内容未变直接 return，
+             不再每 2 分钟无条件走会话读取+回写+DOM 检查链 */
+          if (!fullHtml || fullHtml === window.__akiniLast120sSig) return;
+          window.__akiniLast120sSig = fullHtml;
           if (fullHtml.trim()) {
             var dedupedHtml = __akiniDeduplicateChatHTML(fullHtml);
             if (dedupedHtml !== fullHtml) {
@@ -13519,15 +13523,11 @@ window.akiniContacts = {
     }
     // 兜底守卫：通话未接通且非我主叫时，强制隐藏「最小化」（该位置应为「接通」，接通后才切换为最小化）
     // v648: 增加全局遮罩与通话状态看门狗，防任何非预期卡死
+    /* v680 性能修复：无通话时直接 return（原来每 1s 无条件 querySelector 空转） */
     setInterval(function () {
       try {
-        if (!we.active) {
-          var b = document.getElementById("callBlockOverlay");
-          if (b && b.style.display !== "none") {
-            b.style.display = "none";
-          }
-        }
-        if (!we.active || we.answered || we.isMyCalling) return;
+        if (!we.active || document.hidden) return;
+        var b = document.getElementById("callBlockOverlay");
         var v = document.getElementById("callMinimizeBtnFull");
         if (v && v.parentElement && v.parentElement.style.display !== "none") {
           v.style.display = "none";
@@ -13545,6 +13545,10 @@ window.akiniContacts = {
 
       setInterval(function () {
         try {
+          /* v680 性能修复：无通话且无残留遮罩时直接 return，后台也不巡检 */
+          if (document.hidden) return;
+          var _cbo = document.getElementById("callBlockOverlay");
+          if ((!window._callState || !window._callState.active) && (!_cbo || _cbo.style.display === "none")) return;
           // 1. 如果通话已不在进行，但 callBlockOverlay 残留阻断交互，强制移除
           if (!window._callState || !window._callState.active) {
             var cbo = document.getElementById("callBlockOverlay");
@@ -19787,6 +19791,9 @@ window.akiniContacts = {
       var _kaDelay = 0;            // 下次补播间隔；0=不在退避轨道
       var _kaLastPlayAt = 0;       // 最近一次成功开播时间（稳定 30s 后清零退避）
       function _kaAudioEnabled() {
+        /* v680 对齐 milk/syy：静音保活默认关闭（原先 !== false 默认开启）。
+           后台循环音频会被 iOS/Android 判定为异常高能耗，触发系统强杀进程（闪退元凶之一）。
+           仅在用户显式开启开关后才播放；通话场景另有独立音频管理，不受影响 */
         try { return "1" === localStorage.getItem("akini_toggle_keepAliveToggle"); } catch (e) { return false; }
       }
       function _kaScheduleRetry() {
@@ -26785,11 +26792,14 @@ window.__akiniNotifyUnreadChanged = function() {
 // 周期性轻量自动纠偏刷新角标（1.5秒），通过轻量比较防抖，杜绝递归与高频计算导致的闪退卡顿
 if (!window.__akiniUnreadTickerStarted) {
   window.__akiniUnreadTickerStarted = true;
+  /* v680 性能修复：原 1500ms 轮询——每 1.5 秒多次 JSON.parse(localStorage)+querySelector，
+     是后台空转与主线程占用的最凶元凶（对齐 milk/syy：徽章只在可见时刷新，且降频到 5s） */
   setInterval(function () {
     try {
+      if (document.hidden) return;
       if (window.__updateHomeBadges) window.__updateHomeBadges();
     } catch(e) {}
-  }, 1500);
+  }, 5000);
 }
 
 
