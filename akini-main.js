@@ -3450,9 +3450,13 @@ window.akiniContacts = {
       setTimeout(function () {
         try {
           if (!__akiniToggleOn("readReceiptToggle")) return;
-          chatBody.querySelectorAll(".msg-row.me[data-read-pending]").forEach(function (row) {
-            setTimeout(function () { try { __akiniShowReadReceipt(row); } catch (e) {} }, 1200 + Math.random() * 1800);
-          });
+          var pRows = chatBody.querySelectorAll(".msg-row.me[data-read-pending]");
+          var pLimit = Math.min(pRows.length, 15);
+          for (var pi = 0; pi < pLimit; pi++) {
+            (function (row, idx) {
+              setTimeout(function () { try { __akiniShowReadReceipt(row); } catch (e) {} }, 1200 + idx * 200);
+            })(pRows[pi], pi);
+          }
         } catch (e) {}
       }, 400);
       __akiniCleanFinishedTransferInline(chatBody);
@@ -7613,6 +7617,15 @@ window.akiniContacts = {
       }
       if (0 === t.length) return "";
       if (1 === t.length) return t[0];
+      /* v681 极速比对（防 OOM/防卡崩）：
+         如果全部有效源内容完全一样（常见于 IDB 与 LS 均落盘同一版本），直接返回第一个，
+         跳过后续所有 LastMsgTs 正则、DOM 解析与复杂计数流程 */
+      var allSame = true;
+      for (var si = 1; si < t.length; si++) {
+        if (t[si] !== t[0]) { allSame = false; break; }
+      }
+      if (allSame) return t[0];
+
       // v626 终极防回退守卫（v624 的补丁因脚本中断从未写盘，本次真正落地）：
       // 时间戳同代优先——几十个版本前冻结的陈旧污染源（最后消息时间早于全局最新 6 小时以上）
       // 一律出局，绝不允许仅凭"行数多"复活远古版本。6 小时阈值确保同一天内的正常
@@ -21801,8 +21814,9 @@ window.akiniContacts = {
           window.addEventListener("pagehide", function () {
             ct();
           }),
+          /* v681 优化：音乐状态巡检加 !d 守卫（无播放时直接 return，不再每 10s 执行 rt() 与两段逻辑） */
           setInterval(function () {
-            if (document.hidden) return;
+            if (document.hidden || !d) return;
             (rt(),
               
               d &&
@@ -25603,11 +25617,14 @@ window.akiniContacts = {
   } else {
     _bind();
   }
-  /* 角标刷新：防卡顿节流，回前台或周期检测时仅在数字变动时更新 DOM */
+  /* 角标刷新：防卡顿节流，回前台或周期检测时仅在数字变动时更新 DOM。
+     v681 修复重复定时器：本闭包定时器与 26788 行 __updateHomeBadges 轮询严重重叠！
+     统一加上 document.hidden 守卫并降频到 10s，避免后台/低端设备双定时器并发 JSON.parse 导致卡崩 */
   var _badgeTimer = setInterval(function () {
+    if (document.hidden) return;
     _syncMailSeen();
     if (window.__updateHomeBadges) window.__updateHomeBadges();
-  }, 3000);
+  }, 10000);
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) {
       _syncMailSeen();
