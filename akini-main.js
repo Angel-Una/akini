@@ -5668,6 +5668,36 @@ window.akiniContacts = {
     window.__akiniGetChatMem = function (cid) {
       try { return (E && E[cid]) || ""; } catch (e) { return ""; }
     };
+    /* v684 防闪退：释放非活跃聊天的内存全量 HTML 缓存。
+       E（权威缓存）与 sessCache.messagesHTML 双份持有完整聊天 HTML，
+       切换/退出会话从不清除，重度多会话用户内存只增不减，
+       低端 WebView（UC/狐猴）内存耗尽即被系统杀进程——"莫名其妙闪退"的元凶。
+       仅释放 >256KB 的非当前会话；重进时 openChat 有
+       sessCache→E→LS 正/备份→critical→IDB 全链路恢复，数据零丢失 */
+    window.__akiniReleaseChatMemory = function (keepId) {
+      try {
+        var KEEP_LEN = 262144;
+        if (E) {
+          for (var ek in E) {
+            if (!Object.prototype.hasOwnProperty.call(E, ek) || ek === keepId) continue;
+            if (typeof E[ek] === "string" && E[ek].length > KEEP_LEN) delete E[ek];
+          }
+        }
+        if (window.akiniContacts && window.akiniContacts.getSessions) {
+          var sc = window.akiniContacts.getSessions();
+          if (sc && typeof sc === "object") {
+            for (var sk in sc) {
+              if (!Object.prototype.hasOwnProperty.call(sc, sk) || sk === keepId) continue;
+              var srow = sc[sk];
+              if (srow && typeof srow === "object" && typeof srow.messagesHTML === "string" && srow.messagesHTML.length > KEEP_LEN) {
+                srow.messagesHTML = "";
+              }
+            }
+          }
+        }
+        try { window.__akiniLast120sSig = null; } catch (eS) {}
+      } catch (e) {}
+    };
     window.__akiniFlushPendingSaves = function() {
       try {
         if (window.__akiniSaveDebounceTimers) {
@@ -8700,6 +8730,8 @@ window.akiniContacts = {
       if (window.akiniContacts) {
         window._akiniLastChatId = t;
         A();
+        /* v684 防闪退：切换会话时释放其他聊天的超大内存缓存（数据仍完整存于 LS/IDB） */
+        try { window.__akiniReleaseChatMemory && window.__akiniReleaseChatMemory(t); } catch (eMem) {}
         if (U) {
           var __rendered = U.getAttribute("data-rendered-chat-id");
           __rendered !== t && (U.innerHTML = "");
@@ -9332,6 +9364,8 @@ window.akiniContacts = {
             window.akiniContacts.setActiveChatId(null);
           }
         } catch (e) {}
+        /* v684 防闪退：返回会话列表时释放全部聊天的超大内存缓存（无活跃会话，全清） */
+        try { window.__akiniReleaseChatMemory && window.__akiniReleaseChatMemory(null); } catch (eMem) {}
         try { typeof window.__updateHomeBadges === "function" && window.__updateHomeBadges(); } catch (e) {}
         try { typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(); } catch (e) {}
         try { typeof window.__akiniRefreshChatListBadges === "function" && window.__akiniRefreshChatListBadges(); } catch (e) {}
@@ -17896,10 +17930,10 @@ window.akiniContacts = {
                           e = replyInput ? replyInput.value.trim() : "";
                         if (e) {
                           var a = i("akini_mail_sent", []);
-                          // compat 规则：回复对方主动来信（subtype=active）仅 30% 概率收到回信；
+                          // compat 规则：回复对方主动来信（subtype=active）50% 概率收到回信；
                           // 回复对方给我的回信则正常预约回信
                           var isActiveLetter = originalLetter.subtype === "active";
-                          var willReply = isActiveLetter ? Math.random() < 0.3 : true;
+                          var willReply = isActiveLetter ? Math.random() < 0.5 : true;
                           var nowTs = Date.now();
                           var deliverDelay = 15000;
                           var sentItem = {
