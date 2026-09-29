@@ -64,6 +64,11 @@
   /* ========== 2. 旧 Akini 数据迁移到 compat 格式 ========== */
   async function migrateAkiniTocompat() {
     if (safeGetItem('__akini_compat_migrated__') === '1') return;
+    // 低内存或弱机型跳过沉重的单次全库 DOM 解析迁移，直接标记完成
+    if (window.__akiniLowMem) {
+      safeSetItem('__akini_compat_migrated__', '1');
+      return;
+    }
     console.log('[akini-compat-bridge] 开始迁移旧 Akini 数据到 compat 格式...');
 
     try {

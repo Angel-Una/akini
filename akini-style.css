@@ -23,6 +23,14 @@ html {
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
   text-size-adjust: 100%;
   touch-action: pan-y;
   position: fixed;
@@ -136,17 +144,27 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: relative;
   flex: 1;
   width: 100%;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
   height: 100%;
   min-height: 0;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
+  justify-content: space-between;
   align-items: center;
   overflow-y: hidden !important;
   overflow-x: hidden !important;
   overscroll-behavior: none !important;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.content-wrapper::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 .akini-safe-mode .content-wrapper,
 .akini-deep-safe .content-wrapper {
@@ -155,25 +173,33 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 /* 模块级独立缩放壳：inner 固定 390/380 基准宽渲染，按屏宽等比缩放，垂直 flex 分布 */
 .fit-mod {
   width: 100%;
+  max-width: 420px;
+  margin-left: auto;
+  margin-right: auto;
   display: flex;
   justify-content: center;
-  align-items: flex-start; /* 阻止 stretch 拉伸 inner，保证量取真实自然高 */
+  align-items: stretch;
   flex-shrink: 0;
   position: relative;
   overflow: visible;
+  box-sizing: border-box;
 }
 .fit-inner {
-  transform-origin: top center;
+  width: 100% !important;
+  max-width: 100% !important;
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
 }/* ===== 首页排布 v2 ===== */
 /* 纪念日方卡 + 竖排气泡 同行：纪念日左、气泡右 */
 .anniv-preview-row {
   display: flex;
-  align-items: flex-start;
-  gap: 14px;
+  align-items: center;
+  gap: 12px;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 6px;
+  padding: 0 4px;
 }
 .anniv-preview-row .right-card {
   margin-left: 0;
@@ -186,10 +212,13 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
 }
 /* zzzp：仿状态栏已整体移除——PWA 桌面模式下与系统真状态栏重复（双状态栏），浏览器模式下也无存在必要，用户要求删除 */
 /* 模块间距：顶卡与播放器拉开 / 网格与下行 / 底栏沉底 */
-.fit-gap-lg { margin-top: 10px; }.fit-gap { margin-top: 8px; }.fit-bottom { margin-top: auto; }.apps-grid {
+.fit-gap-lg { margin-top: clamp(6px, 1.4vh, 12px); }
+.fit-gap { margin-top: clamp(4px, 1vh, 8px); }
+.fit-bottom { margin-top: auto; }
+.apps-grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 12px 4px;
+  gap: clamp(8px, 1.2vh, 12px) 2px;
   padding: 2px 2px;
   box-sizing: border-box;
   width: 100%;
@@ -216,7 +245,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   position: relative;
 }.top-card .cover-img {
   width: 100%;
-  height: 160px;
+  height: clamp(120px, 17vh, 160px);
   border-radius: 22px;
   background: transparent;
   background-size: cover !important;
@@ -5578,8 +5607,9 @@ button.back-btn[type="button"] {
   white-space: nowrap;
 }/* player-only fixes */
 .music-player-card {
-  padding: 12px !important;
+  padding: clamp(8px, 1.4vh, 12px) !important;
   gap: 8px !important;
+  box-sizing: border-box !important;
 }
 .music-player-disc {
   width: 84px !important;

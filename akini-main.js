@@ -3482,21 +3482,22 @@ window.akiniContacts = {
             });
           });
           __akiniScheduleRrGroups();
-          /* 任何发送路径产生的待读回执统一调度点亮（不依赖具体发送函数） */
-          try {
-            if (__akiniToggleOn("readReceiptToggle")) {
-              var __pendRows = chatBody.querySelectorAll(".msg-row.me[data-read-pending]");
-              for (var __pi = 0; __pi < __pendRows.length; __pi++) {
-                (function (__row) {
-                  if (__row.__rrFlushT) return;
-                  __row.__rrFlushT = setTimeout(function () {
-                    __row.__rrFlushT = null;
-                    try { __akiniShowReadReceipt(__row); } catch (e) {}
-                  }, 1500 + Math.random() * 2500);
-                })(__pendRows[__pi]);
-              }
-            }
-          } catch (e) {}
+      /* 任何发送路径产生的待读回执统一调度点亮（不依赖具体发送函数） */
+      try {
+        if (__akiniToggleOn("readReceiptToggle")) {
+          var __pendRows = chatBody.querySelectorAll(".msg-row.me[data-read-pending]");
+          var __pLimit = Math.min(__pendRows.length, 10);
+          for (var __pi = 0; __pi < __pLimit; __pi++) {
+            (function (__row, __idx) {
+              if (__row.__rrFlushT) return;
+              __row.__rrFlushT = setTimeout(function () {
+                __row.__rrFlushT = null;
+                try { __akiniShowReadReceipt(__row); } catch (e) {}
+              }, 1200 + __idx * 250);
+            })(__pendRows[__pi], __pi);
+          }
+        }
+      } catch (e) {}
         });
         obs.observe(chatBody, { childList: true });
         chatBody.__akiniMetaObserver = obs;
@@ -4051,9 +4052,11 @@ window.akiniContacts = {
         lastSenderAvatar: f(),
         lastSenderName: g() || "我",
       }),
-        S(),
-        V(),
+        /* v682: __akiniAppendMessageHTML 内部已经完成了消息追加、Sess更新以及 C(chatId, fullHTML) 300ms防抖落盘，
+           发消息瞬间禁止重复同步执行 S() 和 V()。V() 改为防抖备份，避免每次发消息都同步触发整库备份遍历 */
         (K.value = ""));
+      // 触发防抖备份
+      try { V(); } catch (eV) {}
       // TA的手机：按概率自动收藏用户发送的聊天消息
       try { if (window.akiniTaPhoneCollectChat && r) window.akiniTaPhoneCollectChat(r, t, Date.now()); } catch (e) {}
       // 对齐 core：行为在发送时判定一次并贯穿整条时间线（已读 → 输入动态 → 打字 → 回复），
