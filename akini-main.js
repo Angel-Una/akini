@@ -2139,7 +2139,7 @@ document.addEventListener("DOMContentLoaded", function () {
           var _myAv = _memOrLs("akini_my_avatar", "akini_icity_my_avatar");
           var _restoredAny = !1;
           e.forEach(function (c) {
-            if (c && (!c.avatar || !String(c.avatar).trim() || c.avatar === "")) {
+            if (c && (!c.avatar || !String(c.avatar).trim() || c.avatar === "" || c.avatar === "null" || c.avatar === "undefined")) {
               if (c.isDefault) c.avatar = _taAv || "";
               else if (c.id === "me" || c.id === "my") c.avatar = _myAv || "";
               else {
@@ -2523,7 +2523,8 @@ window.akiniContacts = {
             var e = w(t);
             if (e && "contact" === e.type) {
               try {
-                localStorage.setItem("akini_ta_avatar", e.avatar);
+                var cleanAv = (e.avatar && e.avatar !== "null" && e.avatar !== "undefined") ? e.avatar : "";
+                if (cleanAv) localStorage.setItem("akini_ta_avatar", cleanAv);
               } catch (t) {}
               try {
                 localStorage.setItem("akini_ta_name", e.name);
@@ -2538,14 +2539,16 @@ window.akiniContacts = {
         setHomeAvatars: S,
         addContact: function (t, e) {
           var n = f(),
-            i = localStorage.getItem("akini_ta_avatar") || "",
-            a = {
-              id: s("ta"),
-              name: t || "新联系人",
-              avatar: e || i || "",
-              note: window.pickWordCards ? window.pickWordCards(1) : "",
-              createdAt: Date.now(),
-            };
+            i = localStorage.getItem("akini_ta_avatar") || "";
+          if (i === "null" || i === "undefined") i = "";
+          var cleanE = (e && e !== "null" && e !== "undefined") ? e : "";
+          var a = {
+            id: s("ta"),
+            name: t || "新联系人",
+            avatar: cleanE || i || "",
+            note: window.pickWordCards ? window.pickWordCards(1) : "",
+            createdAt: Date.now(),
+          };
           // 联系人头像单独持久化到专用键（IDB 优先），避免随大数组写失败而丢失
           if (a.avatar && String(a.avatar).trim()) {
             try { L("akini_contact_avatar_" + a.id, a.avatar); } catch (err) {}
@@ -7985,10 +7988,20 @@ window.akiniContacts = {
     /* v613: 把消息 HTML 字符串里的默认占位头像替换为真实头像（进入聊天前调用，避免闪默认头像） */
     function __akiniFixMsgAvatarHTML(html, chatId) {
       try {
-        if (!html || html.indexOf("data:image/svg") < 0) return html;
+        if (!html) return html;
         if (!window.akiniContacts) return html;
         var mySrc = "";
         try { mySrc = __akiniExtractImgSrc(window.getMyAvatar ? window.getMyAvatar() : ""); } catch (e) {}
+        if (!mySrc) {
+          try {
+            var _rawMy = localStorage.getItem("akini_my_avatar") || localStorage.getItem("akini_icity_my_avatar") || "";
+            if (_rawMy) {
+              mySrc = __akiniExtractImgSrc(_rawMy);
+              /* v687: 存储值可能是纯 data:/http URL（非 <img> 标签），extract 会漏，直接判前缀 */
+              if (!mySrc && /^(data:|https?:|blob:)/i.test(_rawMy.trim())) mySrc = _rawMy.trim();
+            }
+          } catch (eMy) {}
+        }
         var myOk = mySrc && !__akiniIsLineAvatarSrc(mySrc) ? mySrc : "";
         var contactAv = {};
         try {
@@ -8008,7 +8021,6 @@ window.akiniContacts = {
           chatTaSrc = String(chatTarget.avatar);
         }
         var taSrc = chatTaSrc;
-        // 如果单聊目标没有专属头像，也不使用全局 getTaAvatar（无参数）兜底，避免切换聊天时串头像
         if (!taSrc) {
           try {
             var _ct2 = window.akiniContacts.getChatTarget(chatId);
@@ -8017,23 +8029,41 @@ window.akiniContacts = {
             }
           } catch (e) {}
         }
+        if (!taSrc && !isGroup) {
+          try {
+            var _rawTa = localStorage.getItem("akini_ta_avatar") || localStorage.getItem("akini_icity_ta_avatar") || "";
+            if (_rawTa) {
+              var _exTa = __akiniExtractImgSrc(_rawTa);
+              if (!_exTa && /^(data:|https?:|blob:)/i.test(_rawTa.trim())) _exTa = _rawTa.trim();
+              if (_exTa && !__akiniIsLineAvatarSrc(_exTa)) taSrc = _exTa;
+            }
+          } catch (eTa) {}
+        }
         if (taSrc && __akiniIsLineAvatarSrc(taSrc)) taSrc = "";
         if (!myOk && !Object.keys(contactAv).length && !taSrc) return html;
-        var doc = new DOMParser().parseFromString(html, "text/html");
-        var changed = false;
+        
+        /* v687: 极速正则替换，杜绝 DOMParser 异步卡顿与灰色圆形闪烁 */
+        var out = html;
         if (myOk) {
-          doc.querySelectorAll('.msg-row.me .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
-            img.setAttribute("src", myOk);
-            changed = true;
+          out = out.replace(/(<div[^>]*class="[^"]*\bmsg-row\b[^"]*\bme\b[^"]*"[\s\S]*?<div[^>]*class="[^"]*\bmsg-avatar\b[^"]*"[^>]*>[\s\S]*?<img[^>]*?\bsrc=")([^"]*)(")/gi, function (m, p1, oldSrc, p3) {
+            if (__akiniIsLineAvatarSrc(oldSrc) || !oldSrc || oldSrc.indexOf("data:image/svg") === 0) {
+              return p1 + myOk.replace(/"/g, "&quot;") + p3;
+            }
+            return m;
           });
         }
-        doc.querySelectorAll('.msg-row.other .msg-avatar img[src^="data:image/svg"]').forEach(function (img) {
-          var box = img.closest ? img.closest(".msg-avatar") : null;
-          var name = box ? (box.getAttribute("data-sender-name") || "") : "";
-          var real = (name && contactAv[name]) || (!isGroup ? taSrc : "") || "";
-          if (real) { img.setAttribute("src", real); changed = true; }
-        });
-        return changed ? doc.body.innerHTML : html;
+        if (Object.keys(contactAv).length || taSrc) {
+          out = out.replace(/(<div[^>]*class="[^"]*\bmsg-row\b[^"]*\bother\b[^"]*"[\s\S]*?<div[^>]*class="[^"]*\bmsg-avatar\b[^"]*"([^>]*)>[\s\S]*?<img[^>]*?\bsrc=")([^"]*)(")/gi, function (m, p1, boxAttrs, oldSrc, p3) {
+            var nmMatch = boxAttrs.match(/data-sender-name="([^"]*)"/i);
+            var senderName = nmMatch ? nmMatch[1] : "";
+            var real = (senderName && contactAv[senderName]) || (!isGroup ? taSrc : "") || "";
+            if (real && (__akiniIsLineAvatarSrc(oldSrc) || !oldSrc || oldSrc.indexOf("data:image/svg") === 0)) {
+              return p1 + real.replace(/"/g, "&quot;") + p3;
+            }
+            return m;
+          });
+        }
+        return out;
       } catch (e) { return html; }
     }
     window.__akiniFixMsgAvatarHTML = __akiniFixMsgAvatarHTML;
@@ -8319,7 +8349,9 @@ window.akiniContacts = {
                 /* core 式：切回前台对比消息行数，会话/IDB 备份比 UI 多则自动恢复（防后台吞消息） */
                 /* v612: 快速正则计数——切前台是高频时机，DOM 版对大记录全量解析会卡顿掉帧 */
                 var uiRows = __akiniCountMsgRowsFast(U.innerHTML || "");
-                if (__akiniCountMsgRowsFast(sessHtml) > uiRows) {
+                var sessRows = __akiniCountMsgRowsFast(sessHtml);
+                if (sessRows > uiRows && (sessRows - uiRows < 500)) {
+                  // v687: 差量恢复，不在前台恢复瞬间卡顿线程
                   __akiniRenderChatBody(__akiniDeduplicateChatHTML(sessHtml), e);
                 } else if (window._idbStore && window._idbStore.get) {
                   window._idbStore.get("akini_chat_history_" + e, function (bak) {
@@ -15051,8 +15083,14 @@ window.akiniContacts = {
               } else {
                 const n = t.querySelector(".quote-bubble");
                 let i = t.innerText || "";
-                (n && (i = i.replace(n.innerText || "", "").trim()),
-                  (e = i.slice(0, 60)));
+                if (n) i = i.replace(n.innerText || "", "").trim();
+                // v687: 过滤掉无意义占位符
+                e = i.slice(0, 60);
+                if (!e && img) {
+                  stickerUrl = _imgSrc || "";
+                  stickerMh = _imgMh || "";
+                  e = "【表情包】";
+                }
               }
             }
             const i = n.classList.contains("me"),
@@ -18378,8 +18416,7 @@ window.akiniContacts = {
                 mpR && setHtmlKeepInput(mpR, ta.avatar));
               const x = document.getElementById("bgAvatarDisplay");
               x && (x.innerHTML = n);
-              const E = document.getElementById("friendsProfileName");
-              E && (E.textContent = e);
+
               const S = document.getElementById("myMsgAvatar");
               S && (S.innerHTML = n);
               const A = document.getElementById("taMsgAvatar");
@@ -19942,6 +19979,7 @@ window.akiniContacts = {
             // standard 方案：被系统/其他 App 暂停时退避补播（后台保活失效的另一半原因）
             _kaAudio.addEventListener("pause", function () {
               try {
+                window.__akiniKaAudioPlaying = false;
                 if (!_kaAudioEnabled() || _kaUserStopped) return;
                 // 稳定播放满 30s 后被打断 → 退避轨道清零重算
                 if (_kaLastPlayAt && Date.now() - _kaLastPlayAt > 30000) _kaDelay = 0;
@@ -19951,8 +19989,9 @@ window.akiniContacts = {
                 _kaScheduleRetry();
               } catch (e) {}
             });
-            _kaAudio.addEventListener("playing", function () { _kaLastPlayAt = Date.now(); });
+            _kaAudio.addEventListener("playing", function () { _kaLastPlayAt = Date.now(); window.__akiniKaAudioPlaying = true; });
           }
+          window.__akiniKaAudioPlaying = true;
           var p = _kaAudio.play();
           if (p && p.then) p.then(function () { _kaLastPlayAt = Date.now(); _kaDelay = 0; });
           if (p && p.catch) p.catch(function () {
@@ -19965,6 +20004,7 @@ window.akiniContacts = {
       }
       function _kaAudioStop() {
         _kaUserStopped = true;
+        window.__akiniKaAudioPlaying = false;
         clearTimeout(_kaRetryTimer);
         if (_kaAudio) { try { _kaAudio.pause(); _kaAudio.currentTime = 0; } catch (e) {} }
       }
@@ -23062,8 +23102,14 @@ window.akiniContacts = {
         try {
           /* v509：低内存/iOS 设备不初始化保活音频，避免音频解码+MediaSession 占用内存导致启动崩溃 */
           if (window.__akiniLowMem) return;
-          if (h && !h.paused) return;
-          if (
+          /* v687 根因修复：统一保活音频源——_kaAudio(silence.wav) 已是主循环音源时，
+             不再创建第二个 audio 元素。此前双 audio 循环 + OscillatorNode 三重占用被
+             iOS/Android 判定异常高能耗 → 后台强杀进程（保活被断）→ 回前台大恢复卡崩闪退。
+             主音源在播时此处仅刷新 MediaSession 元数据，保持后台“正在播放”系统信号 */
+          var _kaActive = false;
+          try { _kaActive = window.__akiniKaAudioPlaying === true; } catch (eKa) {}
+          if (!_kaActive) {
+            if (h && !h.paused) return;
             (h ||
               (((h = document.createElement("audio")).loop = !0),
               (h.preload = "auto"),
@@ -23083,11 +23129,9 @@ window.akiniContacts = {
                   (L = setTimeout(function () {
                     !ot() || (u && !u.paused) || V();
                   }, 2e3))));
-            }),
-            "mediaSession" in navigator &&
-              navigator.mediaSession &&
-              (!u || u.paused))
-          )
+            }));
+          }
+          if ("mediaSession" in navigator && navigator.mediaSession && (!u || u.paused))
             try {
               var t =
                 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" preserveAspectRatio="none"><rect x="0" y="0" width="100" height="100" rx="0" fill="%23000000"/><text x="50" y="68" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" font-weight="700" fill="%23ffffff">A</text></svg>';
@@ -23144,10 +23188,13 @@ window.akiniContacts = {
         ot() ? V() : __akiniMediaPause();
       }
       function ct() {
-        (ot() && (V(), Q()),
-          __akiniManualPlay &&
-            d &&
-            (Q(), u && u.paused && u.play().catch(function () {})));
+        /* v687: 切后台保活安全保护——后台不抢占高消耗 OscillatorNode，仅保证静音音频 */
+        if (ot()) {
+          try { V(); } catch(eV) {}
+        }
+        if (__akiniManualPlay && d) {
+          try { u && u.paused && u.play().catch(function () {}); } catch (ePlay) {}
+        }
       }
       function lt() {
         var selectedSeconds = 0;
@@ -26974,26 +27021,41 @@ if (!window.__akiniUnreadTickerStarted) {
   function _taName() { try { return (localStorage.getItem("akini_ta_name") || "对方").trim() || "对方"; } catch (e) { return "对方"; } }
 
   /* v649: 引用卡片统一渲染——名字完整显示（不截断），内容超15字省略 */
+  /* v687: 修复引用表情包气泡下方白框/无图——支持 data-mh 异步回填；若 _stk 和 _t 均无则回退文字【表情包】，杜绝空白胶囊 */
   window.__akiniQuoteCardHtml = function (name, text, sticker, mh) {
     var _n = String(name == null ? "" : name).trim() || "我";
     var _t = String(text == null ? "" : text).trim();
-    /* v686: 引用表情包——传入 sticker/mh 时渲染表情小图缩略，不再显示"【表情包】"文字 */
     var _stk = "";
-    if (sticker && /^(https?:|data:image)/.test(String(sticker))) _stk = String(sticker);
-    else if (mh && window.__akiniMedia && window.__akiniMedia.getSync) {
+    var _mh = (mh && typeof mh === "string") ? mh.trim() : "";
+    if (sticker && /^(https?:|data:image)/.test(String(sticker))) {
+      _stk = String(sticker);
+    } else if (_mh && window.__akiniMedia && window.__akiniMedia.getSync) {
       try {
-        var _r2 = window.__akiniMedia.getSync(mh);
+        var _r2 = window.__akiniMedia.getSync(_mh);
         if (_r2 && /^(https?:|data:image)/.test(String(_r2))) _stk = String(_r2);
       } catch (eS) {}
     }
-    if (_stk) _t = "";
+    // 如果没有取到同步真实图但有 mh，保留 data-mh 属性供 resolve 异步回填
+    var isSticker = !!(_stk || _mh || _t === "【表情包】");
+    if (_stk || _mh) {
+      _t = "";
+    } else if (isSticker) {
+      _t = "【表情包】";
+    }
+    // 防御：若文本和表情均为空，绝不渲染孤立名字的空白胶囊
+    if (!_stk && !_mh && !_t) return "";
+
     /* v677: 引用文本超过 15 字自动截断加省略号 */
     if (_t.length > 15) _t = _t.slice(0, 15) + "…";
     var nameHtml = '<span style="font-weight:600;white-space:nowrap;color:#333;flex-shrink:0;">' + (window.rt ? rt(_n) : _esc(_n)) + "</span>";
-    /* v661: 引用文字与名字同色（#333），不再一深一浅两个颜色 */
-    var textHtml = _stk
-      ? '<span style="white-space:nowrap;color:#333;flex-shrink:0;">：</span><img class="quote-sticker-thumb" src="' + _stk.replace(/"/g, "&quot;") + '" alt="表情包"/>'
-      : _t ? '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:150px;">：' + (window.rt ? rt(_t) : _esc(_t)) + "</span>" : "";
+    var textHtml = "";
+    if (_stk) {
+      textHtml = '<span style="white-space:nowrap;color:#333;flex-shrink:0;">：</span><img class="quote-sticker-thumb" src="' + _stk.replace(/"/g, "&quot;") + '" alt="表情包"/>';
+    } else if (_mh) {
+      textHtml = '<span style="white-space:nowrap;color:#333;flex-shrink:0;">：</span><img class="quote-sticker-thumb" data-mh="' + _mh.replace(/"/g, "&quot;") + '" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="表情包"/>';
+    } else if (_t) {
+      textHtml = '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:150px;">：' + (window.rt ? rt(_t) : _esc(_t)) + "</span>";
+    }
     return '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:3px 8px!important;font-size:11px!important;line-height:1.3!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:2px!important;display:inline-flex!important;align-items:center!important;max-width:210px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;box-sizing:border-box!important;">' + nameHtml + textHtml + "</div>";
   };
   /* v686: 朋友圈/iCity 评论回复条——点击回复时输入区上方显示「回复 xxx」，可 ✕ 取消 */

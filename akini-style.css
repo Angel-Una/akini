@@ -1994,7 +1994,7 @@ body.dark-mode .chat-top-bar-blur .chat-blur-l5 {
   width: 38px;
   height: 38px;
   border-radius: 50% !important;
-  background: #ddd;
+  background: transparent !important;
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
