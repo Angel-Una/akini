@@ -97,12 +97,13 @@
           chat: Array.isArray(parsed.chat) ? parsed.chat : [],
           moments: Array.isArray(parsed.moments) ? parsed.moments : [],
           icity: Array.isArray(parsed.icity) ? parsed.icity : [],
-          music: Array.isArray(parsed.music) ? parsed.music : []
+          music: Array.isArray(parsed.music) ? parsed.music : [],
+          calls: Array.isArray(parsed.calls) ? parsed.calls : []
         };
         return _colCache[contactId];
       }
     } catch (e) {}
-    _colCache[contactId] = _colCache[contactId] || { chat: [], moments: [], icity: [], music: [] };
+    _colCache[contactId] = _colCache[contactId] || { chat: [], moments: [], icity: [], music: [], calls: [] };
     return _colCache[contactId];
   }
 
@@ -126,6 +127,32 @@
       var c = wb[Math.floor(Math.random() * wb.length)];
       return String(c.text || c.content || '').trim();
     } catch (e) { return ''; }
+  }
+
+  function addCallRecord(contactId, record) {
+    if (!contactId || !record) return false;
+    try {
+      var data = loadCollections(contactId);
+      if (!Array.isArray(data.calls)) data.calls = [];
+      var item = {
+        id: Date.now() + Math.random(),
+        duration: record.duration || '00:00',
+        durationSec: record.durationSec || 0,
+        avatar: record.avatar || '',
+        name: record.name || 'TA',
+        endTime: record.endTime || Date.now()
+      };
+      data.calls.unshift(item);
+      saveCollections(contactId, data);
+      // 若当前正停留在该联系人的通话记录界面，立即无缝刷新
+      if (currentContactId === contactId && currentTab === 'calls') {
+        renderList();
+      }
+      return true;
+    } catch (e) {
+      console.warn('[TA手机] 添加通话记录失败', e);
+      return false;
+    }
   }
 
   function addCollection(contactId, type, content, originalTime, images) {
@@ -320,7 +347,13 @@
     if (listView) listView.style.display = 'flex';
     var c = getContactById(currentContactId);
     var _cname = (c && c.name && !/^(null|undefined|nan)$/i.test(String(c.name).trim())) ? c.name + ' · ' : '';
-    updateTitle(_cname + (tab === 'chat' ? '聊天' : (tab === 'moments' ? '朋友圈' : (tab === 'music' ? '网易云' : 'iCity'))));
+    var tabTitle = '收藏';
+    if (tab === 'chat') tabTitle = '聊天';
+    else if (tab === 'moments') tabTitle = '朋友圈';
+    else if (tab === 'music') tabTitle = '网易云';
+    else if (tab === 'icity') tabTitle = 'iCity';
+    else if (tab === 'calls') tabTitle = '通话记录';
+    updateTitle(_cname + tabTitle);
     renderList();
   }
 
@@ -385,6 +418,32 @@
     var sorted = items.slice();
     // 所有数据统一按收藏时间倒序排列
     sorted.sort(function (a, b) { return (b.collectedTime || 0) - (a.collectedTime || 0); });
+    if (currentTab === 'calls') {
+      if (!items.length) {
+        el.innerHTML = '<div class="akini-ta-phone-empty">暂无通话记录...</div>';
+        return;
+      }
+      var sortedCalls = items.slice();
+      sortedCalls.sort(function (a, b) { return (b.endTime || 0) - (a.endTime || 0); });
+      var defAvatarHtml = (window.__akiniLineAvatarImg && typeof window.__akiniLineAvatarImg === 'function')
+        ? window.__akiniLineAvatarImg()
+        : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+      el.innerHTML = sortedCalls.map(function (item) {
+        var avBox = defAvatarHtml;
+        return '<div class="akini-ta-phone-item akini-ta-phone-call-item" style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:#f9f9f9;border-radius:14px;margin-bottom:10px;">' +
+          '<div style="width:48px;height:48px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#f0f0f0;display:flex;align-items:center;justify-content:center;">' + avBox + '</div>' +
+          '<div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;">' +
+            '<div style="font-size:15px;font-weight:600;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(item.name || 'TA') + '</div>' +
+            '<div style="font-size:13px;color:#111;display:flex;align-items:center;gap:5px;">' +
+              '<svg fill="none" height="15" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24" width="15" style="color:#111;flex-shrink:0;"><path d="m22 8-6 4 6 4V8Z"/><rect height="12" rx="2" width="14" x="2" y="6"/></svg>' +
+              '<span style="color:#111;">通话时长 ' + escapeHtml(item.duration || '00:00') + '</span>' +
+            '</div>' +
+            '<div style="font-size:11px;color:#999;margin-top:2px;">' + formatTime(item.endTime) + '</div>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      return;
+    }
     if (currentTab === 'music') {
       el.innerHTML = sorted.map(function (item) {
         var t = item.track || {};
@@ -515,6 +574,10 @@
             '<div class="akini-ta-phone-app-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>' +
             '<span class="akini-ta-phone-app-name">网易云</span>' +
           '</div>' +
+          '<div class="akini-ta-phone-app" onclick="window.AkiniTaPhone.showApp(\'calls\')">' +
+            '<div class="akini-ta-phone-app-icon"><svg fill="none" height="42" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewBox="0 0 24 24" width="42"><path d="m22 8-6 4 6 4V8Z"/><rect height="12" rx="2" width="14" x="2" y="6"/></svg></div>' +
+            '<span class="akini-ta-phone-app-name">通话记录</span>' +
+          '</div>' +
         '</div>' +
         // 收藏列表
         '<div class="akini-ta-phone-list-view" id="akini-ta-phone-list-view">' +
@@ -540,7 +603,8 @@
     goBack: goBack,
     openContact: openContact,
     showApp: showApp,
-    deleteCollection: deleteCollection
+    deleteCollection: deleteCollection,
+    addCallRecord: addCallRecord
   };
 
   if (document.readyState === 'loading') {
