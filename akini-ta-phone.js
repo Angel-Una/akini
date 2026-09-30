@@ -66,25 +66,16 @@
 
   function avatarHtml(c, size) {
     size = size || 48;
-    var av = (c && c.avatar != null) ? String(c.avatar).trim() : '';
+    var av = (c && c.avatar) || '';
     var style = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;background:#f0f0f0;flex-shrink:0;';
-    var fallbackSvg = window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" style="width:100%;height:100%;display:block;"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/></svg>';
-    /* 彻底杜绝 null / undefined 字符串或空值 */
-    if (!av || av === 'null' || av === 'undefined' || av === '👤' || av === '[object Object]') {
-      return '<div style="' + style + '">' + fallbackSvg + '</div>';
+    /* zzzl：默认/未设头像一律用线条人像 SVG（不再用 emoji） */
+    var _badAv = av && /^(null|undefined|nan)$/i.test(String(av).trim());
+    var isDef = !av || _badAv || av === '👤' || (window.__akiniIsDefAv && window.__akiniIsDefAv(av));
+    if (isDef && window.__akiniLineAvatarImg) {
+      return '<div style="' + style + '">' + window.__akiniLineAvatarImg() + '</div>';
     }
-    var isDef = false;
-    try {
-      if (typeof window.__akiniIsDefAv === 'function') isDef = window.__akiniIsDefAv(av);
-    } catch (_) {}
-    if (isDef) {
-      return '<div style="' + style + '">' + fallbackSvg + '</div>';
-    }
-    if (typeof av === 'string' && (av.indexOf('data:') === 0 || av.indexOf('http') === 0 || av.indexOf('blob:') === 0 || av.indexOf('/') === 0)) {
-      return '<div style="' + style + '"><img src="' + escapeHtml(av) + '" style="width:100%;height:100%;object-fit:cover;" alt="头像"/></div>';
-    }
-    if (av.length > 4) {
-      return '<div style="' + style + '">' + fallbackSvg + '</div>';
+    if (typeof av === 'string' && av.indexOf('data:') === 0) {
+      return '<div style="' + style + '"><img src="' + av + '" style="width:100%;height:100%;object-fit:cover;" alt="头像"/></div>';
     }
     return '<div style="' + style + '"><span style="font-size:' + Math.round(size * 0.55) + 'px;">' + escapeHtml(av || '👤') + '</span></div>';
   }
@@ -318,7 +309,7 @@
     var desktop = getEl('akini-ta-phone-desktop');
     if (desktop) desktop.style.display = 'flex';
     var c = getContactById(contactId);
-    updateTitle((c && c.name) || 'TA的手机');
+    updateTitle((c && c.name && !/^(null|undefined|nan)$/i.test(String(c.name).trim())) ? c.name : 'TA的手机');
   }
 
   function showApp(tab) {
@@ -328,7 +319,8 @@
     var listView = getEl('akini-ta-phone-list-view');
     if (listView) listView.style.display = 'flex';
     var c = getContactById(currentContactId);
-    updateTitle((c && c.name ? c.name + ' · ' : '') + (tab === 'chat' ? '聊天' : (tab === 'moments' ? '朋友圈' : (tab === 'music' ? '网易云' : 'iCity'))));
+    var _cname = (c && c.name && !/^(null|undefined|nan)$/i.test(String(c.name).trim())) ? c.name + ' · ' : '';
+    updateTitle(_cname + (tab === 'chat' ? '聊天' : (tab === 'moments' ? '朋友圈' : (tab === 'music' ? '网易云' : 'iCity'))));
     renderList();
   }
 
@@ -339,7 +331,7 @@
       hideAllViews();
       if (desktop) desktop.style.display = 'flex';
       var c = getContactById(currentContactId);
-      updateTitle((c && c.name) || 'TA的手机');
+      updateTitle((c && c.name && !/^(null|undefined|nan)$/i.test(String(c.name).trim())) ? c.name : 'TA的手机');
     } else if (desktop && desktop.style.display !== 'none') {
       showContactGrid();
       currentContactId = null;

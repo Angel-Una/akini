@@ -157,6 +157,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   overflow-y: hidden !important;
   overflow-x: hidden !important;
   overscroll-behavior: none !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+  box-sizing: border-box !important;
   padding-bottom: env(safe-area-inset-bottom, 0px);
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
@@ -233,7 +236,9 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   width: 40px;
   height: 40px;
 }.top-card {
-  margin: calc(10px + env(safe-area-inset-top, 0px)) 16px 4px;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: calc(10px + env(safe-area-inset-top, 0px)) 0 4px !important;
   background: #ffffff;
   border-radius: 26px;
   box-shadow: none;
@@ -1994,7 +1999,7 @@ body.dark-mode .chat-top-bar-blur .chat-blur-l5 {
   width: 38px;
   height: 38px;
   border-radius: 50% !important;
-  background: transparent !important;
+  background: #ddd;
   overflow: hidden;
   flex-shrink: 0;
   display: flex;
@@ -7717,6 +7722,9 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
 /* ===== v519: 首页禁止上下滑动，底部模块更贴近屏幕底，底栏保持原样 ===== */
 .content-wrapper {
   touch-action: none !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+  box-sizing: border-box !important;
   padding-bottom: 0 !important;
 }
 .fit-bottom {
