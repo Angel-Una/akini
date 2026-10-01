@@ -5,6 +5,7 @@ const PRECACHE_ASSETS = [
   './akini-main.js',
   './favicon.png',
   './localforage.min.js',
+  './silence.flac',
 ];
 
 self.addEventListener('install', function(event) {

@@ -19959,28 +19959,9 @@ window.akiniContacts = {
         }
         var elapsedMs = Date.now() - _kaStartAt;
         if (el) el.textContent = "运行中 · 已保活 " + _kaFmtUp(elapsedMs);
-
-        // 同步锁屏 MediaSession 媒体卡片计时（无上限持续推进，避免卡在 2 秒）
-        try {
-          if ("mediaSession" in navigator && navigator.mediaSession) {
-            // 若当前没有在播放一起听音乐，则由保活接管锁屏卡片
-            var isMusicPlaying = (typeof u !== "undefined" && u && !u.paused);
-            if (!isMusicPlaying) {
-              var posSec = Math.max(0, Math.floor(elapsedMs / 1000));
-              var fakeDuration = Math.max(86400 * 365, posSec + 3600); // 1年无上限时长
-              if (posSec % 5 === 0) {
-                if (navigator.mediaSession.setPositionState) {
-                  navigator.mediaSession.setPositionState({
-                    duration: fakeDuration,
-                    playbackRate: 1,
-                    position: Math.min(posSec, fakeDuration)
-                  });
-                }
-                navigator.mediaSession.playbackState = "playing";
-              }
-            }
-          }
-        } catch (e) {}
+        /* 锁屏卡片计时已由 12 小时静音 FLAC 的真实播放位置驱动（系统只认音频元素真实进度，
+           此前虚报 setPositionState 时长实测无效），故删除每 5 秒一次的 positionState 轮询，
+           省去后台系统 IPC 唤醒，进一步降低锁屏被杀/卡崩概率 */
       }
       function _kaUpStart() {
         if (!_kaStartAt) _kaStartAt = Date.now();
@@ -20010,9 +19991,12 @@ window.akiniContacts = {
         try {
           _kaUserStopped = false;
           if (!_kaAudio) {
-            // v505 根因修复：原远程静音源 img.heliar.top 域名已失效（DNS 解析失败），
-            // 每次启动都触发网络错误+error 回退链，是安卓反复卡崩的元凶之一。直接使用本地静音 wav 循环。
-            _kaAudio = new Audio("silence.wav");
+            /* 对齐 syy 的超长静音音频：本地 12 小时静音 FLAC（仅约 1MB）。
+               ① 锁屏媒体卡片进度由音频真实位置驱动——2 秒 wav 循环导致卡片时间每 2 秒重置（用户实测根因），
+                 换 12 小时长音频后可持续累计，体感无上限，与 syy 一致；
+               ② 消除 2 秒 loop 循环重启的系统 IPC 风暴（后台每 2 秒被唤醒处理音频会话，卡崩诱因之一）；
+               ③ syy 的远程静音源 img.heliar.top 已 DNS 失效，本地文件彻底无外链依赖。 */
+            _kaAudio = new Audio("silence.flac");
             _kaAudio.loop = true;
             _kaAudio.volume = 0.01;
             _kaAudio.preload = "auto";
@@ -23140,7 +23124,7 @@ window.akiniContacts = {
               (h.preload = "auto"),
               (h.volume = 0.001),
               (h.muted = !1),
-              (h.src = "silence.wav"),
+              (h.src = "silence.flac"),
               h.setAttribute("playsinline", ""),
               h.setAttribute("webkit-playsinline", ""),
               h.setAttribute("x5-playsinline", ""),
@@ -23174,16 +23158,8 @@ window.akiniContacts = {
                 ],
               })),
                 (navigator.mediaSession.playbackState = "playing"));
-              if (navigator.mediaSession.setPositionState) {
-                var elapsedMs = _kaStartAt ? (Date.now() - _kaStartAt) : 0;
-                var posSec = Math.max(0, Math.floor(elapsedMs / 1000));
-                var fakeDuration = Math.max(86400 * 365, posSec + 3600);
-                navigator.mediaSession.setPositionState({
-                  duration: fakeDuration,
-                  playbackRate: 1,
-                  position: Math.min(posSec, fakeDuration)
-                });
-              }
+              /* 锁屏进度由 12 小时静音音频真实位置驱动；setPositionState 虚报时长实测对
+                 锁屏卡片无效且徒增后台 IPC，故不再设置 */
             } catch (t) {}
         } catch (t) {
           console.warn("保活灵动岛启动失败", t);
