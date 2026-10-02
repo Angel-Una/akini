@@ -40,7 +40,9 @@
   }
   function safeSetItem(key, value) {
     try {
-      if (typeof value === 'object') value = JSON.stringify(value);
+      /* v692：typeof null === 'object'，原写法会把 null 序列化成字面 "null" 存入 */
+      if (typeof value === 'object' && value !== null) value = JSON.stringify(value);
+      if (value === null || value === undefined) return;
       localStorage.setItem(key, value);
     } catch (e) { console.warn('[safeSetItem]', key, e); }
   }

@@ -64,7 +64,8 @@
         var k = localStorage.key(i);
         if (!k || k.indexOf("akini_") !== 0 || SKIP_RE.test(k)) continue;
         var v = localStorage.getItem(k);
-        if (v != null) data[k] = v;
+        /* v692：跳过字面 "null"/"undefined" 脏值，防止把脏数据传上云端再回填到其他设备 */
+        if (v != null && v !== "null" && v !== "undefined") data[k] = v;
       }
     } catch (e) {}
     // 内存镜像补充：大键（>200KB 图片等）只存在内存/IDB，必须全量遍历内存键，否则会漏备
@@ -271,7 +272,10 @@
           try { local = localStorage.getItem(k); } catch (e) {}
           var mem = null;
           try { if (window.akiniStore && window.akiniStore.memoryGet) mem = window.akiniStore.memoryGet(k); } catch (e) {}
-          if ((local == null || local === "") && (mem == null || mem === "") && cloud[k]) {
+          /* v692：云端 payload 里的字面 "null"/"undefined" 脏值不回填——
+             否则会经 setItem 变成字符串 "null" 污染本地（气泡 CSS 变 null 元凶） */
+          if ((local == null || local === "") && (mem == null || mem === "") && cloud[k] &&
+              cloud[k] !== "null" && cloud[k] !== "undefined") {
             missing.push(k);
           }
         });

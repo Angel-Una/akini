@@ -447,6 +447,12 @@
         // 清除数据期间：akini_ 键一律拒写（含原始 LS 层），杜绝清完复活
         if (window.__akiniWiping && k && String(k).indexOf('akini_') === 0) return;
         var sv = String(v);
+        /* v692 修复"气泡 CSS 变 null"根因：setItem(k, null/undefined) 会被浏览器
+           存成字面字符串 "null"，下次启动当成有效 CSS 应用 → 气泡透明。
+           任何 akini_ 键的 null 值与字面 "null"/"undefined" 脏值一律拒写（空串是
+           合法清除操作，必须放行）。 */
+        if (k && String(k).indexOf('akini_') === 0 &&
+            (v === null || v === undefined || sv === 'null' || sv === 'undefined')) return;
         if ((sv === '[]' || sv === '{}') && _isGuardKeyProto(k) && !window.__akiniWiping && !window._akiniAllowRemove) {
           try {
             var _gp = self.memGet(k);
@@ -513,6 +519,9 @@
       var _shimSet = rawLS.setItem, _shimGet = rawLS.getItem, _shimRemove = rawLS.removeItem;
       rawLS.setItem = function (k, v) {
         var sv = String(v);
+        /* v692：null 值/字面 "null"/"undefined" 脏值对 akini_ 键一律拒写（同主拦截层） */
+        if (k && String(k).indexOf('akini_') === 0 &&
+            (v === null || v === undefined || sv === 'null' || sv === 'undefined')) return;
         try { _shimSet.call(rawLS, k, sv); } catch (e) {}
         try {
           if (isCriticalKey(k)) {

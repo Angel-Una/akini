@@ -298,6 +298,56 @@
   /* ============ 渲染 ============ */
   function getEl(id) { return document.getElementById(id); }
 
+  var _statusBarTimer = null;
+  var _batteryInstance = null;
+
+  function applyDeviceBattery(level) {
+    try {
+      var levelEl = getEl('akiniTaPhoneBatLevel');
+      if (!levelEl) return;
+      var num = (typeof level === 'number' && !isNaN(level)) ? level : 0.9;
+      var pct = Math.max(8, Math.min(100, Math.round(num * 100)));
+      levelEl.style.width = pct + '%';
+    } catch(e) {}
+  }
+
+  function syncBatteryOnce() {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.getBattery) {
+        navigator.getBattery().then(function(b) {
+          _batteryInstance = b;
+          applyDeviceBattery(b.level);
+          b.onlevelchange = function() {
+            applyDeviceBattery(b.level);
+          };
+        }).catch(function() {
+          applyDeviceBattery(0.9);
+        });
+      } else {
+        applyDeviceBattery(0.9);
+      }
+    } catch(e) {
+      applyDeviceBattery(0.9);
+    }
+  }
+
+  function updateStatusBar() {
+    try {
+      var timeEl = getEl('akiniTaPhoneTime');
+      if (timeEl) {
+        var d = new Date();
+        var hh = String(d.getHours()).padStart(2, '0');
+        var mm = String(d.getMinutes()).padStart(2, '0');
+        timeEl.textContent = hh + ':' + mm;
+      }
+      if (_batteryInstance && typeof _batteryInstance.level === 'number') {
+        applyDeviceBattery(_batteryInstance.level);
+      } else {
+        syncBatteryOnce();
+      }
+    } catch(e) {}
+  }
+
   function showContainer() {
     var c = getEl('akini-ta-phone-container');
     if (!c) {
@@ -308,11 +358,18 @@
     if (c.parentElement !== document.body) document.body.appendChild(c);
     c.style.display = 'flex';
     showContactGrid();
+    updateStatusBar();
+    if (_statusBarTimer) clearInterval(_statusBarTimer);
+    _statusBarTimer = setInterval(updateStatusBar, 1000);
   }
 
   function hideContainer() {
     var c = getEl('akini-ta-phone-container');
     if (c) c.style.display = 'none';
+    if (_statusBarTimer) {
+      clearInterval(_statusBarTimer);
+      _statusBarTimer = null;
+    }
   }
 
   function hideAllViews() {
@@ -499,8 +556,22 @@
       // 竖屏小手机外观
       '.akini-ta-phone-modal{width:min(76vw,340px);height:min(78vh,680px);max-height:680px;background:#fff;border-radius:44px;overflow:hidden;box-shadow:0 25px 70px rgba(0,0,0,0.22);display:flex;flex-direction:column;border:10px solid #111;}',
       // 灵动岛
-      '.akini-ta-phone-notch{width:90px;height:26px;background:#111;border-radius:13px;margin:10px auto 4px;flex-shrink:0;}',
-      // header
+      // 拟真状态栏与灵动岛
+      '.akini-ta-phone-statusbar{display:flex;align-items:center;justify-content:space-between;padding:10px 18px 4px;width:100%;box-sizing:border-box;flex-shrink:0;user-select:none;}',
+      '.akini-ta-phone-sb-left{flex:1;display:flex;align-items:center;justify-content:flex-start;min-width:0;}',
+      '.akini-ta-phone-time{font-size:14.5px;font-weight:700;color:#000;letter-spacing:-0.3px;font-variant-numeric:tabular-nums;line-height:1;}',
+      '.akini-ta-phone-notch{width:78px;height:23px;background:#000;border-radius:12px;flex-shrink:0;margin:0 4px;}',
+      '.akini-ta-phone-sb-right{flex:1;display:flex;align-items:center;justify-content:flex-end;gap:7px;min-width:0;}',
+      '.akini-ta-phone-signal{display:flex;align-items:flex-end;gap:2px;height:12px;padding-bottom:1px;}',
+      '.akini-ta-phone-signal .bar{width:3px;background:#000;border-radius:0.8px;}',
+      '.akini-ta-phone-signal .bar-1{height:3.5px;}',
+      '.akini-ta-phone-signal .bar-2{height:6.2px;}',
+      '.akini-ta-phone-signal .bar-3{height:9px;}',
+      '.akini-ta-phone-signal .bar-4{height:12px;}',
+      '.akini-ta-phone-battery-wrap{display:flex;align-items:center;}',
+      '.akini-ta-phone-battery{width:22px;height:11.5px;border:1.6px solid #000;border-radius:3.8px;padding:1.2px;position:relative;display:flex;align-items:center;box-sizing:border-box;}',
+      '.akini-ta-phone-battery::after{content:\'\';position:absolute;right:-2.8px;top:2.2px;width:1.6px;height:4.2px;background:#000;border-radius:0 1.2px 1.2px 0;}',
+      '.akini-ta-phone-battery-level{height:100%;background:#000;border-radius:1.8px;transition:width 0.3s;}',
       '.akini-ta-phone-header{background:transparent;display:flex;align-items:center;justify-content:space-between;padding:8px 14px 10px;flex-shrink:0;}',
       '.akini-ta-phone-back{background:none;border:none;color:#999;font-size:24px;cursor:pointer;font-weight:400;line-height:1;padding:0 4px;}',
       '.akini-ta-phone-back:active{opacity:0.6;}',
@@ -546,9 +617,30 @@
     container.id = 'akini-ta-phone-container';
     container.className = 'akini-ta-phone-container';
     container.style.display = 'none';
+    container.onclick = function(e) {
+      if (e.target === container) { hideContainer(); }
+    };
     container.innerHTML =
       '<div class="akini-ta-phone-modal">' +
-        '<div class="akini-ta-phone-notch"></div>' +
+        '<div class="akini-ta-phone-statusbar">' +
+          '<div class="akini-ta-phone-sb-left">' +
+            '<span class="akini-ta-phone-time" id="akiniTaPhoneTime">14:52</span>' +
+          '</div>' +
+          '<div class="akini-ta-phone-notch"></div>' +
+          '<div class="akini-ta-phone-sb-right">' +
+            '<div class="akini-ta-phone-signal" title="蜂窝信号">' +
+              '<span class="bar bar-1"></span>' +
+              '<span class="bar bar-2"></span>' +
+              '<span class="bar bar-3"></span>' +
+              '<span class="bar bar-4"></span>' +
+            '</div>' +
+            '<div class="akini-ta-phone-battery-wrap">' +
+              '<div class="akini-ta-phone-battery" title="设备电量">' +
+                '<div class="akini-ta-phone-battery-level" id="akiniTaPhoneBatLevel" style="width:90%"></div>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
         '<div class="akini-ta-phone-header">' +
           '<button class="akini-ta-phone-back" onclick="window.AkiniTaPhone.goBack()">‹</button>' +
           '<span class="akini-ta-phone-title" id="akini-ta-phone-title">TA的手机</span>' +

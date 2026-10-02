@@ -544,9 +544,10 @@ window.AKR = (function () {
       pokeOn = localStorage.getItem("akini_toggle_contactPokeToggle") === "1";
     } catch (e) {}
 
-    var transferOn = false;
+    var transferOn = true;
     try {
-      transferOn = localStorage.getItem("akini_toggle_contactTransferToggle") === "1";
+      var _tv = localStorage.getItem("akini_toggle_contactTransferToggle");
+      transferOn = _tv === null ? true : _tv === "1";
     } catch (e) {}
 
     var emojiMixOn = false;
@@ -1793,6 +1794,11 @@ document.addEventListener("DOMContentLoaded", function () {
               evt.preventDefault();
               evt.stopPropagation();
             } catch (x) {}
+          }
+          /* v695：保护最小化按钮！当最小化执行后，悬浮窗 ge 刚生成，
+             避免当次点击或穿透事件立即触发 ge 的展开（Ce），导致"刚最小化就闪退回全屏" */
+          if (t && (t.id === "callMinimizeBtn" || t.id === "callMinimizeBtnFull")) {
+            if (window._callState) window._callState._minimizedAt = Date.now();
           }
           e(evt);
         };
@@ -3817,6 +3823,7 @@ window.akiniContacts = {
         var B = "";
         if (
           (l || !s) &&
+          window.__akiniToggleOn("contactTransferToggle", true) &&
           (s
             ? Math.random() < window.AKR.getProb("groupTransferMe")
             : Math.random() < window.AKR.getProb("taTransfer"))
@@ -5089,7 +5096,7 @@ window.akiniContacts = {
       }
       function runExtras() {
         var list = [];
-        if (ex.transfer && window.__akiniToggleOn("contactTransferToggle", false)) list.push(doTransfer);
+        if (ex.transfer && window.__akiniToggleOn("contactTransferToggle", true)) list.push(doTransfer);
         if (ex.sticker) list.push(doSticker);
         if (ex.poke && "group" !== e.type && window.__akiniToggleOn("contactPokeToggle", false)) list.push(doPoke);
         if (ex.call && window.__akiniToggleOn("contactActiveMsgToggle", false)) list.push(doCall);
@@ -7313,6 +7320,13 @@ window.akiniContacts = {
       X = document.getElementById("sendBtn");
     var Y = document.getElementById("chatMenuOverlay"),
       Q = document.getElementById("menuBg");
+    var _mpCloseBtn = document.getElementById("mpCloseBtn");
+    if (_mpCloseBtn) {
+      _mpCloseBtn.onclick = function (e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        if (Y) { Y.style.display = "none"; Y.classList.remove("show"); }
+      };
+    }
     // ========== 首页防闪：数据未就绪前隐藏默认内容；切后台回来禁止整体下拉 ==========
     (function () {
       if (document.getElementById("akiniNoFlashStyle")) return;
@@ -8292,22 +8306,23 @@ window.akiniContacts = {
       }
     }
     ((window._flushAllData = flushAllData),
+      /* v690 防闪退：pagehide/hidden 的同步大序列化是切后台闪退主因（jetsam 强杀）。
+         延迟到下一事件循环 + 60s 真节流；数据已由每条消息的 300ms 防抖即时落盘兜底 */
       window.addEventListener("pagehide", function () {
         try {
           V();
         } catch (t) {}
-        try {
-          flushAllData();
-        } catch (t) {}
+        setTimeout(flushAllData, 0);
       }),
       document.addEventListener("visibilitychange", function () {
         if (document.hidden) {
           try {
             V();
           } catch (t) {}
-          try {
-            flushAllData();
-          } catch (t) {}
+          var _now = Date.now();
+          if (window.__akiniLastHideFlush && _now - window.__akiniLastHideFlush < 60000) return;
+          window.__akiniLastHideFlush = _now;
+          setTimeout(flushAllData, 0);
         } else if (U && window.akiniContacts) {
           try {
             var e = window.akiniContacts.getActiveChatId();
@@ -9871,6 +9886,20 @@ window.akiniContacts = {
         var isGrp = t && "group" === t.type;
         var _taAvatarBtn = document.getElementById("changeTaAvatarBtn");
         var _nameLabel = document.getElementById("menuItemNameLabel");
+        var _mpPanel = Y ? Y.querySelector(".menu-panel") : null;
+        if (_mpPanel) {
+          _mpPanel.classList.toggle("mp-group", !!isGrp);
+          _mpPanel.classList.toggle("mp-single", !isGrp);
+          var _mpTitle = document.getElementById("mpTitle");
+          if (_mpTitle) _mpTitle.textContent = isGrp ? "群聊设置" : "聊天设置";
+          try {
+            var _currAvatar = t && t.avatar ? t.avatar : "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23f2f2f7%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2229%22%20r%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%238e8e93%22%20stroke-width%3D%222.6%22/%3E%3Cpath%20d%3D%22M12%2076c4-17%2014-26%2028-26s24%209%2028%2026%22%20fill%3D%22none%22%20stroke%3D%22%238e8e93%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E";
+            var _taImg = document.getElementById("mpTaAvatarImg");
+            if (_taImg) _taImg.src = _currAvatar;
+            var _grpImg = document.getElementById("mpGroupAvatarImg");
+            if (_grpImg) _grpImg.src = _currAvatar;
+          } catch(e) {}
+        }
         if (isGrp) {
           // 群聊模式：更换群头像、更改群聊名称、添加群成员、移除群成员、解散群聊
           if (jt) jt.style.display = "flex";
@@ -9963,6 +9992,8 @@ window.akiniContacts = {
               var e = window.akiniContacts.getActiveChatId();
               e && window.akiniContacts.updateContact(e, { avatar: t });
             }
+            var _taImg = document.getElementById("mpTaAvatarImg");
+            if (_taImg) _taImg.src = t;
             (Tn(),
               window.renderBeautifyContacts && window.renderBeautifyContacts(),
               window.renderHomeAvatarContacts &&
@@ -10048,6 +10079,7 @@ window.akiniContacts = {
             (n &&
               "group" === n.type &&
               window.akiniContacts.updateGroup(e, { avatar: t }),
+              (function(){ var _gi = document.getElementById("mpGroupAvatarImg"); if(_gi)_gi.src=t; })(),
               Tn(),
               window.renderChatList && window.renderChatList(),
               Y &&
@@ -13149,6 +13181,10 @@ window.akiniContacts = {
           : U.classList.remove("call-expanded"));
     }
     function Ce() {
+      /* v696：如果正处于最小化保护期（< 800ms 内），绝对禁止展开回全屏 */
+      if (we._minimizedAt && Date.now() - we._minimizedAt < 800) {
+        return;
+      }
       we.isMinimized = !1;
       be();
       const t = document.getElementById("app-call");
@@ -13628,6 +13664,8 @@ window.akiniContacts = {
     setInterval(function () {
       try {
         if (!we.active || document.hidden) return;
+        /* v697修复：仅在未接通且非主叫时隐藏最小化按钮（来电响铃阶段） */
+        if (we.answered || we.isMyCalling) return;
         var b = document.getElementById("callBlockOverlay");
         var v = document.getElementById("callMinimizeBtnFull");
         if (v && v.parentElement && v.parentElement.style.display !== "none") {
@@ -13692,22 +13730,40 @@ window.akiniContacts = {
     function Ne() {
       if (!we.active) return;
       ((we.isMinimized = !0), be());
+      we._minimizedAt = Date.now();
       const t = document.getElementById("app-call");
-      (t && (t.style.display = "none"),
-        (ge.style.zIndex = "2147483647"),
-        document.body.appendChild(ge),
+      /* v694：先同步显示胶囊（默认顶部居中），再用缓存位置修正——
+         原实现完全等 IndexedDB 异步回调才设置 display:flex，
+         iOS 通话音频激活时 IDB 挂起/延迟会导致胶囊迟迟不显示，表现为"最小化后悬浮窗消失" */
+      t && (t.style.display = "none"),
+        ge.classList.add("call-mini-shrunk");
+      try {
+        document.body.appendChild(ge);
+      } catch (e) {}
+      ge.style.cssText =
+        "display:flex; position:fixed; top:60px; left:50%; right:auto; transform:translateX(-50%); z-index:2147483647;";
+      /* 强制再次隐藏全屏通话，双保险 */
+      if (t) {
+        t.style.display = "none";
+      }
+      try {
         De(function (t) {
-          t && "number" == typeof t.top && "number" == typeof t.left
-            ? (ge.style.cssText =
+          try {
+            if (
+              t &&
+              "number" == typeof t.top &&
+              "number" == typeof t.left
+            ) {
+              ge.style.cssText =
                 "display:flex; position:fixed; top:" +
                 t.top +
                 "px; left:" +
                 t.left +
-                "px; right:auto; transform:none; z-index:2147483647;")
-            : (ge.style.cssText =
-                "display:flex; position:fixed; top:60px; left:50%; right:auto; transform:translateX(-50%); z-index:2147483647;");
-        }),
-        ge.classList.add("call-mini-shrunk"));
+                "px; right:auto; transform:none; z-index:2147483647;";
+            }
+          } catch (e) {}
+        });
+      } catch (e) {}
       var e = document.getElementById("callAvatar"),
         n = document.getElementById("callName");
       (e &&
@@ -13823,6 +13879,10 @@ window.akiniContacts = {
     ) {
       function Oe(t) {
         if (!we.active && !we.isMinimized) return;
+        /* v696：如果刚最小化（< 800ms 内），绝对禁止触发展开！彻底消除最小化按钮事件穿透到悬浮窗导致瞬间弹回全屏的问题 */
+        if (we._minimizedAt && Date.now() - we._minimizedAt < 800) {
+          return;
+        }
         if (ge._didDrag) {
           ge._didDrag = !1;
           return;
@@ -13838,6 +13898,9 @@ window.akiniContacts = {
       ge.addEventListener("click", Oe);
       window.__akiniExpandCall = function (ev) {
         try {
+          if (we && we._minimizedAt && Date.now() - we._minimizedAt < 800) {
+            return;
+          }
           if (ge && ge._didDrag) {
             ge._didDrag = !1;
             return;
@@ -13917,15 +13980,6 @@ window.akiniContacts = {
                   window._idbStore.set &&
                   window._idbStore.set(e, info));
             } catch (_) {}
-        } else {
-          /* 点击/点按触发：如果未拖拽且目标是悬浮窗 ge，直接展开通话 */
-          if (t === ge && (Date.now() - startTs < 350)) {
-            try {
-              if (ev && ev.cancelable) ev.preventDefault();
-              if (ev && ev.stopPropagation) ev.stopPropagation();
-            } catch (_) {}
-            Ce();
-          }
         }
       }
       if (window.PointerEvent) {
@@ -14297,18 +14351,28 @@ window.akiniContacts = {
         })()
       )
         if (we.isMinimized) {
-          (De(function (t) {
-            t && "number" == typeof t.top && "number" == typeof t.left
-              ? (ge.style.cssText =
-                  "display:flex; position:fixed; top:" +
-                  t.top +
-                  "px; left:" +
-                  t.left +
-                  "px; right:auto; transform:none; z-index:2147483647;")
-              : (ge.style.cssText =
-                  "display:flex; position:fixed; top:60px; left:50%; right:auto; transform:translateX(-50%); z-index:2147483647;");
-          }),
-            ge.classList.add("call-mini-shrunk"));
+          /* v694：同步先显示胶囊，IDB 回调仅修正位置（防 iOS IDB 挂起导致胶囊不显示） */
+          ge.classList.add("call-mini-shrunk");
+          ge.style.cssText =
+            "display:flex; position:fixed; top:60px; left:50%; right:auto; transform:translateX(-50%); z-index:2147483647;";
+          try {
+            De(function (t) {
+              try {
+                if (
+                  t &&
+                  "number" == typeof t.top &&
+                  "number" == typeof t.left
+                ) {
+                  ge.style.cssText =
+                    "display:flex; position:fixed; top:" +
+                    t.top +
+                    "px; left:" +
+                    t.left +
+                    "px; right:auto; transform:none; z-index:2147483647;";
+                }
+              } catch (e) {}
+            });
+          } catch (e) {}
           const t = document.getElementById("callName"),
             e = document.getElementById("callAvatar");
           (t &&
@@ -14405,21 +14469,39 @@ window.akiniContacts = {
       document.addEventListener("visibilitychange", function () {
         if (!document.hidden && we.active)
           if ((be(), we.isMinimized))
-            (De(function (t) {
-              t && "number" == typeof t.top && "number" == typeof t.left
-                ? (ge.style.cssText =
-                    "display:flex; position:fixed; top:" +
-                    t.top +
-                    "px; left:" +
-                    t.left +
-                    "px; right:auto; transform:none; z-index:2147483647;")
-                : (ge.style.cssText =
-                    "display:flex; position:fixed; top:60px; left:50%; right:auto; transform:translateX(-50%); z-index:2147483647;");
-            }),
-              ge.classList.add("call-mini-shrunk"));
+            /* v694：同步先显示胶囊，IDB 回调仅修正位置（防 iOS IDB 挂起导致胶囊不显示） */
+            (ge.classList.add("call-mini-shrunk"),
+              (ge.style.cssText =
+                "display:flex; position:fixed; top:60px; left:50%; right:auto; transform:translateX(-50%); z-index:2147483647;"),
+              (function () {
+                try {
+                  De(function (t) {
+                    try {
+                      if (
+                        t &&
+                        "number" == typeof t.top &&
+                        "number" == typeof t.left
+                      ) {
+                        ge.style.cssText =
+                          "display:flex; position:fixed; top:" +
+                          t.top +
+                          "px; left:" +
+                          t.left +
+                          "px; right:auto; transform:none; z-index:2147483647;";
+                      }
+                    } catch (e) {}
+                  });
+                } catch (e) {}
+              })());
           else {
-            const t = document.getElementById("app-call");
-            t && ((t.style.zIndex = "99999999"), (t.style.display = "flex"));
+            /* v694：切回前台恢复全屏时走 Ce() 完整恢复（含按钮状态刷新+body直下防fixed失效），
+               原实现只 display:flex，呼叫中/通话中按钮状态（最小化键）可能丢失 */
+            try {
+              Ce();
+            } catch (e) {
+              const t = document.getElementById("app-call");
+              t && ((t.style.zIndex = "99999999"), (t.style.display = "flex"));
+            }
           }
       }));
     const Ve = document.getElementById("transferBtn"),
@@ -18852,6 +18934,40 @@ window.akiniContacts = {
             }
           }),
           (function () {
+            // 统一各个背景图的清除恢复默认功能
+            function bindClearBg(btnId, storageKey, resetFn) {
+              const b = document.getElementById(btnId);
+              if (!b) return;
+              b.addEventListener("click", function() {
+                try { localStorage.removeItem(storageKey); } catch(e) {}
+                try { if (window.akiniStore && window.akiniStore.remove) window.akiniStore.remove(storageKey); } catch(e) {}
+                try { if (window._idbStore && window._idbStore.del) window._idbStore.del(storageKey); } catch(e) {}
+                if (typeof resetFn === "function") resetFn();
+              });
+            }
+            bindClearBg("clearCoverBtnBeautify", "akini_cover_img", function() {
+              const el = document.getElementById("coverAreaMain");
+              if (el) el.style.backgroundImage = "";
+            });
+            bindClearBg("clearDayBgBtnBeautify", "akini_bg_img", function() {
+              const el = document.getElementById("bgArea");
+              if (el) el.style.backgroundImage = "";
+            });
+            bindClearBg("clearFriendsBgBtnBeautify", "akini_friends_bg", function() {
+              const el = document.getElementById("friendsHeader");
+              if (el) el.style.backgroundImage = "";
+            });
+            bindClearBg("clearCallBgBtnBeautify", "akini_call_bg", function() {
+              if (window.__applyCallBg) window.__applyCallBg("");
+            });
+            bindClearBg("clearCallMiniBgBtnBeautify", "akini_callmini_bg", function() {
+              if (window.__applyCallMiniBg) window.__applyCallMiniBg("");
+            });
+            bindClearBg("clearMusicBgBtnBeautify", "akini_music_bg", function() {
+              const el = document.getElementById("musicBgLayer");
+              if (el) el.style.backgroundImage = "";
+            });
+            
             const clearBtn = document.getElementById("clearHomeBgBtn");
             if (!clearBtn) return;
             clearBtn.addEventListener("click", function () {
@@ -19959,7 +20075,7 @@ window.akiniContacts = {
         }
         var elapsedMs = Date.now() - _kaStartAt;
         if (el) el.textContent = "运行中 · 已保活 " + _kaFmtUp(elapsedMs);
-        /* 锁屏卡片计时已由 12 小时静音 FLAC 的真实播放位置驱动（系统只认音频元素真实进度，
+        /* 锁屏卡片计时已由 7 天静音 FLAC 的真实播放位置驱动（系统只认音频元素真实进度，
            此前虚报 setPositionState 时长实测无效），故删除每 5 秒一次的 positionState 轮询，
            省去后台系统 IPC 唤醒，进一步降低锁屏被杀/卡崩概率 */
       }
@@ -19991,9 +20107,9 @@ window.akiniContacts = {
         try {
           _kaUserStopped = false;
           if (!_kaAudio) {
-            /* 对齐 syy 的超长静音音频：本地 12 小时静音 FLAC（仅约 1MB）。
+            /* 对齐 syy 的超长静音音频：本地 7 天静音 FLAC（约 2MB）。
                ① 锁屏媒体卡片进度由音频真实位置驱动——2 秒 wav 循环导致卡片时间每 2 秒重置（用户实测根因），
-                 换 12 小时长音频后可持续累计，体感无上限，与 syy 一致；
+                 换 7 天长音频后可近乎无上限持续累计，与 syy 一致；
                ② 消除 2 秒 loop 循环重启的系统 IPC 风暴（后台每 2 秒被唤醒处理音频会话，卡崩诱因之一）；
                ③ syy 的远程静音源 img.heliar.top 已 DNS 失效，本地文件彻底无外链依赖。 */
             _kaAudio = new Audio("silence.flac");
@@ -20144,7 +20260,14 @@ window.akiniContacts = {
         t("pinyinCardToggle", !1),
         t("emojiMixToggle", !1),
         t("contactPokeToggle", !1),
-        t("contactTransferToggle", !1),
+        (function(){
+          try {
+            if (localStorage.getItem("akini_toggle_contactTransferToggle") === null) {
+              localStorage.setItem("akini_toggle_contactTransferToggle", "1");
+            }
+          } catch(e){}
+        })(),
+        t("contactTransferToggle", !0),
         (function(){
           try {
             localStorage.setItem("akini_toggle_contactReplyToggle", "1");
@@ -23158,8 +23281,8 @@ window.akiniContacts = {
                 ],
               })),
                 (navigator.mediaSession.playbackState = "playing"));
-              /* 锁屏进度由 12 小时静音音频真实位置驱动；setPositionState 虚报时长实测对
-                 锁屏卡片无效且徒增后台 IPC，故不再设置 */
+              /* 锁屏进度由 7 天静音音频真实位置驱动，近乎无上限累计；
+                 setPositionState 虚报时长实测对锁屏卡片无效且徒增后台 IPC，故不再设置 */
             } catch (t) {}
         } catch (t) {
           console.warn("保活灵动岛启动失败", t);
