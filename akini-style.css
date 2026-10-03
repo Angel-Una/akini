@@ -11855,3 +11855,1328 @@ body.akini-fav-selecting .chat-body .msg-row .msg-content-line > .bubble-wrap {
   background: #333333 !important;
   color: #ffffff !important;
 }
+/* v712 双屏首页架构修复版 */
+.home-slider { position: relative; width: 100%; height: 100%; overflow: hidden; }
+.home-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; padding: 0 16px; box-sizing: border-box; opacity: 0; pointer-events: none; transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.4s; overflow-y: auto; overflow-x: hidden; }
+.home-screen.active { opacity: 1; pointer-events: auto; transform: translateX(0); z-index: 2; }
+.home-screen.exit-left { transform: translateX(-100%); }
+.home-indicator { display: flex; justify-content: center; gap: 6px; padding: 8px 0; position: relative; z-index: 10; }
+.home-indicator .dot { width: 6px; height: 6px; border-radius: 50%; background-color: #ccc; cursor: pointer; transition: background-color 0.3s; }
+.home-indicator .dot.active { background-color: #333; }
+
+/* 第一屏磨砂渐变大卡片 */
+.screen1-card { position: relative; width: 100%; height: 280px; border-radius: 24px; overflow: hidden; background-color: #e0e0e0; margin-bottom: 16px; }
+.s1-bg-img { position: absolute; top: 0; left: 0; right: 0; height: 140px; background-image: url(''); background-size: cover; background-position: center; }
+.s1-overlay { position: absolute; bottom: 0; left: 0; right: 0; height: 200px; background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 40%, rgba(255,255,255,0.95) 100%); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
+.s1-content { position: absolute; bottom: 20px; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; z-index: 2; }
+.s1-avatar { width: 80px; height: 80px; border-radius: 50%; border: 4px solid #fff; background-color: #f0f0f0; margin-bottom: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.s1-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.s1-texts { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.s1-line { font-size: 14px; color: #333; font-weight: 500; cursor: pointer; padding: 4px 8px; border-radius: 8px; transition: background-color 0.2s; }
+.s1-line:hover { background-color: rgba(0,0,0,0.05); }
+
+/* 第一屏底部模块排布 */
+.s1-bottom-row { display: flex; flex-direction: row; align-items: flex-start; justify-content: space-between; gap: 12px; width: 100%; }
+.s1-polaroid { position: relative; width: 45%; background-color: #fff; padding: 12px 12px 32px 12px; border-radius: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); transform: rotate(-4deg); margin-top: 12px; }
+.s1-pin { position: absolute; top: -14px; left: 20px; width: 24px; height: 40px; border: 3px solid #888; border-bottom: none; border-radius: 12px 12px 0 0; transform: rotate(-15deg); }
+.s1-pin::after { content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%); width: 10px; height: 10px; background-color: #888; border-radius: 50%; }
+.s1-photo { width: 100%; aspect-ratio: 1/1; background-color: #f0f0f0; border-radius: 2px; overflow: hidden; background-size: cover; background-position: center; }
+.s1-caption { text-align: center; font-family: 'Courier New', cursive; font-size: 13px; color: #333; margin-top: 10px; }
+.s1-apps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 50%; }
+
+/* 第二屏布局 */
+.screen2-mid-row { display: flex; flex-direction: row; align-items: stretch; gap: 12px; width: 100%; flex: 1; }
+.s2-mid-left { display: flex; flex-direction: column; gap: 12px; width: 55%; }
+.s2-apps-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.s2-anniv { flex: 1; background-color: #fff; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 1px solid #f0f0f0; }
+
+
+
+
+
+
+
+/* ========================================================
+   v719 双屏首页：100% 严格按图一与图二实物高保真复刻
+   ======================================================== */
+
+/* 全屏统一纯白壁纸背景（恢复v710默认纯白底色，不再带绿色波点） */
+body, .phone-frame, .content-wrapper {
+  background-color: #ffffff !important;
+  background-image: none !important;
+}
+
+.home-slider {
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 86px);
+  overflow: hidden;
+  background: transparent;
+}
+
+.home-screen {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px 70px 14px;
+  box-sizing: border-box;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(100%);
+  transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.35s ease;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: transparent;
+}
+
+.home-screen.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(0);
+  z-index: 2;
+}
+
+.home-screen.exit-left {
+  transform: translateX(-100%);
+}
+
+/* ========================================================
+   第一屏：图一 1:1 像素级复刻
+   ======================================================== */
+.s1-top-card-fig3 {
+  position: relative;
+  width: 100%;
+  height: 334px;
+  border-radius: 28px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 24px;
+  flex-shrink: 0;
+  background: #ffffff;
+}
+
+.s1-card-banner {
+  width: 100%;
+  height: 180px;
+  background-color: #3b2d28;
+  background-size: cover;
+  background-position: center;
+  cursor: pointer;
+  position: relative;
+}
+
+.s1-card-content {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 34px;
+  padding-bottom: 12px;
+}
+
+.s1-avatar-circle {
+  position: absolute;
+  top: -42px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: 4px solid #ffffff;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  background: #ffffff;
+  cursor: pointer;
+  z-index: 10;
+}
+.s1-avatar-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.s1-texts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.s1-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #111111;
+  cursor: pointer;
+}
+.s1-mood {
+  font-size: 13px;
+  color: #666666;
+  letter-spacing: 2px;
+  cursor: pointer;
+}
+.s1-wave {
+  font-size: 13px;
+  color: #333333;
+  cursor: pointer;
+}
+.s1-loc {
+  font-size: 13px;
+  color: #333333;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.s1-bottom-fig3 {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: auto;
+  margin-bottom: 8px;
+}
+
+.s1-polaroid-card {
+  position: relative;
+  width: 146px;
+  background: #ffffff;
+  padding: 10px 10px 28px 10px;
+  border-radius: 4px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.05);
+  transform: rotate(-4.5deg);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.s1-polaroid-card:hover {
+  transform: rotate(-2deg) scale(1.02);
+}
+
+/* 图一高仿真金属曲别针实物 */
+.s1-clip-wrap {
+  position: absolute;
+  top: -14px;
+  left: 0px;
+  width: 36px;
+  height: 56px;
+  z-index: 15;
+  pointer-events: none;
+}
+.s1-clip-real-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(1.5px 3px 2px rgba(0,0,0,0.35));
+}
+
+.s1-polaroid-inner {
+  width: 100%;
+  height: 130px;
+  background-color: #2b2b2b;
+  background-size: cover;
+  background-position: center;
+  border-radius: 2px;
+}
+
+.s1-polaroid-note {
+  position: absolute;
+  bottom: 6px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.s1-apps-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 140px;
+  flex-shrink: 0;
+}
+.s1-app-row {
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+}
+.s1-apps-col .app-item {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 56px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+.s2-mid-body {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+  align-items: stretch;
+}
+
+.s2-col-left {
+  flex: 1.15;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.s2-shop-pair {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding-top: 4px;
+}
+.s2-shop-pair .app-item {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  width: 56px !important;
+}
+
+.s2-col-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.s2-apps-2x2-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.s2-app-row-2 {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+.s2-apps-2x2-block .app-item {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  width: 56px !important;
+}
+
+/* v727：底栏定位保留双屏布局所需的 fixed 贴底，样式全部回归 v710 原版 */
+.fit-mod.fit-bottom {
+  position: fixed !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  z-index: 100 !important;
+  background: transparent !important;
+  display: flex !important;
+  justify-content: center !important;
+  pointer-events: none !important;
+}
+.bottom-bar { pointer-events: auto !important; }
+
+.home-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  position: fixed;
+  bottom: 74px;
+  left: 0;
+  width: 100%;
+  z-index: 40;
+}
+.home-indicator .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.20);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.home-indicator .dot.active {
+  background: rgba(0,0,0,0.60);
+  width: 14px;
+  border-radius: 3px;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* ==========================================================================
+   v748 核心优化与问题解决:
+   1. 时间模块样式恢复为纯白不透明
+   2. 单人头像模块样式恢复，撕拉片默认颜色恢复
+   3. 功能模块间距调整，避免挤到一块
+   4. 底部设置美化字卡库去除底图
+   5. 聊天输入栏优化，麦克风线条放在input-wrap内最右端，外部发送按钮独立
+   6. 彻底移除所有可能遮挡的背景元素
+   ========================================================================== */
+
+/* 1. 时间模块样式恢复 */
+.s1-mini-calendar-card {
+  width: 100% !important;
+  max-width: 320px !important;
+  height: auto !important;
+  background: #ffffff !important;
+  border: none !important;
+  border-radius: 20px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08) !important;
+  padding: 12px 18px 10px 18px !important;
+  box-sizing: border-box !important;
+  margin: 0 auto 14px auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex-shrink: 0 !important;
+  overflow: hidden !important;
+}
+
+.cal-top-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+.cal-time {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  color: #777777 !important;
+  letter-spacing: 0.5px !important;
+}
+
+.cal-hearts {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  width: 50px !important;
+  height: 18px !important;
+  max-width: 50px !important;
+  max-height: 18px !important;
+  overflow: hidden !important;
+}
+
+.cal-hearts-img {
+  width: 48px !important;
+  height: 16px !important;
+  max-width: 48px !important;
+  max-height: 16px !important;
+  object-fit: contain !important;
+  display: block !important;
+}
+
+.cal-mid-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  margin-top: 3px !important;
+}
+
+.cal-date {
+  font-size: 14.5px !important;
+  color: #888888 !important;
+  font-weight: 400 !important;
+}
+
+.cal-weekday {
+  font-size: 14px !important;
+  color: #888888 !important;
+  font-weight: 400 !important;
+}
+
+.cal-custom-text-center {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  color: #777777 !important;
+  text-align: center !important;
+  margin: 6px 0 8px 0 !important;
+  cursor: pointer !important;
+  letter-spacing: 1px !important;
+}
+
+.cal-week-grid {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  padding: 0 4px !important;
+  box-sizing: border-box !important;
+}
+
+.cal-week-grid .w-item {
+  width: 24px !important;
+  height: 24px !important;
+  line-height: 24px !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  color: #999999 !important;
+  border-radius: 50% !important;
+  display: inline-block !important;
+}
+
+.cal-week-grid .w-item.today-active {
+  background: #a3a3a3 !important;
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* 2. 单人头像模块样式恢复 */
+.s1-top-card-pure {
+  position: relative !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 340px !important;
+  border-radius: 28px !important;
+  overflow: visible !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin-top: 4px !important;
+  margin-bottom: 14px !important;
+  flex-shrink: 0 !important;
+  background: #ffffff !important;
+  border: none !important;
+  outline: none !important;
+}
+
+.s1-card-banner {
+  width: 100% !important;
+  height: 240px !important;
+  min-height: 240px !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(135deg, #e4e7eb 0%, #f1f3f6 100%);
+  background-size: cover !important;
+  background-position: center !important;
+  cursor: pointer !important;
+  position: relative !important;
+  border-top-left-radius: 28px !important;
+  border-top-right-radius: 28px !important;
+  border: none !important;
+  outline: none !important;
+  overflow: hidden !important;
+}
+
+.s1-frosted-content {
+  position: relative !important;
+  width: 100% !important;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.94) 55%, rgba(255, 255, 255, 0.88) 100%) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  padding-top: 46px !important;
+  padding-bottom: 16px !important;
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+  border-radius: 26px !important;
+  margin-top: -20px !important;
+  z-index: 5 !important;
+  box-sizing: border-box !important;
+  border: none !important;
+}
+
+.s1-avatar-circle {
+  position: absolute !important;
+  top: -44px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: 86px !important;
+  height: 86px !important;
+  border-radius: 50% !important;
+  border: 4px solid #ffffff !important;
+  overflow: hidden !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12) !important;
+  background: #ffffff !important;
+  cursor: default !important;
+  z-index: 10 !important;
+}
+.s1-avatar-circle img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.s1-texts {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 3px !important;
+  width: 100% !important;
+  margin-top: 2px !important;
+}
+.s1-custom-text {
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: opacity 0.15s ease !important;
+  text-align: center !important;
+}
+.s1-text-line1 {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+}
+.s1-text-line3, .s1-text-line4 {
+  font-size: 13px !important;
+  color: #333333 !important;
+}
+.s1-loc-row {
+  display: flex !important;
+  align-items: center !important;
+  margin-top: 3px !important;
+  cursor: pointer !important;
+}
+.s1-text-loc {
+  font-size: 12px !important;
+  color: #666666 !important;
+}
+
+/* 3. 撕拉片默认颜色恢复 */
+.s1-polaroid-card {
+  position: relative !important;
+  width: 150px !important;
+  background: #ffffff !important;
+  padding: 8px 8px 24px 8px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+  transform: rotate(-3.5deg) !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  border: none !important;
+}
+.s1-polaroid-inner {
+  position: relative !important;
+  width: 100% !important;
+  height: 136px !important;
+  background-color: transparent !important;
+  background-image: linear-gradient(135deg, #eaecef 0%, #f7f8fa 100%);
+  background-size: cover !important;
+  background-position: center !important;
+  border-radius: 2px !important;
+  border: none !important;
+  overflow: hidden !important;
+}
+.s1-polaroid-note {
+  font-size: 13px !important;
+  color: #222222 !important;
+  text-align: left !important;
+  margin-top: 8px !important;
+  margin-left: 2px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+}
+
+/* 4. 功能模块间距调整 */
+
+.s1-apps-pure .s1-app-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  background: transparent !important;
+}
+.s1-apps-pure .app-item {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+}
+.s1-apps-pure .app-item .icon-wrap {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 12px !important;
+}
+.s1-apps-pure .app-item .icon-wrap svg {
+  width: 32px !important;
+  height: 32px !important;
+}
+.s1-apps-pure .app-item .label {
+  font-size: 13px !important;
+  color: #333333 !important;
+  line-height: 1.25 !important;
+  margin-top: 4px !important;
+  text-align: center !important;
+  font-weight: 500 !important;
+}
+
+/* 5. 双人头像模块样式恢复 */
+#topCard {
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 28px !important;
+  border: none !important;
+  background: #ffffff !important;
+}
+.cover-img,
+#coverAreaMain {
+  width: 100% !important;
+  height: 160px !important;
+  min-height: 160px !important;
+  background: linear-gradient(135deg, #e4e7eb 0%, #f1f3f6 100%) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  border-top-left-radius: 28px !important;
+  border-top-right-radius: 28px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  border: none !important;
+}
+
+#bgArea {
+  background: linear-gradient(135deg, #f0f2f5 0%, #fafbfc 100%) !important;
+  background-size: cover !important;
+  background-position: center !important;
+  border-radius: 22px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08) !important;
+  border: none !important;
+}
+
+#musicPlayer,
+.music-player-card,
+.music-player-wrap {
+  box-shadow: none !important;
+  -webkit-box-shadow: none !important;
+  filter: none !important;
+  -webkit-filter: none !important;
+  border-radius: 22px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+/* 6. 聊天输入栏优化 */
+.input-wrap {
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  position: relative !important;
+  padding-right: 4px !important;
+  background: #ffffff !important;
+  border-radius: 20px !important;
+  border: 1px solid #e5e5e5 !important;
+}
+#watchMsgInput {
+  flex: 1 !important;
+  min-width: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  font-size: 15px !important;
+  color: #1a1a1a !important;
+  padding: 8px 6px 8px 4px !important;
+}
+#watchMicContinueBtn {
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 6px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  color: #666666 !important;
+  transition: opacity 0.2s ease, transform 0.15s ease !important;
+}
+#watchMicContinueBtn:active {
+  transform: scale(0.9) !important;
+  color: #111111 !important;
+}
+#watchSendBtn {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 50% !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #1a1a1a !important;
+  flex-shrink: 0 !important;
+  cursor: pointer !important;
+}
+
+/* 7. 底部导航优化 */
+.bottom-bar {
+  position: absolute !important;
+  bottom: 16px !important;
+  left: 0 !important;
+  right: 0 !important;
+  margin: 0 auto !important;
+  z-index: 100 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  pointer-events: auto !important;
+}
+.bottom-btn-container {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: flex !important;
+  gap: 12px !important;
+  padding: 0 !important;
+  margin: 0 auto !important;
+}
+.bottom-btn {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+  border-radius: 24px !important;
+  padding: 6px 14px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+.bottom-btn:active {
+  transform: scale(0.95) !important;
+}
+.bottom-btn .icon-wrap {
+  width: 22px !important;
+  height: 22px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.bottom-btn .icon-wrap svg {
+  width: 18px !important;
+  height: 18px !important;
+}
+.bottom-btn .label {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #333333 !important;
+  line-height: 1 !important;
+}
+
+/* 8. 彻底移除所有白色背景遮层 */
+#phoneFrame,
+.content-wrapper,
+#homeScreens,
+.home-slider,
+.home-screen,
+#screen1,
+#screen2,
+.phone-frame {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+.bg-wave,
+#bgWave {
+  display: none !important;
+}
+
+/* 9. 聊天预览字体完整包裹修复 */
+.chat-preview .preview-bubble {
+  padding: 8px 14px !important;
+  border-radius: 18px !important;
+  font-size: 13.5px !important;
+  line-height: 1.4 !important;
+  height: auto !important;
+  min-height: 36px !important;
+  max-width: 220px !important;
+  width: fit-content !important;
+  display: inline-block !important;
+  box-sizing: border-box !important;
+  word-break: break-word !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  background: #ffffff !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05) !important;
+  border: 1px solid rgba(0, 0, 0, 0.03) !important;
+}
+
+/* ==========================================================================
+   v751 用户反馈修复（叠加于 v748 patch 之上）:
+   1. 单人头像卡去白底：卡片透明，下部磨砂质地、底部渐变透明完全融入背景图
+   2. 时间模块保持纯白不透明（加固）
+   3. 金属别针移至左下角
+   4. 主聊天输入栏：麦克风线条内嵌 input-wrap 最右端，发送键独立互不打扰
+   5. 底栏还原 v710：透明容器 + gap:8px 半透明胶囊，不再被透明度拉条刷白
+   6. 双人头像白色底图背景交给美化透明度拉条控制（JS 内联生效，CSS 不写死）
+   ========================================================================== */
+
+/* 1. 单人头像卡：去白底，磨砂质地，底部渐变透明融入背景图 */
+.s1-top-card-pure {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.s1-frosted-content {
+  background: linear-gradient(to bottom,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.38) 34%,
+    rgba(255, 255, 255, 0.20) 60%,
+    rgba(255, 255, 255, 0.07) 80%,
+    rgba(255, 255, 255, 0) 100%) !important;
+  backdrop-filter: blur(18px) saturate(1.15) !important;
+  -webkit-backdrop-filter: blur(18px) saturate(1.15) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* 2. 时间模块纯白不透明（加固） */
+.s1-mini-calendar-card {
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 3. 别针回到左上角并略往下移 */
+.s1-clip-wrap {
+  top: -8px !important;
+  left: -4px !important;
+  bottom: auto !important;
+}
+
+/* 4. 主聊天输入栏麦克风线条（内嵌最右端，发送键独立） */
+#chatMicContinueBtn {
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 0 6px 0 2px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  color: #666666 !important;
+  transition: opacity 0.2s ease, transform 0.15s ease !important;
+}
+#chatMicContinueBtn:active {
+  transform: scale(0.9) !important;
+  color: #111111 !important;
+}
+#msgInput {
+  padding-right: 4px !important;
+}
+
+/* 5. 底栏还原 v710：透明容器 + gap:8px 胶囊 */
+.bottom-btn-container {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  gap: 8px !important;
+  padding: 6px 12px !important;
+  border-radius: 28px !important;
+}
+.bottom-btn {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 6. 双人头像底图交给拉条控制（不写死背景色） */
+#topCard,
+.top-card {
+  border-radius: 28px !important;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ==========================================================================
+/* ==========================================================================
+/* ==========================================================================
+   v755 严格复刻 v710 原始底栏 + 标点放大空心圆点 + 统一文字
+   ========================================================================== */
+
+/* 1. 首页底栏 100% 完全还原 v710 原版样式：
+   - 纯透明背景底栏，没有多余的伪胶囊或横向药丸条
+   - 竖向三按钮（设置/美化/字卡库）
+   - 图标 32x32，圆角 10px，无边框无厚重背景
+   - 灰度柔和文字与图标，完全与 v710 解压包源码一致
+*/
+.bottom-bar {
+  padding: 2px 16px max(2px, env(safe-area-inset-bottom, 0px)) !important;
+  flex-shrink: 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  position: sticky !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  background: transparent !important;
+  z-index: 200 !important;
+  pointer-events: auto !important;
+}
+
+.bottom-btn-container {
+  background: transparent !important;
+  border-radius: 28px !important;
+  padding: 6px 12px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 8px !important;
+  box-shadow: none !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  margin: 0 auto !important;
+}
+
+.bottom-btn {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-radius: 0 !important;
+  cursor: pointer !important;
+  transition: 0.15s !important;
+  font-family: inherit !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 2px !important;
+  padding: 6px 12px !important;
+}
+
+.bottom-btn:active {
+  transform: scale(0.92) !important;
+}
+
+.bottom-btn .icon-wrap {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
+  border: none !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  font-size: 24px !important;
+  color: #666666 !important;
+  background: transparent !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  box-shadow: none !important;
+}
+
+.bottom-btn .icon-wrap img,
+.bottom-btn .icon-wrap svg {
+  border-radius: 0 !important;
+  object-fit: contain !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+  color: #666666 !important;
+  stroke: #666666 !important;
+}
+
+.bottom-btn .label {
+  font-size: 13px !important;
+  color: #666666 !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  text-shadow: none !important;
+}
+
+/* 2. 单人头像模块：
+   - 名字加粗
+   - 第二行、第三行、第四行、定位文本完全统一为 #222222，13px
+   - 定位标点：整体放大至 16px，外轮廓加深 #222222，内部空心圆点填充纯白 #ffffff
+*/
+.s1-text-line1 {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  color: #111111 !important;
+}
+
+.s1-text-line3,
+.s1-text-line4,
+.s1-text-loc,
+.s1-loc-row .s1-text-loc {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: #222222 !important;
+  line-height: 1.4 !important;
+}
+
+.s1-loc-row {
+  display: flex !important;
+  align-items: center !important;
+  margin-top: 4px !important;
+  cursor: pointer !important;
+}
+
+.s1-loc-row svg.s1-pin-marker,
+.s1-pin-marker {
+  width: 16px !important;
+  height: 16px !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  margin-right: 4px !important;
+}
+
+.s1-loc-row svg.s1-pin-marker path,
+.s1-pin-marker path {
+  fill: #222222 !important;
+}
+
+.s1-loc-row svg.s1-pin-marker circle,
+.s1-pin-marker circle {
+  fill: #ffffff !important;
+  stroke: none !important;
+}
+/* ==========================================================================
+   v757：双屏完整显示保护 + 垃圾桶删除按钮（时间右侧14px小图标）+ 第1屏功能卡片对齐第2屏标准
+   ========================================================================== */
+
+/* 1. 双屏（第1屏、第2屏）完整显示保护：
+   - 移除任何可能导致裁剪的 overflow 限制
+   - 确保内容在任意屏幕尺寸下完整可见，不被底部遮挡
+   - 增加充足的底部留白，防止被底栏或安全区裁剪
+*/
+.home-screen {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth !important;
+  padding-bottom: max(80px, calc(env(safe-area-inset-bottom, 0px) + 60px)) !important;
+  min-height: 100% !important;
+  height: auto !important;
+  max-height: 100% !important;
+  box-sizing: border-box !important;
+  overscroll-behavior: contain !important;
+}
+
+.home-screen.active {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.home-screen.exit-left {
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* 确保 home-screen 内部所有直接子元素不被意外裁剪 */
+.home-screen > * {
+  flex-shrink: 0 !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+/* 2. 垃圾桶删除按钮样式（纯线条、无背景、轻量） */
+.post-delete-btn {
+  background: none !important;
+  border: none !important;
+  padding: 4px !important;
+  cursor: pointer !important;
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0.55 !important;
+  transition: opacity 0.15s ease !important;
+  flex-shrink: 0 !important;
+}
+
+.post-delete-btn:hover {
+  opacity: 0.85 !important;
+}
+
+.post-delete-btn:active {
+  opacity: 1 !important;
+  transform: scale(0.88) !important;
+}
+
+.post-delete-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+  pointer-events: none !important;
+  display: block !important;
+}
+
+/* 3. 防卡顿终极保险：
+   - 全局 CSS 动画仅保留必要硬件加速
+   - 移除所有低效的 background-attachment: fixed（避免移动端卡顿）
+*/
+* {
+  background-attachment: scroll !important;
+}
+
+/* 确保滚动容器不会因 overscroll 而卡顿 */
+html, body {
+  overscroll-behavior: none !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* 减少不必要的重绘区域 */
+.phone-frame,
+.content-wrapper,
+.fit-mod,
+.fit-inner {
+  contain: layout style !important;
+  will-change: auto !important;
+}
+/* ==========================================================================
+   v766：删除朋友圈弹窗层级提升确保在朋友圈上层 + 点赞评论小弹窗改为白底黑字 + 美化增加更换网站标签图标(Favicon)
+   - 彻底解决用户反馈的"太挤了"问题
+   - 与第2屏视觉区分，第1屏更宽松大气
+   ========================================================================== */
+.s1-apps-pure {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  flex-shrink: 0 !important;
+  width: 160px !important;
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+  margin-left: -5px !important;
+}
+.s1-apps-pure .s1-app-row {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  background: transparent !important;
+  gap: 12px !important;
+}
+.s1-apps-pure .app-item {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 4px !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+}
+.s1-apps-pure .app-item .icon-wrap {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 12px !important;
+}
+.s1-apps-pure .app-item .icon-wrap svg {
+  width: 32px !important;
+  height: 32px !important;
+}
+.s1-apps-pure .app-item .label {
+  font-size: 13px !important;
+  color: #333333 !important;
+  line-height: 1.25 !important;
+  margin-top: 6px !important;
+  text-align: center !important;
+  font-weight: 500 !important;
+}
+
+
+/* ==========================================================================
+   v769 补丁：
+   1. 首页首屏单人头像外圈包裹线条调细为 1.5px 精致圆环，支持直接点击更换并全局同步
+   2. 朋友圈每条动态底部的删除垃圾桶图标下移 3px 与发布时间严格居中对齐，并左移贴近时间文本
+   3. 完全恢复首页第一屏单人头像模块原版磨砂渐变外观（撤销 v767 的白底透明度统一改动）
+   ========================================================================== */
+
+/* 首屏单人头像外圈包裹线条变细 */
+.s1-avatar-circle {
+  border: 1.5px solid rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* 朋友圈删除垃圾桶按钮：下移 3px 严格居中，左移贴近发布时间文本 */
+.post-delete-btn {
+  position: relative !important;
+  top: 3px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin-left: 4px !important;
+  margin-top: 0 !important;
+  vertical-align: middle !important;
+}

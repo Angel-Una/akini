@@ -12,13 +12,13 @@
   function go() {
     if (jumped) return;
     jumped = true;
-    location.replace("akini.html?v=20261001");
+    location.replace("akini.html?v=20261003v770");
   }
   /* 每次版本升级都把清理标记升级一级：老用户（已置 v1）会再次全量注销 SW 并删除所有缓存，杜绝旧版本缓存数据 */
   var cleaned = false;
-  try { cleaned = localStorage.getItem("__akini_entry_cleaned_v2") === "1"; } catch (e) {}
+  try { cleaned = localStorage.getItem("__akini_entry_cleaned_v767") === "1"; } catch (e) {}
   if (cleaned) { go(); return; }
-  try { localStorage.setItem("__akini_entry_cleaned_v2", "1"); } catch (e) {}
+  try { localStorage.setItem("__akini_entry_cleaned_v767", "1"); } catch (e) {}
   try {
     var jobs = [];
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
@@ -40,6 +40,24 @@
   } catch (e) { go(); }
 })();
 </script>
+
+  <script>
+    (function() {
+      try {
+        var savedFav = localStorage.getItem('akini_custom_favicon');
+        if (savedFav) {
+          var link = document.querySelector("link[rel*='icon']");
+          if (!link) {
+            link = document.createElement('link');
+            link.rel = 'icon';
+            document.head.appendChild(link);
+          }
+          link.href = savedFav;
+        }
+      } catch(e) {}
+    })();
+  </script>
+
 </head>
 <body></body>
 </html>

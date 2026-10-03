@@ -1,3 +1,50 @@
+
+window.__akiniConfirmDialog = function(onConfirm) {
+  try {
+    var oldOverlay = document.getElementById('akiniDeleteModalOverlay');
+    if (oldOverlay && oldOverlay.parentNode) oldOverlay.parentNode.removeChild(oldOverlay);
+    var overlay = document.createElement('div');
+    overlay.id = 'akiniDeleteModalOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100000000;display:flex;align-items:center;justify-content:center;pointer-events:auto;';
+    var dialog = document.createElement('div');
+    dialog.style.cssText = 'background:#ffffff;border-radius:16px;padding:32px 24px;max-width:280px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center;box-sizing:border-box;';
+    var msgDiv = document.createElement('div');
+    msgDiv.style.cssText = 'font-size:16px;font-weight:600;color:#000000;margin-bottom:24px;line-height:1.5;';
+    msgDiv.textContent = '确认删除这条朋友圈吗？';
+    var btnWrap = document.createElement('div');
+    btnWrap.style.cssText = 'display:flex;gap:12px;';
+    var cancelBtn = document.createElement('button');
+    cancelBtn.style.cssText = 'flex:1;padding:12px 20px;border:1px solid #e0e0e0;border-radius:10px;background:#ffffff;color:#000000;font-size:15px;font-weight:500;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;';
+    cancelBtn.textContent = '取消';
+    var okBtn = document.createElement('button');
+    okBtn.style.cssText = 'flex:1;padding:12px 20px;border:1px solid #000000;border-radius:10px;background:#000000;color:#ffffff;font-size:15px;font-weight:500;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;';
+    okBtn.textContent = '确定';
+    btnWrap.appendChild(cancelBtn);
+    btnWrap.appendChild(okBtn);
+    dialog.appendChild(msgDiv);
+    dialog.appendChild(btnWrap);
+    overlay.appendChild(dialog);
+    var targetParent = document.getElementById('app-friends') || document.body;
+    if (targetParent && targetParent.style.display !== 'none') {
+      targetParent.appendChild(overlay);
+    } else {
+      document.body.appendChild(overlay);
+    }
+    cancelBtn.onclick = function() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    };
+    okBtn.onclick = function() {
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      try {
+        if (typeof onConfirm === 'function') onConfirm();
+      } catch (err) { console.warn('[Akini] 删除失败', err); }
+    };
+    overlay.onclick = function(evt) {
+      if (evt.target === overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+    };
+  } catch(e) { console.error('[Akini] 弹窗展示异常', e); }
+};
+
 function escapeHtmlSafe(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 /* v608 性能减负：激活 .low-mem 低端机自动降级（CSS 减负规则早已就绪但此前从未启用——纯死代码）。
    deviceMemory<=4GB 或 核心数<=4 判定为低端机：关闭全部循环装饰动画与残余 backdrop-filter，
@@ -3115,9 +3162,7 @@ window.akiniContacts = {
       var fmt = localStorage.getItem("akini_timeFormat") || "24";
       var time = hh + ":" + mm;
       if (fmt === "24s") return time + ":" + String(e.getSeconds()).padStart(2, "0");
-      if (fmt === "12PM") return time + "PM";
-      if (fmt === "12AM") return time + "AM";
-      return time;
+      return time + " AM";
     }
     // 全局时间格式化辅助：其他场景保持 24 小时制，不带后缀
     window.__akiniFormatTimePart = function (date) {
@@ -12606,7 +12651,7 @@ window.akiniContacts = {
                   t.img +
                   '" alt="" style="max-height:200px;"></div>'
                 : "") +
-              '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-top:8px;"><div class="post-time">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;"><div style="display:inline-flex;align-items:center;"><div class="post-time" style="font-size:12px;color:#999;line-height:16px;">' +
               (function (t) {
                 if (!t) return "";
                 var e = new Date(t.replace(/\//g, "-"));
@@ -12622,17 +12667,29 @@ window.akiniContacts = {
                         ? Math.floor(n / 86400) + "天前"
                         : Math.floor(n / 86400 / 30) + "个月前";
               })(t.date || __akiniFormatDateTime(new Date(t.ts))) +
-              '</div><div style="display:flex;align-items:center;gap:10px;flex-shrink:0;position:relative;"><button type="button" class="post-dots-trigger" data-pidx="' +
-              n +
-              '" style="background:#f0f0f0;border:none;border-radius:10px;padding:6px 9px;display:flex;align-items:center;gap:3px;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;"><span style="width:4px;height:4px;border-radius:50%;background:#333;"></span><span style="width:4px;height:4px;border-radius:50%;background:#333;"></span></button><div class="post-action-popup" data-pidx="' +
-              n +
-              '" style="display:none;position:absolute;bottom:calc(100% + 6px);right:0;background:#f0f0f0;border-radius:12px;padding:8px 12px;box-shadow:0 -4px 20px rgba(0,0,0,.12);z-index:100;gap:10px;align-items:center;white-space:nowrap;"><button type="button" data-action="like" data-pidx="' +
-              n +
-              '" style="background:none;border:none;padding:0;cursor:pointer;font-size:20px;color:#333;outline:none;">♡</button><div style="width:1px;height:18px;background:#000;"></div><button type="button" data-action="comment" data-pidx="' +
-              n +
-              '" style="background:none;border:none;padding:0;cursor:pointer;font-size:18px;color:#333;outline:none;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round style="width:20px;height:20px;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button></div></div></div>' +
+              '</div><button type="button" class="post-delete-btn" data-pidx="' + n + '" data-post-id="' + (t.id || '') + '" style="background:none;border:none;padding:0;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;position:relative;top:3px;vertical-align:middle;" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;pointer-events:none;"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg></button></div><div style="position:relative;display:flex;align-items:center;"><div class="post-action-popup" data-pidx="' + n + '" data-post-id="' + (t.id || '') + '" style="display:none;position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;padding:6px 14px;z-index:100;gap:12px;align-items:center;white-space:nowrap;box-shadow:0 4px 18px rgba(0,0,0,0.12);"><button type="button" data-action="like" data-pidx="' + n + '" style="background:none;border:none;padding:0;cursor:pointer;font-size:14px;color:#333333;outline:none;display:flex;align-items:center;gap:4px;">♡ 赞</button><div style="width:1px;height:14px;background:#e0e0e0;"></div><button type="button" data-action="comment" data-pidx="' + n + '" style="background:none;border:none;padding:0;cursor:pointer;font-size:14px;color:#ffffff;outline:none;display:flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" fill=none stroke="#333333" stroke-width=2 stroke-linecap=round stroke-linejoin=round style="width:14px;height:14px;color:#333333;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> <span style="color:#333333;">评论</span></button></div><button type="button" class="post-dots-trigger" data-pidx="' + n + '" style="background:#f7f7f7;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;color:#576b95;font-weight:900;letter-spacing:1px;font-size:14px;line-height:1;" title="评论与赞">··</button></div></div>' +
               d),
             e.appendChild(u));
+          (function(curPost, curIdx, itemElem) {
+            var delBtn = itemElem.querySelector('.post-delete-btn');
+            if (delBtn) {
+              delBtn.onclick = function(ev) {
+                if (ev) {
+                  ev.stopPropagation();
+                  ev.preventDefault();
+                  if (ev.stopImmediatePropagation) ev.stopImmediatePropagation();
+                }
+                window.__akiniConfirmDialog(function() {
+                  var all = O();
+                  var filtered = all.filter(function(p) { return String(p.id) !== String(curPost.id); });
+                  R(filtered, function() {
+                    if (window._renderPosts) window._renderPosts();
+                  });
+                  console.log('[Akini] 朋友圈已删除:', curPost.id);
+                });
+              };
+            }
+          })(t, n, u);
         }),
           (e.onclick = function (e) {
             const dotsTrigger = e.target.closest(".post-dots-trigger");
@@ -12647,6 +12704,61 @@ window.akiniContacts = {
               if (popup && popup.dataset.pidx === pidx) {
                 popup.style.display = wasOpen ? "none" : "flex";
               }
+              return;
+            }
+            const deleteBtn = e.target.closest(".post-delete-btn");
+            if (deleteBtn) {
+              e.stopPropagation();
+              e.preventDefault();
+              e.stopImmediatePropagation();
+              const pidx = parseInt(deleteBtn.getAttribute('data-pidx'));
+              if (isNaN(pidx) || pidx < 0) { console.warn("[Akini] 删除按钮索引无效", pidx); return; }
+              const posts = O().filter((t) => "icity" !== t.source);
+              posts.sort((t, e) => (e.ts || 0) - (t.ts || 0));
+              const target = posts[pidx];
+              if (!target) { console.warn("[Akini] 找不到要删除的帖子, pidx=", pidx); return; }
+              // 自定义黑白确认弹窗（网站内部样式）
+              var overlay = document.createElement("div");
+              overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:10000;display:flex;align-items:center;justify-content:center;";
+              var dialog = document.createElement("div");
+              dialog.style.cssText = "background:#ffffff;border-radius:16px;padding:32px 24px;max-width:280px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);text-align:center;";
+              var msgDiv = document.createElement("div");
+              msgDiv.style.cssText = "font-size:16px;font-weight:600;color:#000000;margin-bottom:24px;line-height:1.5;";
+              msgDiv.textContent = "确认删除这条朋友圈吗？";
+              var btnWrap = document.createElement("div");
+              btnWrap.style.cssText = "display:flex;gap:12px;";
+              var cancelBtn = document.createElement("button");
+              cancelBtn.id = "akiniConfirmCancel";
+              cancelBtn.style.cssText = "flex:1;padding:12px 24px;border:1px solid #e0e0e0;border-radius:10px;background:#ffffff;color:#000000;font-size:15px;font-weight:500;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;";
+              cancelBtn.textContent = "取消";
+              var okBtn = document.createElement("button");
+              okBtn.id = "akiniConfirmOk";
+              okBtn.style.cssText = "flex:1;padding:12px 24px;border:1px solid #000000;border-radius:10px;background:#000000;color:#ffffff;font-size:15px;font-weight:500;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;";
+              okBtn.textContent = "确定";
+              btnWrap.appendChild(cancelBtn);
+              btnWrap.appendChild(okBtn);
+              dialog.appendChild(msgDiv);
+              dialog.appendChild(btnWrap);
+              overlay.appendChild(dialog);
+              document.body.appendChild(overlay);
+              
+              cancelBtn.onclick = function() {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+              };
+              okBtn.onclick = function() {
+                if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+                try {
+                  var all = O();
+                  var filtered = all.filter(function(p) { return String(p.id) !== String(target.id); });
+                  R(filtered, function() {
+                    if (window._renderPosts) window._renderPosts();
+                  });
+                  console.log("[Akini] 朋友圈已删除:", target.id);
+                } catch (err) { console.warn("[Akini] 删除失败", err); }
+              };
+              overlay.onclick = function(e) {
+                if (e.target === overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+              };
               return;
             }
             const n = e.target.closest("[data-action]"),
@@ -18456,6 +18568,15 @@ window.akiniContacts = {
                   _.style.visibility = "hidden";
                   _.innerHTML = "";
                 }
+              }
+              const s1Av = document.getElementById("s1AvatarImg");
+              if (s1Av && (__myAv || (u && u.avatar))) {
+                var newAvSrc = __myAv;
+                if (!newAvSrc && u && u.avatar) {
+                  var m = u.avatar.match(/src="([^"]+)"/);
+                  if (m) newAvSrc = m[1];
+                }
+                if (newAvSrc) s1Av.src = newAvSrc;
               }
               const b = document.getElementById("avatarLeft"),
                 I = document.getElementById("avatarRight");
@@ -27949,3 +28070,604 @@ if (!window.__akiniUnreadTickerStarted) {
   } else {
     __akiniBindSplashEntry();
   }
+
+// v713 双屏滑动切换系统
+let currentScreen = 0;
+let touchStartX = 0;
+let touchEndX = 0;
+
+window.switchHomeScreen = switchHomeScreen;
+function switchHomeScreen(index) {
+  const screens = document.querySelectorAll('.home-screen');
+  const dots = document.querySelectorAll('.home-indicator .dot');
+  
+  if (index < 0 || index >= screens.length) return;
+  
+  screens.forEach((screen, i) => {
+    if (i === index) {
+      screen.classList.add('active');
+      screen.classList.remove('exit-left');
+    } else if (i < index) {
+      screen.classList.remove('active');
+      screen.classList.add('exit-left');
+    } else {
+      screen.classList.remove('active');
+      screen.classList.remove('exit-left');
+    }
+  });
+  
+  dots.forEach((dot, i) => {
+    if (i === index) dot.classList.add('active');
+    else dot.classList.remove('active');
+  });
+  
+  currentScreen = index;
+}
+
+// 触摸手势支持
+document.addEventListener('DOMContentLoaded', function() {
+  const slider = document.getElementById('homeSlider');
+  if (!slider) return;
+  
+  slider.addEventListener('touchstart', function(e) {
+    touchStartX = e.changedTouches[0].screenX;
+  }, {passive: true});
+  
+  slider.addEventListener('touchend', function(e) {
+    touchEndX = e.changedTouches[0].screenX;
+    handleSwipe();
+  }, {passive: true});
+  
+  function handleSwipe() {
+    const diff = touchStartX - touchEndX;
+    const threshold = 50;
+    
+    if (Math.abs(diff) < threshold) return;
+    
+    if (diff > 0 && currentScreen === 0) {
+      // 左滑 -> 第二屏
+      switchHomeScreen(1);
+    } else if (diff < 0 && currentScreen === 1) {
+      // 右滑 -> 第一屏
+      switchHomeScreen(0);
+    }
+  }
+});
+
+// 编辑第一屏文字
+function editS1Text(lineNum) {
+  const el = document.getElementById('s1Text' + lineNum);
+  if (!el) return;
+  
+  const newText = prompt('编辑文字：', el.textContent);
+  if (newText !== null && newText.trim() !== '') {
+    el.textContent = newText.trim();
+    // 保存到本地存储
+    try {
+      const texts = JSON.parse(localStorage.getItem('akini_s1_texts') || '{}');
+      texts['line' + lineNum] = newText.trim();
+      localStorage.setItem('akini_s1_texts', JSON.stringify(texts));
+    } catch(e) {}
+  }
+}
+
+// 更换第一屏拍立得照片
+function changeS1Photo() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const img = document.getElementById('s1PolaroidImg');
+      if (img) {
+        img.style.backgroundImage = `url(${event.target.result})`;
+        img.style.backgroundSize = 'cover';
+        img.style.backgroundPosition = 'center';
+        // 保存到本地存储
+        try {
+          localStorage.setItem('akini_s1_photo', event.target.result);
+        } catch(e) {}
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+// 初始化第一屏内容
+document.addEventListener('DOMContentLoaded', function() {
+  // 恢复保存的文字
+  try {
+    const texts = JSON.parse(localStorage.getItem('akini_s1_texts') || '{}');
+    for (let i = 1; i <= 4; i++) {
+      if (texts['line' + i]) {
+        const el = document.getElementById('s1Text' + i);
+        if (el) el.textContent = texts['line' + i];
+      }
+    }
+  } catch(e) {}
+  
+  // 恢复保存的照片
+  try {
+    const photo = localStorage.getItem('akini_s1_photo');
+    if (photo) {
+      const img = document.getElementById('s1PolaroidImg');
+      if (img) {
+        img.style.backgroundImage = `url(${photo})`;
+        img.style.backgroundSize = 'cover';
+        img.style.backgroundPosition = 'center';
+      }
+    }
+  } catch(e) {}
+  
+  // 头像联动：同步我自己的头像到第一屏
+  function syncS1Avatar() {
+    const s1Avatar = document.getElementById('s1AvatarCircle');
+    const myAvatar = document.querySelector('.my-avatar') || document.getElementById('myAvatar');
+    if (s1Avatar && myAvatar) {
+      s1Avatar.innerHTML = myAvatar.innerHTML;
+    }
+  }
+  
+  // 初始同步 + 定期同步
+  syncS1Avatar();
+  setInterval(syncS1Avatar, 2000);
+});
+
+// v714 头像与数据双向同步
+function syncDualScreensData() {
+  // 1. 同步第一屏头像：优先用户自定义设置，未设置时保留图三默认白发动漫头像，绝不被第二屏空白头像覆盖
+  try {
+    const s1Avatar = document.getElementById('s1AvatarCircle');
+    const custom = localStorage.getItem('akini_s1_avatar');
+    if (s1Avatar) {
+      if (custom) {
+        s1Avatar.innerHTML = `<img src="${custom}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+      }
+    }
+  } catch(e) {}
+
+  // 2. 检查第二屏聊天气泡内容
+  try {
+    const bubbleL = document.getElementById('previewBubbleLeft');
+    const bubbleR = document.getElementById('previewBubbleRight');
+    const lastChat = localStorage.getItem('akini_last_chat');
+    if (lastChat && bubbleL) {
+      // 保持层次气泡
+    }
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  syncDualScreensData();
+  setInterval(syncDualScreensData, 1500);
+});
+
+// v715 第一屏背景图与头像单独更换
+function changeS1Cover() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const el = document.getElementById('s1CoverBg');
+      if (el) {
+        el.style.backgroundImage = `url(${event.target.result})`;
+        try { localStorage.setItem('akini_s1_cover', event.target.result); } catch(err) {}
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+function changeS1Avatar() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const el = document.getElementById('s1AvatarCircle');
+      if (el) {
+        el.innerHTML = `<img src="${event.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        try { localStorage.setItem('akini_s1_avatar', event.target.result); } catch(err) {}
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+}
+
+// 初始化加载第一屏自定义图片
+document.addEventListener('DOMContentLoaded', function() {
+  try {
+    const cover = localStorage.getItem('akini_s1_cover');
+    if (cover) {
+      const el = document.getElementById('s1CoverBg');
+      if (el) el.style.backgroundImage = `url(${cover})`;
+    }
+    const avatar = localStorage.getItem('akini_s1_avatar');
+    if (avatar) {
+      const el = document.getElementById('s1AvatarCircle');
+      if (el) el.innerHTML = `<img src="${avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+    }
+  } catch(e) {}
+});
+
+// v717 修复背景上传与直接点击更换背景
+window.triggerCoverUpload = function() {
+  const input = document.getElementById("fileInputCoverBg");
+  if (input) { input.click(); }
+  else { changeS1Cover(); }
+};
+
+window.triggerDayBgUpload = function() {
+  const input = document.getElementById("fileInputDayBgBeautify");
+  if (input) { input.click(); }
+  else {
+    const tmp = document.createElement("input");
+    tmp.type = "file";
+    tmp.accept = "image/*";
+    tmp.onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = function(evt) {
+        const bg = document.getElementById("bgArea");
+        if (bg) {
+          bg.style.backgroundImage = `url(${evt.target.result})`;
+          bg.style.backgroundSize = "cover";
+        }
+        try { localStorage.setItem("akini_day_bg", evt.target.result); } catch(e){}
+      };
+      r.readAsDataURL(file);
+    };
+    tmp.click();
+  }
+};
+
+// 确保美化页图四各个按钮整行可点击
+document.addEventListener("DOMContentLoaded", function() {
+  const binds = [
+    { rowId: "changeHomeBgBtnBeautify", inputId: "fileInputHomeBg" },
+    { rowId: "changeCoverBtnBeautify", inputId: "fileInputCoverBg" },
+    { rowId: "changeDayBgBtnBeautify", inputId: "fileInputDayBgBeautify" },
+    { rowId: "changeFriendsBgBtnBeautify", inputId: "fileInputFriendsBgBeautify" },
+    { rowId: "changeCallBgBtnBeautify", inputId: "fileInputCallBgBeautify" },
+    { rowId: "changeCallMiniBgBtnBeautify", inputId: "fileInputCallMiniBgBeautify" }
+  ];
+
+  binds.forEach(function(item) {
+    const btn = document.getElementById(item.rowId);
+    const input = document.getElementById(item.inputId);
+    if (btn && input) {
+      btn.onclick = function(e) {
+        if (e.target !== input) {
+          input.click();
+        }
+      };
+    }
+  });
+
+  // 安全缓存清理与版本锁：防止旧数据撑爆 localStorage 造成卡顿闪退
+  try {
+    const curV = "v717";
+    const oldV = localStorage.getItem("akini_app_version");
+    if (oldV !== curV) {
+      // 检查存储使用量，清理废弃的超大历史缓存
+      let totalSize = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const val = localStorage.getItem(key);
+        if (val) totalSize += val.length;
+      }
+      // 如果存储大于 3.5MB，安全清理非核心临时键
+      if (totalSize > 3500000) {
+        const keepKeys = ['akini_user_id', 'akini_chat_history', 'akini_s1_texts', 'akini_s1_cover', 'akini_s1_photo'];
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (keepKeys.indexOf(k) === -1 && k.indexOf('temp') !== -1) {
+            localStorage.removeItem(k);
+          }
+        }
+      }
+      localStorage.setItem("akini_app_version", curV);
+    }
+  } catch(e) {
+    console.warn("Storage check safely handled:", e);
+  }
+});
+
+
+// ==========================================================================
+// v728: 首页三大背景直接点击更换（主页壁纸、首页封面图、纪念日底图）
+// + 播放器逻辑（播放/暂停/切歌/进度与网易云歌单联动）
+// ==========================================================================
+
+// 1. 点击直接更换首页封面图
+window.triggerCoverUpload = function() {
+  const input = document.getElementById("fileInputCoverBg");
+  if (input) {
+    input.click();
+  } else {
+    const tmp = document.createElement("input");
+    tmp.type = "file";
+    tmp.accept = "image/*";
+    tmp.onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = function(evt) {
+        const cover = document.getElementById("coverAreaMain");
+        if (cover) {
+          cover.style.backgroundImage = `url(${evt.target.result})`;
+          cover.style.backgroundSize = "cover";
+          cover.style.backgroundPosition = "center";
+        }
+        try { localStorage.setItem("akini_cover_img", evt.target.result); } catch(e){}
+      };
+      r.readAsDataURL(file);
+    };
+    tmp.click();
+  }
+};
+
+// 2. 点击直接更换纪念日底图
+window.triggerDayBgUpload = function() {
+  const input = document.getElementById("fileInputDayBgBeautify");
+  if (input) {
+    input.click();
+  } else {
+    const tmp = document.createElement("input");
+    tmp.type = "file";
+    tmp.accept = "image/*";
+    tmp.onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = function(evt) {
+        const bg = document.getElementById("bgArea");
+        if (bg) {
+          bg.style.backgroundImage = `url(${evt.target.result})`;
+          bg.style.backgroundSize = "cover";
+          bg.style.backgroundPosition = "center";
+        }
+        try { localStorage.setItem("akini_bg_img", evt.target.result); } catch(e){}
+      };
+      r.readAsDataURL(file);
+    };
+    tmp.click();
+  }
+};
+
+// 3. 点击主页空白壁纸更换壁纸
+window.triggerHomeBgUpload = function() {
+  const input = document.getElementById("fileInputHomeBg");
+  if (input) {
+    input.click();
+  } else {
+    const tmp = document.createElement("input");
+    tmp.type = "file";
+    tmp.accept = "image/*";
+    tmp.onchange = function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = function(evt) {
+        const pf = document.getElementById("phoneFrame");
+        if (pf) {
+          pf.style.backgroundImage = `url(${evt.target.result})`;
+          pf.style.backgroundSize = "cover";
+          pf.style.backgroundPosition = "center";
+          pf.classList.add("has-custom-bg");
+        }
+        try { localStorage.setItem("akini_home_bg", evt.target.result); } catch(e){}
+      };
+      r.readAsDataURL(file);
+    };
+    tmp.click();
+  }
+};
+
+// 4. 播放器逻辑初始化与 UI 同步
+function initHomeMusicPlayerSection() {
+  const playBtn = document.getElementById('musicPlayerPlay');
+  const prevBtn = document.getElementById('musicPlayerPrev');
+  const nextBtn = document.getElementById('musicPlayerNext');
+  const titleEl = document.getElementById('musicPlayerTitle');
+  const artistEl = document.getElementById('musicPlayerArtist');
+  const coverEl = document.getElementById('musicPlayerCoverImg');
+  const discEl = document.querySelector('.music-player-disc');
+  const timeEl = document.getElementById('musicPlayerListenTime');
+
+  // 切歌 / 暂停控制
+  if (prevBtn) {
+    prevBtn.onclick = function(e) {
+      e.stopPropagation();
+      const originBtn = document.getElementById('musicPrevBtn');
+      if (originBtn) originBtn.click();
+    };
+  }
+  if (nextBtn) {
+    nextBtn.onclick = function(e) {
+      e.stopPropagation();
+      const originBtn = document.getElementById('musicNextBtn');
+      if (originBtn) originBtn.click();
+    };
+  }
+  if (playBtn) {
+    playBtn.onclick = function(e) {
+      e.stopPropagation();
+      const originBtn = document.getElementById('musicPlayBtn');
+      if (originBtn) originBtn.click();
+    };
+  }
+
+  // 轮询与监听真实音乐播放状态
+  function syncHomeMusicUI() {
+    const origSongName = document.getElementById('musicSongName');
+    const origArtist = document.getElementById('musicArtist');
+    const origCover = document.getElementById('musicCover');
+    const origPlayBtn = document.getElementById('musicPlayBtn');
+    const origListenTime = document.getElementById('musicPlayerListenTime');
+
+    if (origSongName && titleEl && origSongName.textContent && origSongName.textContent !== '一起听') {
+      titleEl.textContent = origSongName.textContent;
+    }
+    if (origArtist && artistEl && origArtist.textContent && origArtist.textContent !== '点击右上角导入歌单') {
+      artistEl.textContent = origArtist.textContent;
+    }
+    if (origCover && coverEl && origCover.src && !origCover.src.includes('data:image/gif')) {
+      coverEl.src = origCover.src;
+    }
+
+    // 播放/暂停状态同步
+    const isPlaying = origPlayBtn && origPlayBtn.classList.contains('playing');
+    if (playBtn) {
+      const playIcon = playBtn.querySelector('.play-icon');
+      const pauseIcon = playBtn.querySelector('.pause-icon');
+      if (isPlaying) {
+        if (playIcon) playIcon.style.display = 'none';
+        if (pauseIcon) pauseIcon.style.display = 'block';
+        playBtn.classList.add('playing');
+        if (discEl) discEl.style.animation = 'disc-spin 6s linear infinite';
+      } else {
+        if (playIcon) playIcon.style.display = 'block';
+        if (pauseIcon) pauseIcon.style.display = 'none';
+        playBtn.classList.remove('playing');
+        if (discEl) discEl.style.animation = 'none';
+      }
+    }
+
+    // 同步头像到播放器右侧一起听
+    try {
+      const leftAv = document.getElementById('musicPlayerLeftAvatar');
+      const rightAv = document.getElementById('musicPlayerRightAvatar');
+      const myAv = document.getElementById('avatarLeft') || document.getElementById('myAvatarImg');
+      const taAv = document.getElementById('avatarRight') || document.getElementById('taAvatarImg');
+      if (leftAv && myAv) {
+        const img = myAv.querySelector('img') || myAv;
+        if (img && img.src && (!leftAv.querySelector('img') || leftAv.querySelector('img').src !== img.src)) {
+          leftAv.innerHTML = `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+        }
+      }
+      if (rightAv && taAv) {
+        const img = taAv.querySelector('img') || taAv;
+        if (img && img.src && (!rightAv.querySelector('img') || rightAv.querySelector('img').src !== img.src)) {
+          rightAv.innerHTML = `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+        }
+      }
+    } catch(e) {}
+  }
+
+  setInterval(syncHomeMusicUI, 800);
+}
+
+// 5. 点击 phoneFrame 空白区域快速更换主页壁纸
+document.addEventListener('DOMContentLoaded', function() {
+  initHomeMusicPlayerSection();
+
+// 移除主页空白点击更换壁纸，遵循用户需求统一在美化设置弹窗中更换
+
+  // 确保启动时纪念日底图和封面图持久化正确渲染
+  try {
+    const savedDayBg = localStorage.getItem('akini_bg_img');
+    const bgArea = document.getElementById('bgArea');
+    if (savedDayBg && bgArea) {
+      bgArea.style.backgroundImage = `url(${savedDayBg})`;
+      bgArea.style.backgroundSize = 'cover';
+      bgArea.style.backgroundPosition = 'center';
+    }
+  } catch(e) {}
+});
+
+
+// v731 第一屏可点击编辑自定义文字与保存逻辑（默认xxx）
+window.editS1CustomText = function(index) {
+  let key = 'akini_s1_custom_text_' + index;
+  let cur = '';
+  let promptText = '请输入文字内容：';
+  if (index === 1) { cur = document.getElementById('s1Text1')?.textContent || 'xxx'; promptText = '请输入第一行昵称/文字：'; }
+  else if (index === 2) { cur = document.getElementById('s1Text2')?.textContent || 'xxx'; promptText = '请输入第二行文字：'; }
+  else if (index === 3) { cur = document.getElementById('s1Text3')?.textContent || 'xxx'; promptText = '请输入第三行文字：'; }
+  else if (index === 4) { cur = document.getElementById('s1Text4')?.textContent || 'xxx'; promptText = '请输入标点线条后的自定义文字：'; }
+  else if (index === 5) { cur = document.getElementById('s1TextLoc')?.textContent || 'xxx'; promptText = '请输入定位文字：'; }
+
+  let val = prompt(promptText, cur === 'xxx' ? '' : cur);
+  if (val !== null) {
+    val = val.trim() || 'xxx';
+    try { localStorage.setItem(key, val); } catch(e){}
+    if (index === 1) { const el = document.getElementById('s1Text1'); if (el) el.textContent = val; }
+    else if (index === 2) { const el = document.getElementById('s1Text2'); if (el) el.textContent = val; }
+    else if (index === 3) { const el = document.getElementById('s1Text3'); if (el) el.textContent = val; }
+    else if (index === 4) { const el = document.getElementById('s1Text4'); if (el) el.textContent = val; }
+    else if (index === 5) { const el = document.getElementById('s1TextLoc'); if (el) el.textContent = val; }
+  }
+};
+
+window.editS1PolaroidNote = function() {
+  let cur = document.getElementById('s1PolaroidNote')?.textContent || 'xxx';
+  let val = prompt('请输入小卡片左下角自定义文字：', cur === 'xxx' ? '' : cur);
+  if (val !== null) {
+    val = val.trim() || 'xxx';
+    try { localStorage.setItem('akini_s1_polaroid_note', val); } catch(e){}
+    const el = document.getElementById('s1PolaroidNote');
+    if (el) el.textContent = val;
+  }
+};
+
+window.changeS1Photo = function() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      const el = document.getElementById('s1PolaroidImg');
+      if (el) {
+        el.style.backgroundImage = `url("${event.target.result}")`;
+        try { localStorage.setItem('akini_s1_photo', event.target.result); } catch(err) {}
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+  input.click();
+};
+
+window.loadS1SavedTexts = function() {
+  try {
+    const t1 = localStorage.getItem('akini_s1_custom_text_1');
+    const t2 = localStorage.getItem('akini_s1_custom_text_2');
+    const t3 = localStorage.getItem('akini_s1_custom_text_3');
+    const t4 = localStorage.getItem('akini_s1_custom_text_4');
+    const t5 = localStorage.getItem('akini_s1_custom_text_5');
+    const note = localStorage.getItem('akini_s1_polaroid_note');
+    const photo = localStorage.getItem('akini_s1_photo');
+
+    if (t1 && document.getElementById('s1Text1')) document.getElementById('s1Text1').textContent = t1;
+    if (t2 && document.getElementById('s1Text2')) document.getElementById('s1Text2').textContent = t2;
+    if (t3 && document.getElementById('s1Text3')) document.getElementById('s1Text3').textContent = t3;
+    if (t4 && document.getElementById('s1Text4')) document.getElementById('s1Text4').textContent = t4;
+    if (t5 && document.getElementById('s1TextLoc')) document.getElementById('s1TextLoc').textContent = t5;
+    if (note && document.getElementById('s1PolaroidNote')) document.getElementById('s1PolaroidNote').textContent = note;
+    if (photo && document.getElementById('s1PolaroidImg')) document.getElementById('s1PolaroidImg').style.backgroundImage = `url("${photo}")`;
+  } catch(e){}
+};
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', window.loadS1SavedTexts);
+} else {
+  window.loadS1SavedTexts();
+}
