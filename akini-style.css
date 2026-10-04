@@ -4931,9 +4931,13 @@ body.dark-mode #wbSearchBar input {
 }
 body.dark-mode .bottom-row,
 body.dark-mode .bottom-btn-container,
-body.dark-mode .right-card,
+body.dark-mode .right-card:not(#bgArea),
 body.dark-mode .app-item .icon-wrap {
   background: transparent !important;
+}
+/* 纪念日卡在暗色模式下仅重置底色（单属性），绝不冲刷用户自定义 background-image */
+body.dark-mode #bgArea {
+  background-color: transparent !important;
 }
 body.dark-mode .app-item .app-label {
   color: #aaa !important;
@@ -12593,9 +12597,9 @@ body, .phone-frame, .content-wrapper {
 }
 
 #bgArea {
-  background: linear-gradient(135deg, #f0f2f5 0%, #fafbfc 100%) !important;
-  background-size: cover !important;
-  background-position: center !important;
+  background: linear-gradient(135deg, #f0f2f5 0%, #fafbfc 100%);
+  background-size: cover;
+  background-position: center;
   border-radius: 22px !important;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.08) !important;
   border: none !important;
@@ -13395,3 +13399,29 @@ html body #app-shop {
   padding-top: env(safe-area-inset-top, 0px) !important;
   box-sizing: border-box !important;
 }
+
+
+/* ===== v803 跨设备等比缩放补丁（syy 式完整显示方案）=====
+   任何手机/浏览器/平板打开：420px 设计宽度锁死居中 + 两屏内容整体等比缩放至完全装下，
+   不放大不缩小错乱、不缺失、不重叠、无需滚动。 */
+/* 1) 缩放承载盒：包住每屏全部内容，由 JS __akiniFitScale 动态等比缩放 */
+.home-screen > .fit-scale-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+  transform-origin: top center;
+  max-width: none !important;
+  margin-left: 0;
+}
+/* 缩放生效时彻底禁止滚动：内容已等比装下，绝无滚动条/滚动行为 */
+.home-screen.fit-no-scroll { overflow: hidden !important; }
+/* 2) 动态视口高度兜底：dvh 为现代标准，杜绝手机地址栏收起/展开的高度跳变 */
+.phone-frame { height: 100vh; height: 100svh; height: 100dvh; }
+/* 3) 强制禁止各浏览器内核（微信/QQ/UC/Safari）对文本自动大小调整 */
+html, body { -webkit-text-size-adjust: 100% !important; text-size-adjust: 100% !important; }
+/* 4) 420px 设计宽度锁死居中：平板/电脑等大屏一律呈现与手机完全一致的窄列 */
+.content-wrapper, .fit-mod { max-width: 420px !important; margin-left: auto !important; margin-right: auto !important; }
+/* 5) 极端兜底：缩放下限之外的内容允许纵向滚动，绝不重叠 */
+.home-screen { overflow-y: auto !important; overflow-x: hidden !important; }
