@@ -13180,3 +13180,189 @@ html, body {
   margin-top: 0 !important;
   vertical-align: middle !important;
 }
+
+
+/* ==========================================================================
+   v794: 彻底遵循用户要求与 770 版本原貌复刻
+   1. 双人头像底图四个角全部为圆角（22px），四周包裹纯白底图边框
+   2. 不强加带 !important 的默认背景，绝不覆盖或重置用户已换好的图片
+   3. 换图逻辑原生直读 FileReader，存盘多键互通
+   ========================================================================== */
+
+/* 双人头像全卡片：纯白底、26px圆角、四周白色余量包裹内部底图 */
+html body #screen2 #topCard,
+html body #screen2 .top-card,
+html body #topCard,
+html body .top-card {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: calc(10px + env(safe-area-inset-top, 0px)) 0 4px !important;
+  background: #ffffff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-radius: 26px !important;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.05) !important;
+  border: none !important;
+  padding: 8px 8px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* 双人头像底图：四个角全部都是圆角（22px），内嵌在纯白卡片内，四周均被白色底图包围 */
+html body #screen2 #coverAreaMain,
+html body #screen2 .top-card .cover-img,
+html body #screen2 .cover-img,
+html body #topCard #coverAreaMain,
+html body #topCard .cover-img,
+html body #coverAreaMain,
+html body .top-card .cover-img,
+html body .cover-img {
+  width: 100% !important;
+  height: 160px !important;
+  min-height: 160px !important;
+  max-height: 160px !important;
+  border-radius: 22px !important;
+  border-top-left-radius: 22px !important;
+  border-top-right-radius: 22px !important;
+  border-bottom-left-radius: 22px !important;
+  border-bottom-right-radius: 22px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  border: none !important;
+  margin: 0 0 0 0 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+/* 仅在无任何内联 background-image 时提供默认浅灰相框底，绝不使用 !important 冲掉用户的图片 */
+#coverAreaMain:not([style*="background-image"]) {
+  background: linear-gradient(135deg, #e4e7eb 0%, #f1f3f6 100%);
+}
+
+/* 底图内若有 img 标签，同样四角全圆角并铺满 */
+html body #screen2 .cover-img img,
+html body .cover-img img,
+html body #coverAreaMain img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+  border-radius: 22px !important;
+}
+
+/* 双人头像位置与样式：严格复刻 770 原版 */
+html body #screen2 .top-card .dual-avatar-wrap,
+html body .top-card .dual-avatar-wrap {
+  width: 120px !important;
+  height: 60px !important;
+  margin-top: -30px !important;
+  margin-bottom: 2px !important;
+  position: relative !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: flex-end !important;
+  cursor: pointer !important;
+  z-index: 10 !important;
+  flex-shrink: 0 !important;
+}
+
+html body #screen2 .top-card .dual-avatar-wrap .avatar-left,
+html body .top-card .dual-avatar-wrap .avatar-left {
+  position: absolute !important;
+  left: 0 !important;
+  bottom: 0 !important;
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 50% !important;
+  background: #e8e8e8 !important;
+  border: 3px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 2 !important;
+}
+
+html body #screen2 .top-card .dual-avatar-wrap .avatar-right,
+html body .top-card .dual-avatar-wrap .avatar-right {
+  position: absolute !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 60px !important;
+  height: 60px !important;
+  border-radius: 50% !important;
+  background: #e8e8e8 !important;
+  border: 3px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+  overflow: hidden !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 1 !important;
+}
+
+html body #screen2 .top-card .dual-avatar-wrap .avatar-left img,
+html body #screen2 .top-card .dual-avatar-wrap .avatar-right img,
+html body .top-card .dual-avatar-wrap .avatar-left img,
+html body .top-card .dual-avatar-wrap .avatar-right img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+html body #screen2 .top-card .subtitle,
+html body .top-card .subtitle {
+  font-size: 13px !important;
+  color: rgba(60, 60, 60, 0.8) !important;
+  margin-top: 2px !important;
+  letter-spacing: 0.8px !important;
+  font-weight: 400 !important;
+  text-shadow: 0 1px 4px rgba(255, 255, 255, 0.6) !important;
+  flex-shrink: 0 !important;
+}
+
+/* 纪念日卡片：140x140 经典方卡，22px 圆角，默认浅灰渐变底，有自定义图片时绝不冲刷 */
+html body #screen2 #bgArea,
+html body #screen2 .right-card,
+html body #bgArea,
+html body .right-card {
+  width: 140px !important;
+  height: 140px !important;
+  border-radius: 22px !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+  overflow: hidden !important;
+  position: relative !important;
+  cursor: pointer !important;
+}
+
+#bgArea:not([style*="background-image"]) {
+  background: linear-gradient(135deg, #e4e7eb 0%, #f1f3f6 100%);
+}
+
+/* 换图原生 input 全覆盖透明层，保证点击 100% 灵敏 */
+#s2CoverInputDirect,
+#s2DayBgInputDirect {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0.001 !important;
+  cursor: pointer !important;
+  z-index: 99 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}

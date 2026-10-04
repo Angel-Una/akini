@@ -431,12 +431,84 @@ window.__akiniBootStep = "start";
     var bg = localStorage.getItem("akini_home_bg");
     if (bg) {
       var pf = document.getElementById("phoneFrame");
-      if (pf && pf.classList.contains("force-home-bg")) {
-        pf.style.backgroundImage = "url(" + bg + ")";
-        pf.style.backgroundSize = "cover";
-        pf.style.backgroundPosition = "center";
-        pf.style.backgroundRepeat = "no-repeat";
-        pf.classList.add("has-custom-bg");
+      /* v783 修复（v782 补丁①引发的重复闪退）：v782 把存量背景图同步设到 phoneFrame，
+         其上叠着底栏/双人头像/聊天气泡/输入栏多层 backdrop-filter 磨砂，每帧对大图
+         采样模糊，低内存机型 GPU 超载 → 启动即崩 → 重载再应用再崩的死循环。
+         本版改为三重防护：
+         ① 异步降采样：先 Image 解码 → canvas 压到 ≤820px / JPEG ≤90KB → 写回存储
+            替换大图 → 再应用（已合规的小图 ≤130KB 直接用，同样延后到确认可用后）；
+         ② 应用延后：开屏内容就绪后再设背景，避免与启动峰值叠加；
+         ③ 防崩看门狗：sessionStorage 计数本会话连续启动次数，连续 3 次未存活过
+            2.5s 判定为背景致崩 → 写入 akini_home_bg_skip（记录当时图长）本次起跳过
+            背景、保住页面可用；用户更换背景（长度必变）或清除后自动恢复尝试。 */
+      if (pf) {
+        try {
+          var __bgSkipLen = 0;
+          try { __bgSkipLen = parseInt(localStorage.getItem("akini_home_bg_skip") || "0", 10) || 0; } catch (e0) {}
+          var __bgSkipped = bg.length > 0 && __bgSkipLen === bg.length;
+          var __bgOk = false;
+          try { __bgOk = localStorage.getItem("akini_home_bg_ok") === "1"; } catch (e0) {}
+          var __bgBootKey = "__akiniBgBootN";
+          var __bgBootN = 0;
+          if (!__bgSkipped) {
+            try { __bgBootN = parseInt(sessionStorage.getItem(__bgBootKey) || "0", 10) || 0; } catch (e0) {}
+            __bgBootN += 1;
+            try { sessionStorage.setItem(__bgBootKey, String(__bgBootN)); } catch (e0) {}
+            if (__bgBootN >= 3 && !__bgOk) {
+              try { localStorage.setItem("akini_home_bg_skip", String(bg.length)); } catch (e0) {}
+              __bgSkipped = true;
+              try { console.warn("[Akini] 背景图疑似导致闪退，本次启动已跳过；更换或清除壁纸后自动恢复"); } catch (e0) {}
+            }
+          }
+          if (!__bgSkipped) {
+            var __bgApply = function (dataUrl) {
+              try {
+                pf.style.backgroundImage = "url(" + dataUrl + ")";
+                pf.style.backgroundSize = "cover";
+                pf.style.backgroundPosition = "center";
+                pf.style.backgroundRepeat = "no-repeat";
+                pf.classList.add("has-custom-bg");
+              } catch (e1) {}
+              setTimeout(function () {
+                try { sessionStorage.setItem(__bgBootKey, "0"); } catch (e0) {}
+                try { localStorage.setItem("akini_home_bg_ok", "1"); } catch (e0) {}
+              }, 2500);
+            };
+            if (bg.indexOf("data:image") === 0 && bg.length <= 130000) {
+              setTimeout(function () { __bgApply(bg); }, 300);
+            } else {
+              var __bgIm = new Image();
+              var __bgDone = false;
+              setTimeout(function () { __bgDone = true; /* 超时放弃：宁可无背景不冒崩溃风险 */ }, 6000);
+              __bgIm.onload = function () {
+                if (__bgDone) return;
+                __bgDone = true;
+                try {
+                  var w = __bgIm.naturalWidth || 0, h = __bgIm.naturalHeight || 0;
+                  if (!w || !h) return;
+                  var md = 820;
+                  if (w > md || h > md) {
+                    var s = Math.min(md / w, md / h);
+                    w = Math.round(w * s); h = Math.round(h * s);
+                  }
+                  var cv = document.createElement("canvas");
+                  cv.width = w; cv.height = h;
+                  var ctx = cv.getContext("2d");
+                  ctx.imageSmoothingEnabled = true;
+                  ctx.imageSmoothingQuality = "high";
+                  ctx.drawImage(__bgIm, 0, 0, w, h);
+                  var q = 0.8, out = cv.toDataURL("image/jpeg", q), g = 0;
+                  while (out.length > 90000 && q > 0.35 && g < 5) { q -= 0.1; g++; out = cv.toDataURL("image/jpeg", q); }
+                  try { localStorage.setItem("akini_home_bg", out); } catch (e1) {}
+                  try { localStorage.removeItem("akini_home_bg_skip"); } catch (e1) {}
+                  __bgApply(out);
+                } catch (e1) { /* 压缩失败不应用：保住启动 */ }
+              };
+              __bgIm.onerror = function () { __bgDone = true; };
+              __bgIm.src = bg;
+            }
+          }
+        } catch (e) {}
       }
     }
   } catch (e) {}
@@ -5406,6 +5478,21 @@ window.akiniContacts = {
       [500].forEach(function (_ms) {
         setTimeout(function () { try { U.scrollTop = U.scrollHeight; } catch (e) {} }, _ms);
       });
+      /* v782 修复：图片晚加载把聊天体撑高后，视口停在半路导致最新消息"没全显示"——
+         1.5s 窗口内图片加载完成时，若用户仍停留在底部附近则跟随滚底（上滑翻阅历史时不拽回） */
+      try {
+        var __fkUntil = Date.now() + 1500;
+        var __fkImgs = U.querySelectorAll("img");
+        for (var __fk = 0; __fk < __fkImgs.length; __fk++) {
+          (function (im) {
+            if (im.complete) return;
+            im.addEventListener("load", function () {
+              if (Date.now() > __fkUntil) return;
+              try { if (U.scrollHeight - U.scrollTop - U.clientHeight < 260) U.scrollTop = U.scrollHeight; } catch (e0) {}
+            }, { once: true });
+          })(__fkImgs[__fk]);
+        }
+      } catch (e) {}
       // v594 防卡崩：保持聊天 DOM 节点上限，超限时移除最早的消息
       try {
         var _maxRows = AKINI_CHAT_BATCH_SIZE + 10;
@@ -5688,18 +5775,19 @@ window.akiniContacts = {
       C(chatId, fullHTML);
       // 若当前正在看该聊天，把新消息追加到 DOM（新消息刚生成、必然不在已渲染批次中，直接追加安全）
       if (isCurActive && U) {
+        /* v782 修复：头像修复改在追加前只处理新消息片段——原 v686 写法读取整个 U.innerHTML
+           （数百行聊天即数 MB 字符串同步序列化）再全量回写，既造成收发消息时的间歇性卡顿，
+           回写还会重置图片加载与滚动位置（"点进聊天消息没全显示"的元凶之一） */
+        try {
+          if (cleanNew && cleanNew.indexOf("data:image/svg") >= 0 && typeof __akiniFixMsgAvatarHTML === "function") {
+            cleanNew = __akiniFixMsgAvatarHTML(cleanNew, chatId);
+          }
+        } catch (e) {}
         var temp = document.createElement('div'); temp.innerHTML = cleanNew;
         while (temp.firstChild) {
           U.appendChild(temp.firstChild);
         }
         try { window.__akiniMedia && window.__akiniMedia.resolve(U); } catch (e) {}
-        /* v686 防头像闪烁：新追加的消息若仍带旧 SVG 占位头像，立即替换为真实头像（只对含 SVG 的头像跑，轻量） */
-        try {
-          if (U.innerHTML.indexOf("data:image/svg") >= 0 && typeof __akiniFixMsgAvatarHTML === "function") {
-            var _fixedHtml = __akiniFixMsgAvatarHTML(U.innerHTML, chatId);
-            if (_fixedHtml !== U.innerHTML) U.innerHTML = _fixedHtml;
-          }
-        } catch (e) {}
         // 最多只保留最近 200 条在界面上：超出后从顶部裁剪，并启用下拉加载回看更早记录
         var excess = U.querySelectorAll('.msg-row').length - AKINI_CHAT_BATCH_SIZE;
         if (excess > 0) {
@@ -28671,3 +28759,260 @@ if (document.readyState === 'loading') {
 } else {
   window.loadS1SavedTexts();
 }
+
+window.handleDayBgDirect = function(e) {
+  var file = e.target.files && e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var b64 = evt.target.result;
+    var bg = document.getElementById('dayCardBg') || document.getElementById('bgArea');
+    if (bg) {
+      bg.style.backgroundImage = 'url("' + b64 + '")';
+      bg.style.backgroundSize = 'cover';
+      bg.style.backgroundPosition = 'center';
+    }
+    try {
+      localStorage.setItem('akini_day_bg', b64);
+      localStorage.setItem('akini_anniv_bg', b64);
+    } catch(err){}
+    if (window.akiniToast) akiniToast('纪念日底图更换成功');
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+};
+
+window.handleS2DayBgDirect = function(e) {
+  var file = e.target.files && e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var b64 = evt.target.result;
+    var bg = document.getElementById('bgArea');
+    if (bg) {
+      bg.style.backgroundImage = 'url("' + b64 + '")';
+      bg.style.backgroundSize = 'cover';
+      bg.style.backgroundPosition = 'center';
+    }
+    try {
+      localStorage.setItem('akini_day_bg', b64);
+      localStorage.setItem('akini_anniv_bg', b64);
+    } catch(err){}
+    if (window.akiniToast) akiniToast('纪念日底图更换成功');
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+};
+
+// v774 强力通用底图更换处理器：双人头像封面 + 纪念日底图
+window.handleS2CoverDirect = function(e) {
+  var file = (e.target && e.target.files && e.target.files[0]) || (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var dataUrl = evt.target.result;
+    var el = document.getElementById("coverAreaMain");
+    if (el) {
+      el.style.backgroundImage = "url('" + dataUrl + "')";
+      el.style.backgroundSize = "cover";
+      el.style.backgroundPosition = "center";
+    }
+    try {
+      localStorage.setItem("akini_cover_bg", dataUrl);
+      localStorage.setItem("cover_bg", dataUrl);
+    } catch(ex){}
+    if (window.akiniToast) akiniToast("双人封面更换成功");
+  };
+  reader.readAsDataURL(file);
+  if (e.target) e.target.value = '';
+};
+
+window.handleS2DayBgDirect = function(e) {
+  var file = (e.target && e.target.files && e.target.files[0]) || (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var dataUrl = evt.target.result;
+    var el = document.getElementById("bgArea");
+    if (el) {
+      el.style.backgroundImage = "url('" + dataUrl + "')";
+      el.style.backgroundSize = "cover";
+      el.style.backgroundPosition = "center";
+      el.style.backgroundColor = "transparent";
+    }
+    try {
+      localStorage.setItem("akini_day_bg", dataUrl);
+      localStorage.setItem("akini_anniv_bg", dataUrl);
+      localStorage.setItem("aki_day_bg", dataUrl);
+    } catch(ex){}
+    if (window.akiniToast) akiniToast("纪念日底图更换成功");
+  };
+  reader.readAsDataURL(file);
+  if (e.target) e.target.value = '';
+};
+
+// v775 强化换图：直接以 highest priority 注入内联样式
+window.handleS2CoverDirect = function(e) {
+  var file = (e.target && e.target.files && e.target.files[0]) || (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var dataUrl = evt.target.result;
+    var el = document.getElementById("coverAreaMain");
+    if (el) {
+      el.style.setProperty('background-image', 'url("' + dataUrl + '")', 'important');
+      el.style.setProperty('background-size', 'cover', 'important');
+      el.style.setProperty('background-position', 'center', 'important');
+    }
+    try {
+      localStorage.setItem("akini_cover_bg", dataUrl);
+      localStorage.setItem("cover_bg", dataUrl);
+    } catch(ex){}
+    if (window.akiniToast) akiniToast("双人封面更换成功");
+  };
+  reader.readAsDataURL(file);
+  if (e.target) e.target.value = '';
+};
+
+window.handleS2DayBgDirect = function(e) {
+  var file = (e.target && e.target.files && e.target.files[0]) || (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var dataUrl = evt.target.result;
+    var el = document.getElementById("bgArea");
+    if (el) {
+      el.style.setProperty('background-image', 'url("' + dataUrl + '")', 'important');
+      el.style.setProperty('background-size', 'cover', 'important');
+      el.style.setProperty('background-position', 'center', 'important');
+      el.style.setProperty('background-color', 'transparent', 'important');
+    }
+    try {
+      localStorage.setItem("akini_day_bg", dataUrl);
+      localStorage.setItem("akini_anniv_bg", dataUrl);
+      localStorage.setItem("aki_day_bg", dataUrl);
+    } catch(ex){}
+    if (window.akiniToast) akiniToast("纪念日底图更换成功");
+  };
+  reader.readAsDataURL(file);
+  if (e.target) e.target.value = '';
+};
+
+// v776 双人头像封面图绝对生效更换器
+window.handleS2CoverDirect = function(e) {
+  var file = (e.target && e.target.files && e.target.files[0]) || (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var dataUrl = evt.target.result;
+    var el = document.getElementById("coverAreaMain");
+    if (el) {
+      el.style.setProperty('background-image', 'url("' + dataUrl + '")', 'important');
+      el.style.setProperty('background-size', 'cover', 'important');
+      el.style.setProperty('background-position', 'center', 'important');
+    }
+    try {
+      localStorage.setItem("akini_cover_img", dataUrl);
+      localStorage.setItem("akini_cover_bg", dataUrl);
+      localStorage.setItem("cover_bg", dataUrl);
+    } catch(ex){}
+    if (window.akiniToast) akiniToast("双人封面更换成功");
+    if (window.applyAllSavedBgs) window.applyAllSavedBgs();
+  };
+  reader.readAsDataURL(file);
+  if (e.target) e.target.value = '';
+};
+
+window.handleS2DayBgDirect = function(e) {
+  var file = (e.target && e.target.files && e.target.files[0]) || (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var dataUrl = evt.target.result;
+    var el = document.getElementById("bgArea");
+    if (el) {
+      el.style.setProperty('background-image', 'url("' + dataUrl + '")', 'important');
+      el.style.setProperty('background-size', 'cover', 'important');
+      el.style.setProperty('background-position', 'center', 'important');
+      el.style.setProperty('background-color', 'transparent', 'important');
+    }
+    try {
+      localStorage.setItem("akini_day_bg", dataUrl);
+      localStorage.setItem("akini_anniv_bg", dataUrl);
+      localStorage.setItem("aki_day_bg", dataUrl);
+      localStorage.setItem("akini_bg_img", dataUrl);
+    } catch(ex){}
+    if (window.akiniToast) akiniToast("纪念日底图更换成功");
+    if (window.applyAllSavedBgs) window.applyAllSavedBgs();
+  };
+  reader.readAsDataURL(file);
+  if (e.target) e.target.value = '';
+};
+
+// v777 强化双人封面图更换：同步写入所有相关 localStorage key 并即刻渲染
+window.handleS2CoverDirect = function(e) {
+  var file = (e.target && e.target.files && e.target.files[0]) || (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]);
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(evt) {
+    var dataUrl = evt.target.result;
+    var el = document.getElementById("coverAreaMain");
+    if (el) {
+      el.style.setProperty('background-image', 'url("' + dataUrl + '")', 'important');
+      el.style.setProperty('background-size', 'cover', 'important');
+      el.style.setProperty('background-position', 'center', 'important');
+    }
+    try {
+      localStorage.setItem("akini_cover_img", dataUrl);
+      localStorage.setItem("akini_cover_bg", dataUrl);
+      localStorage.setItem("cover_bg", dataUrl);
+      localStorage.setItem("akini_s2_cover", dataUrl);
+    } catch(ex){}
+    if (window.akiniToast) akiniToast("双人封面更换成功");
+    if (window.applyAllSavedBgs) window.applyAllSavedBgs();
+  };
+  reader.readAsDataURL(file);
+  if (e.target) e.target.value = '';
+};
+
+
+/* ==========================================================================
+   v782 修复：iOS 软键盘遮挡聊天输入栏（"打字显示不全"）
+   #app-chat 为 100dvh 固定布局、输入栏贴底、chat-body 内部滚动——键盘弹起时
+   visualViewport 缩小但布局高度不变，输入栏被键盘盖住，用户看不见自己输入的内容。
+   方案：监听 visualViewport，仅聊天页可见时把 #app-chat 视觉平移（transform 不改
+   布局流、不动任何样式定义），键盘收起自动复位。全程幂等、零布局改动。
+   ========================================================================== */
+(function () {
+  if (!window.visualViewport) return;
+  var vv = window.visualViewport;
+  var __akiniKbShift = 0;
+  function __akiniKbFix() {
+    try {
+      var chat = document.getElementById("app-chat");
+      if (!chat) return;
+      var visible = chat.style.display !== "none" && (chat.offsetParent !== null || chat.getClientRects().length > 0);
+      if (!visible) {
+        if (__akiniKbShift !== 0) { chat.style.transform = ""; __akiniKbShift = 0; }
+        return;
+      }
+      var bar = chat.querySelector(".chat-input-bar-area") || chat.querySelector(".chat-input-bar");
+      if (!bar) return;
+      var r = bar.getBoundingClientRect();
+      var realBottom = r.bottom + __akiniKbShift; /* 还原平移前的真实位置，保证幂等收敛 */
+      var vvBottom = vv.height + vv.offsetTop;
+      var over = realBottom - vvBottom;
+      var shift = over > 2 ? Math.min(over + 8, 420) : 0;
+      if (shift !== __akiniKbShift) {
+        chat.style.transform = shift > 0 ? "translateY(" + (-shift) + "px)" : "";
+        __akiniKbShift = shift;
+      }
+    } catch (e) {}
+  }
+  vv.addEventListener("resize", __akiniKbFix);
+  vv.addEventListener("scroll", __akiniKbFix);
+  /* 键盘收起后（回前台/退出聊天页）兜底复位 */
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) setTimeout(__akiniKbFix, 120);
+  });
+})();
