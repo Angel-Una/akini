@@ -1,11 +1,10 @@
-const CACHE_NAME = 'akini-cache-20261004v794';
+const CACHE_NAME = 'akini-cache-20261004v799';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
   './akini-main.js',
   './favicon.png',
   './localforage.min.js',
-  './silence.flac',
 ];
 
 self.addEventListener('install', function(event) {
@@ -34,6 +33,14 @@ self.addEventListener('activate', function(event) {
   );
 });
 
+// v796: 带超时的网络请求——弱网下4秒内无响应立即回退缓存,进站/刷新不再白等
+function fetchWithTimeout(req, ms) {
+  return Promise.race([
+    fetch(req),
+    new Promise(function(_, reject) { setTimeout(function() { reject(new Error('akini-timeout')); }, ms); })
+  ]);
+}
+
 self.addEventListener('fetch', function(event) {
   var req = event.request;
   var url = new URL(req.url);
@@ -49,7 +56,7 @@ self.addEventListener('fetch', function(event) {
   // 主资源采用 network-first：新版立即生效，网络不通时才用缓存
   if (isNav || isSW || isMainAsset) {
     event.respondWith(
-      fetch(req).then(function(response) {
+      fetchWithTimeout(req, isNav ? 8000 : 6000).then(function(response) {
         if (response && response.status === 200 && response.type === 'basic') {
           var clone = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {

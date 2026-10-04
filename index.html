@@ -12,13 +12,13 @@
   function go() {
     if (jumped) return;
     jumped = true;
-    location.replace("akini.html?v=20261003v794");
+    location.replace("akini.html?v=20261004v797");
   }
   /* 每次版本升级都把清理标记升级一级：老用户（已置 v1）会再次全量注销 SW 并删除所有缓存，杜绝旧版本缓存数据 */
   var cleaned = false;
-  try { cleaned = localStorage.getItem("__akini_entry_cleaned_v767") === "1"; } catch (e) {}
+  try { cleaned = localStorage.getItem("__akini_entry_cleaned_v797") === "1"; } catch (e) {}
   if (cleaned) { go(); return; }
-  try { localStorage.setItem("__akini_entry_cleaned_v767", "1"); } catch (e) {}
+  try { localStorage.setItem("__akini_entry_cleaned_v797", "1"); } catch (e) {}
   try {
     var jobs = [];
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
@@ -28,7 +28,7 @@
     }
     if (window.caches && caches.keys) {
       jobs.push(caches.keys().then(function (ks) {
-        return Promise.all(ks.map(function (k) { return caches.delete(k); }));
+        return Promise.all(ks.map(function (k) { return k === 'akini-vault-v1' ? Promise.resolve() : caches.delete(k); }));
       }));
     }
     if (jobs.length) {

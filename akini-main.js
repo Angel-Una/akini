@@ -18055,9 +18055,14 @@ window.akiniContacts = {
                   if (e.repliedByTa) {
                     isRead = true;
                   } else {
+                    /* v798: 超过1天的信默认视为已读(联系人早已收到),不依赖可能丢失的repliedByTa */
+                    try {
+                      var _age = Date.now() - (e.ts || Date.parse(e.date) || 0);
+                      if (!isNaN(_age) && _age > 86400000) isRead = true;
+                    } catch (eAge) {}
                     try {
                       var rList = JSON.parse(localStorage.getItem("akini_mail_received") || "[]");
-                      isRead = rList.some(function(item){
+                      isRead = isRead || rList.some(function(item){
                         return item && item.subtype === "reply" && (
                           (item.originalContent && item.originalContent === e.content) ||
                           (e.replyTime && item.ts === e.replyTime)
@@ -21465,10 +21470,12 @@ window.akiniContacts = {
         }
       }
       function Ct() {
-        e.playIcon &&
-          e.pauseIcon &&
-          ((e.playIcon.style.display = d ? "none" : "block"),
-          (e.pauseIcon.style.display = d ? "block" : "none"));
+        if (!e.playIcon || !e.pauseIcon) return;
+        /* v798 修复:图标以真实audio播放状态为准,杜绝解码慢/加载失败导致图标错显暂停键 */
+        var realPlaying = false;
+        try { realPlaying = !!(u && !u.paused && !u.ended && u.readyState > 1); } catch (eS) { realPlaying = !!d; }
+        e.playIcon.style.display = realPlaying ? "none" : "block";
+        e.pauseIcon.style.display = realPlaying ? "block" : "none";
       }
       function Bt() {
         var _pc = document.getElementById("musicPlaylistContainer");
@@ -21770,7 +21777,7 @@ window.akiniContacts = {
           ((e.contactList.innerHTML = ""),
             t.forEach(function (t, n) {
               var i = T.some(function (e) {
-                  return e.id === t.id;
+                  return String(e.id) === String(t.id);
                 }),
                 a = document.createElement("div");
               ((a.className = "music-contact-item"),
@@ -21791,9 +21798,9 @@ window.akiniContacts = {
                   J(t.name || "对方") +
                   "</div>"),
                 a.addEventListener("click", function () {
-                  var _selNow = !(function (t) {
+                  var _selNow = (function (t) {
                     var e = T.findIndex(function (e) {
-                      return e.id === t.id;
+                      return String(e.id) === String(t.id);
                     });
                     if (e >= 0) {
                       // 再点同一人：取消选择
@@ -21853,6 +21860,15 @@ window.akiniContacts = {
         }
       }
       function Rt() {
+        try {
+          var _rawSaved = localStorage.getItem("akini_music_selected_contacts");
+          if (_rawSaved) {
+            var _parsed = JSON.parse(_rawSaved);
+            if (Array.isArray(_parsed)) {
+              T = _parsed;
+            }
+          }
+        } catch (eRT) {}
         e.contactPicker &&
           ((e.contactPicker.style.display = "flex"), zt(), Ot());
       }
@@ -22810,6 +22826,11 @@ window.akiniContacts = {
           }),
           e.pickerConfirmBtn &&
             Wt(e.pickerConfirmBtn, function () {
+              /* v798 修复:确认前从持久层强制重新读取已选联系人,杜绝作用域/时序错乱读到空 */
+              try {
+                var _forceSel = JSON.parse(localStorage.getItem("akini_music_selected_contacts") || "[]");
+                if (Array.isArray(_forceSel) && _forceSel.length) T = _forceSel;
+              } catch (eFR) {}
               0 !== T.length
                 ? (function () {
                     window._akiniMusicExited = false;

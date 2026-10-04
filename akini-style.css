@@ -13366,3 +13366,32 @@ html body .right-card {
   margin: 0 !important;
   padding: 0 !important;
 }
+
+/* ================= v796 布局回归 770 基准补丁 ================= */
+/* 商店全屏页顶部安全区：避免 56px 标题栏被系统状态栏遮挡(仅真机生效,预览无影响) */
+html body #app-shop {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  box-sizing: border-box !important;
+}
+
+
+/* ================= v797 位置修正与安全区补丁 ================= */
+/* 商店 / TA的手机 入口按钮组：整体明确下移，与上方聊天预览拉开清晰间距，不再贴上 */
+.s2-col-left {
+  gap: 14px !important;
+}
+.s2-shop-pair {
+  margin-top: 14px !important;
+  padding-top: 0 !important;
+  justify-content: space-around !important;
+}
+/* 商店全屏页顶部安全区：标题栏不被系统状态栏遮挡 */
+html body #app-shop {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  box-sizing: border-box !important;
+}
+/* TA的手机弹层顶部安全区 */
+.akini-ta-phone-container {
+  padding-top: env(safe-area-inset-top, 0px) !important;
+  box-sizing: border-box !important;
+}
