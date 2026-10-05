@@ -4907,8 +4907,9 @@ body.dark-mode #app-mail,
   background-repeat: no-repeat !important;
   width: 100% !important;
   height: 100% !important;
-  filter: blur(18px);
-  transform: scale(1.1);
+  filter: none !important;
+  -webkit-filter: none !important;
+  transform: none !important;
 }
 #app-friends,
 #app-music {

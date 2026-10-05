@@ -20327,6 +20327,8 @@ window.akiniContacts = {
           if (!_kaAudioEnabled() || _kaUserStopped || !_kaAudio) return;
           /* 双保险：退避到期时若在后台，不抢音频焦点，等 visible 续播 */
           if (document.hidden) { _kaDelay = 0; return; }
+          /* v818：音乐正在播放时不抢音频会话焦点，杜绝保活静音与音乐互相打断 */
+          if (window.__akiniMusicIsPlaying && window.__akiniMusicIsPlaying()) { _kaDelay = 0; return; }
           var p = _kaAudio.play();
           if (p && p.catch) p.catch(function () { _kaScheduleRetry(); });
         }, _kaDelay);
@@ -20379,7 +20381,7 @@ window.akiniContacts = {
         document.addEventListener("visibilitychange", function () {
           if (_kaAudioEnabled() && "visible" === document.visibilityState) {
             _kaDelay = 0;
-            if (_kaAudio && _kaAudio.paused) _kaAudio.play().catch(function () {});
+            if (_kaAudio && _kaAudio.paused && !(window.__akiniMusicIsPlaying && window.__akiniMusicIsPlaying())) _kaAudio.play().catch(function () {});
           }
         }),
         // 启动时若已开启保活则尝试开播（被自动播放策略拦截时由 unlock 兜底）
@@ -22363,7 +22365,10 @@ window.akiniContacts = {
               d &&
                 (Q(),
                 Y(),
-                u && u.paused && u.play().catch(function () {}),
+                /* v818：u.play() 加30s节流——iOS系统打断/省电模式与自动补播拉锯
+                   正是"暂停↔播放来回切换"的最后根因；节流后不抢用户/系统意图 */
+                u && u.paused && (!u._resumeAt || Date.now() - u._resumeAt > 30000) &&
+                  ((u._resumeAt = Date.now()), u.play().catch(function () {})),
                 u &&
                   !u._ending &&
                   (u.ended ||
@@ -22375,6 +22380,12 @@ window.akiniContacts = {
         var N = null,
           P = null,
           H = [];
+        /* v818：暴露权威播放状态查询，供保活音频等子系统避让音乐播放 */
+        (window.__akiniMusicIsPlaying = function () {
+          try { if (u) return !u.paused && !u.ended; } catch (t) {}
+          try { return localStorage.getItem("akini_music_playing") === "1"; } catch (t) {}
+          return false;
+        }),
         ((window.isMusicListeningActive = qt),
           (window._showMusicContactPicker = function () {
             try {
@@ -23552,11 +23563,11 @@ window.akiniContacts = {
         } catch (t) {}
       }
       function it() {
-        !ot() || (u && !u.paused) || V();
+        !ot() || (u && !u.paused) || ((u._resumeAt = Date.now()), V());
       }
       function at() {
         try {
-          !ot() || (u && !u.paused) || V();
+          !ot() || (u && !u.paused) || ((u._resumeAt = Date.now()), V());
         } catch (t) {}
       }
       function ot() {
@@ -23676,6 +23687,11 @@ window.akiniContacts = {
         _spRaf && (cancelAnimationFrame(_spRaf), (_spRaf = null));
       }
       function yt() {
+        // v817 修复：换歌时清零错误计数与冷却，新歌从干净状态开始
+        try {
+          window._akiniAudioErrCounts = {};
+          window._akiniAudioErrStopAt = 0;
+        } catch (t) {}
         // 防止 timeupdate 与 ended 事件在短时间内重复触发导致跳一首
         if (window._akiniEndingLock) return;
         window._akiniEndingLock = !0;
@@ -23841,6 +23857,7 @@ window.akiniContacts = {
               }),
               u.addEventListener("timeupdate", function () {
                 if (u) {
+                  try { if (u._ctsTimer) { clearTimeout(u._ctsTimer); u._ctsTimer = null; } } catch (t) {}
                   ((w = u.currentTime),
                     (_spLastTs = performance.now()),
                     (_spLastW = w),
@@ -23882,7 +23899,9 @@ window.akiniContacts = {
                 if (u && !u.paused) {
                   setTimeout(function() {
                     try {
-                      if (u && u.readyState < 3 && !u.paused) {
+                      var _now = Date.now();
+                      if (u && u.readyState < 3 && !u.paused && (!u._stallRecoverAt || _now - u._stallRecoverAt > 30000)) {
+                        u._stallRecoverAt = _now;
                         u.currentTime = u.currentTime;
                         u.play().catch(function(){});
                       }
@@ -23935,6 +23954,12 @@ window.akiniContacts = {
                   // 防止同一首歌反复失败导致界面卡死
                   if (!window._akiniAudioErrCounts) window._akiniAudioErrCounts = {};
                   var errKey = String(c[l] && c[l].id || r || e || "_");
+                  /* v817 修复：同一首歌连续失败停用后进入60秒冷却期，
+                     冷却内不再自动重试，彻底杜绝播放/暂停来回切换死循环 */
+                  if (window._akiniAudioErrStopAt && Date.now() - window._akiniAudioErrStopAt < 60000) {
+                    xt();
+                    return;
+                  }
                   window._akiniAudioErrCounts[errKey] = (window._akiniAudioErrCounts[errKey] || 0) + 1;
                   if (window._akiniAudioErrCounts[errKey] > 3) {
                     console.warn("[Akini Music] 同一首歌错误次数过多，停止重试", errKey);
@@ -23946,6 +23971,7 @@ window.akiniContacts = {
                       }, 200);
                     }
                     window._akiniAudioErrCounts[errKey] = 0;
+                    window._akiniAudioErrStopAt = Date.now();
                     xt();
                     return;
                   }
@@ -24002,6 +24028,7 @@ window.akiniContacts = {
                 }),
               ),
               u.addEventListener("play", function () {
+                try { u._resumeAt = Date.now(); } catch (t) {}
                 d = !0;
                 try {
                   localStorage.setItem("akini_music_playing", "1");
@@ -24012,15 +24039,21 @@ window.akiniContacts = {
                   et(),
                   Q(),
                   _startSmooth());
-                var _ctsStart = u.currentTime,
-                  _ctsTimer = setTimeout(function () {
-                    if (u && u.currentTime === _ctsStart && !u.paused) {
-                      console.warn("audio currentTime not advancing", u.src);
-                      u.dispatchEvent(new Event("error"));
-                    }
-                  }, 2500);
+                /* v817 修复：卡死检测改为10秒+readyState>=3门槛+可清除定时器，
+               缓冲中(currentTime未走但无数据)不再误判，杜绝播放/暂停无限循环 */
+                try { if (u._ctsTimer) { clearTimeout(u._ctsTimer); u._ctsTimer = null; } } catch (t) {}
+                var _ctsStart = u.currentTime;
+                u._ctsTimer = setTimeout(function () {
+                  u._ctsTimer = null;
+                  if (u && u.currentTime === _ctsStart && !u.paused && u.readyState >= 3) {
+                    console.warn("audio currentTime not advancing", u.src);
+                    u.dispatchEvent(new Event("error"));
+                  }
+                }, 10000);
               }),
               u.addEventListener("pause", function () {
+                try { u._resumeAt = 0; } catch (t) {}
+                try { if (u._ctsTimer) { clearTimeout(u._ctsTimer); u._ctsTimer = null; } } catch (t) {}
                 d = !1;
                 try {
                   localStorage.setItem("akini_music_playing", "0");
@@ -28655,7 +28688,23 @@ function initHomeMusicPlayerSection() {
     }
 
     // 播放/暂停状态同步
-    const isPlaying = origPlayBtn && origPlayBtn.classList.contains('playing');
+    // v820：旧逻辑读 musicPlayBtn 的 playing class——全屏播放器从不设置该 class（用图标 display 切换），
+    // 导致 isPlaying 永远 false，每 800ms 强制首页按钮翻回"暂停"图标，
+    // 与 v810 applyMusicState(500ms 真实双信号) 互写拉锯 → 按钮图标一直暂停/播放反复闪。
+    // 改为与 v810 完全一致的权威双信号：全屏图标 display + akini_music_playing LS + u 元素兜底
+    const isPlaying = (function(){
+      try {
+        const pi = document.getElementById('musicPlayIcon');
+        const pa = document.getElementById('musicPauseIcon');
+        if (pi && pa) {
+          if (pa.style.display && pa.style.display !== 'none') return true;
+          if (pi.style.display && pi.style.display !== 'none') return false;
+        }
+      } catch(e) {}
+      try { if (typeof window.__akiniMusicIsPlaying === 'function') return window.__akiniMusicIsPlaying(); } catch(e) {}
+      try { return localStorage.getItem('akini_music_playing') === '1'; } catch(e) {}
+      return !!(origPlayBtn && origPlayBtn.classList.contains('playing'));
+    })();
     if (playBtn) {
       const playIcon = playBtn.querySelector('.play-icon');
       const pauseIcon = playBtn.querySelector('.pause-icon');
