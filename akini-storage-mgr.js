@@ -13,6 +13,13 @@
     if (!body) return;
 
     body.innerHTML =
+      '<div class="settings-card"><div class="card-title">版本与代码更新</div>' +
+        '<div class="ak-hint" style="margin-top:0">当前最新版本：<b>v824</b>。如果您的手机显示旧版或修复未生效，是因为手机浏览器/桌面图标缓存了旧版代码。点击下方按钮可强制清除代码缓存并拉取最新版本（<b>绝不会丢失</b>您的聊天记录与联系人数据）。</div>' +
+        '<div class="ak-btn-col">' +
+          '<button class="ak-stor-btn" id="akStorForceUpdate" style="background:#1a1a1a;color:#fff;font-weight:600" type="button">一键清缓存并强制更新至 v824</button>' +
+        "</div>" +
+      "</div>" +
+
       '<div class="settings-card"><div class="card-title">备份与恢复</div>' +
         '<div class="ak-hint" style="margin-top:0">数据每次变更已自动备份到浏览器本地库；换设备/清理浏览器前请先导出备份文件</div>' +
         '<div class="ak-btn-col">' +
@@ -47,6 +54,41 @@
         else alert(msg);
       } catch (e) { alert(msg); }
     };
+
+    var updateCacheBtn = $("akStorForceUpdate");
+    if (updateCacheBtn) {
+      updateCacheBtn.onclick = function () {
+        updateCacheBtn.disabled = true;
+        updateCacheBtn.textContent = "正在清理代码缓存并拉取最新版…";
+        var jobs = [];
+        try {
+          if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
+            jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+              return Promise.all(rs.map(function (r) { return r.unregister(); }));
+            }));
+          }
+        } catch (e) {}
+        try {
+          if (window.caches && caches.keys) {
+            jobs.push(caches.keys().then(function (ks) {
+              return Promise.all(ks.map(function (k) {
+                return k === "akini-vault-v1" ? Promise.resolve() : caches.delete(k);
+              }));
+            }));
+          }
+        } catch (e) {}
+        try { localStorage.removeItem("__akini_entry_cleaned_v824"); } catch (e) {}
+        var go = function () {
+          location.replace("index.html?t=" + Date.now() + "&v=20261006v824");
+        };
+        if (jobs.length) {
+          Promise.all(jobs).then(function () { setTimeout(go, 200); }).catch(go);
+          setTimeout(go, 1200);
+        } else {
+          go();
+        }
+      };
+    }
 
     var expBtn = $("akStorExport");
     if (expBtn) expBtn.onclick = function () {
