@@ -132,8 +132,16 @@
           });
           saveReceived(recv);
           s.repliedByTa = true;
+          s.isRead = true;
+          s.read = true;
           changed = true;
           delivered.push(s);
+        } else if (s && s.replyTime && now >= s.replyTime && (!s.isRead || !s.repliedByTa)) {
+          // 回信时间到达，确保寄信状态置为已读
+          s.repliedByTa = true;
+          s.isRead = true;
+          s.read = true;
+          changed = true;
         }
       }
       if (changed) saveSent(sent);

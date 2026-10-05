@@ -18051,24 +18051,38 @@ window.akiniContacts = {
                     isRead = !sentTs || isNaN(sentTs) || (Date.now() - sentTs >= 15000);
                   }
                 } else {
-                  // 用户寄信：联系人回复了显示已读，没回复显示未读
-                  if (e.repliedByTa) {
+                  // 用户寄信（sent）：
+                  // 1) 对方已回信或显式已读
+                  if (e.repliedByTa || e.isRead || e.read) {
                     isRead = true;
-                  } else {
-                    /* v798: 超过1天的信默认视为已读(联系人早已收到),不依赖可能丢失的repliedByTa */
-                    try {
-                      var _age = Date.now() - (e.ts || Date.parse(e.date) || 0);
-                      if (!isNaN(_age) && _age > 86400000) isRead = true;
-                    } catch (eAge) {}
+                  }
+                  // 2) 联系人回信时间已到：自动变成已读！
+                  else if (e.replyTime && Date.now() >= e.replyTime) {
+                    isRead = true;
+                    e.repliedByTa = true;
+                    e.isRead = true;
+                  }
+                  // 3) 对方已有回信在 received 列表
+                  else {
                     try {
                       var rList = JSON.parse(localStorage.getItem("akini_mail_received") || "[]");
-                      isRead = isRead || rList.some(function(item){
+                      if (Array.isArray(rList) && rList.some(function(item){
                         return item && item.subtype === "reply" && (
                           (item.originalContent && item.originalContent === e.content) ||
                           (e.replyTime && item.ts === e.replyTime)
                         );
-                      });
-                    } catch(_) { isRead = false; }
+                      })) {
+                        isRead = true;
+                        e.repliedByTa = true;
+                      }
+                    } catch(_) {}
+                    // 4) 兜底：信件已寄出超过 60 秒，对方已接收，默认呈现已读
+                    if (!isRead) {
+                      try {
+                        var _age = Date.now() - (e.ts || Date.parse(e.date) || 0);
+                        if (!isNaN(_age) && _age >= 60000) isRead = true;
+                      } catch (eAge) {}
+                    }
                   }
                 }
                 var statusText = isRead ? "已读" : "未读";
