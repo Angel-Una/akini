@@ -2245,7 +2245,10 @@ document.addEventListener("DOMContentLoaded", function () {
           } catch (_e) {}
         }
         if (!Array.isArray(e) || 0 === e.length) {
-          if (window._restoringData) return (d = []);
+          /* v824：恢复期读到空时绝不缓存假空——原 return (d=[]) 会把空表钉进内存缓存，
+             后续 addContact 基于假空 push 并保存，直接把整表覆盖成单联系人
+             （用户"添加的联系人都没了/新联系人自动消失"根因之一） */
+          if (window._restoringData) return [];
           e = [];
         }
         // 头像恢复：联系人 avatar 为空时优先从专用键（IDB 权威）恢复，再回填对方/我的头像
@@ -2322,6 +2325,20 @@ document.addEventListener("DOMContentLoaded", function () {
           try { localStorage.setItem(t, JSON.stringify(e)); } catch (err) { console.warn('[akiniContacts] save to localStorage failed', err); }
           c(t, e);
         }
+        /* v824：联系人列表带大头像时超 200KB，storage-safe 走 isBigVal 通道清空 LS 只驻 IDB，
+           逐键快照 snap_akini_contacts 因此长期停更（LS 读不到值→snapshotKey 不写；
+           lsRemoveRaw 绕过 setItem 劫持→不触发）——重进时旧快照把用户添加/删除操作全部回滚。
+           此处每次保存主动把最新列表同步写进 snap 双键，确保快照永远等于最新列表。 */
+        try {
+          var _sj = JSON.stringify(e);
+          if (_sj && _sj.length > 2 && window._idbStore && window._idbStore.set) {
+            window._idbStore.set("snap_akini_contacts", _sj);
+            window._idbStore.set("snap2_akini_contacts", _sj);
+          }
+        } catch (_eSnap) {}
+        /* v824：联系人 CRUD 低频但关键，保存后立即落盘 IDB（不等 500ms 防抖），
+           防止添加/删除后瞬间切后台时旧值复活 */
+        try { if (window.akiniStore && window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (_eFlush) {}
         try { if(typeof window._snapshotCritical === 'function') window._snapshotCritical(); } catch(err){}
       }
       function y() {
@@ -2683,6 +2700,29 @@ window.akiniContacts = {
               note: window.pickWordCards ? window.pickWordCards(1) : "",
               createdAt: Date.now(),
             };
+          /* v824 假空防御：恢复期/大键水合期 f() 可能返回假空列表（列表带大头像超 200KB 时
+             storage-safe 清空 LS 驻留 IDB，读取时序不对就拿到空）。直接 push 保存会把整表
+             覆盖成单联系人。追加前依次从应急备份/原始 LS/内存镜像重捞非空列表。 */
+          if (!Array.isArray(n) || 0 === n.length) {
+            var _rescueList = null;
+            try {
+              var _emc = sessionStorage.getItem("akini_contacts_emergency");
+              if (_emc) { var _emp = JSON.parse(_emc); if (Array.isArray(_emp) && _emp.length > 0) _rescueList = _emp; }
+            } catch (_e0) {}
+            if (!_rescueList) {
+              try {
+                var _lsc = localStorage.getItem("akini_contacts");
+                if (_lsc) { var _lsp = JSON.parse(_lsc); if (Array.isArray(_lsp) && _lsp.length > 0) _rescueList = _lsp; }
+              } catch (_e1) {}
+            }
+            if (!_rescueList && window.akiniStore && window.akiniStore.getSync) {
+              try {
+                var _msc = window.akiniStore.getSync("akini_contacts");
+                if (_msc) { var _msp = JSON.parse(_msc); if (Array.isArray(_msp) && _msp.length > 0) _rescueList = _msp; }
+              } catch (_e2) {}
+            }
+            if (_rescueList) { n = _rescueList; d = n; }
+          }
           // 联系人头像单独持久化到专用键（IDB 优先），避免随大数组写失败而丢失
           if (a.avatar && String(a.avatar).trim()) {
             try { L("akini_contact_avatar_" + a.id, a.avatar); } catch (err) {}
@@ -2734,11 +2774,10 @@ window.akiniContacts = {
           );
         },
         deleteContact: function (t) {
-          var e = f(),
-            n = e.filter(function (t) {
-              return !t.isDefault;
-            });
-          if (0 === e.length) return (alert("至少保留一个联系人"), !1);
+          var e = f();
+          /* v824：移除原"至少保留一个联系人"死限制与无用的 isDefault 过滤死代码——
+             当列表只剩默认联系人时用户永远删不掉它；空表时静默返回即可 */
+          if (!Array.isArray(e) || 0 === e.length) return !1;
 
           // ========== 级联删除：该联系人的所有相关数据 ==========
           try {
@@ -2822,11 +2861,40 @@ window.akiniContacts = {
           }
           // ========== 级联删除结束 ==========
 
-          g(
-            (e = e.filter(function (e) {
-              return e.id !== t;
-            })),
-          );
+          /* v824：删除最后一个联系人走显式清空通道——原 g() 的空数组保护会把空表顶回旧表
+             （"删除永远无效"），且必须全链清理 LS/IDB 主键+backup+snap 快照+应急备份，
+             杜绝删除后被任何恢复链复活。 */
+          var _after = e.filter(function (e2) { return e2.id !== t; });
+          if (0 === _after.length) {
+            try { window._akiniAllowRemove = !0; } catch (_e0) {}
+            try { d = []; } catch (_e1) {}
+            try { sessionStorage.removeItem("akini_contacts_emergency"); } catch (_e2) {}
+            try {
+              if (window.akiniStore && window.akiniStore.remove) window.akiniStore.remove("akini_contacts");
+              else localStorage.removeItem("akini_contacts");
+            } catch (_e3) {}
+            try {
+              if (window._idbStore && window._idbStore.remove) {
+                window._idbStore.remove("akini_contacts");
+                window._idbStore.remove("akini_contacts_backup");
+                window._idbStore.remove("snap_akini_contacts");
+                window._idbStore.remove("snap2_akini_contacts");
+              }
+            } catch (_e4) {}
+            try { window._akiniAllowRemove = !1; } catch (_e5) {}
+            var i0 = k();
+            (delete i0[t], _(i0));
+            var a0 = y();
+            (a0.forEach(function (e3) {
+              e3.memberIds = (e3.memberIds || []).filter(function (e4) {
+                return e4 !== t;
+              });
+            }),
+              p(a0));
+            return !0;
+          }
+          g(_after);
+          e = _after;
           var i = k();
           (delete i[t], _(i));
           var a = y();
@@ -3051,7 +3119,12 @@ window.akiniContacts = {
               // 始终合并本地与 IDB 联系人（按 id 取并集），任何一方存在的联系人都不会丢失
               if (Array.isArray(idbC) && idbC.length > 0) {
                 var byId = {};
-                (Array.isArray(r) ? r : []).forEach(function (c) {
+                /* v824：合并基线改用实时列表——r 是恢复入口时的快照，恢复窗口期间
+                   用户 addContact 的新联系人不在 r 里，会被合并结果直接覆盖丢失 */
+                var _liveC = null;
+                try { _liveC = window.akiniContacts.getContacts(); } catch (_le) {}
+                if (!Array.isArray(_liveC) || 0 === _liveC.length) _liveC = r;
+                (Array.isArray(_liveC) ? _liveC : []).forEach(function (c) {
                   c && c.id && (byId[c.id] = c);
                 });
                 var changed = !1;
@@ -13151,18 +13224,35 @@ window.akiniContacts = {
       const t = document.getElementById("coverAreaMain");
       t &&
         D("akini_cover_img", function (e) {
-          if (e) {
-            ((t.style.backgroundImage = `url(${e})`),
+          /* v822：LS 的 COVER_KEYS 是换图 handler 必经写入层——有值则优先于 IDB 旧值，
+             杜绝启动时 IDB 异步旧图覆盖新图（"换完刷新被打回"根因） */
+          var _use = e;
+          try {
+            var _cks = ["akini_cover_bg", "akini_cover_img", "akini_s2_cover", "cover_bg"];
+            for (var _i = 0; _i < _cks.length; _i++) {
+              var _v = localStorage.getItem(_cks[_i]);
+              if (_v && _v.length > 10) { _use = _v; break; }
+            }
+          } catch (_e0) {}
+          if (_use) {
+            ((t.style.backgroundImage = `url(${_use})`),
               (t.style.backgroundSize = "cover"),
-              (t.style.backgroundPosition = "center"),
-              (t.textContent = ""));
+              (t.style.backgroundPosition = "center"));
           }
         });
       const n = document.getElementById("bgArea");
       n &&
         D("akini_bg_img", function (t) {
-          t &&
-            ((n.style.backgroundImage = `url(${t})`),
+          var _use2 = t;
+          try {
+            var _dks = ["akini_day_bg", "akini_bg_img", "akini_anniv_bg", "day_bg"];
+            for (var _j = 0; _j < _dks.length; _j++) {
+              var _v2 = localStorage.getItem(_dks[_j]);
+              if (_v2 && _v2.length > 10) { _use2 = _v2; break; }
+            }
+          } catch (_e1) {}
+          _use2 &&
+            ((n.style.backgroundImage = `url(${_use2})`),
             (n.style.backgroundSize = "cover"),
             (n.style.backgroundPosition = "center"));
         });
@@ -18630,11 +18720,60 @@ window.akiniContacts = {
                 /* “我”的头像永远以 localStorage/缓存为准（左位固定是我），禁止被联系人头像覆盖 */
                 r = { name: e, avatar: n },
                 c = { name: a, avatar: o };
+              /* v823 终极修复右侧联系人头像丢失/空白问题：
+                 联系人头像是双人模块的核心，必须多层级穿透解析并强力保障渲染：
+                 1. 优先读取首页绑定的联系人头像；
+                 2. 若绑定联系人无头像或未绑定，自动回退到当前活跃聊天对象的头像；
+                 3. 若仍无，按序查找联系人列表中首个有有效头像的联系人；
+                 4. 若仍无，读取本地持久化存储（akini_ta_avatar / akini_avatar_right / akini_icity_ta_avatar）；
+                 5. 若全局均未设置过联系人头像，强制采用优雅默认人像 window.__akiniLineAvatarImg()，
+                    杜绝右位空白透明或只有单头像的情况！
+              */
+              var _finalTaAv = "";
               if (window.akiniContacts) {
-                var l = window.akiniContacts.getHomeAvatars(),
-                  d = window.akiniContacts.getChatTarget(l.right);
-                d && (c = { name: d.name, avatar: it(d.avatar, "") });
+                var l = window.akiniContacts.getHomeAvatars();
+                var d = (l && l.right) ? window.akiniContacts.getChatTarget(l.right) : null;
+                if (d) {
+                  c.name = d.name || c.name;
+                  if (d.avatar && d.avatar.trim() && !window.__akiniIsDefaultAvatarToken(d.avatar)) {
+                    _finalTaAv = it(d.avatar, "");
+                  }
+                }
+                if (!_finalTaAv) {
+                  var _actTgt = window.akiniContacts.getChatTarget(window.akiniContacts.getActiveChatId());
+                  if (_actTgt && _actTgt.avatar && _actTgt.avatar.trim() && !window.__akiniIsDefaultAvatarToken(_actTgt.avatar)) {
+                    _finalTaAv = it(_actTgt.avatar, "");
+                    c.name = _actTgt.name || c.name;
+                  }
+                }
+                if (!_finalTaAv) {
+                  var _allC = window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+                  for (var _ci = 0; _ci < _allC.length; _ci++) {
+                    if (_allC[_ci] && _allC[_ci].avatar && _allC[_ci].avatar.trim() && !window.__akiniIsDefaultAvatarToken(_allC[_ci].avatar)) {
+                      _finalTaAv = it(_allC[_ci].avatar, "");
+                      if (!c.name || c.name === "哥哥") c.name = _allC[_ci].name || c.name;
+                      break;
+                    }
+                  }
+                }
               }
+              if (!_finalTaAv) {
+                var _lsTa = (typeof _memGet === "function" ? _memGet("akini_ta_avatar") : null) ||
+                            (typeof _memGet === "function" ? _memGet("akini_avatar_right") : null) ||
+                            localStorage.getItem("akini_ta_avatar") ||
+                            localStorage.getItem("akini_avatar_right") ||
+                            localStorage.getItem("akini_icity_ta_avatar");
+                if (_lsTa && _lsTa.trim() && !window.__akiniIsDefaultAvatarToken(_lsTa)) {
+                  _finalTaAv = it(_lsTa, "");
+                }
+              }
+              if (!_finalTaAv) {
+                _finalTaAv = (window.getTaAvatar && window.getTaAvatar()) || "";
+              }
+              if (!_finalTaAv || !_finalTaAv.trim()) {
+                _finalTaAv = window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : '<img src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23f7f8fa%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2229%22%20r%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%222.6%22/%3E%3Cpath%20d%3D%22M12%2076c4-17%2014-26%2028-26s24%209%2028%2026%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+              }
+              c.avatar = _finalTaAv;
               var u = r,
                 ta = c;
               var __homeSwapped = "function" == typeof window.isSwapped && window.isSwapped();
@@ -19280,8 +19419,7 @@ window.akiniContacts = {
               (n &&
                 ((n.style.backgroundImage = `url(${e})`),
                 (n.style.backgroundSize = "cover"),
-                (n.style.backgroundPosition = "center"),
-                (n.textContent = "")),
+                (n.style.backgroundPosition = "center")),
                 L("akini_cover_img", e));
             }),
               e.readAsDataURL(t),
