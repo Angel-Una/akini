@@ -9039,6 +9039,8 @@ window.akiniContacts = {
     function ct(t, e) {
       if (window.akiniContacts) {
         window._akiniLastChatId = t;
+        /* v837: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
+        try { if (window.__akiniFlushPendingSaves) window.__akiniFlushPendingSaves(); } catch(eFlush){}
         A();
         /* v684 防闪退：切换会话时释放其他聊天的超大内存缓存（数据仍完整存于 LS/IDB） */
         try { window.__akiniReleaseChatMemory && window.__akiniReleaseChatMemory(t); } catch (eMem) {}
@@ -9144,6 +9146,16 @@ window.akiniContacts = {
         /* zzzk 性能：me() 每次进聊天都全量重建表情面板（读 IDB + 逐个建 img），是点进对话框卡顿的主因之一。
            表情包库在会话期间不会变，改为仅首次构建；增删表情包处已显式调用 me() 刷新 */
         (c && (c.style.display = "none"), st(t), (!U || !U.__akiniEmojiPanelBuilt) && me(null, false), U && (U.__akiniEmojiPanelBuilt = !0), typeof hideEmojiPanel === "function" && hideEmojiPanel(), typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(), e || o("chat"));
+        /* v837: 打开会话后多阶段确保平滑滚动至最底部，保证刚收到的通知消息即时呈现在视野内 */
+        [50, 150, 350].forEach(function(delay){
+          setTimeout(function(){
+            try {
+              if (U) U.scrollTop = U.scrollHeight;
+              var cb = document.getElementById("chatBody");
+              if (cb) cb.scrollTop = cb.scrollHeight;
+            } catch(eScr){}
+          }, delay);
+        });
       }
       function l(t) {
         U &&
@@ -21105,21 +21117,27 @@ window.akiniContacts = {
               e = window.akiniContacts.getHomeAvatars(),
               n =
                 '<div style="font-size:12px;color:#999;width:100%;margin-bottom:4px;">点击选择显示在主页的联系人</div>';
-            t.forEach(function (t) {
-              var i =
-                e.right === t.id
-                  ? "border:2px solid #007aff;"
-                  : "border:2px solid transparent;";
+            /* v837：主页双人头像选择样式改为播放器联系人一致的卡片式（大头像44px圆环、2px黑边框+浅灰底色#f2f2f7选中态、勾选标记） */
+            t.forEach(function (cItem) {
+              var sel = e.right === cItem.id;
               n +=
-                '<div style="display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;" data-slot-contact="' +
-                t.id +
-                '"><div style="width:42px;height:42px;border-radius:50%;background:#e8e8e8;overflow:hidden;display:flex;align-items:center;justify-content:center;' +
-                i +
-                '">' +
-                nt(t.avatar, 42) +
-                '</div><div style="font-size:11px;color:#666;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
-                rt(t.name) +
-                "</div></div>";
+                '<button type="button" data-slot-contact="' +
+                cItem.id +
+                '" style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 10px;border-radius:12px;border:2px solid ' +
+                (sel ? "#1a1a1a" : "transparent") +
+                ';background:' +
+                (sel ? "#f2f2f7" : "#fff") +
+                ';cursor:pointer;min-width:64px">' +
+                '<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:22px;background:#f0f0f0">' +
+                nt(cItem.avatar, 44) +
+                '</div>' +
+                '<span style="font-size:11px;color:' +
+                (sel ? "#1a1a1a" : "#888") +
+                ';max-width:72px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+                rt(cItem.name) +
+                (sel ? " ✓" : "") +
+                '</span>' +
+                '</button>';
             });
             (a.innerHTML = n),
               a.querySelectorAll("[data-slot-contact]").forEach(function (t) {
@@ -23970,27 +23988,12 @@ window.akiniContacts = {
         e.distanceText && (e.distanceText.textContent = fullText);
         /* v836：首页播放器时长跟随美化页「播放器联系人」所选联系人（listenMap 按人分账累计）；
            所选联系人正在一起听时叠加实时增量，未在选择时显示其存量累计；未选联系人则保持原一起听逻辑 */
+        /* v837：统一首页播放器与一起听歌界面的时长计算源头。
+           用户明确指出：“首页播放器显示的一起听时间和我在个人一起听歌界面的根本不一样！”
+           因此两处统一使用 timeText（当前一起听界面的权威累计时长），保证两处数字毫秒级完全一致！ */
         var homeText = timeText;
-        try {
-          var p_pid = localStorage.getItem("akini_music_player_right_contact");
-          if (p_pid) {
-            var p_sec = listenMap[p_pid] || 0;
-            if (T && T.length) {
-              for (var p_k = 0; p_k < T.length; p_k++) {
-                if (T[p_k] && T[p_k].id === p_pid) {
-                  p_sec += x ? Math.floor((Date.now() - x) / 1e3) : 0;
-                  break;
-                }
-              }
-            }
-            var p_n = Math.floor(p_sec / 60), p_hh = Math.floor(p_n / 60), p_a = "";
-            if (p_hh > 0) p_a += p_hh + " 小时 ";
-            p_a += (p_n % 60) + " 分钟";
-            homeText = "一起听了 " + p_a;
-          }
-        } catch (t) {}
         e.listenTime && (e.listenTime.textContent = homeText);
-        /* v835/v836：同步权威时长快照（含播放器所选联系人优先）与时间戳给首页轮询 */
+        /* 同步权威时长快照与时间戳给首页轮询与页面恢复 */
         try { window.__akiniMusicListenText = homeText; window.__akiniMusicListenTextAt = Date.now(); } catch (t) {}
       }
       function st() {
@@ -25160,10 +25163,11 @@ window.akiniContacts = {
         if (window.akiniContacts && window.akiniContacts.getContacts) {
           var contactsEmpty = window.akiniContacts.getContacts().length === 0;
           var sessions = window.akiniContacts.getSessions ? window.akiniContacts.getSessions() : {};
-          var anyMsg = !1;
-          for (var sid in sessions)
-            if (sessions.hasOwnProperty(sid) && sessions[sid] && sessions[sid].messagesHTML && sessions[sid].messagesHTML.trim()) { anyMsg = !0; break; }
-          if (contactsEmpty || (!anyMsg && Object.keys(sessions).length === 0)) {
+          var sessKeys = Object.keys(sessions);
+          /* v837: sessions持久化早已slim剔除messagesHTML（独立持久化在akini_chat_history_*），
+             因此内存中重载后sessions[*].messagesHTML为空是预期行为，绝不能将其误判为内存数据被清空并调用restoreAll！
+             仅当联系人列表为空且sessions完全无key时才视为极端回收 */
+          if (contactsEmpty && sessKeys.length === 0) {
             // 内存数据疑似被回收清空：从 IDB 恢复
             window._restoringData = !0;
             window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll(function () {
