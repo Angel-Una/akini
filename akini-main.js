@@ -9039,7 +9039,7 @@ window.akiniContacts = {
     function ct(t, e) {
       if (window.akiniContacts) {
         window._akiniLastChatId = t;
-        /* v837: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
+        /* v838: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
         try { if (window.__akiniFlushPendingSaves) window.__akiniFlushPendingSaves(); } catch(eFlush){}
         A();
         /* v684 防闪退：切换会话时释放其他聊天的超大内存缓存（数据仍完整存于 LS/IDB） */
@@ -9146,7 +9146,7 @@ window.akiniContacts = {
         /* zzzk 性能：me() 每次进聊天都全量重建表情面板（读 IDB + 逐个建 img），是点进对话框卡顿的主因之一。
            表情包库在会话期间不会变，改为仅首次构建；增删表情包处已显式调用 me() 刷新 */
         (c && (c.style.display = "none"), st(t), (!U || !U.__akiniEmojiPanelBuilt) && me(null, false), U && (U.__akiniEmojiPanelBuilt = !0), typeof hideEmojiPanel === "function" && hideEmojiPanel(), typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(), e || o("chat"));
-        /* v837: 打开会话后多阶段确保平滑滚动至最底部，保证刚收到的通知消息即时呈现在视野内 */
+        /* v838: 打开会话后多阶段确保平滑滚动至最底部，保证刚收到的通知消息即时呈现在视野内 */
         [50, 150, 350].forEach(function(delay){
           setTimeout(function(){
             try {
@@ -19532,7 +19532,6 @@ window.akiniContacts = {
                 pf.style.backgroundRepeat = "";
                 pf.classList.remove("has-custom-bg");
               }
-              window.__akiniToast && window.__akiniToast("已清除主页壁纸");
             });
           })());
         const d = document.getElementById("fileInputMusicBg");
@@ -19548,6 +19547,18 @@ window.akiniContacts = {
                 try { if (window._idbStore && _idbStore.set) _idbStore.set("akini_music_bg", finalUrl); } catch (e) {}
                 try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set("akini_music_bg", finalUrl); } catch (e) {}
                 try { if (window.akiniStore && window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (e) {}
+                /* v838：写入后回读校验，IDB 写入失败时延迟重写一次，确保新背景必达存储 */
+                try {
+                  if (window._idbStore && _idbStore.get && _idbStore.set) {
+                    setTimeout(function () {
+                      try {
+                        _idbStore.get("akini_music_bg", function (chk) {
+                          if (chk !== finalUrl) { try { _idbStore.set("akini_music_bg", finalUrl); } catch (eRw) {} }
+                        });
+                      } catch (eChk) {}
+                    }, 400);
+                  }
+                } catch (eV) {}
                 const el = document.getElementById("musicBgLayer");
                 if (el) {
                   el.style.backgroundImage = `url(${finalUrl})`;
@@ -19556,7 +19567,6 @@ window.akiniContacts = {
                   el.style.backgroundRepeat = "no-repeat";
                   el.style.display = "block";
                 }
-                if (window.__akiniToast) window.__akiniToast("网易云壁纸更换成功");
               }
               /* 压缩大于 1600px 或 > 1.5MB 的超大图片，防止超出配额回退 */
               var img = new Image();
@@ -21115,9 +21125,8 @@ window.akiniContacts = {
           if (a && window.akiniContacts) {
             var t = window.akiniContacts.getContacts(),
               e = window.akiniContacts.getHomeAvatars(),
-              n =
-                '<div style="font-size:12px;color:#999;width:100%;margin-bottom:4px;">点击选择显示在主页的联系人</div>';
-            /* v837：主页双人头像选择样式改为播放器联系人一致的卡片式（大头像44px圆环、2px黑边框+浅灰底色#f2f2f7选中态、勾选标记） */
+              n = "";
+            /* v838：主页双人头像选择样式改为播放器联系人一致的卡片式（大头像44px圆环、2px黑边框+浅灰底色#f2f2f7选中态、勾选标记） */
             t.forEach(function (cItem) {
               var sel = e.right === cItem.id;
               n +=
@@ -23620,18 +23629,16 @@ window.akiniContacts = {
           st(),
           syncAvatars(),
           (function () {
-            // 存量修复：localStorage 残留的 akini_music_bg 会遮蔽 IDB 中的新背景
+            /* v838：背景防回退——LS 与 IDB 不一致时以 LS 为准回写 IDB（换图入口最后写入 LS）；
+               一致时保留 LS 副本兜底，绝不删除 LS，避免 IDB 旧值独大导致背景回退 */
             try {
               var _oldBg = localStorage.getItem("akini_music_bg");
-              if (_oldBg) {
+              if (_oldBg && _idbStore && _idbStore.get) {
                 _idbStore.get("akini_music_bg", function (v) {
-                  if (!v) {
-                    _idbStore.set("akini_music_bg", _oldBg, function () {
-                      try { localStorage.removeItem("akini_music_bg"); } catch (e) {}
-                      U();
-                    });
-                  } else {
-                    try { localStorage.removeItem("akini_music_bg"); } catch (e) {}
+                  if (!v || v !== _oldBg) {
+                    try {
+                      _idbStore.set("akini_music_bg", _oldBg, function () { try { U(); } catch (eU) {} });
+                    } catch (eS) {}
                   }
                 });
               }
@@ -23725,14 +23732,21 @@ window.akiniContacts = {
                 ? "radial-gradient(circle at 50% 40%, rgba(0,0,0,0.30) 0%, rgba(15,15,18,0.55) 70%, rgba(15,15,18,0.75) 100%)"
                 : "radial-gradient(circle at 50% 40%, transparent 0%, rgba(15,15,18,0.75) 70%, rgba(15,15,18,0.92) 100%)"));
         }
-        /* 优先读 IndexedDB（新图写入的权威存储），localStorage 仅作兜底，避免旧残留遮蔽新值 */
+        /* v838：IDB+LS 双源校验防回退——两源不一致时以 LS 为准（换图入口最后写入 LS）并回写 IDB，
+           杜绝 IDB 写入失败残留旧值导致一起听背景回退 */
+        var _lsBg = "";
+        try { _lsBg = localStorage.getItem("akini_music_bg") || ""; } catch (eLs) {}
         if (window._idbStore && _idbStore.get) {
           _idbStore.get("akini_music_bg", function (v) {
+            if (_lsBg && _lsBg !== v) {
+              try { _idbStore.set("akini_music_bg", _lsBg); } catch (eW) {}
+              return apply(_lsBg);
+            }
             if (typeof v === "string" && v) return apply(v);
             D("akini_music_bg", function (n) { apply(n || ""); });
           });
         } else {
-          D("akini_music_bg", function (n) { apply(n || ""); });
+          D("akini_music_bg", function (n) { apply(_lsBg || n || ""); });
         }
       }
       function K() {
@@ -23988,7 +24002,7 @@ window.akiniContacts = {
         e.distanceText && (e.distanceText.textContent = fullText);
         /* v836：首页播放器时长跟随美化页「播放器联系人」所选联系人（listenMap 按人分账累计）；
            所选联系人正在一起听时叠加实时增量，未在选择时显示其存量累计；未选联系人则保持原一起听逻辑 */
-        /* v837：统一首页播放器与一起听歌界面的时长计算源头。
+        /* v838：统一首页播放器与一起听歌界面的时长计算源头。
            用户明确指出：“首页播放器显示的一起听时间和我在个人一起听歌界面的根本不一样！”
            因此两处统一使用 timeText（当前一起听界面的权威累计时长），保证两处数字毫秒级完全一致！ */
         var homeText = timeText;
@@ -24854,6 +24868,8 @@ window.akiniContacts = {
                 "icity",
                 "add-contact",
                 "contact-detail",
+                "novel",
+                "shop",
               ],
               i = 0;
             i < n.length;
@@ -24883,7 +24899,37 @@ window.akiniContacts = {
           } catch (t) {}
         }
         function n() {
-          return;
+          /* v838：恢复最后页面状态——挂后台被系统杀页重载后不再"重进"首页，
+             30 分钟内回到切出前停留的界面；等待主 boot 完成后执行，避免时序竞争 */
+          try {
+            var raw = null;
+            try { raw = localStorage.getItem(t); } catch (eR) {}
+            if (!raw) return;
+            var st = null;
+            try { st = JSON.parse(raw); } catch (eP) {}
+            if (!st || (!st.page && !st.area)) return;
+            var age = Date.now() - (st.ts || 0);
+            if (age < 0 || age > 30 * 60 * 1000) return;
+            var tries = 0;
+            (function waitBoot() {
+              try {
+                if (window.__akiniBooted || tries > 120) {
+                  if (st.page && window.showPage) {
+                    try { window.showPage(st.page); } catch (eO) {}
+                  } else if (st.page) {
+                    var appEl = document.getElementById("app-" + st.page);
+                    if (appEl) { try { appEl.style.display = "flex"; appEl.classList.add("show"); } catch (eD) {} }
+                  }
+                  if (st.area && window.showArea) {
+                    try { window.showArea(st.area); } catch (eA) {}
+                  }
+                  return;
+                }
+              } catch (eW) {}
+              tries++;
+              setTimeout(waitBoot, 100);
+            })();
+          } catch (eN) {}
         }
         (document.addEventListener("visibilitychange", function () {
           "hidden" === document.visibilityState && e();
@@ -25164,7 +25210,7 @@ window.akiniContacts = {
           var contactsEmpty = window.akiniContacts.getContacts().length === 0;
           var sessions = window.akiniContacts.getSessions ? window.akiniContacts.getSessions() : {};
           var sessKeys = Object.keys(sessions);
-          /* v837: sessions持久化早已slim剔除messagesHTML（独立持久化在akini_chat_history_*），
+          /* v838: sessions持久化早已slim剔除messagesHTML（独立持久化在akini_chat_history_*），
              因此内存中重载后sessions[*].messagesHTML为空是预期行为，绝不能将其误判为内存数据被清空并调用restoreAll！
              仅当联系人列表为空且sessions完全无key时才视为极端回收 */
           if (contactsEmpty && sessKeys.length === 0) {
@@ -26019,7 +26065,6 @@ window.akiniContacts = {
         try { localStorage.setItem("akini_watch_wallpaper", dataUrl); }
         catch (e) { window.__akiniCenterModal("提示", "壁纸图片过大，保存失败，请换一张试试"); return; }
         applyWatchWallpaper();
-        window.__akiniCenterModal("更换成功", "观影聊天壁纸已更新");
       });
     });
     var mwc = $("watchMenuWallpaperClear");
@@ -29305,7 +29350,6 @@ window.handleDayBgDirect = function(e) {
       localStorage.setItem('akini_day_bg', b64);
       localStorage.setItem('akini_anniv_bg', b64);
     } catch(err){}
-    if (window.akiniToast) akiniToast('纪念日底图更换成功');
   };
   reader.readAsDataURL(file);
   e.target.value = '';
@@ -29327,7 +29371,6 @@ window.handleS2DayBgDirect = function(e) {
       localStorage.setItem('akini_day_bg', b64);
       localStorage.setItem('akini_anniv_bg', b64);
     } catch(err){}
-    if (window.akiniToast) akiniToast('纪念日底图更换成功');
   };
   reader.readAsDataURL(file);
   e.target.value = '';
@@ -29350,7 +29393,6 @@ window.handleS2CoverDirect = function(e) {
       localStorage.setItem("akini_cover_bg", dataUrl);
       localStorage.setItem("cover_bg", dataUrl);
     } catch(ex){}
-    if (window.akiniToast) akiniToast("双人封面更换成功");
   };
   reader.readAsDataURL(file);
   if (e.target) e.target.value = '';
@@ -29374,7 +29416,6 @@ window.handleS2DayBgDirect = function(e) {
       localStorage.setItem("akini_anniv_bg", dataUrl);
       localStorage.setItem("aki_day_bg", dataUrl);
     } catch(ex){}
-    if (window.akiniToast) akiniToast("纪念日底图更换成功");
   };
   reader.readAsDataURL(file);
   if (e.target) e.target.value = '';
@@ -29397,7 +29438,6 @@ window.handleS2CoverDirect = function(e) {
       localStorage.setItem("akini_cover_bg", dataUrl);
       localStorage.setItem("cover_bg", dataUrl);
     } catch(ex){}
-    if (window.akiniToast) akiniToast("双人封面更换成功");
   };
   reader.readAsDataURL(file);
   if (e.target) e.target.value = '';
@@ -29421,7 +29461,6 @@ window.handleS2DayBgDirect = function(e) {
       localStorage.setItem("akini_anniv_bg", dataUrl);
       localStorage.setItem("aki_day_bg", dataUrl);
     } catch(ex){}
-    if (window.akiniToast) akiniToast("纪念日底图更换成功");
   };
   reader.readAsDataURL(file);
   if (e.target) e.target.value = '';
@@ -29445,7 +29484,6 @@ window.handleS2CoverDirect = function(e) {
       localStorage.setItem("akini_cover_bg", dataUrl);
       localStorage.setItem("cover_bg", dataUrl);
     } catch(ex){}
-    if (window.akiniToast) akiniToast("双人封面更换成功");
     if (window.applyAllSavedBgs) window.applyAllSavedBgs();
   };
   reader.readAsDataURL(file);
@@ -29471,7 +29509,6 @@ window.handleS2DayBgDirect = function(e) {
       localStorage.setItem("aki_day_bg", dataUrl);
       localStorage.setItem("akini_bg_img", dataUrl);
     } catch(ex){}
-    if (window.akiniToast) akiniToast("纪念日底图更换成功");
     if (window.applyAllSavedBgs) window.applyAllSavedBgs();
   };
   reader.readAsDataURL(file);
@@ -29497,7 +29534,6 @@ window.handleS2CoverDirect = function(e) {
       localStorage.setItem("cover_bg", dataUrl);
       localStorage.setItem("akini_s2_cover", dataUrl);
     } catch(ex){}
-    if (window.akiniToast) akiniToast("双人封面更换成功");
     if (window.applyAllSavedBgs) window.applyAllSavedBgs();
   };
   reader.readAsDataURL(file);
