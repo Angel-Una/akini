@@ -83,7 +83,11 @@ window.__akiniMedia = (function () {
   }
   return {
     PLACEHOLDER: PLACEHOLDER,
-    /* 存 base64 入池，返回 hash（同步写内存，异步写 IDB） */
+    /* v833: 丢图根修。v627 声称的 flush 是死代码（_idbStore 从无该方法）、
+       v646 声称的双通道镜像被拦截层"大键只删不写"架空（>200KB 媒体 LS 副本被清，
+       唯一持久层只剩异步 localforage，微信杀进程不 commit 即丢）。
+       修复：媒体池条目一律走 rawLSSet 直写 LS 独立镜像（不受大键拦截影响、
+       不入 LS 主存、不进 _evictBigKeys 驱逐），并立即 flushIdb 强制落盘 storage-safe 队列 */
     put: function (dataUrl) {
       if (!dataUrl || dataUrl.indexOf("data:") !== 0) return null;
       var h = hash(dataUrl);
@@ -93,23 +97,23 @@ window.__akiniMedia = (function () {
         MEM_SIZE += dataUrl.length;
         evict(); // 超预算时 LRU 淘汰，防内存无限增长崩溃
         try { window._idbStore && window._idbStore.set("akini_media_" + h, dataUrl); } catch (e) {}
-        // v627: 立即尝试 flush，降低切后台/刷新导致媒体池未落盘丢图概率
-        try { window._idbStore && window._idbStore.flush && window._idbStore.flush(); } catch (e) {}
-        // v646: 双通道镜像——同步写 storage-safe 通道（内存镜像立即生效+IDB 第二副本），
-        // localforage 切后台事务不 commit 时仍有独立副本可恢复，图片消息不再莫名消失
         try { window.akiniStore && window.akiniStore.set && window.akiniStore.set("akini_media_" + h, dataUrl); } catch (e2) {}
+        try { window.akiniStore && window.akiniStore.flushIdb && window.akiniStore.flushIdb(); } catch (e3) {}
+        /* v833 独立 LS 镜像：rawLSSet 绕过一切拦截，media_ 前缀已被 _evictBigKeys 排除，
+           配额不足抛错也只影响本条镜像、不伤主数据；读取链路在 get() 内兜底 */
+        try { window.akiniStore && window.akiniStore.rawLSSet && window.akiniStore.rawLSSet("akini_media_" + h, dataUrl); } catch (e4) {}
       }
       return h;
     },
     get: function (h, cb) {
       if (MEM[h]) return cb(MEM[h]);
-      /* v646: 三级兜底——MEM → localforage 主库 → storage-safe 镜像（内存/LS/其IDB），
-         任一层存活都能取回真图；取回后回写主库自愈 */
+      /* v833: 四级兜底——MEM → localforage 主库 → storage-safe 镜像 → rawLS 镜像，
+         任一层存活都能取回真图；取回后回写主库与内存自愈 */
       var _done = false;
       var _finish = function (v) {
         if (_done) return;
         _done = true;
-        if (v) { MEM[h] = v; }
+        if (v) { MEM[h] = v; MEM_ORDER.push(h); MEM_SIZE += v.length; }
         cb(v || null);
       };
       try {
@@ -124,6 +128,16 @@ window.__akiniMedia = (function () {
             if (window.akiniStore && window.akiniStore.get) {
               window.akiniStore.get("akini_media_" + h, function (v2) {
                 if (v2 && v2.length > 10) { try { window._idbStore.set("akini_media_" + h, v2); } catch (eR2) {} }
+                if (v2 && v2.length > 10) return _finish(v2);
+                /* v833: rawLS 独立镜像兜底（拦截层可能删过 LS 主副本，此镜像键独立存在） */
+                try {
+                  var _raw = "";
+                  try { _raw = localStorage.getItem("akini_media_" + h) || ""; } catch (eL) {}
+                  if (_raw && _raw.indexOf("data:image") === 0) {
+                    try { window._idbStore.set("akini_media_" + h, _raw); } catch (eW) {}
+                    return _finish(_raw);
+                  }
+                } catch (e3) {}
                 _finish(v2 || null);
               });
             } else _finish(null);
@@ -132,12 +146,24 @@ window.__akiniMedia = (function () {
       } catch (e) {
         try {
           var _m2 = window.akiniStore && window.akiniStore.getSync ? window.akiniStore.getSync("akini_media_" + h) : null;
-          _finish(_m2 || null);
+          if (_m2 && _m2.length > 10) return _finish(_m2);
+          var _raw2 = "";
+          try { _raw2 = localStorage.getItem("akini_media_" + h) || ""; } catch (eL2) {}
+          _finish((_raw2 && _raw2.indexOf("data:image") === 0) ? _raw2 : null);
         } catch (e2) { cb(null); }
       }
     },
     /* v637：同步取池内真图（MEM 命中即返回，未命中返回 null 走 resolve 异步回填） */
-    getSync: function (h) { return MEM[h] || null; },
+    getSync: function (h) {
+      if (MEM[h]) return MEM[h];
+      /* v833: getSync 同步补 rawLS 镜像命中（引用条等 getSync-only 渲染路径也能取到真图） */
+      try {
+        var _r = "";
+        try { _r = localStorage.getItem("akini_media_" + h) || ""; } catch (eL) {}
+        if (_r && _r.indexOf("data:image") === 0 && _r.length > 10) { MEM[h] = _r; return _r; }
+      } catch (e) {}
+      return null;
+    },
     /* DOM 回填：扫描容器内 img[data-mh] 从池取真图 */
     resolve: function (root) {
       if (!root || !root.querySelectorAll) return;
@@ -147,12 +173,14 @@ window.__akiniMedia = (function () {
         (function (img) {
           var h = img.getAttribute("data-mh");
           if (!h || img.__mhDone) return;
-          /* v646: 读取失败不再立即判死刑——1.5s/4s 退避重试（覆盖 IDB 异步落盘、
-             镜像水合、恢复窗口期竞态），仍失败才标记 missing，杜绝"发完图刷新就丢" */
+          /* v833 重试加宽：1s/3s/8s/15s/25s/40s 六档退避——微信内 localforage 冷启动
+             （legacy 迁移+多库 ready 队列）实测可慢至数十秒，v646 的 5.5s 窗口内
+             主库仍未就绪即误判 missing；任一档取回即回填，全程不破坏 UI */
+          var schedule = [1000, 3000, 8000, 15000, 25000, 40000];
           var attempt = function (n) {
             self.get(h, function (url) {
               if (url) { img.src = url; img.__mhDone = true; return; }
-              if (n < 2) { setTimeout(function () { attempt(n + 1); }, n === 0 ? 1500 : 4000); return; }
+              if (n < schedule.length) { setTimeout(function () { attempt(n + 1); }, schedule[n]); return; }
               img.classList.add("akini-media-missing"); img.alt = "图片丢失";
             });
           };
@@ -3425,7 +3453,7 @@ window.akiniContacts = {
         if (av0) oldCol.parentNode.insertBefore(av0, oldCol);
         oldCol.remove();
       }
-      /* v832: 兜底修复 row 级头像（历史商店卡等异常结构行）——头像迁入 msg-content-line 内，
+      /* v833: 兜底修复 row 级头像（历史商店卡等异常结构行）——头像迁入 msg-content-line 内，
          me 行置于行尾、other/ta/group 行置于行首，与标准行结构完全一致，
          根治联系人卡片头像与气泡上下堆叠、两侧头像-气泡间距不对称的问题 */
       var strayRowAv = row.querySelector(":scope > .msg-avatar");
@@ -6029,6 +6057,13 @@ window.akiniContacts = {
         if (window.akiniStore && window.akiniStore.set) {
           window.akiniStore.set(key, clean);
           window.akiniStore.set(backup, clean);
+          /* v833: 大记录（>200KB）被拦截层"只删不写 LS"，唯一持久层只剩异步 IDB——
+             300ms 防抖窗口过后再刷新时，退出钩子（__akiniFlushPendingSaves）已无事可做，
+             IDB 若 commit 失败记录即丢。补 rawLSSet 同步热备（绕过拦截直写 LS），
+             与退出路径一致保持 LS+IDB 双通道；媒体池化后记录本身多已 <200KB，开销可控 */
+          if (clean.length > 200 * 1024) {
+            try { window.akiniStore.rawLSSet && window.akiniStore.rawLSSet(key, clean); } catch (eR) {}
+          }
         } else {
           try { _idbStore.set(key, clean); } catch (err) {}
           try { _idbStore.set(backup, clean); } catch (err) {}
@@ -8145,6 +8180,23 @@ window.akiniContacts = {
     // v573: 新增字卡库/纪念日/设置开关/邮箱/商店刷新——这些界面此前恢复完成后不重渲染，
     // 启动竞态期间显示的空/默认值会被用户操作固化为真实写入，导致"数据丢失"
     window.__akiniOnCriticalRestored = function () {
+      /* v833: 启动对账恢复完成后重扫三个聊天容器的媒体占位——首次渲染时
+         localforage ready 队列/IDB 大键水合可能未就绪（PLACEHOLDER 显示中），
+         恢复完成后数据已全部就位，重扫即可回填真图，杜绝"退出重进表情包消失" */
+      try {
+        var _reResolve = function () {
+          try {
+            var _roots = [document.getElementById("chatBody"), document.getElementById("watchChatBody"), document.getElementById("companionMsgs")];
+            for (var i = 0; i < _roots.length; i++) {
+              if (_roots[i] && window.__akiniMedia && window.__akiniMedia.resolve) {
+                window.__akiniMedia.resolve(_roots[i]);
+              }
+            }
+          } catch (e) {}
+        };
+        setTimeout(_reResolve, 600);
+        setTimeout(_reResolve, 3500);
+      } catch (e) {}
       try { if (window.__akiniVaultRecover) window.__akiniVaultRecover(function () {}); } catch (e) {}
       try { setTimeout(__akiniRestorePendingReply, 3000); } catch (e) {}
       try { if (window.akiniContacts && window.akiniContacts.resetCache) window.akiniContacts.resetCache(); } catch (e) {}
@@ -15577,7 +15629,7 @@ window.akiniContacts = {
               u.focus();
             }
             if (m && f) {
-              /* v832: 输入区引用预览统一 名字："内容" 格式——表情包同样带冒号+引号包裹小图，与文字引用完全一致 */
+              /* v833: 输入区引用预览统一 名字："内容" 格式——表情包同样带冒号+引号包裹小图，与文字引用完全一致 */
               if (stickerUrl || stickerMh) {
                 var _barStkSrc = stickerUrl;
                 if (!_barStkSrc && stickerMh && window.__akiniMedia && window.__akiniMedia.getSync) {
@@ -27716,7 +27768,7 @@ if (!window.__akiniUnreadTickerStarted) {
     if (_t.length > 15) _t = _t.slice(0, 15) + "…";
     var nameHtml = '<span style="font-weight:600;white-space:nowrap;color:#333;flex-shrink:0;">' + (window.rt ? rt(_n) : _esc(_n)) + "</span>";
     /* v661: 引用文字与名字同色（#333），不再一深一浅两个颜色 */
-    /* v832: 引用统一 名字："内容" 格式——名字后带冒号与引号，包裹被引用内容 */
+    /* v833: 引用统一 名字："内容" 格式——名字后带冒号与引号，包裹被引用内容 */
     var textHtml = _t ? '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:150px;">："' + (window.rt ? rt(_t) : _esc(_t)) + '"</span>' : "";
     /* v686: 有表情源时，名字后插入缩略小图（优先级：dataURL > mh 媒体句柄），完全替代文字 */
     var stkHtml = "";
@@ -27726,7 +27778,7 @@ if (!window.__akiniUnreadTickerStarted) {
         try { _src = window.__akiniMedia.getSync(_mh) || ""; } catch (e) { _src = ""; }
       }
       if (_src) {
-        /* v832: 表情包引用同样带冒号+引号结构：名字：" [小图] "，与文字引用格式完全一致 */
+        /* v833: 表情包引用同样带冒号+引号结构：名字：" [小图] "，与文字引用格式完全一致 */
         stkHtml = '<span style="color:#333;flex-shrink:0;">："</span>' +
           '<img class="quote-sticker-thumb" src="' + _src + '" data-mh="' + (window.rt ? rt(_mh) : _esc(_mh)) + '" style="width:22px;height:22px;border-radius:5px;object-fit:cover;flex-shrink:0;margin-left:1px;margin-right:1px;" alt="表情包"/>' +
           '<span style="color:#333;flex-shrink:0;">"</span>';
