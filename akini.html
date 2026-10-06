@@ -7047,7 +7047,14 @@ else window.addEventListener('load', function(){ setTimeout(window.__akiniRegist
   var LS_LEFT = "akini_music_player_left_contact";
   var LS_RIGHT = "akini_music_player_right_contact";
   function getContacts(){
-    if(window.akiniContacts && window.akiniContacts.getContacts) return window.akiniContacts.getContacts();
+    if(window.akiniContacts && window.akiniContacts.getContacts){
+      var r = window.akiniContacts.getContacts();
+      if(Array.isArray(r) && r.length) return r;
+    }
+    try {
+      var ls = JSON.parse(localStorage.getItem("akini_contacts") || "[]");
+      if(Array.isArray(ls) && ls.length) return ls;
+    } catch(e){}
     return [];
   }
     function renderAvatar(avatar, size){
@@ -7140,13 +7147,18 @@ else window.addEventListener('load', function(){ setTimeout(window.__akiniRegist
   window.addEventListener("DOMContentLoaded", function(){
     updatePreview();
     renderList();
-    /* 低频自刷新：设置区可见时每 30s 重建列表，联系人增删后回设置页也能看到最新名单 */
+    /* 自刷新：美化区或设置区可见时自动重建列表，联系人增删后回美化页即刻看到最新名单 */
     setInterval(function(){
       try {
-        var area = document.getElementById("settingsArea");
-        if (area && area.style && area.style.display !== "none") renderList();
+        var bArea = document.getElementById("beautifyArea");
+        var sArea = document.getElementById("settingsArea");
+        if ((bArea && bArea.style && bArea.style.display !== "none") ||
+            (sArea && sArea.style && sArea.style.display !== "none")) {
+          renderList();
+          updatePreview();
+        }
       } catch(e2){}
-    }, 30000);
+    }, 2000);
   });
 })();
 </script><script>
