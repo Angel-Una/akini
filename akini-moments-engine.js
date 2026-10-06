@@ -290,7 +290,9 @@
     var contacts = getContacts();
     if (!contacts.length) return;
 
-    var myName = localStorage.getItem('akini_my_name') || '我';
+    var myName = app === 'icity'
+      ? (localStorage.getItem('akini_icity_my_nick') || localStorage.getItem('akini_my_name') || '我')
+      : (localStorage.getItem('akini_my_name') || '我');
     var didAnything = false;
 
     contacts.forEach(function (contact) {
@@ -393,7 +395,9 @@
     var data = getData(app);
     var moment = findMoment(data, momentId);
     var authorName = moment ? (moment.author || '') : '';
-    var myName = localStorage.getItem('akini_my_name') || '我';
+    var myName = app === 'icity'
+      ? (localStorage.getItem('akini_icity_my_nick') || localStorage.getItem('akini_my_name') || '我')
+      : (localStorage.getItem('akini_my_name') || '我');
 
     // 判断是否是“单独回复某条联系人评论”：targetName 不是动态作者，视为单独回复
     var isTopLevelComment = !targetName || (authorName && targetName === authorName);
@@ -414,7 +418,7 @@
     var contact = getContactById(targetName);
     if (!contact) {
       for (var i = 0; i < contacts.length; i++) {
-        if (getContactName(contacts[i], app) === targetName) {
+        if (getContactName(contacts[i], app) === targetName || (contacts[i] && contacts[i].name === targetName)) {
           contact = contacts[i];
           break;
         }
