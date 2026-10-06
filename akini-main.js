@@ -13691,20 +13691,30 @@ window.akiniContacts = {
       }
     }
     function isCallOngoing() {
-      if (we && we.active) return true;
       try {
         var appCall = document.getElementById("app-call");
-        if (appCall && appCall.style.display !== "none") return true;
+        var isAppCallOpen = !!(appCall && appCall.style.display !== "none" && (appCall.offsetHeight > 0 || appCall.clientHeight > 0));
         var mini = document.getElementById("callMiniWindow");
-        if (mini && mini.style.display !== "none") return true;
+        var isMiniOpen = !!(mini && mini.style.display !== "none" && (mini.offsetHeight > 0 || mini.clientHeight > 0));
+        if (isAppCallOpen || isMiniOpen) return true;
       } catch (e) {}
+      /* v834: 若当前无任何活动通话界面，强制自愈重置残留的 active/锁，绝不假死阻塞拨打 */
+      if (we && we.active) {
+        try {
+          we.active = !1;
+          we.answered = !1;
+          we.isMinimized = !1;
+          we.__akiniCallStartTs = 0;
+        } catch (e) {}
+      }
       return false;
     }
     window.isCallOngoing = isCallOngoing;
     window.Te = Te;
 
     function Te(t, e, n) {
-      if (((n = n || {}), isCallOngoing() || we.active)) {
+      n = n || {};
+      if (isCallOngoing()) {
         if (!e && n.targetId && window.akiniContacts && typeof Me === "function") {
           var busyName = n.callerName || t || "对方";
           Me(n.targetId, busyName + "正忙，未接来电");
@@ -13712,6 +13722,11 @@ window.akiniContacts = {
         if (e && window.__akiniToast)
           window.__akiniToast("正在通话中，请先挂断当前通话再拨打", 2600);
         return;
+      }
+      if (we) {
+        we.active = !1;
+        we.answered = !1;
+        we.isMinimized = !1;
       }
       if (n.targetId && window.akiniContacts) {
         var profile = window.akiniContacts.getChatTarget(n.targetId);
@@ -15636,11 +15651,13 @@ window.akiniContacts = {
                   try { _barStkSrc = window.__akiniMedia.getSync(stickerMh) || ""; } catch (e) { _barStkSrc = ""; }
                 }
                 var _barImgHtml = _barStkSrc
-                  ? '<img src="' + _barStkSrc + '" style="width:20px;height:20px;border-radius:4px;object-fit:cover;vertical-align:middle;margin-left:1px;" alt="表情"/>'
-                  : '<span style="color:#999;margin-left:1px;">【表情包】</span>';
-                f.innerHTML = '<span style="font-weight:600;white-space:normal;word-break:break-all;">' + rt(c) + '</span><span style="color:#999;">："</span>' + _barImgHtml + '<span style="color:#999;">"</span>';
+                  ? '<img src="' + _barStkSrc + '" style="width:20px;height:20px;border-radius:4px;object-fit:cover;vertical-align:middle;margin-left:2px;" alt="表情"/>'
+                  : '<span style="color:#999;margin-left:2px;">【表情包】</span>';
+                /* v834: 引用统一去除双引号，表情包带冒号： */
+                f.innerHTML = '<span style="font-weight:600;white-space:normal;word-break:break-all;">' + rt(c) + '</span><span style="color:#999;">：</span>' + _barImgHtml;
               } else {
-                f.innerHTML = '<span style="font-weight:600;white-space:normal;word-break:break-all;">' + rt(c) + '</span>' + (_qShort ? '<span style="color:#999;white-space:normal;word-break:break-all;">："' + rt(_qShort) + '"</span>' : '');
+                /* v834: 文字引用同样去除双引号，纯净 名字：内容 展现 */
+                f.innerHTML = '<span style="font-weight:600;white-space:normal;word-break:break-all;">' + rt(c) + '</span>' + (_qShort ? '<span style="color:#999;white-space:normal;word-break:break-all;">：' + rt(_qShort) + '</span>' : '');
               }
               m.classList.add("show");
             }
@@ -19512,18 +19529,50 @@ window.akiniContacts = {
             const t = this.files[0];
             if (!t) return;
             const e = new FileReader();
-            ((e.onload = function (t) {
-              L("akini_music_bg", t.target.result);
-              const e = document.getElementById("musicBgLayer");
-              e &&
-                ((e.style.backgroundImage = `url(${t.target.result})`),
-                (e.style.backgroundSize = "cover"),
-                (e.style.backgroundPosition = "center"),
-                (e.style.backgroundRepeat = "no-repeat"),
-                (e.style.display = "block"));
-            }),
-              e.readAsDataURL(t),
-              (this.value = ""));
+            e.onload = function (ev) {
+              var dataURL = ev.target.result;
+              function saveAndApply(finalUrl) {
+                try { L("akini_music_bg", finalUrl); } catch (e) {}
+                try { if (window._idbStore && _idbStore.set) _idbStore.set("akini_music_bg", finalUrl); } catch (e) {}
+                try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set("akini_music_bg", finalUrl); } catch (e) {}
+                try { if (window.akiniStore && window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (e) {}
+                const el = document.getElementById("musicBgLayer");
+                if (el) {
+                  el.style.backgroundImage = `url(${finalUrl})`;
+                  el.style.backgroundSize = "cover";
+                  el.style.backgroundPosition = "center";
+                  el.style.backgroundRepeat = "no-repeat";
+                  el.style.display = "block";
+                }
+                if (window.__akiniToast) window.__akiniToast("网易云壁纸更换成功");
+              }
+              /* 压缩大于 1600px 或 > 1.5MB 的超大图片，防止超出配额回退 */
+              var img = new Image();
+              img.onload = function () {
+                try {
+                  var isSvg = String(dataURL).indexOf("data:image/svg") === 0;
+                  if (isSvg || (img.width <= 1600 && img.height <= 1600 && dataURL.length <= 1572864)) {
+                    saveAndApply(dataURL);
+                    return;
+                  }
+                  var cv = document.createElement("canvas");
+                  var sc = Math.min(1600 / Math.max(img.width, img.height), 1);
+                  cv.width = Math.max(1, Math.round(img.width * sc));
+                  cv.height = Math.max(1, Math.round(img.height * sc));
+                  var cx = cv.getContext("2d");
+                  if (!cx) { saveAndApply(dataURL); return; }
+                  cx.drawImage(img, 0, 0, cv.width, cv.height);
+                  var out = cv.toDataURL("image/jpeg", 0.85);
+                  saveAndApply(out && out.length > 100 ? out : dataURL);
+                } catch (e) {
+                  saveAndApply(dataURL);
+                }
+              };
+              img.onerror = function () { saveAndApply(dataURL); };
+              img.src = dataURL;
+            };
+            e.readAsDataURL(t);
+            this.value = "";
           }),
           (function(){
             var show = function (t) {
@@ -23919,7 +23968,30 @@ window.akiniContacts = {
         var timeText = "一起听了 " + (a += (n % 60) + " 分钟");
         var fullText = "TA就在你的身边 " + timeText;
         e.distanceText && (e.distanceText.textContent = fullText);
-        e.listenTime && (e.listenTime.textContent = timeText);
+        /* v836：首页播放器时长跟随美化页「播放器联系人」所选联系人（listenMap 按人分账累计）；
+           所选联系人正在一起听时叠加实时增量，未在选择时显示其存量累计；未选联系人则保持原一起听逻辑 */
+        var homeText = timeText;
+        try {
+          var p_pid = localStorage.getItem("akini_music_player_right_contact");
+          if (p_pid) {
+            var p_sec = listenMap[p_pid] || 0;
+            if (T && T.length) {
+              for (var p_k = 0; p_k < T.length; p_k++) {
+                if (T[p_k] && T[p_k].id === p_pid) {
+                  p_sec += x ? Math.floor((Date.now() - x) / 1e3) : 0;
+                  break;
+                }
+              }
+            }
+            var p_n = Math.floor(p_sec / 60), p_hh = Math.floor(p_n / 60), p_a = "";
+            if (p_hh > 0) p_a += p_hh + " 小时 ";
+            p_a += (p_n % 60) + " 分钟";
+            homeText = "一起听了 " + p_a;
+          }
+        } catch (t) {}
+        e.listenTime && (e.listenTime.textContent = homeText);
+        /* v835/v836：同步权威时长快照（含播放器所选联系人优先）与时间戳给首页轮询 */
+        try { window.__akiniMusicListenText = homeText; window.__akiniMusicListenTextAt = Date.now(); } catch (t) {}
       }
       function st() {
         var t = [
@@ -27764,13 +27836,11 @@ if (!window.__akiniUnreadTickerStarted) {
     /* v686: 被引用的是表情包——名字右侧显示表情小图，不再显示「【表情包】」文字 */
     var _stk = String(sticker == null ? "" : sticker);
     var _mh = String(mh == null ? "" : mh);
-    /* v677: 引用文本超过 15 字自动截断加省略号 */
+    /* v834: 引用文本与输入区预览严格对齐（超15字截断加省略号），与预览完全一致 */
     if (_t.length > 15) _t = _t.slice(0, 15) + "…";
+    /* v834: 统一去除双引号，表情包与文字引用名字后统一带冒号：，气泡不硬性二次挤压截断 */
     var nameHtml = '<span style="font-weight:600;white-space:nowrap;color:#333;flex-shrink:0;">' + (window.rt ? rt(_n) : _esc(_n)) + "</span>";
-    /* v661: 引用文字与名字同色（#333），不再一深一浅两个颜色 */
-    /* v833: 引用统一 名字："内容" 格式——名字后带冒号与引号，包裹被引用内容 */
-    var textHtml = _t ? '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:150px;">："' + (window.rt ? rt(_t) : _esc(_t)) + '"</span>' : "";
-    /* v686: 有表情源时，名字后插入缩略小图（优先级：dataURL > mh 媒体句柄），完全替代文字 */
+    var textHtml = _t ? '<span style="white-space:nowrap;color:#333;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;max-width:220px;">：' + (window.rt ? rt(_t) : _esc(_t)) + "</span>" : "";
     var stkHtml = "";
     if (_stk || _mh) {
       var _src = _stk;
@@ -27778,14 +27848,13 @@ if (!window.__akiniUnreadTickerStarted) {
         try { _src = window.__akiniMedia.getSync(_mh) || ""; } catch (e) { _src = ""; }
       }
       if (_src) {
-        /* v833: 表情包引用同样带冒号+引号结构：名字：" [小图] "，与文字引用格式完全一致 */
-        stkHtml = '<span style="color:#333;flex-shrink:0;">："</span>' +
-          '<img class="quote-sticker-thumb" src="' + _src + '" data-mh="' + (window.rt ? rt(_mh) : _esc(_mh)) + '" style="width:22px;height:22px;border-radius:5px;object-fit:cover;flex-shrink:0;margin-left:1px;margin-right:1px;" alt="表情包"/>' +
-          '<span style="color:#333;flex-shrink:0;">"</span>';
+        /* v834: 表情包引用带冒号无引号：名字：[小图] */
+        stkHtml = '<span style="color:#333;flex-shrink:0;">：</span>' +
+          '<img class="quote-sticker-thumb" src="' + _src + '" data-mh="' + (window.rt ? rt(_mh) : _esc(_mh)) + '" style="width:20px;height:20px;border-radius:4px;object-fit:cover;flex-shrink:0;margin-left:1px;margin-right:2px;" alt="表情包"/>';
         textHtml = ""; /* 表情引用不再叠文字 */
       }
     }
-    return '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:3px 8px!important;font-size:11px!important;line-height:1.3!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:2px!important;display:inline-flex!important;align-items:center!important;max-width:210px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;box-sizing:border-box!important;">' + nameHtml + stkHtml + textHtml + "</div>";
+    return '<div class="quote-bubble" style="background:#fff!important;color:#333!important;border:none!important;border-radius:10px!important;padding:3px 8px!important;font-size:11px!important;line-height:1.3!important;box-shadow:0 1px 3px rgba(0,0,0,.1)!important;margin-top:2px!important;display:inline-flex!important;align-items:center!important;max-width:280px!important;overflow:hidden!important;white-space:nowrap!important;text-overflow:ellipsis!important;box-sizing:border-box!important;">' + nameHtml + stkHtml + textHtml + "</div>";
   };
 
   /* ---------- 消息解析 ---------- */
@@ -28051,7 +28120,8 @@ if (!window.__akiniUnreadTickerStarted) {
       var t = (info.text || "").trim();
       if (!t || t === "【转账】" || t === "【表情包】" || t === "【卡片】" || t === "【图片】" || t === "【语音】" || t === "【红包】" || t.indexOf("【") === 0) { skipped++; return; }
       total++;
-      var sName = info.name || (info.isMe ? _myName() : _taName());
+      /* v834: 单聊场景下严格按当前联系人归一化，杜绝改名后旧消息昵称拆分成多个统计项 */
+      var sName = info.isMe ? _myName() : (isGroup ? (info.name || _taName()) : _taName());
       if (!senderStats[sName]) senderStats[sName] = { count: 0, words: {} };
       senderStats[sName].count++;
       if (info.text) {
@@ -29091,11 +29161,24 @@ function initHomeMusicPlayerSection() {
           leftAv.innerHTML = `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
         }
       }
-      if (rightAv && taAv) {
-        const img = taAv.querySelector('img') || taAv;
-        if (img && img.src && (!rightAv.querySelector('img') || rightAv.querySelector('img').src !== img.src)) {
-          rightAv.innerHTML = `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+      if (rightAv) {
+        /* v835：优先使用美化页「播放器联系人」所选联系人头像，未选择或联系人已删除时退回首页双人头像右侧 */
+        let rightHtml = '';
+        try {
+          const selId = localStorage.getItem('akini_music_player_right_contact');
+          const selC = selId && window.akiniContacts && window.akiniContacts.getContactById
+            ? window.akiniContacts.getContactById(selId) : null;
+          if (selC && selC.avatar && window.renderAvatarHtml) {
+            rightHtml = window.renderAvatarHtml(selC.avatar, 64);
+          }
+        } catch(e) {}
+        if (!rightHtml && taAv) {
+          const img = taAv.querySelector('img') || taAv;
+          if (img && img.src) {
+            rightHtml = `<img src="${img.src}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+          }
         }
+        if (rightHtml && rightAv.innerHTML !== rightHtml) rightAv.innerHTML = rightHtml;
       }
     } catch(e) {}
   }

@@ -13333,3 +13333,36 @@ html body .chat-body .msg-row.other .msg-content-line > .bubble-wrap,
 html body .chat-body .msg-row.ta .msg-content-line > .bubble-wrap {
   margin-left: 0 !important;
 }
+
+/* ===== v834: 彻底解决首页底栏与上方卡片内容重叠（跨浏览器/跨设备一致性修复） ===== */
+.phone-frame {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  height: 100svh !important;
+  height: 100dvh !important;
+  overflow: hidden !important;
+}
+.phone-frame > .content-wrapper,
+#homeScreens.content-wrapper {
+  flex: 1 1 0% !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  box-sizing: border-box !important;
+}
+.phone-frame > .bottom-bar,
+.bottom-bar {
+  flex-shrink: 0 !important;
+  position: relative !important;
+  bottom: auto !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  z-index: 50 !important;
+  pointer-events: auto !important;
+}
