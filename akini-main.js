@@ -1033,7 +1033,47 @@ document.addEventListener("DOMContentLoaded", function () {
       document.body.appendChild(overlay);
       try { setTimeout(function () { try { input.focus(); } catch (e) {} }, 80); } catch (e) {}
     };
-    window._idbStore = (function () {
+    /* ===== v839：表情包启动预热回填 =====
+   根因：表情包键（akini_stickers / akini_stickers_me / akini_stickers_<联系人id>）保存走
+   _idbStore(localforage) + 裸 setItem——集合超 200KB 被 LS 拦截层挡在 localStorage 外，
+   且 localforage 库与启动对账体系互不可见 → 重载后 LS 恒空，裸读 LS 的表情包面板
+   （"我的表情包"等）读到空 → 表情包被吞。
+   修复：启动后定时把 _idbStore 里的表情包键回填 LS（rawLSSet 直写绕拦截；
+   LS 已有值不覆盖），并清 __csCache 陈旧缓存。 */
+(function () {
+  function _stickerKeys() {
+    var ks = ["akini_stickers", "akini_stickers_me"];
+    try {
+      (window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : []).forEach(function (c) {
+        if (c && c.id != null) ks.push("akini_stickers_" + String(c.id));
+      });
+    } catch (e) {}
+    return ks;
+  }
+  function prewarmStickers() {
+    if (!window._idbStore || !window._idbStore.get) return;
+    var ks = _stickerKeys(), hit = 0;
+    ks.forEach(function (k) {
+      try {
+        if (localStorage.getItem(k)) return;
+        window._idbStore.get(k, function (v) {
+          if (v && typeof v === "string" && v.length > 2) {
+            try {
+              if (window.akiniStore && window.akiniStore.rawLSSet) {
+                if (window.akiniStore.rawLSSet(k, v)) hit++;
+              } else {
+                localStorage.setItem(k, v); hit++;
+              }
+              if (hit === 1) { try { if (window.__csCache) window.__csCache = {}; } catch (eC) {} }
+            } catch (e) {}
+          }
+        });
+      } catch (e) {}
+    });
+  }
+  [1200, 3500, 8000, 15000].forEach(function (ms) { setTimeout(prewarmStickers, ms); });
+})();
+window._idbStore = (function () {
       // 存储逻辑对齐 core/compat：localforage（IndexedDB→WebSQL→localStorage 自动降级）为唯一主存储；
       // localStorage 仅作小键热备与同步读取缓存。旧自研库 akini_img_db 的数据首次启动自动迁入。
       var lf = null;
@@ -9039,7 +9079,7 @@ window.akiniContacts = {
     function ct(t, e) {
       if (window.akiniContacts) {
         window._akiniLastChatId = t;
-        /* v838: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
+        /* v839: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
         try { if (window.__akiniFlushPendingSaves) window.__akiniFlushPendingSaves(); } catch(eFlush){}
         A();
         /* v684 防闪退：切换会话时释放其他聊天的超大内存缓存（数据仍完整存于 LS/IDB） */
@@ -9146,7 +9186,7 @@ window.akiniContacts = {
         /* zzzk 性能：me() 每次进聊天都全量重建表情面板（读 IDB + 逐个建 img），是点进对话框卡顿的主因之一。
            表情包库在会话期间不会变，改为仅首次构建；增删表情包处已显式调用 me() 刷新 */
         (c && (c.style.display = "none"), st(t), (!U || !U.__akiniEmojiPanelBuilt) && me(null, false), U && (U.__akiniEmojiPanelBuilt = !0), typeof hideEmojiPanel === "function" && hideEmojiPanel(), typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(), e || o("chat"));
-        /* v838: 打开会话后多阶段确保平滑滚动至最底部，保证刚收到的通知消息即时呈现在视野内 */
+        /* v839: 打开会话后多阶段确保平滑滚动至最底部，保证刚收到的通知消息即时呈现在视野内 */
         [50, 150, 350].forEach(function(delay){
           setTimeout(function(){
             try {
@@ -19543,11 +19583,12 @@ window.akiniContacts = {
             e.onload = function (ev) {
               var dataURL = ev.target.result;
               function saveAndApply(finalUrl) {
+                try { localStorage.removeItem("akini_music_bg"); } catch (eRm) {}
                 try { L("akini_music_bg", finalUrl); } catch (e) {}
                 try { if (window._idbStore && _idbStore.set) _idbStore.set("akini_music_bg", finalUrl); } catch (e) {}
                 try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set("akini_music_bg", finalUrl); } catch (e) {}
                 try { if (window.akiniStore && window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (e) {}
-                /* v838：写入后回读校验，IDB 写入失败时延迟重写一次，确保新背景必达存储 */
+                /* v839：写入后回读校验，IDB 写入失败时延迟重写一次，确保新背景必达存储 */
                 try {
                   if (window._idbStore && _idbStore.get && _idbStore.set) {
                     setTimeout(function () {
@@ -21126,7 +21167,7 @@ window.akiniContacts = {
             var t = window.akiniContacts.getContacts(),
               e = window.akiniContacts.getHomeAvatars(),
               n = "";
-            /* v838：主页双人头像选择样式改为播放器联系人一致的卡片式（大头像44px圆环、2px黑边框+浅灰底色#f2f2f7选中态、勾选标记） */
+            /* v839：主页双人头像选择样式改为播放器联系人一致的卡片式（大头像44px圆环、2px黑边框+浅灰底色#f2f2f7选中态、勾选标记） */
             t.forEach(function (cItem) {
               var sel = e.right === cItem.id;
               n +=
@@ -22541,6 +22582,25 @@ window.akiniContacts = {
         } catch (e) {
           listenMap = {};
         }
+        /* v839：一起听时长重载补时——上次以播放状态挂后台（30 分钟内）被系统杀掉，
+           把后台期间时长补回总时长与右联系人累计，杜绝重进后一起听时间缩短 */
+        try {
+          if (localStorage.getItem("akini_music_listen_active") === "1") {
+            var _bkTs = parseInt(localStorage.getItem("akini_music_listen_ts") || "0", 10) || 0;
+            var _bkD = _bkTs ? Math.floor((Date.now() - _bkTs) / 1000) : 0;
+            try { localStorage.removeItem("akini_music_listen_active"); } catch (eC1) {}
+            try { localStorage.removeItem("akini_music_listen_ts"); } catch (eC2) {}
+            if (_bkD > 0 && _bkD <= 1800) {
+              I += _bkD;
+              try {
+                var _bkRc = localStorage.getItem("akini_music_player_right_contact") || "";
+                if (_bkRc) listenMap[_bkRc] = (listenMap[_bkRc] || 0) + _bkD;
+                localStorage.setItem("akini_music_listen_together", JSON.stringify(listenMap));
+              } catch (eM2) {}
+              try { localStorage.setItem("akini_music_listen_seconds", String(I)); } catch (eM3) {}
+            }
+          }
+        } catch (eRestore) {}
         ((window.isSwapped = function () {
             var t = localStorage.getItem("akini_swap_avatar_pos");
             return "true" === t || "1" === t;
@@ -23629,13 +23689,14 @@ window.akiniContacts = {
           st(),
           syncAvatars(),
           (function () {
-            /* v838：背景防回退——LS 与 IDB 不一致时以 LS 为准回写 IDB（换图入口最后写入 LS）；
-               一致时保留 LS 副本兜底，绝不删除 LS，避免 IDB 旧值独大导致背景回退 */
+            /* v839：背景防回退方向修正——IDB 为唯一权威（换图入口最后写 IDB 且带回读校验）；
+               仅 IDB 缺失而 LS 有值时才用 LS 回填 IDB；
+               LS 残留旧值（大键拦截残留/外部回填）绝不反向覆盖 IDB 新图 */
             try {
               var _oldBg = localStorage.getItem("akini_music_bg");
               if (_oldBg && _idbStore && _idbStore.get) {
                 _idbStore.get("akini_music_bg", function (v) {
-                  if (!v || v !== _oldBg) {
+                  if (!v) {
                     try {
                       _idbStore.set("akini_music_bg", _oldBg, function () { try { U(); } catch (eU) {} });
                     } catch (eS) {}
@@ -23732,17 +23793,14 @@ window.akiniContacts = {
                 ? "radial-gradient(circle at 50% 40%, rgba(0,0,0,0.30) 0%, rgba(15,15,18,0.55) 70%, rgba(15,15,18,0.75) 100%)"
                 : "radial-gradient(circle at 50% 40%, transparent 0%, rgba(15,15,18,0.75) 70%, rgba(15,15,18,0.92) 100%)"));
         }
-        /* v838：IDB+LS 双源校验防回退——两源不一致时以 LS 为准（换图入口最后写入 LS）并回写 IDB，
+        /* v839：IDB+LS 双源校验防回退——两源不一致时以 LS 为准（换图入口最后写入 LS）并回写 IDB，
            杜绝 IDB 写入失败残留旧值导致一起听背景回退 */
         var _lsBg = "";
         try { _lsBg = localStorage.getItem("akini_music_bg") || ""; } catch (eLs) {}
         if (window._idbStore && _idbStore.get) {
           _idbStore.get("akini_music_bg", function (v) {
-            if (_lsBg && _lsBg !== v) {
-              try { _idbStore.set("akini_music_bg", _lsBg); } catch (eW) {}
-              return apply(_lsBg);
-            }
             if (typeof v === "string" && v) return apply(v);
+            if (_lsBg) return apply(_lsBg);
             D("akini_music_bg", function (n) { apply(n || ""); });
           });
         } else {
@@ -23787,6 +23845,23 @@ window.akiniContacts = {
           }
         }
       }, 10000);
+      /* v839：挂后台防一起听时长丢失——hidden 时落盘当前累计并以最后结算基准 x 记时间戳（补时无缝覆盖最后 tick 之后全程）；
+         页面存活切回：x 基准未动，下一 tick 的 delta 自动补上后台全程（原有自愈保留）；
+         页面被杀重载：由启动补时逻辑（akini_music_listen_active/ts）补回，杜绝时间缩短 */
+      document.addEventListener("visibilitychange", function () {
+        try {
+          if (document.hidden) {
+            if (d && x) {
+              try { localStorage.setItem("akini_music_listen_seconds", String(I)); } catch (eS1) {}
+              try { localStorage.setItem("akini_music_listen_together", JSON.stringify(listenMap)); } catch (eS2) {}
+              try { localStorage.setItem("akini_music_listen_ts", String(x)); } catch (eS3) {}
+              try { localStorage.setItem("akini_music_listen_active", "1"); } catch (eS4) {}
+            }
+          } else {
+            try { localStorage.removeItem("akini_music_listen_active"); } catch (eS5) {}
+          }
+        } catch (e) {}
+      });
       function Y() {
         try {
           if ("mediaSession" in navigator && navigator.mediaSession) {
@@ -24002,7 +24077,7 @@ window.akiniContacts = {
         e.distanceText && (e.distanceText.textContent = fullText);
         /* v836：首页播放器时长跟随美化页「播放器联系人」所选联系人（listenMap 按人分账累计）；
            所选联系人正在一起听时叠加实时增量，未在选择时显示其存量累计；未选联系人则保持原一起听逻辑 */
-        /* v838：统一首页播放器与一起听歌界面的时长计算源头。
+        /* v839：统一首页播放器与一起听歌界面的时长计算源头。
            用户明确指出：“首页播放器显示的一起听时间和我在个人一起听歌界面的根本不一样！”
            因此两处统一使用 timeText（当前一起听界面的权威累计时长），保证两处数字毫秒级完全一致！ */
         var homeText = timeText;
@@ -24899,7 +24974,7 @@ window.akiniContacts = {
           } catch (t) {}
         }
         function n() {
-          /* v838：恢复最后页面状态——挂后台被系统杀页重载后不再"重进"首页，
+          /* v839：恢复最后页面状态——挂后台被系统杀页重载后不再"重进"首页，
              30 分钟内回到切出前停留的界面；等待主 boot 完成后执行，避免时序竞争 */
           try {
             var raw = null;
@@ -25210,7 +25285,7 @@ window.akiniContacts = {
           var contactsEmpty = window.akiniContacts.getContacts().length === 0;
           var sessions = window.akiniContacts.getSessions ? window.akiniContacts.getSessions() : {};
           var sessKeys = Object.keys(sessions);
-          /* v838: sessions持久化早已slim剔除messagesHTML（独立持久化在akini_chat_history_*），
+          /* v839: sessions持久化早已slim剔除messagesHTML（独立持久化在akini_chat_history_*），
              因此内存中重载后sessions[*].messagesHTML为空是预期行为，绝不能将其误判为内存数据被清空并调用restoreAll！
              仅当联系人列表为空且sessions完全无key时才视为极端回收 */
           if (contactsEmpty && sessKeys.length === 0) {
