@@ -129,11 +129,28 @@
     } catch (e) { return ''; }
   }
 
-  function addCallRecord(contactId, record) {
+  /* v841：通话记录不再存进"收藏"键（akini_ta_phone_<id>.calls），改存独立键 akini_ta_calls_<id>。
+   用户反馈"通话记录不是收藏"——之前通话记录混进收藏数据结构，导致通话 tab 显示的是收藏而非全量通话记录 */
+function _callKey(contactId) { return 'akini_ta_calls_' + contactId; }
+function loadCallRecords(contactId) {
+    try {
+      var raw = window.akiniStore && window.akiniStore.getSync ? window.akiniStore.getSync(_callKey(contactId), null) : localStorage.getItem(_callKey(contactId));
+      if (raw && typeof raw === 'string') { var p = JSON.parse(raw); return Array.isArray(p) ? p : []; }
+    } catch (e) {}
+    return [];
+  }
+  function saveCallRecords(contactId, list) {
+    try {
+      var n = JSON.stringify(list || []);
+      if (window.akiniStore && window.akiniStore.set) { window.akiniStore.set(_callKey(contactId), n); }
+      else { try { localStorage.setItem(_callKey(contactId), n); } catch (e) {} }
+    } catch (e) {}
+  }
+function addCallRecord(contactId, record) {
     if (!contactId || !record) return false;
     try {
-      var data = loadCollections(contactId);
-      if (!Array.isArray(data.calls)) data.calls = [];
+      var list = loadCallRecords(contactId);
+      var data = { calls: list };
       var item = {
         id: Date.now() + Math.random(),
         duration: record.duration || '00:00',
@@ -142,8 +159,8 @@
         name: record.name || 'TA',
         endTime: record.endTime || Date.now()
       };
-      data.calls.unshift(item);
-      saveCollections(contactId, data);
+      list.unshift(item);
+      saveCallRecords(contactId, list);
       // 若当前正停留在该联系人的通话记录界面，立即无缝刷新
       if (currentContactId === contactId && currentTab === 'calls') {
         renderList();
@@ -456,11 +473,12 @@
     var el = getEl('akini-ta-phone-list');
     if (!el || !currentContactId) return;
     var data = loadCollections(currentContactId);
-    var items = data[currentTab] || [];
+    /* v841：通话记录走独立键（全量），其余 tab 仍读收藏数据 */
+    var items = (currentTab === 'calls') ? loadCallRecords(currentContactId) : (data[currentTab] || []);
     var sortBar = getEl('akini-ta-phone-sort-bar');
     if (sortBar) sortBar.style.display = currentTab === 'chat' ? 'flex' : 'none';
     if (!items.length) {
-      el.innerHTML = '<div class="akini-ta-phone-empty">TA 还没有收藏任何内容...</div>';
+      el.innerHTML = '<div class="akini-ta-phone-empty">' + (currentTab === 'calls' ? '暂无通话记录...' : 'TA 还没有收藏任何内容...') + '</div>';
       return;
     }
     /* 旧收藏补齐备注：无 remark 的条目现场从字卡库抽一张补上并持久化（字卡库为空则跳过，无兜底文案） */

@@ -1033,7 +1033,7 @@ document.addEventListener("DOMContentLoaded", function () {
       document.body.appendChild(overlay);
       try { setTimeout(function () { try { input.focus(); } catch (e) {} }, 80); } catch (e) {}
     };
-    /* ===== v840：表情包+聊天记录启动水合（v840 预热升级：idle 分片防卡顿） =====
+    /* ===== v842：表情包+聊天记录启动水合（v842 预热升级：idle 分片防卡顿） =====
    根因：表情包键 / 聊天记录键（akini_chat_history_*，>50KB 被 LS 拦截层挡在
    localStorage 外只留 IDB）与启动对账体系互不可见 → 重载后 LS 恒空，
    裸读 LS 的表情包面板与聊天渲染读到空 → 表情包库和聊天表情包消息"被吞"。
@@ -1088,6 +1088,43 @@ document.addEventListener("DOMContentLoaded", function () {
     })();
   }
   [8000, 22000, 50000].forEach(function (ms) { setTimeout(hydrateBigKeys, ms); });
+  /* v842 问题七：表情包/图片消息用媒体池 data-mh 引用（大图只存 IDB akini_media_*）。
+     闪退/内存淘汰后哈希在内存消失，重进图片变空白。此处扫描聊天 HTML 里的 data-mh，
+     空闲时从 IDB 把对应媒体回填进内存池，resolve 即可还原图片。 */
+  function rehydrateMediaPool() {
+    if (!window.__akiniMedia || !window._idbStore || !window._idbStore.get) return;
+    var mhSet = {};
+    try {
+      var cs = window.akiniContacts && window.akiniContacts.getContacts ? window.akiniContacts.getContacts() : [];
+      (cs || []).forEach(function (c) {
+        if (!c || c.id == null) return;
+        var cid = String(c.id);
+        [cid, cid + "_backup"].forEach(function (suffix) {
+          try {
+            var html = localStorage.getItem("akini_chat_history_" + suffix) || "";
+            var re = /data-mh="([^"]+)"/g, m;
+            while ((m = re.exec(html))) mhSet[m[1]] = 1;
+          } catch (e) {}
+        });
+      });
+    } catch (e) {}
+    var keys = Object.keys(mhSet);
+    if (!keys.length) return;
+    (function next(i) {
+      if (i >= keys.length) return;
+      var h = keys[i];
+      try {
+        if (window.__akiniMedia.getSync && window.__akiniMedia.getSync(h)) { next(i + 1); return; }
+        window._idbStore.get("akini_media_" + h, function (v) {
+          if (v && typeof v === "string" && v.indexOf("data:") === 0) {
+            try { window.__akiniMedia.put(v); } catch (e) {}
+          }
+          next(i + 1);
+        });
+      } catch (e) { next(i + 1); }
+    })(0);
+  }
+  [12000, 35000].forEach(function (ms) { setTimeout(rehydrateMediaPool, ms); });
 })();
 window._idbStore = (function () {
       // 存储逻辑对齐 core/compat：localforage（IndexedDB→WebSQL→localStorage 自动降级）为唯一主存储；
@@ -6588,12 +6625,17 @@ window.akiniContacts = {
           t &&
           "string" == typeof t &&
           0 === t.indexOf("akini_")
-        )
+        ) {
+          // v842: 彻底排除高频临时播放进度键，严禁向 IDB 派发每秒4~5次的高频写事务，根除听歌闪退
+          if (t === "akini_music_current_time" || t === "akini_music_listen_seconds" || t === "akini_last_ping") {
+            return a;
+          }
           try {
             window._idbStore &&
               window._idbStore.set &&
               window._idbStore.set(t, e);
           } catch (n) {}
+        }
         return a;
       } catch (c) {
         if (
@@ -9095,7 +9137,7 @@ window.akiniContacts = {
     function ct(t, e) {
       if (window.akiniContacts) {
         window._akiniLastChatId = t;
-        /* v840: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
+        /* v842: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
         try { if (window.__akiniFlushPendingSaves) window.__akiniFlushPendingSaves(); } catch(eFlush){}
         A();
         /* v684 防闪退：切换会话时释放其他聊天的超大内存缓存（数据仍完整存于 LS/IDB） */
@@ -9202,7 +9244,7 @@ window.akiniContacts = {
         /* zzzk 性能：me() 每次进聊天都全量重建表情面板（读 IDB + 逐个建 img），是点进对话框卡顿的主因之一。
            表情包库在会话期间不会变，改为仅首次构建；增删表情包处已显式调用 me() 刷新 */
         (c && (c.style.display = "none"), st(t), (!U || !U.__akiniEmojiPanelBuilt) && me(null, false), U && (U.__akiniEmojiPanelBuilt = !0), typeof hideEmojiPanel === "function" && hideEmojiPanel(), typeof window.__akiniUpdateChatBackBadge === "function" && window.__akiniUpdateChatBackBadge(), e || o("chat"));
-        /* v840: 打开会话后多阶段确保平滑滚动至最底部，保证刚收到的通知消息即时呈现在视野内 */
+        /* v842: 打开会话后多阶段确保平滑滚动至最底部，保证刚收到的通知消息即时呈现在视野内 */
         [50, 150, 350].forEach(function(delay){
           setTimeout(function(){
             try {
@@ -10504,7 +10546,9 @@ window.akiniContacts = {
                   : alert("头像压缩失败，请换一张图片试试");
               });
             } catch (t) {
-              (console.error("[avatar] 压缩异常", t), alert("压缩头像时出错"));
+              /* v842：导入失败时给出可读原因（文件过大/格式不支持/浏览器限制），而非笼统"压缩出错" */
+              console.error("[avatar] 导入头像异常", t);
+              alert("导入头像失败：" + ((t && t.message) || "图片可能过大或格式不支持（请用 JPG/PNG，小于 5MB）"));
             }
             this.value = "";
           }
@@ -19599,21 +19643,23 @@ window.akiniContacts = {
             e.onload = function (ev) {
               var dataURL = ev.target.result;
               function saveAndApply(finalUrl) {
+                window.__akiniCurrentMusicBg = finalUrl;
                 try { localStorage.removeItem("akini_music_bg"); } catch (eRm) {}
                 try { L("akini_music_bg", finalUrl); } catch (e) {}
-                try { if (window._idbStore && _idbStore.set) _idbStore.set("akini_music_bg", finalUrl); } catch (e) {}
-                try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set("akini_music_bg", finalUrl); } catch (e) {}
+                try { if (window._idbStore && _idbStore.set) { _idbStore.set("akini_music_bg", finalUrl); _idbStore.set("snap_akini_music_bg", finalUrl); } } catch (e) {}
+                try { if (window.akiniStore && window.akiniStore.set) { window.akiniStore.set("akini_music_bg", finalUrl); window.akiniStore.set("snap_akini_music_bg", finalUrl); } } catch (e) {}
                 try { if (window.akiniStore && window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (e) {}
-                /* v840：写入后回读校验，IDB 写入失败时延迟重写一次，确保新背景必达存储 */
+                try { if (window.__akiniVaultSave) window.__akiniVaultSave(); } catch (eVault) {}
+                /* v842：网易云背景图终极持久化保障，多重写入与防覆盖加固 */
                 try {
                   if (window._idbStore && _idbStore.get && _idbStore.set) {
                     setTimeout(function () {
                       try {
                         _idbStore.get("akini_music_bg", function (chk) {
-                          if (chk !== finalUrl) { try { _idbStore.set("akini_music_bg", finalUrl); } catch (eRw) {} }
+                          if (chk !== finalUrl) { try { _idbStore.set("akini_music_bg", finalUrl); _idbStore.set("snap_akini_music_bg", finalUrl); } catch (eRw) {} }
                         });
                       } catch (eChk) {}
-                    }, 400);
+                    }, 300);
                   }
                 } catch (eV) {}
                 const el = document.getElementById("musicBgLayer");
@@ -21183,7 +21229,7 @@ window.akiniContacts = {
             var t = window.akiniContacts.getContacts(),
               e = window.akiniContacts.getHomeAvatars(),
               n = "";
-            /* v840：主页双人头像选择样式改为播放器联系人一致的卡片式（大头像44px圆环、2px黑边框+浅灰底色#f2f2f7选中态、勾选标记） */
+            /* v842：主页双人头像选择样式改为播放器联系人一致的卡片式（大头像44px圆环、2px黑边框+浅灰底色#f2f2f7选中态、勾选标记） */
             t.forEach(function (cItem) {
               var sel = e.right === cItem.id;
               n +=
@@ -22598,7 +22644,7 @@ window.akiniContacts = {
         } catch (e) {
           listenMap = {};
         }
-        /* v840：一起听时长重载补时——上次以播放状态挂后台（30 分钟内）被系统杀掉，
+        /* v842：一起听时长重载补时——上次以播放状态挂后台（30 分钟内）被系统杀掉，
            把后台期间时长补回总时长与右联系人累计，杜绝重进后一起听时间缩短 */
         try {
           if (localStorage.getItem("akini_music_listen_active") === "1") {
@@ -23705,7 +23751,7 @@ window.akiniContacts = {
           st(),
           syncAvatars(),
           (function () {
-            /* v840：背景防回退方向修正——IDB 为唯一权威（换图入口最后写 IDB 且带回读校验）；
+            /* v842：背景防回退方向修正——IDB 为唯一权威（换图入口最后写 IDB 且带回读校验）；
                仅 IDB 缺失而 LS 有值时才用 LS 回填 IDB；
                LS 残留旧值（大键拦截残留/外部回填）绝不反向覆盖 IDB 新图 */
             try {
@@ -23809,18 +23855,33 @@ window.akiniContacts = {
                 ? "radial-gradient(circle at 50% 40%, rgba(0,0,0,0.30) 0%, rgba(15,15,18,0.55) 70%, rgba(15,15,18,0.75) 100%)"
                 : "radial-gradient(circle at 50% 40%, transparent 0%, rgba(15,15,18,0.75) 70%, rgba(15,15,18,0.92) 100%)"));
         }
-        /* v840：IDB+LS 双源校验防回退——两源不一致时以 LS 为准（换图入口最后写入 LS）并回写 IDB，
-           杜绝 IDB 写入失败残留旧值导致一起听背景回退 */
+        /* v842：背景加载终极优先级——内存最新图优先 -> IDB权威图 -> LS本地图，杜绝旧图回退 */
+        if (window.__akiniCurrentMusicBg) {
+          return apply(window.__akiniCurrentMusicBg);
+        }
         var _lsBg = "";
         try { _lsBg = localStorage.getItem("akini_music_bg") || ""; } catch (eLs) {}
         if (window._idbStore && _idbStore.get) {
           _idbStore.get("akini_music_bg", function (v) {
-            if (typeof v === "string" && v) return apply(v);
-            if (_lsBg) return apply(_lsBg);
-            D("akini_music_bg", function (n) { apply(n || ""); });
+            if (typeof v === "string" && v) {
+              window.__akiniCurrentMusicBg = v;
+              return apply(v);
+            }
+            if (_lsBg) {
+              window.__akiniCurrentMusicBg = _lsBg;
+              return apply(_lsBg);
+            }
+            D("akini_music_bg", function (n) {
+              if (n) window.__akiniCurrentMusicBg = n;
+              apply(n || "");
+            });
           });
         } else {
-          D("akini_music_bg", function (n) { apply(_lsBg || n || ""); });
+          D("akini_music_bg", function (n) {
+            var bg = _lsBg || n || "";
+            if (bg) window.__akiniCurrentMusicBg = bg;
+            apply(bg);
+          });
         }
       }
       function K() {
@@ -23861,7 +23922,7 @@ window.akiniContacts = {
           }
         }
       }, 10000);
-      /* v840：挂后台防一起听时长丢失——hidden 时落盘当前累计并以最后结算基准 x 记时间戳（补时无缝覆盖最后 tick 之后全程）；
+      /* v842：挂后台防一起听时长丢失——hidden 时落盘当前累计并以最后结算基准 x 记时间戳（补时无缝覆盖最后 tick 之后全程）；
          页面存活切回：x 基准未动，下一 tick 的 delta 自动补上后台全程（原有自愈保留）；
          页面被杀重载：由启动补时逻辑（akini_music_listen_active/ts）补回，杜绝时间缩短 */
       document.addEventListener("visibilitychange", function () {
@@ -24093,7 +24154,7 @@ window.akiniContacts = {
         e.distanceText && (e.distanceText.textContent = fullText);
         /* v836：首页播放器时长跟随美化页「播放器联系人」所选联系人（listenMap 按人分账累计）；
            所选联系人正在一起听时叠加实时增量，未在选择时显示其存量累计；未选联系人则保持原一起听逻辑 */
-        /* v840：统一首页播放器与一起听歌界面的时长计算源头。
+        /* v842：统一首页播放器与一起听歌界面的时长计算源头。
            用户明确指出：“首页播放器显示的一起听时间和我在个人一起听歌界面的根本不一样！”
            因此两处统一使用 timeText（当前一起听界面的权威累计时长），保证两处数字毫秒级完全一致！ */
         var homeText = timeText;
@@ -24356,9 +24417,14 @@ window.akiniContacts = {
                     ft(),
                     gt(),
                     w > 0 && pt(""));
-                  try {
-                    localStorage.setItem("akini_music_current_time", String(w));
-                  } catch (t) {}
+                  /* v842: 听歌进度落盘 3 秒节流，彻底消灭每秒4~5次同步写磁盘导致的移动端发热与闪退 */
+                  var _nowT = Date.now();
+                  if (!u._lastSaveTime || _nowT - u._lastSaveTime >= 3000) {
+                    u._lastSaveTime = _nowT;
+                    try {
+                      localStorage.setItem("akini_music_current_time", String(w));
+                    } catch (t) {}
+                  }
                   d &&
                     u.duration &&
                     u.currentTime > 0 &&
@@ -24990,7 +25056,7 @@ window.akiniContacts = {
           } catch (t) {}
         }
         function n() {
-          /* v840：恢复最后页面状态——挂后台被系统杀页重载后不再"重进"首页，
+          /* v842：恢复最后页面状态——挂后台被系统杀页重载后不再"重进"首页，
              30 分钟内回到切出前停留的界面；等待主 boot 完成后执行，避免时序竞争 */
           try {
             var raw = null;
@@ -25301,7 +25367,7 @@ window.akiniContacts = {
           var contactsEmpty = window.akiniContacts.getContacts().length === 0;
           var sessions = window.akiniContacts.getSessions ? window.akiniContacts.getSessions() : {};
           var sessKeys = Object.keys(sessions);
-          /* v840: sessions持久化早已slim剔除messagesHTML（独立持久化在akini_chat_history_*），
+          /* v842: sessions持久化早已slim剔除messagesHTML（独立持久化在akini_chat_history_*），
              因此内存中重载后sessions[*].messagesHTML为空是预期行为，绝不能将其误判为内存数据被清空并调用restoreAll！
              仅当联系人列表为空且sessions完全无key时才视为极端回收 */
           if (contactsEmpty && sessKeys.length === 0) {
@@ -28057,6 +28123,54 @@ if (!window.__akiniUnreadTickerStarted) {
     var ts = parseInt(row.getAttribute("data-ts"), 10) || 0;
     return { isMe: isMe, name: name, avatarHtml: avatarHtml, text: text, ts: ts, bubbleEl: bub };
   }
+    /* v842: 用户明确要求“收藏消息列表搜索消息列表就改成当前头像呀！”
+     统一读取联系人与我方当前最新有效头像，彻底解决历史DOM快照损坏/灰圈问题 */
+  function _renderCurrentAvatar(isMe, senderName, size, fallbackHtml) {
+    size = size || 38;
+    var avUrl = "";
+    if (isMe) {
+      try {
+        if (typeof window.getMyAvatar === "function") avUrl = window.getMyAvatar();
+        if (!avUrl) avUrl = localStorage.getItem("akini_my_avatar") || "";
+        if (!avUrl && window.__akiniAvatarCache) avUrl = window.__akiniAvatarCache.my || "";
+      } catch (e) {}
+    } else {
+      try {
+        if (window.akiniContacts && window.akiniContacts.getContacts) {
+          var cs = window.akiniContacts.getContacts() || [];
+          var match = cs.find(function(c) {
+            return c && ((senderName && (c.name === senderName || c.remark === senderName)) || c.isDefault);
+          });
+          if (match && match.avatar) avUrl = match.avatar;
+        }
+      } catch (e) {}
+      if (!avUrl) {
+        try {
+          if (typeof window.getTaAvatar === "function") avUrl = window.getTaAvatar();
+          if (!avUrl) avUrl = localStorage.getItem("akini_ta_avatar") || "";
+          if (!avUrl && window.__akiniAvatarCache) avUrl = window.__akiniAvatarCache.ta || "";
+        } catch (e) {}
+      }
+    }
+
+    if (avUrl && typeof avUrl === "string" && avUrl.trim()) {
+      var src = avUrl.trim();
+      if (src.indexOf("<img") === 0) {
+        return "<div style=\"width:" + size + "px;height:" + size + "px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;\">" + src + "</div>";
+      }
+      return "<div style=\"width:" + size + "px;height:" + size + "px;border-radius:50%;overflow:hidden;flex-shrink:0;background:#f0f0f2;\">" +
+        "<img src=\"" + src + "\" style=\"width:100%;height:100%;object-fit:cover;display:block;\" onerror=\"this.onerror=null;this.parentElement.style.background='#d1d1d6';\"/>" +
+        "</div>";
+    }
+
+    if (fallbackHtml && typeof fallbackHtml === "string" && fallbackHtml.indexOf("<img") >= 0) {
+      return "<div style=\"width:" + size + "px;height:" + size + "px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;\">" + fallbackHtml + "</div>";
+    }
+
+    var initial = (senderName || (isMe ? "我" : "Ta")).slice(0, 1).toUpperCase();
+    return "<div style=\"width:" + size + "px;height:" + size + "px;border-radius:50%;background:#e5e5ea;color:#666;font-size:" + Math.round(size * 0.45) + "px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;\">" + initial + "</div>";
+  }
+
   function _avatarBox(avatarHtml, name, size, opts) {
     // v656 根因修复: 真实头像 base64 普遍超过 6000 字符, 旧逻辑一律回退首字母灰圈。
     // 只要以 <img 开头(真实图片标签, ≤500KB)一律直接渲染; 其它短内容(≤6000)照旧。
@@ -28211,7 +28325,7 @@ if (!window.__akiniUnreadTickerStarted) {
     list.forEach(function (info) {
       html +=
         '<div class="cr-search-row" data-ts="' + (info.ts || 0) + '" data-text="' + encodeURIComponent(info.text || "") + '" data-isme="' + (info.isMe ? 1 : 0) + '" style="display:flex;gap:10px;padding:10px;background:#fff;border-radius:12px;margin-bottom:8px;align-items:flex-start;cursor:pointer;">' +
-        _avatarBox(info.avatarHtml, info.name, 38) +
+        _renderCurrentAvatar(info.isMe, info.name, 38, info.avatarHtml) +
         '<div style="flex:1;min-width:0;">' +
         '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">' +
         '<div style="font-size:13px;font-weight:600;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(info.name) + "</div>" +
@@ -28430,7 +28544,7 @@ if (!window.__akiniUnreadTickerStarted) {
   function _favDialogRow(it, opts) {
     opts = opts || {};
     // v658: 原样显示收藏时保存的头像, 不做实时补正(不取当前头像, 不显示别人的头像); 无头像时显示无字空灰圈
-    var av = _avatarBox(it.avatarHtml, it.name, 32, { noInitial: true });
+    var av = _renderCurrentAvatar(it.isMe, it.name, 32, it.avatarHtml);
     // 名字在头像正上方，宽度与头像一致，超出省略
     var nameLine = '<div style="font-size:10px;color:#999;margin-bottom:3px;text-align:center;width:32px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _esc(it.name) + "</div>";
     var bub = _favBubble(it);
