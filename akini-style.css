@@ -301,7 +301,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex-shrink: 0;
 }
 .top-card .dual-avatar-wrap .avatar-left {
-  position: absolute;
+  /* v843: !important 压制任何残留 inline position，恢复 absolute 双人布局 */
+  position: absolute !important;
   left: 0;
   bottom: 0;
   width: 60px;
@@ -317,7 +318,8 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   z-index: 2;
 }
 .top-card .dual-avatar-wrap .avatar-right {
-  position: absolute;
+  /* v843: !important 压制任何残留 inline position，恢复 absolute 双人布局 */
+  position: absolute !important;
   right: 0;
   bottom: 0;
   width: 60px;
@@ -340,13 +342,17 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   display: block;
 }
 .top-card .dual-avatar-wrap.swapped .avatar-left {
+  /* v843: 位置对调强制生效（absolute 左->右） */
+  position: absolute !important;
   left: auto;
-  right: 0;
+  right: 0 !important;
   z-index: 1;
 }
 .top-card .dual-avatar-wrap.swapped .avatar-right {
+  /* v843: 位置对调强制生效（absolute 右->左） */
+  position: absolute !important;
   right: auto;
-  left: 0;
+  left: 0 !important;
   z-index: 2;
 }
 .top-card .subtitle {

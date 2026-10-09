@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-20261007v842';
+const CACHE_NAME = 'akini-cache-20261007v843';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -56,7 +56,7 @@ self.addEventListener('fetch', function(event) {
   // 主资源采用 network-first：新版立即生效，网络不通时才用缓存
   if (isNav || isSW || isMainAsset) {
     event.respondWith(
-      fetchWithTimeout(req, isNav ? 8000 : 6000).then(function(response) {
+      fetchWithTimeout(req, isNav ? 5000 : 5000).then(function(response) {
         if (response && response.status === 200 && response.type === 'basic') {
           var clone = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {
