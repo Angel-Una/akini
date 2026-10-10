@@ -1746,8 +1746,10 @@ window._idbStore = (function () {
                     delayMs = freshDelay;
                   }
                 } else {
-                  /* v843: 离线错过的周期任务尽快补发（对齐主动来信逻辑）——1.5~3.5s 内触发，
-                     回调自动回写 __akiniBackdateTs=计划时刻，内容时间戳还原"离线期间发布" */
+                  /* v843/v854: 离线错过的周期任务尽快补发（对齐主动来信/信箱）——1.5~3.5s 内触发，
+                     回调自动回写 __akiniBackdateTs=计划时刻，内容时间戳还原"离线期间发布"。
+                     朋友圈/iCity 同样走此回溯补发（用户要求：不在线也要按设置的时间范围发布），
+                     防狂发由 action 内的参数 clamp + 5 分钟硬冷却 + 并发锁保障 */
                   delayMs = 1500 + Math.floor(Math.random() * 2000);
                 }
               }
@@ -1801,8 +1803,8 @@ window._idbStore = (function () {
           } catch (e) {}
         },
         catchUp: function (actions) {
-          /* v843: 退出网站期间错过的 icity/朋友圈改为立即补发（对齐主动来信）——
-             联系人离线期间也会按用户设定的频率发布动态，上线即可看到，时间戳回溯离线期间 */
+          /* v843/v854: 退出网站期间错过的 icity/朋友圈按主动来信同款逻辑立即回溯补发——
+             时间戳还原离线期间的应发时刻；防狂发由 action 内 clamp + 5 分钟硬冷却 + 并发锁保障 */
           var NO_CATCHUP_RESCHEDULE = {
             icityPost: "_akiniRescheduleIcityPost",
             friendsPost: "_akiniRescheduleFriendsPost",
@@ -1828,7 +1830,8 @@ window._idbStore = (function () {
                         !window.__akiniToggleOn ||
                         window.__akiniToggleOn(_tk, false)
                       ) {
-                        /* v843: 立即补发（带离线期间计划时刻，action 内部自行重排下一周期） */
+                        /* v854: 立即回溯补发（带离线期间计划时刻，action 内部自行重排下一周期；
+                           5 分钟硬冷却拦截异常连续补发） */
                         var _act = window[CATCHUP_ACTIONS[name]];
                         if (typeof _act === "function") {
                           try {
@@ -3057,7 +3060,7 @@ window.akiniContacts = {
             a = {
               id: s("gp"),
               name: t || "群聊",
-              avatar: e || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E",
+              avatar: e || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22%20stroke%3D%22none%22/%3E%3Cg%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/g%3E%3C/svg%3E",
               memberIds: n || [],
               createdAt: Date.now(),
             };
@@ -6799,6 +6802,7 @@ window.akiniContacts = {
           }
         }
       } catch (err) {}
+      /* v855: 存储不再设上限——全量保留历史动态，仅渲染层截断（_renderPosts 最新 30 条） */
       z = t || [];
       var n = JSON.stringify(z);
       // 优先写入 IndexedDB（容量大，不受 localStorage 配额限制，彻底解决数据消失）
@@ -8180,7 +8184,7 @@ window.akiniContacts = {
       );
     };
     /* 群聊默认头像：完全恢复最初没有改动之前的经典双人 Users 图标（与朋友圈原版图标同款） */
-    var AKINI_GROUP_LINE_AVATAR_URI = "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E";
+    var AKINI_GROUP_LINE_AVATAR_URI = "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22%20stroke%3D%22none%22/%3E%3Cg%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/g%3E%3C/svg%3E";
     window.AKINI_GROUP_LINE_AVATAR_URI = AKINI_GROUP_LINE_AVATAR_URI;
     window.__akiniGroupLineAvatarImg = function () {
       return (
@@ -8193,11 +8197,15 @@ window.akiniContacts = {
     /* v851：历史群聊与联系人粗线条默认头像平滑清洗（自动将本地存储中的旧粗线 SVG 统一升级为 1.5 细线头像） */
     (function __akiniMigrateLegacyGroupAvatars() {
       try {
-        var fineUri = window.AKINI_GROUP_LINE_AVATAR_URI || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E";
+        var fineUri = window.AKINI_GROUP_LINE_AVATAR_URI || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22%20stroke%3D%22none%22/%3E%3Cg%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/g%3E%3C/svg%3E";
         function isOldThick(str) {
           if (!str || typeof str !== "string") return false;
-          // 如果是 v851 错误写入的朋友圈 24x24 图标，自动清洗恢复为原始 80x80 双人头像
-          if (str.indexOf("M17 21v-2a4") >= 0 || str.indexOf("M17%2021v-2a4") >= 0 || str.indexOf("viewBox%3D%220%200%2024%2024%22") >= 0) return true;
+          // v856: 旧版 rect 继承了 svg 的 stroke 导致四周黑边，自动清洗升级为无黑边纯净版
+          if (str.indexOf("fill%3D%22%23f7f8fa%22/%3E") >= 0 || str.indexOf('fill="#f7f8fa"/>') >= 0) return true;
+          if (str.indexOf("M17 21v-2a4") >= 0 || str.indexOf("M17%2021v-2a4") >= 0 || str.indexOf("viewBox%3D%220%200%2024%2024%22") >= 0) {
+            // 如果不是最新的 stroke="none" 版本，全部自动升级
+            if (str.indexOf("stroke%3D%22none%22") < 0 && str.indexOf('stroke="none"') < 0) return true;
+          }
           return (
             str.indexOf("PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI") >= 0 ||
             str.indexOf("M16 21v-2a4 4 0 0 0-4-4") >= 0 ||
@@ -9585,8 +9593,8 @@ window.akiniContacts = {
       if (t && window.akiniContacts) {
         ((dt = []),
           e &&
-            (setHtmlKeepInput(e, nt("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E", 56)),
-            e.setAttribute("data-avatar", "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E")),
+            (setHtmlKeepInput(e, nt("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22%20stroke%3D%22none%22/%3E%3Cg%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/g%3E%3C/svg%3E", 56)),
+            e.setAttribute("data-avatar", "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22%20stroke%3D%22none%22/%3E%3Cg%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/g%3E%3C/svg%3E")),
           n && (n.value = ""));
         var i = window.akiniContacts.getContacts(),
           o = "";
@@ -9652,7 +9660,7 @@ window.akiniContacts = {
                 var t = document.getElementById("createGroupNameInput"),
                   e = document.getElementById("createGroupAvatarPreview"),
                   n = t ? t.value.trim() : "",
-                  i = (e && e.getAttribute("data-avatar")) || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E";
+                  i = (e && e.getAttribute("data-avatar")) || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22%20stroke%3D%22none%22/%3E%3Cg%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/g%3E%3C/svg%3E";
                 dt.length < 2
                   ? alert("请至少选择 2 个联系人")
                   : n
@@ -9991,7 +9999,7 @@ window.akiniContacts = {
                 )
               : null;
             if (!t || "group" !== t.type) return [];
-            var e = [{ id: "all", name: "全体成员", avatar: "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E" }];
+            var e = [{ id: "all", name: "全体成员", avatar: "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22%20stroke%3D%22none%22/%3E%3Cg%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/g%3E%3C/svg%3E" }];
             return (
               (t.memberIds || []).forEach(function (t) {
                 var n = window.akiniContacts.getChatTarget(t);
@@ -13047,7 +13055,16 @@ window.akiniContacts = {
         n && (n.style.display = "none");
         const a = localStorage.getItem("akini_my_name") || "我";
         localStorage.getItem("akini_ta_name");
-        (i.forEach((t, n) => {
+        /* v852: 渲染截断（最多渲染前 30 条），杜绝无限长 DOM 撑爆 iOS 内存导致闪退卡崩 */
+        var renderItems = i.slice(0, 30);
+        /* v855: 渲染上限提示——存储全量保留，只是列表只渲染最新 30 条 */
+        if (i.length > 30) {
+          var _ptip = document.createElement("div");
+          _ptip.style.cssText = "text-align:center;color:#999;font-size:12px;padding:10px 0;";
+          _ptip.textContent = "仅显示最新 30 条动态，更早内容已完整保留";
+          e.appendChild(_ptip);
+        }
+        (renderItems.forEach((t, n) => {
           !t.author || t.author;
           const i = (function (t) {
               if (!t.author || t.author === a)
@@ -16232,11 +16249,21 @@ window.akiniContacts = {
           (0 === y.length
             ? g && (g.style.display = "")
             : g && (g.style.display = "none"),
+            (function () {
+              /* v855: 渲染上限提示——存储全量保留，列表只渲染最新 30 条 */
+              if (y.length > 30) {
+                var _itip = document.createElement("div");
+                _itip.style.cssText = "text-align:center;color:#999;font-size:12px;padding:8px 0;";
+                _itip.textContent = "仅显示最新 30 条日记，更早内容已完整保留";
+                f.appendChild(_itip);
+              }
+            })(),
             y
               .slice()
               .sort(function (t, e) {
                 return (e.ts || 0) - (t.ts || 0);
               })
+              .slice(0, 30)
               .forEach(function (e) {
                 var n,
                   l,
@@ -16431,6 +16458,16 @@ window.akiniContacts = {
                     ? 1
                     : (e.ts || 0) - (t.ts || 0);
               })
+              /* v855: 渲染上限——置顶全部显示，其余取最新，总量至少 30 条；存储全量保留 */
+              .slice(
+                0,
+                (function (_arr) {
+                  var _pn = 0;
+                  for (var _k = 0; _k < _arr.length; _k++)
+                    if (_arr[_k] && _arr[_k].pinned) _pn++;
+                  return Math.max(30, _pn);
+                })(a)
+              )
               .forEach(function (t) {
                 var i =
                     "me" === t.author || "me" === t.who
@@ -16622,7 +16659,13 @@ window.akiniContacts = {
           0 === l.length
             ? (c.innerHTML =
                 '<div style="font-size:13px;color:#aaa;text-align:center;padding:18px 0;">暂无评论</div>')
-            : ((c.innerHTML = l
+            : ((c.innerHTML =
+                /* v855: 评论渲染上限——只渲染最新 200 条，存储全量保留 */
+                (l.length > 200
+                  ? '<div style="text-align:center;color:#999;font-size:12px;padding:8px 0;">仅显示最新 200 条评论，更早评论已完整保留</div>'
+                  : "") +
+                l
+                .slice(-200)
                 .map(function (t, e) {
                   var n = nt(f(t), 36),
                     i = t.replyTo
@@ -18478,8 +18521,16 @@ window.akiniContacts = {
         );
       }
       const a = localStorage.getItem("akini_my_name") || "我";
+      /* v855: 信件渲染上限——只渲染最新 50 封（存储全量保留，无上限） */
+      if (n.length > 50) {
+        const _mtip = document.createElement("div");
+        _mtip.style.cssText = "color:#999;text-align:center;padding:8px 0;font-size:12px;";
+        _mtip.textContent = "仅显示最新 50 封信，更早信件已完整保留";
+        dn.appendChild(_mtip);
+      }
       n.slice()
         .reverse()
+        .slice(0, 50)
         .forEach(function (e) {
           const n = document.createElement("div");
           let o = "",
@@ -20229,97 +20280,169 @@ window.akiniContacts = {
           return !document.hidden;
         };
         ((window._pickWordCardsForFriends = c),
-          (function t(isFirst) {
-            const e = parseFloat(
-                localStorage.getItem("akini_num_friendsPostMin") || "30",
-              ),
-              n = parseFloat(
-                localStorage.getItem("akini_num_friendsPostMax") || "60",
-              );
-            // 首次触发使用最小间隔，之后按随机范围
-            var delay = isFirst ? e : (e + Math.random() * Math.max(0, n - e));
-            var i = 60 * delay * 1e3;
-            console.log("[Akini 朋友圈] 下次调度：", delay.toFixed(1), "分钟后触发");
-            function friendsPostAction() {
-              // 防止短时间内多次发朋友圈
-              var _minGap = Math.max(1, e) * 60 * 1000 * 0.8;
-              var _lastRun = parseFloat(localStorage.getItem("akini_last_friendsPost_run") || "0");
-              if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
-                console.log("[Akini 朋友圈] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
-                window.__akiniPostLog && __akiniPostLog("friends", "跳过：距上次发布太近");
-                t(false); return;
-              }
-              localStorage.setItem("akini_last_friendsPost_run", String(Date.now()));
-              if (!window.AKR.isInTimeRange("friends")) {
-                window.__akiniPostLog && __akiniPostLog("friends", "跳过：不在活跃时段");
-                t(false);
-                return;
-              }
-              if (!window.__akiniToggleOn("contactFriendsToggle", false)) {
-                window.__akiniPostLog && __akiniPostLog("friends", "跳过：朋友圈开关关闭");
-                t(false);
-                return;
-              }
-              const _poster = r();
-              if (!_poster) { window.__akiniPostLog && __akiniPostLog("friends", "跳过：无可用联系人"); return void t(false); }
-              const n = _poster.name,
-                i = nt(_poster.avatar, 40),
-                a = c(Math.floor(Math.random() * 5) + 1);
-              if (a) {
-                var l = O();
-                var _pts = window.__akiniNowTs ? window.__akiniNowTs() : Date.now();
-                var post = {
-                  author: n,
-                  authorId: _poster.id,
-                  text: a,
-                  date: __akiniFormatDateTime(new Date(_pts)),
-                  ts: _pts,
-                  likes: [],
-                  comments: [],
-                };
-                window.__akiniPostLog && __akiniPostLog("friends", "已发布：" + String(a || "").slice(0, 20));
-                // 联系人发朋友圈/iCity时，10% 概率附带该联系人专属表情包
-                var _stkProbPost = 0.1;
-                if (Math.random() < _stkProbPost) {
-                  var stickers = typeof window.__akiniStickerSrcs === "function"
-                    ? window.__akiniStickerSrcs(e.id)
-                    : [];
-                  if (stickers.length > 0) {
-                    post.img = stickers[Math.floor(Math.random() * stickers.length)];
+          /* v852: 彻底修复朋友圈狂发与iOS闪退卡崩问题：
+             1. 严格参数 clamp：min/max 必须 >= 10 分钟，严禁 NaN/0 导致 0ms 狂发死循环；
+             2. 绝对物理防重冷却：两次发圈物理间隔绝不可低于 5 分钟，防止 catchUp/切换前台连续补发；
+             3. 并发锁保护：发圈中状态互斥，严禁多重定时器并行；
+             4. 存量刷屏脏数据自动去重（15 秒内同作者连发只留首条）；
+             v855: 存储不再设上限——全量保留历史动态，仅渲染层截断（最新 30 条）。 */
+          (function () {
+            var _friendsPostIsRunning = false;
+            // 清理存量短时间高频刷屏脏数据
+            (function _cleanFloodPosts() {
+              try {
+                var rawPosts = O();
+                if (!Array.isArray(rawPosts) || rawPosts.length <= 1) return;
+                var cleaned = [];
+                var lastPostTs = 0;
+                var lastAuthor = "";
+                for (var i = 0; i < rawPosts.length; i++) {
+                  var p = rawPosts[i];
+                  if (!p) continue;
+                  var curTs = p.ts || 0;
+                  var curAuthor = p.author || "";
+                  // 10秒内同一个联系人连续发布的刷屏动态过滤掉，只保留第一条
+                  if (curAuthor && curAuthor === lastAuthor && Math.abs(curTs - lastPostTs) < 15000) {
+                    continue;
                   }
+                  cleaned.push(p);
+                  lastPostTs = curTs;
+                  lastAuthor = curAuthor;
                 }
-                (l.unshift(post),
-                  R(l),
-                  window._renderPosts && window._renderPosts(),
-                  /* v843: 离线补发的动态静默入库（时间戳已回溯离线期间），不弹通知——就像它早就在那里 */
-                  (window.__akiniBackdateTs ? 0 : window.showInAppNotif({
-                    app: "朋友圈",
-                    avatar: i,
-                    name: n,
-                    fullContent: !0,
-                    msg: post.img ? "[图片]" : a,
-                    onTap: function () {
-                      o("friends");
-                    },
-                  })),
-                  t(false));
-              } else { window.__akiniPostLog && __akiniPostLog("friends", "跳过：字卡内容为空"); t(false); }
+                /* v855: 不再裁剪存量（全量保留历史），仅去重刷屏脏数据 */
+                if (cleaned.length !== rawPosts.length) {
+                  console.log("[Akini 朋友圈] 已自动清理历史高频刷屏动态：", rawPosts.length - cleaned.length, "条");
+                  R(cleaned);
+                }
+              } catch (eClean) {
+                console.warn("[Akini 朋友圈] 清理刷屏脏数据异常", eClean);
+              }
+            })();
+
+            function getSafePostIntervals() {
+              var mn = parseFloat(localStorage.getItem("akini_num_friendsPostMin") || "30");
+              var mx = parseFloat(localStorage.getItem("akini_num_friendsPostMax") || "60");
+              if (isNaN(mn) || mn < 10) mn = 30;
+              if (isNaN(mx) || mx < mn) mx = Math.max(mn + 10, 60);
+              return { min: mn, max: mx };
             }
+
+            function scheduleNext(isFirst) {
+              var intervals = getSafePostIntervals();
+              var delayMins = isFirst
+                ? intervals.min
+                : intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
+              var delayMs = Math.max(600000, Math.floor(delayMins * 60 * 1000)); // 至少 10 分钟
+              console.log("[Akini 朋友圈] 下次发圈计划：", (delayMs / 60000).toFixed(1), "分钟后");
+              if (window.__akiniToggleOn("contactFriendsToggle", false)) {
+                window._akiniTimer.schedule("friendsPost", friendsPostAction, delayMs, { keepNext: true });
+              } else {
+                try { localStorage.removeItem("akini_next_friendsPost"); } catch (e) {}
+              }
+            }
+
+            function friendsPostAction() {
+              if (_friendsPostIsRunning) return;
+              _friendsPostIsRunning = true;
+              try {
+                // 硬性安全检查 1：开关是否开启
+                if (!window.__akiniToggleOn("contactFriendsToggle", false)) {
+                  window.__akiniPostLog && __akiniPostLog("friends", "跳过：朋友圈开关未开启");
+                  scheduleNext(false);
+                  return;
+                }
+                // 硬性安全检查 2：活跃时段
+                if (!window.AKR.isInTimeRange("friends")) {
+                  window.__akiniPostLog && __akiniPostLog("friends", "跳过：不在活跃时段");
+                  scheduleNext(false);
+                  return;
+                }
+                // 硬性安全检查 3：绝对物理冷却（至少 5 分钟），防多端、切换后台或 catchUp 狂发
+                var _lastRun = Math.max(
+                  parseFloat(localStorage.getItem("akini_last_friendsPost_run") || "0") || 0,
+                  parseFloat(localStorage.getItem("akini_last_friendsPost") || "0") || 0
+                );
+                var _now = Date.now();
+                var _HARD_COOLDOWN_MS = 300000; // 5分钟硬冷却
+                if (_lastRun > 0 && _now - _lastRun < _HARD_COOLDOWN_MS) {
+                  console.log("[Akini 朋友圈] 处于硬性冷却期内，跳过本次执行，距上次还不足 5 分钟");
+                  window.__akiniPostLog && __akiniPostLog("friends", "跳过：处于硬性冷却期内");
+                  scheduleNext(false);
+                  return;
+                }
+                // 标记执行时刻
+                localStorage.setItem("akini_last_friendsPost_run", String(_now));
+                localStorage.setItem("akini_last_friendsPost", String(_now));
+
+                const _poster = r();
+                if (!_poster) {
+                  window.__akiniPostLog && __akiniPostLog("friends", "跳过：无可用联系人");
+                  scheduleNext(false);
+                  return;
+                }
+                const n = _poster.name,
+                  i = nt(_poster.avatar, 40),
+                  a = c(Math.floor(Math.random() * 5) + 1);
+                if (a) {
+                  var l = O();
+                  var _pts = window.__akiniNowTs ? window.__akiniNowTs() : Date.now();
+                  var post = {
+                    author: n,
+                    authorId: _poster.id,
+                    text: a,
+                    date: __akiniFormatDateTime(new Date(_pts)),
+                    ts: _pts,
+                    likes: [],
+                    comments: [],
+                  };
+                  window.__akiniPostLog && __akiniPostLog("friends", "已发布：" + String(a || "").slice(0, 20));
+                  // 联系人发朋友圈，10% 概率带专属表情包
+                  var _stkProbPost = 0.1;
+                  if (Math.random() < _stkProbPost && _poster.id) {
+                    var stickers = typeof window.__akiniStickerSrcs === "function"
+                      ? window.__akiniStickerSrcs(_poster.id)
+                      : [];
+                    if (stickers.length > 0) {
+                      post.img = stickers[Math.floor(Math.random() * stickers.length)];
+                    }
+                  }
+                  l.unshift(post);
+                  /* v855: 存储全量保留（不再设上限），渲染层由 _renderPosts 只渲染最新 30 条 */
+                  R(l);
+                  if (window._renderPosts) window._renderPosts();
+                  if (!window.__akiniBackdateTs) {
+                    window.showInAppNotif({
+                      app: "朋友圈",
+                      avatar: i,
+                      name: n,
+                      fullContent: !0,
+                      msg: post.img ? "[图片]" : a,
+                      onTap: function () { o("friends"); },
+                    });
+                  }
+                  scheduleNext(false);
+                } else {
+                  window.__akiniPostLog && __akiniPostLog("friends", "跳过：字卡内容为空");
+                  scheduleNext(false);
+                }
+              } catch (errPost) {
+                console.error("[Akini 朋友圈] 发动态异常", errPost);
+                scheduleNext(false);
+              } finally {
+                _friendsPostIsRunning = false;
+              }
+            }
+
             window._akiniFriendsPostAction = friendsPostAction;
-            window._akiniRescheduleFriendsPost = function (backdateTs) {
+            window._akiniRescheduleFriendsPost = function () {
               try { localStorage.removeItem("akini_next_friendsPost"); } catch (e) {}
-              // 开关关闭时不重新排计划——避免「未开启时上线秒发」
               if (!window.__akiniToggleOn("contactFriendsToggle", false)) return;
-              window.__akiniBackdateTs = backdateTs || 0;
-              try { t(false); } finally { window.__akiniBackdateTs = 0; }
+              scheduleNext(false);
             };
-            // 开关关闭时不排计划（不写 akini_next_friendsPost，keepNext/catchUp 无从补发）
-            if (window.__akiniToggleOn("contactFriendsToggle", false)) {
-              window._akiniTimer.schedule("friendsPost", friendsPostAction, i, { keepNext: true });
-            } else {
-              try { localStorage.removeItem("akini_next_friendsPost"); } catch (e) {}
-            }
-          })(true),
+
+            // 首次启动调度
+            scheduleNext(true);
+          })(),
           (function t() {
             /* 互动检查间隔：按消息回复延迟配置，确保联系人在设定时间后互动 */
             function getFriendsReplyDelayMs() {
@@ -21642,45 +21765,77 @@ window.akiniContacts = {
       }, o);
     })(true);
     (function () {
-      !(function t(isFirst) {
-        const e = parseFloat(
-            localStorage.getItem("akini_num_icityPostMin") || "30",
-          ),
-          n = parseFloat(
-            localStorage.getItem("akini_num_icityPostMax") || "60",
-          );
-        // 首次触发使用最小间隔，之后按随机范围
-        var delay = isFirst ? e : (e + Math.random() * Math.max(0, n - e));
-        var i = 60 * delay * 1e3;
-        console.log("[Akini iCity] 下次调度：", delay.toFixed(1), "分钟后触发");
-        function icityPostAction() {
-          // 防止短时间内多次发 iCity
-          var _minGap = Math.max(1, e) * 60 * 1000 * 0.8;
-          var _lastRun = parseFloat(localStorage.getItem("akini_last_icityPost_run") || "0");
-          if (_lastRun > 0 && Date.now() - _lastRun < _minGap) {
-            console.log("[Akini iCity] 距上次执行太近，跳过本次，间隔不足", e.toFixed(1), "分钟");
-            window.__akiniPostLog && __akiniPostLog("icity", "跳过：距上次发布太近");
-            t(false); return;
-          }
-          localStorage.setItem("akini_last_icityPost_run", String(Date.now()));
-          if (!window.AKR.isInTimeRange("icity")) {
-            window.__akiniPostLog && __akiniPostLog("icity", "跳过：不在活跃时段");
-            t(false);
-            return;
-          }
+      /* v853: iCity 发布引擎安全重写（对齐朋友圈 v852 防护）：
+         1. 严格参数 clamp：min/max 每次调度时实时读取设置，NaN/<10 一律回落 30/60，杜绝 0ms 死循环狂发；
+         2. 绝对物理防重冷却：两次发布物理间隔绝不可低于 5 分钟，防多端/切后台/catchUp 连续补发；
+         3. 并发锁保护：发布中状态互斥，严禁多重定时器并行；
+         4. v855: 存储不再设上限——全量保留历史日记，仅渲染层截断（最新 30 条）；
+         5. 离线补发与主动来信同款：keepNext/catchUp 回溯计划时刻补发，时间戳还原离线期间应发时刻。 */
+      var _icityPostIsRunning = false;
+
+      function getSafeIcityIntervals() {
+        var mn = parseFloat(localStorage.getItem("akini_num_icityPostMin") || "30");
+        var mx = parseFloat(localStorage.getItem("akini_num_icityPostMax") || "60");
+        if (isNaN(mn) || mn < 10) mn = 30;
+        if (isNaN(mx) || mx < mn) mx = Math.max(mn + 10, 60);
+        return { min: mn, max: mx };
+      }
+
+      function scheduleNextIcity(isFirst) {
+        var intervals = getSafeIcityIntervals();
+        var delayMins = isFirst
+          ? intervals.min
+          : intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
+        var delayMs = Math.max(600000, Math.floor(delayMins * 60 * 1000)); // 至少 10 分钟
+        console.log("[Akini iCity] 下次发布计划：", (delayMs / 60000).toFixed(1), "分钟后");
+        if (window.__akiniToggleOn("contactIcityToggle", false)) {
+          window._akiniTimer.schedule("icityPost", icityPostAction, delayMs, { keepNext: true });
+        } else {
+          try { localStorage.removeItem("akini_next_icityPost"); } catch (e) {}
+        }
+      }
+
+      function icityPostAction() {
+        if (_icityPostIsRunning) return;
+        _icityPostIsRunning = true;
+        try {
+          // 硬性安全检查 1：开关是否开启
           if (!window.__akiniToggleOn("contactIcityToggle", false)) {
             window.__akiniPostLog && __akiniPostLog("icity", "跳过：iCity开关关闭");
-            t(false);
+            scheduleNextIcity(false);
             return;
           }
+          // 硬性安全检查 2：活跃时段
+          if (!window.AKR.isInTimeRange("icity")) {
+            window.__akiniPostLog && __akiniPostLog("icity", "跳过：不在活跃时段");
+            scheduleNextIcity(false);
+            return;
+          }
+          // 硬性安全检查 3：绝对物理冷却（至少 5 分钟），防多端、切换后台或 catchUp 狂发
+          var _lastRun = Math.max(
+            parseFloat(localStorage.getItem("akini_last_icityPost_run") || "0") || 0,
+            parseFloat(localStorage.getItem("akini_last_icityPost") || "0") || 0
+          );
+          var _now = Date.now();
+          var _HARD_COOLDOWN_MS = 300000; // 5分钟硬冷却
+          if (_lastRun > 0 && _now - _lastRun < _HARD_COOLDOWN_MS) {
+            console.log("[Akini iCity] 处于硬性冷却期内，跳过本次执行，距上次还不足 5 分钟");
+            window.__akiniPostLog && __akiniPostLog("icity", "跳过：处于硬性冷却期内");
+            scheduleNextIcity(false);
+            return;
+          }
+          // 标记执行时刻
+          localStorage.setItem("akini_last_icityPost_run", String(_now));
+          localStorage.setItem("akini_last_icityPost", String(_now));
+
           var _diary = Dn(0);
-          if ((_diary && (_diary = _diary.replace(/\n/g, " ")), _diary)) {
+          if (_diary && (_diary = _diary.replace(/\n/g, " "))) {
             var n = window.akiniContacts
                 ? window.akiniContacts.getContacts()
                 : [],
               i = n.length ? n[Math.floor(Math.random() * n.length)] : null;
             if (!i) {
-              t(false);
+              scheduleNextIcity(false);
               return;
             }
             var a = i.id,
@@ -21688,8 +21843,8 @@ window.akiniContacts = {
               c = o && o.name ? o.name : i.name,
               l = o && o.avatar ? o.avatar : i.avatar,
               s = q();
-            (window.__akiniPostLog && __akiniPostLog("icity", "已发布：" + String(_diary || "").slice(0, 20)),
-              s.push({
+            window.__akiniPostLog && __akiniPostLog("icity", "已发布：" + String(_diary || "").slice(0, 20));
+            s.push({
               id: (window.__akiniNowTs ? window.__akiniNowTs() : Date.now()) + "_" + Math.floor(1e3 * Math.random()),
               who: a,
               author: c,
@@ -21700,45 +21855,52 @@ window.akiniContacts = {
               likers: [],
               comments: [],
               liked: !1,
-            }),
-              j(s),
-              window._renderIcity && window._renderIcity(),
-              window.renderIcityProfileDiaries &&
-                window.renderIcityProfileDiaries(
-                  "icityTaProfileDiaries",
-                  i.id,
-                ),
-              /* v843: 离线补发的日记静默入库（时间戳已回溯离线期间），不弹通知 */
-              !window.__akiniBackdateTs &&
-                "function" == typeof window.showInAppNotif &&
-                window.showInAppNotif({
-                  app: "icity",
-                  avatar: l,
-                  name: c,
-                  fullContent: !0,
-                  msg: _diary,
-                  onTap: function () {
-                    r("icityArea");
-                  },
-                }),
-              t(false));
-          } else { window.__akiniPostLog && __akiniPostLog("icity", "跳过：日记内容为空"); t(false); }
+            });
+            /* v855: 存储全量保留（不再设上限），渲染层由 _renderIcity 只渲染最新 30 条 */
+            j(s);
+            window._renderIcity && window._renderIcity();
+            window.renderIcityProfileDiaries &&
+              window.renderIcityProfileDiaries(
+                "icityTaProfileDiaries",
+                i.id,
+              );
+            /* 离线补发的日记静默入库（时间戳已回溯离线期间），不弹通知 */
+            !window.__akiniBackdateTs &&
+              "function" == typeof window.showInAppNotif &&
+              window.showInAppNotif({
+                app: "icity",
+                avatar: l,
+                name: c,
+                fullContent: !0,
+                msg: _diary,
+                onTap: function () {
+                  r("icityArea");
+                },
+              });
+            scheduleNextIcity(false);
+          } else {
+            window.__akiniPostLog && __akiniPostLog("icity", "跳过：日记内容为空");
+            scheduleNextIcity(false);
+          }
+        } catch (errIcity) {
+          console.error("[Akini iCity] 发布异常", errIcity);
+          scheduleNextIcity(false);
+        } finally {
+          _icityPostIsRunning = false;
         }
-        window._akiniIcityPostAction = icityPostAction;
-        window._akiniRescheduleIcityPost = function (backdateTs) {
-          try { localStorage.removeItem("akini_next_icityPost"); } catch (e) {}
-          // 开关关闭时不重新排计划——避免「未开启时上线秒发」
-          if (!window.__akiniToggleOn("contactIcityToggle", false)) return;
-          window.__akiniBackdateTs = backdateTs || 0;
-          try { t(false); } finally { window.__akiniBackdateTs = 0; }
-        };
-        // 开关关闭时不排计划（不写 akini_next_icityPost，keepNext/catchUp 无从补发）
-        if (window.__akiniToggleOn("contactIcityToggle", false)) {
-          window._akiniTimer.schedule("icityPost", icityPostAction, i, { keepNext: true });
-        } else {
-          try { localStorage.removeItem("akini_next_icityPost"); } catch (e) {}
-        }
-      })(true);
+      }
+
+      window._akiniIcityPostAction = icityPostAction;
+      window._akiniRescheduleIcityPost = function (backdateTs) {
+        try { localStorage.removeItem("akini_next_icityPost"); } catch (e) {}
+        // 开关关闭时不重新排计划——避免「未开启时上线秒发」
+        if (!window.__akiniToggleOn("contactIcityToggle", false)) return;
+        window.__akiniBackdateTs = backdateTs || 0;
+        try { scheduleNextIcity(false); } finally { window.__akiniBackdateTs = 0; }
+      };
+
+      // 首次启动调度
+      scheduleNextIcity(true);
       var t = {};
       function e(t, e) {
         return Math.floor(Math.random() * (e - t + 1)) + t;
