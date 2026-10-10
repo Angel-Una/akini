@@ -2526,13 +2526,13 @@ window._idbStore = (function () {
       }
       function w(t) {
         if (!t) return null;
-        if ("me" === t)
+        if ("me" === t) {
           return {
             id: "me",
             name:
-              "function" == typeof window.getMyName
+              ("function" == typeof window.getMyName
                 ? window.getMyName()
-                : localStorage.getItem("akini_my_name") || "我",
+                : localStorage.getItem("akini_my_name") || "我"),
             avatar:
               "function" == typeof window.getMyAvatar
                 ? window.getMyAvatar()
@@ -2540,6 +2540,7 @@ window._idbStore = (function () {
                   (window.__akiniAvatarCache && window.__akiniAvatarCache.my) ||
                   "",
           };
+        }
         var e = v(t);
         if (e) {
           var a = e.avatar;
@@ -3056,7 +3057,7 @@ window.akiniContacts = {
             a = {
               id: s("gp"),
               name: t || "群聊",
-              avatar: e || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDQ0NDQ0IiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTYgMjF2LTJhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjkiIGN5PSI3IiByPSI0Ii8+PHBhdGggZD0iTTIyIDIxdi0yYTQgNCAwIDAgMC0zLTMuODciLz48cGF0aCBkPSJNMTYgMy4xM2E0IDQgMCAwIDEgMCA3Ljc1Ii8+PC9zdmc+",
+              avatar: e || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E",
               memberIds: n || [],
               createdAt: Date.now(),
             };
@@ -8167,8 +8168,8 @@ window.akiniContacts = {
       encodeURIComponent(
         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80">' +
           '<rect width="80" height="80" fill="#f7f8fa"/>' +
-          '<circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="2.6"/>' +
-          '<path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="2.6" stroke-linecap="round"/>' +
+          '<circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="1.5"/>' +
+          '<path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="1.5" stroke-linecap="round"/>' +
           "</svg>",
       );
     window.__akiniLineAvatarImg = function () {
@@ -8178,6 +8179,81 @@ window.akiniContacts = {
         '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
       );
     };
+    /* 群聊默认头像：完全恢复最初没有改动之前的经典双人 Users 图标（与朋友圈原版图标同款） */
+    var AKINI_GROUP_LINE_AVATAR_URI = "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E";
+    window.AKINI_GROUP_LINE_AVATAR_URI = AKINI_GROUP_LINE_AVATAR_URI;
+    window.__akiniGroupLineAvatarImg = function () {
+      return (
+        '<img src="' +
+        AKINI_GROUP_LINE_AVATAR_URI +
+        '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">'
+      );
+    };
+
+    /* v851：历史群聊与联系人粗线条默认头像平滑清洗（自动将本地存储中的旧粗线 SVG 统一升级为 1.5 细线头像） */
+    (function __akiniMigrateLegacyGroupAvatars() {
+      try {
+        var fineUri = window.AKINI_GROUP_LINE_AVATAR_URI || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E";
+        function isOldThick(str) {
+          if (!str || typeof str !== "string") return false;
+          // 如果是 v851 错误写入的朋友圈 24x24 图标，自动清洗恢复为原始 80x80 双人头像
+          if (str.indexOf("M17 21v-2a4") >= 0 || str.indexOf("M17%2021v-2a4") >= 0 || str.indexOf("viewBox%3D%220%200%2024%2024%22") >= 0) return true;
+          return (
+            str.indexOf("PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI") >= 0 ||
+            str.indexOf("M16 21v-2a4 4 0 0 0-4-4") >= 0 ||
+            str.indexOf("M16%2021v-2a4") >= 0 ||
+            /stroke-width(?:%3D%22|=")(?:1\.[6-9]|[2-9]|\d{2,})/i.test(str)
+          );
+        }
+        // 清洗 akini_groups
+        var rawG = localStorage.getItem("akini_groups");
+        if (rawG) {
+          try {
+            var glist = JSON.parse(rawG);
+            var gChanged = false;
+            if (Array.isArray(glist)) {
+              glist.forEach(function (g) {
+                if (g && isOldThick(g.avatar)) {
+                  g.avatar = fineUri;
+                  gChanged = true;
+                }
+              });
+              if (gChanged) {
+                localStorage.setItem("akini_groups", JSON.stringify(glist));
+                if (window.akiniStore && window.akiniStore.setJson) {
+                  window.akiniStore.setJson("akini_groups", glist);
+                }
+              }
+            }
+          } catch (e1) {}
+        }
+        // 清洗 akini_contacts
+        var rawC = localStorage.getItem("akini_contacts");
+        if (rawC) {
+          try {
+            var clist = JSON.parse(rawC);
+            var cChanged = false;
+            if (Array.isArray(clist)) {
+              clist.forEach(function (c) {
+                if (c && isOldThick(c.avatar)) {
+                  c.avatar = fineUri;
+                  cChanged = true;
+                }
+              });
+              if (cChanged) {
+                localStorage.setItem("akini_contacts", JSON.stringify(clist));
+                if (window.akiniStore && window.akiniStore.setJson) {
+                  window.akiniStore.setJson("akini_contacts", clist);
+                }
+              }
+            }
+          } catch (e2) {}
+        }
+      } catch (err) {
+        console.warn("[Akini] 群聊默认头像清洗异常", err);
+      }
+    })();
+
     /* 全局 emoji 头像兜底：新增节点在绘制前即时替换（无闪烁），低频全量兜底防漏。
        不用类名选择器——很多头像容器是纯 inline-style 无类名。 */
     (function () {
@@ -8235,22 +8311,48 @@ window.akiniContacts = {
       setTimeout(sweep, 1500);
       setTimeout(sweep, 4000);
     })();
+    window.__akiniIsGroupAvatarToken = function (t) {
+      if (!t || "string" != typeof t) return !1;
+      var s = String(t).trim();
+      return (
+        s.indexOf("AKINI_GROUP_LINE_AVATAR") >= 0 ||
+        s.indexOf("M17%2021v-2a4") >= 0 ||
+        s.indexOf("M17 21v-2a4") >= 0 ||
+        s.indexOf("PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI") >= 0 ||
+        s.indexOf("M16 21v-2a4 4 0 0 0-4-4") >= 0 ||
+        s.indexOf("M16%2021v-2a4") >= 0 ||
+        s.indexOf("cx%3D%2229%22") >= 0 ||
+        s.indexOf('cx="29"') >= 0
+      );
+    };
     window.__akiniIsDefaultAvatarToken = function (t) {
-      // zzc：默认头像统一为线条人像——除真实图片（data:/http/blob/路径/<img）外，
-      // 空、emoji、昵称首字等一律视为默认占位，不再出现 emoji 或文字头像
       if (!t || "string" != typeof t) return !0;
       var s = String(t).trim();
       if (!s || s === "null" || s === "undefined") return !0;
+      // 彻底拦截旧版粗线 SVG（无论 base64 还是 urlencoded，含 1.8 粗线条、M16 21v-2a4、PHN2Zy 等）
+      if (
+        s.indexOf("PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI") >= 0 ||
+        s.indexOf("M16 21v-2a4 4 0 0 0-4-4") >= 0 ||
+        s.indexOf("M16%2021v-2a4") >= 0 ||
+        /stroke-width(?:%3D%22|=")(?:1\.[6-9]|[2-9]|\d{2,})/i.test(s)
+      ) {
+        return !0;
+      }
+      if (s.indexOf("AKINI_LINE_AVATAR") >= 0 || s.indexOf("AKINI_GROUP_LINE_AVATAR") >= 0) return !0;
+      // 细线头像本体（单人或群聊）在渲染时不当成非图片
       if (/^(data:|https?:|blob:|\/|<img)/i.test(s)) return !1;
       return !0;
     };
     function nt(t, e) {
-      if (
-        (e = e || 40) && window.__akiniIsDefaultAvatarToken(t)
-      )
+      if ((e = e || 40) && window.__akiniIsDefaultAvatarToken(t)) {
+        if (window.__akiniIsGroupAvatarToken && window.__akiniIsGroupAvatarToken(t)) {
+          return window.__akiniGroupLineAvatarImg ? window.__akiniGroupLineAvatarImg() : window.__akiniLineAvatarImg();
+        }
         return window.__akiniLineAvatarImg();
+      }
       return (
         (t && "string" == typeof t && t.trim()) || (t = ""),
+
         0 === t.indexOf("<img")
           ? t
           : 0 === t.indexOf("data:") || 0 === t.indexOf("http")
@@ -8267,21 +8369,36 @@ window.akiniContacts = {
     // 导出给信箱等独立引擎使用（局内消息弹窗头像渲染依赖它，未导出时只能回落到默认图标）
     try { window.nt = nt; } catch (e) {}
     function it(t, e) {
-      if (((e = e || ""), !t || "string" != typeof t))
-        return window.__akiniIsDefaultAvatarToken(e)
-          ? window.__akiniLineAvatarImg()
-          : e;
-      if (!(t = t.trim()))
-        return window.__akiniIsDefaultAvatarToken(e)
-          ? window.__akiniLineAvatarImg()
-          : e;
+      if (((e = e || ""), !t || "string" != typeof t)) {
+        if (window.__akiniIsGroupAvatarToken && (window.__akiniIsGroupAvatarToken(t) || window.__akiniIsGroupAvatarToken(e))) {
+          return window.__akiniGroupLineAvatarImg ? window.__akiniGroupLineAvatarImg() : window.__akiniLineAvatarImg();
+        }
+        return window.__akiniIsDefaultAvatarToken(e) ? window.__akiniLineAvatarImg() : e;
+      }
+      if (!(t = t.trim())) {
+        if (window.__akiniIsGroupAvatarToken && (window.__akiniIsGroupAvatarToken(t) || window.__akiniIsGroupAvatarToken(e))) {
+          return window.__akiniGroupLineAvatarImg ? window.__akiniGroupLineAvatarImg() : window.__akiniLineAvatarImg();
+        }
+        return window.__akiniIsDefaultAvatarToken(e) ? window.__akiniLineAvatarImg() : e;
+      }
+      if (window.__akiniIsDefaultAvatarToken(t)) {
+        if (window.__akiniIsGroupAvatarToken && window.__akiniIsGroupAvatarToken(t)) {
+          return window.__akiniGroupLineAvatarImg ? window.__akiniGroupLineAvatarImg() : window.__akiniLineAvatarImg();
+        }
+        return window.__akiniLineAvatarImg();
+      }
       if (0 === t.indexOf("<img")) {
         var n = t.match(/src="([^"]*)"/);
-        if (!n || !n[1])
-          return window.__akiniIsDefaultAvatarToken(e)
-            ? window.__akiniLineAvatarImg()
-            : e;
+        if (!n || !n[1]) {
+          return window.__akiniIsDefaultAvatarToken(e) ? window.__akiniLineAvatarImg() : e;
+        }
         t = n[1];
+        if (window.__akiniIsDefaultAvatarToken(t)) {
+          if (window.__akiniIsGroupAvatarToken && window.__akiniIsGroupAvatarToken(t)) {
+            return window.__akiniGroupLineAvatarImg ? window.__akiniGroupLineAvatarImg() : window.__akiniLineAvatarImg();
+          }
+          return window.__akiniLineAvatarImg();
+        }
       }
       return 0 === t.indexOf("data:") || 0 === t.indexOf("http")
         ? '<img src="' +
@@ -9468,8 +9585,8 @@ window.akiniContacts = {
       if (t && window.akiniContacts) {
         ((dt = []),
           e &&
-            (setHtmlKeepInput(e, nt("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDQ0NDQ0IiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTYgMjF2LTJhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjkiIGN5PSI3IiByPSI0Ii8+PHBhdGggZD0iTTIyIDIxdi0yYTQgNCAwIDAgMC0zLTMuODciLz48cGF0aCBkPSJNMTYgMy4xM2E0IDQgMCAwIDEgMCA3Ljc1Ii8+PC9zdmc+", 56)),
-            e.setAttribute("data-avatar", "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDQ0NDQ0IiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTYgMjF2LTJhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjkiIGN5PSI3IiByPSI0Ii8+PHBhdGggZD0iTTIyIDIxdi0yYTQgNCAwIDAgMC0zLTMuODciLz48cGF0aCBkPSJNMTYgMy4xM2E0IDQgMCAwIDEgMCA3Ljc1Ii8+PC9zdmc+")),
+            (setHtmlKeepInput(e, nt("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E", 56)),
+            e.setAttribute("data-avatar", "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E")),
           n && (n.value = ""));
         var i = window.akiniContacts.getContacts(),
           o = "";
@@ -9535,7 +9652,7 @@ window.akiniContacts = {
                 var t = document.getElementById("createGroupNameInput"),
                   e = document.getElementById("createGroupAvatarPreview"),
                   n = t ? t.value.trim() : "",
-                  i = (e && e.getAttribute("data-avatar")) || "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDQ0NDQ0IiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTYgMjF2LTJhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjkiIGN5PSI3IiByPSI0Ii8+PHBhdGggZD0iTTIyIDIxdi0yYTQgNCAwIDAgMC0zLTMuODciLz48cGF0aCBkPSJNMTYgMy4xM2E0IDQgMCAwIDEgMCA3Ljc1Ii8+PC9zdmc+";
+                  i = (e && e.getAttribute("data-avatar")) || "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E";
                 dt.length < 2
                   ? alert("请至少选择 2 个联系人")
                   : n
@@ -9874,7 +9991,7 @@ window.akiniContacts = {
                 )
               : null;
             if (!t || "group" !== t.type) return [];
-            var e = [{ id: "all", name: "全体成员", avatar: "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDQ0NDQ0IiBzdHJva2Utd2lkdGg9IjEuOCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTYgMjF2LTJhNCA0IDAgMCAwLTQtNEg2YTQgNCAwIDAgMC00IDR2MiIvPjxjaXJjbGUgY3g9IjkiIGN5PSI3IiByPSI0Ii8+PHBhdGggZD0iTTIyIDIxdi0yYTQgNCAwIDAgMC0zLTMuODciLz48cGF0aCBkPSJNMTYgMy4xM2E0IDQgMCAwIDEgMCA3Ljc1Ii8+PC9zdmc+" }];
+            var e = [{ id: "all", name: "全体成员", avatar: "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20fill%3D%22%23f7f8fa%22/%3E%3Cpath%20d%3D%22M17%2021v-2a4%204%200%200%200-4-4H5a4%204%200%200%200-4%204v2%22/%3E%3Ccircle%20cx%3D%229%22%20cy%3D%227%22%20r%3D%224%22/%3E%3Cpath%20d%3D%22M23%2021v-2a4%204%200%200%200-3-3.87%22/%3E%3Cpath%20d%3D%22M16%203.13a4%204%200%200%201%200%207.75%22/%3E%3C/svg%3E" }];
             return (
               (t.memberIds || []).forEach(function (t) {
                 var n = window.akiniContacts.getChatTarget(t);
@@ -10274,58 +10391,63 @@ window.akiniContacts = {
       rmGrpMemBtn.onclick = function() { openGroupMemberPicker("remove"); };
     }
 
+    function syncChatMenuUI() {
+      var _chatApp = document.getElementById("app-chat");
+      if (!_chatApp || _chatApp.style.display === "none") return;
+      var curChatId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+      var t = curChatId && window.akiniContacts ? window.akiniContacts.getChatTarget(curChatId) : null;
+      var isGrp = t && "group" === t.type;
+      var _taAvatarBtn = document.getElementById("changeTaAvatarBtn");
+      var _nameLabel = document.getElementById("menuItemNameLabel");
+      var _nameInput = document.getElementById("inputTaName");
+      var _mpPanel = Y ? Y.querySelector(".menu-panel") : null;
+      if (_mpPanel) {
+        _mpPanel.classList.toggle("mp-group", !!isGrp);
+        _mpPanel.classList.toggle("mp-single", !isGrp);
+        var _mpTitle = document.getElementById("mpTitle");
+        if (_mpTitle) _mpTitle.textContent = isGrp ? "群聊设置" : "聊天设置";
+        try {
+          var _currAvatar = t && t.avatar ? t.avatar : "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23f2f2f7%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2229%22%20r%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%238e8e93%22%20stroke-width%3D%221.5%22/%3E%3Cpath%20d%3D%22M12%2076c4-17%2014-26%2028-26s24%209%2028%2026%22%20fill%3D%22none%22%20stroke%3D%22%238e8e93%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E";
+          var _taImg = document.getElementById("mpTaAvatarImg");
+          if (_taImg) _taImg.src = _currAvatar;
+          var _grpImg = document.getElementById("mpGroupAvatarImg");
+          if (_grpImg) _grpImg.src = _currAvatar;
+        } catch(e) {}
+      }
+      if (_nameInput && t) {
+        _nameInput.value = t.name || (isGrp ? "群聊" : "TA");
+      }
+      if (isGrp) {
+        if (jt) jt.style.display = "flex";
+        if (_nameLabel) _nameLabel.textContent = "更改群聊名称";
+        if (_taAvatarBtn) _taAvatarBtn.style.display = "none";
+        if (addGrpMemBtn) addGrpMemBtn.style.display = "flex";
+        if (rmGrpMemBtn) rmGrpMemBtn.style.display = "flex";
+        if (qt) qt.style.display = "flex";
+        if (delCtcBtn) delCtcBtn.style.display = "none";
+      } else {
+        if (jt) jt.style.display = "none";
+        if (_nameLabel) _nameLabel.textContent = "更改TA的名字";
+        if (_taAvatarBtn) _taAvatarBtn.style.display = "flex";
+        if (addGrpMemBtn) addGrpMemBtn.style.display = "none";
+        if (rmGrpMemBtn) rmGrpMemBtn.style.display = "none";
+        if (qt) qt.style.display = "none";
+        if (delCtcBtn) delCtcBtn.style.display = "flex";
+      }
+    }
+    window.__akiniSyncChatMenuUI = syncChatMenuUI;
     (Ft &&
       Y &&
-      a(Ft, function () {
+      (a(Ft, function () {
         var _chatApp = document.getElementById("app-chat");
         if (!_chatApp || _chatApp.style.display === "none") return;
         ((Y.style.display = "flex"), (Y.style.pointerEvents = "auto"));
-        var t = window.akiniContacts
-          ? window.akiniContacts.getChatTarget(
-              window.akiniContacts.getActiveChatId(),
-            )
-          : null;
-        var isGrp = t && "group" === t.type;
-        var _taAvatarBtn = document.getElementById("changeTaAvatarBtn");
-        var _nameLabel = document.getElementById("menuItemNameLabel");
-        var _mpPanel = Y ? Y.querySelector(".menu-panel") : null;
-        if (_mpPanel) {
-          _mpPanel.classList.toggle("mp-group", !!isGrp);
-          _mpPanel.classList.toggle("mp-single", !isGrp);
-          var _mpTitle = document.getElementById("mpTitle");
-          if (_mpTitle) _mpTitle.textContent = isGrp ? "群聊设置" : "聊天设置";
-          try {
-            var _currAvatar = t && t.avatar ? t.avatar : "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23f2f2f7%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2229%22%20r%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%238e8e93%22%20stroke-width%3D%222.6%22/%3E%3Cpath%20d%3D%22M12%2076c4-17%2014-26%2028-26s24%209%2028%2026%22%20fill%3D%22none%22%20stroke%3D%22%238e8e93%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E";
-            var _taImg = document.getElementById("mpTaAvatarImg");
-            if (_taImg) _taImg.src = _currAvatar;
-            var _grpImg = document.getElementById("mpGroupAvatarImg");
-            if (_grpImg) _grpImg.src = _currAvatar;
-          } catch(e) {}
-        }
-        if (isGrp) {
-          // 群聊模式：更换群头像、更改群聊名称、添加群成员、移除群成员、解散群聊
-          if (jt) jt.style.display = "flex";
-          if (_nameLabel) _nameLabel.textContent = "更改群聊名称";
-          if (_taAvatarBtn) _taAvatarBtn.style.display = "none";
-          if (addGrpMemBtn) addGrpMemBtn.style.display = "flex";
-          if (rmGrpMemBtn) rmGrpMemBtn.style.display = "flex";
-          if (qt) qt.style.display = "flex";
-          if (delCtcBtn) delCtcBtn.style.display = "none";
-        } else {
-          // 单聊模式：更改TA的名字、更改TA的头像、删除联系人
-          if (jt) jt.style.display = "none";
-          if (_nameLabel) _nameLabel.textContent = "更改TA的名字";
-          if (_taAvatarBtn) _taAvatarBtn.style.display = "flex";
-          if (addGrpMemBtn) addGrpMemBtn.style.display = "none";
-          if (rmGrpMemBtn) rmGrpMemBtn.style.display = "none";
-          if (qt) qt.style.display = "none";
-          if (delCtcBtn) delCtcBtn.style.display = "flex";
-        }
+        syncChatMenuUI();
       }),
       Q &&
         Q.addEventListener("click", function () {
           Y && ((Y.style.display = "none"), (Y.style.pointerEvents = "none"));
-        }));
+        })));
     delCtcBtn &&
       a(delCtcBtn, function () {
         var t = window.akiniContacts
@@ -19067,7 +19189,7 @@ window.akiniContacts = {
                 _finalTaAv = (window.getTaAvatar && window.getTaAvatar()) || "";
               }
               if (!_finalTaAv || !_finalTaAv.trim()) {
-                _finalTaAv = window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : '<img src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23f7f8fa%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2229%22%20r%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%222.6%22/%3E%3Cpath%20d%3D%22M12%2076c4-17%2014-26%2028-26s24%209%2028%2026%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%222.6%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+                _finalTaAv = window.__akiniLineAvatarImg ? window.__akiniLineAvatarImg() : '<img src="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2080%2080%22%3E%3Crect%20width%3D%2280%22%20height%3D%2280%22%20fill%3D%22%23f7f8fa%22/%3E%3Ccircle%20cx%3D%2240%22%20cy%3D%2229%22%20r%3D%2214%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.5%22/%3E%3Cpath%20d%3D%22M12%2076c4-17%2014-26%2028-26s24%209%2028%2026%22%20fill%3D%22none%22%20stroke%3D%22%235a5e66%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22/%3E%3C/svg%3E" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
               }
               c.avatar = _finalTaAv;
               var u = r,

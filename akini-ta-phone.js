@@ -129,7 +129,7 @@
     } catch (e) { return ''; }
   }
 
-  /* v841：通话记录不再存进"收藏"键（akini_ta_phone_<id>.calls），改存独立键 akini_ta_calls_<id>。
+  /* v845：通话记录不再存进"收藏"键（akini_ta_phone_<id>.calls），改存独立键 akini_ta_calls_<id>。
    用户反馈"通话记录不是收藏"——之前通话记录混进收藏数据结构，导致通话 tab 显示的是收藏而非全量通话记录 */
 function _callKey(contactId) { return 'akini_ta_calls_' + contactId; }
 function loadCallRecords(contactId) {
@@ -473,7 +473,7 @@ function addCallRecord(contactId, record) {
     var el = getEl('akini-ta-phone-list');
     if (!el || !currentContactId) return;
     var data = loadCollections(currentContactId);
-    /* v841：通话记录走独立键（全量），其余 tab 仍读收藏数据 */
+    /* v845：通话记录走独立键（全量），其余 tab 仍读收藏数据 */
     var items = (currentTab === 'calls') ? loadCallRecords(currentContactId) : (data[currentTab] || []);
     var sortBar = getEl('akini-ta-phone-sort-bar');
     if (sortBar) sortBar.style.display = currentTab === 'chat' ? 'flex' : 'none';
