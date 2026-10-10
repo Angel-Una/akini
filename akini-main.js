@@ -2915,8 +2915,10 @@ window.akiniContacts = {
             });
           if (i < 0) return null;
           for (var a in e) e.hasOwnProperty(a) && (n[i][a] = e[a]);
-          if (!n[i].note && window.pickWordCards)
-            n[i].note = window.pickWordCards(1);
+          if (!n[i].note && window.pickWordCards) {
+            var _w1 = window.pickWordCards(1, t);
+            if (_w1 && typeof _w1 === "string" && _w1.trim()) n[i].note = _w1.trim();
+          }
           // 头像变更时单独持久化到专用键（IDB 优先），防止大数组写失败导致刷新后头像丢失
           if (void 0 !== e.avatar && n[i].avatar && String(n[i].avatar).trim()) {
             try { L("akini_contact_avatar_" + t, n[i].avatar); } catch (err) {}
@@ -3152,8 +3154,10 @@ window.akiniContacts = {
               return "ta_default" !== e.id;
             });
             t.forEach(function (e) {
-              if (!e.note && window.pickWordCards)
-                e.note = window.pickWordCards(1);
+              if (!e.note && window.pickWordCards) {
+                var _w2 = window.pickWordCards(1, e.id);
+                if (_w2 && typeof _w2 === "string" && _w2.trim()) e.note = _w2.trim();
+              }
             });
             (g(t), localStorage.setItem(r, "1"));
           }
@@ -3359,8 +3363,10 @@ window.akiniContacts = {
         window.akiniContacts.migrateContacts();
         var __contacts = window.akiniContacts.getContacts();
         __contacts.forEach(function (e) {
-          if (e && !e.note && window.pickWordCards)
-            e.note = window.pickWordCards(1);
+          if (e && !e.note && window.pickWordCards) {
+            var _w3 = window.pickWordCards(1, e.id);
+            if (_w3 && typeof _w3 === "string" && _w3.trim()) e.note = _w3.trim();
+          }
         });
         window.akiniContacts.saveContacts(__contacts);
       }
@@ -15650,7 +15656,16 @@ window.akiniContacts = {
             s = document.getElementById("tdClose");
           if (!n || !i) return;
           ((i.textContent = "¥" + parseFloat(e.amount).toFixed(2)),
-            (a.textContent = e.note || "（无备注）"),
+            (function(){
+              var _nv = (e.note || "").trim();
+              if (_nv) {
+                a.textContent = _nv;
+                if (a.parentElement) a.parentElement.style.display = "flex";
+              } else {
+                a.textContent = "";
+                if (a.parentElement) a.parentElement.style.display = "none";
+              }
+            })(),
             (o.textContent = e.time || __akiniFormatDateTime(new Date())),
             (r.textContent = "待收款" === e.status ? "待收款" : e.status),
             (function () {
@@ -16646,7 +16661,7 @@ window.akiniContacts = {
           a = document.getElementById("icityDetailLikeBtn");
         a &&
           ((a.innerHTML = '<span style="font-size:16px;color:#000;">♡</span><span style="font-size:14px;margin-left:5px;">喜欢</span>'),
-          (a.style.color = i ? "#e04040" : "#888"));
+          (a.style.color = i ? "#000000" : "#888"));
         var o = document.getElementById("icityDetailLikers");
         o &&
           (n.length
