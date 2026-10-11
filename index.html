@@ -811,32 +811,34 @@ document.addEventListener("DOMContentLoaded", function() {
 </style>
 
 </head><body><script id="akini-boot-guard-v851">
-/* v809 平滑开机守卫：在后台静默注销旧版 Service Worker 并清理旧静态缓存，绝不执行 location.replace/reload 造成页面闪烁与死循环卡崩 */
+/* v879 根治版开机守卫：彻底注销旧版 Service Worker 并清全部旧缓存，network-first 强制取新版，杜绝版本回退与 iOS 缓存锁死 */
 (function(){
-  var VER = "v873";
-  window.AKINI_VERSION = "v873";
+  var VER = "v879";
+  window.AKINI_VERSION = "v879";
   try {
     var seen = null;
     try { seen = localStorage.getItem("akini_boot_ver"); } catch(e){}
+    // v879：每次启动都检查并清掉一切非当前版本的缓存（根治 GitHub Pages 镜像旧 SW 锁死）
+    if (window.caches && caches.keys) {
+      caches.keys().then(function(ks){
+        return Promise.all(ks.map(function(k){
+          // 数据保险箱 akini-vault-v1 永不清；其余旧版本缓存一律删除
+          if (k !== "akini-vault-v1" && k.indexOf("akini-cache-") === 0 && k !== "akini-cache-20261011v879") {
+            return caches.delete(k);
+          }
+        }));
+      }).catch(function(){});
+    }
+    // v879：彻底注销旧 Service Worker（而非仅 update），下次访问即由新版 SW 接管，杜绝缓存优先死锁
+    if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function(rs){
+        rs.forEach(function(r){
+          try { r.unregister(); } catch(eU){}
+        });
+      }).catch(function(){});
+    }
     if (seen !== VER) {
       try { localStorage.setItem("akini_boot_ver", VER); } catch(e){}
-      // v873: 强力清除一切旧版本 Cache 缓存（仅保留用户数据保险箱 akini-vault-v1）
-      if (window.caches && caches.keys) {
-        caches.keys().then(function(ks){
-          return Promise.all(ks.map(function(k){
-            if (k !== "akini-vault-v1" && k !== "akini-cache-20261011v873") {
-              return caches.delete(k);
-            }
-          }));
-        }).catch(function(){});
-      }
-      if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
-        navigator.serviceWorker.getRegistrations().then(function(rs){
-          rs.forEach(function(r){
-            try { r.update(); } catch(eU){}
-          });
-        }).catch(function(){});
-      }
     }
   } catch(e){}
 
@@ -9846,6 +9848,47 @@ setInterval(function () { try { if (document.hidden) return; mirrorIcons(); if (
   };
 })();
 </script>
+
+
+/* v879 iOS 内存崩溃自愈：JS 堆接近上限 / 前台超时未交互时主动降载，防 WebKit watchdog 强杀闪退 */
+(function(){
+  if (!/iP(hone|ad|od)/.test(navigator.userAgent)) return; // 仅 iOS 需要
+  var HEAP_LIMIT = 0.85;       // JS 堆达上限 85% 即触发
+  var IDLE_TIMEOUT = 25000;    // 前台 25s 无任何交互且堆偏高即降载
+  var lastInteraction = Date.now();
+  ['touchstart','touchmove','mousedown','keydown','scroll'].forEach(function(ev){
+    document.addEventListener(ev, function(){ lastInteraction = Date.now(); }, {passive:true, capture:true});
+  });
+  function heapRatio(){
+    try {
+      if (performance && performance.memory && performance.memory.jsHeapSizeLimit) {
+        return performance.memory.usedJSHeapSize / performance.memory.jsHeapSizeLimit;
+      }
+    } catch(e){}
+    return 0;
+  }
+  var degraded = false;
+  function degrade(reason){
+    if (degraded) return;
+    degraded = true;
+    try { console.warn('[Akini v879] iOS 内存压力降载:', reason); } catch(e){}
+    // 停掉一切非核心定时器与动画，保留用户数据（只降 UI 渲染负载，绝不删数据）
+    try { document.documentElement.classList.add('akini-low-mem'); } catch(e){}
+    // 停止背景视频/动画
+    try {
+      document.querySelectorAll('video').forEach(function(v){ try{v.pause();}catch(e){} });
+    } catch(e){}
+  }
+  setInterval(function(){
+    var r = heapRatio();
+    if (r > HEAP_LIMIT) { degrade('heap ' + Math.round(r*100) + '%'); return; }
+    if (r > 0.65 && (Date.now() - lastInteraction) > IDLE_TIMEOUT) { degrade('idle heap ' + Math.round(r*100) + '%'); }
+  }, 5000);
+  // 页面恢复可见时重置降载，允许回到正常模式
+  document.addEventListener('visibilitychange', function(){
+    if (!document.hidden && !degraded) lastInteraction = Date.now();
+  });
+})();
 
 </body></html>
 

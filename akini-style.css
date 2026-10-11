@@ -13406,3 +13406,65 @@ html body .chat-body .msg-row.ta .msg-content-line > .bubble-wrap {
   z-index: 50 !important;
   pointer-events: auto !important;
 }
+
+/* v874 iOS 内存降载模式：隐藏一切非核心视觉负载（背景图/装饰动画），仅保留功能与文字，防 WebKit watchdog 强杀 */
+.akini-low-mem * {
+  animation: none !important;
+  transition: none !important;
+}
+.akini-low-mem .akini-splash-modules,
+.akini-low-mem .bg-wave,
+.akini-low-mem #friendsHeader,
+.akini-low-mem .music-bg,
+.akini-low-mem [style*="background-image"] {
+  background-image: none !important;
+}
+.akini-low-mem img,
+.akini-low-mem video {
+  filter: none !important;
+}
+
+/* ==========================================================================
+   v877: 根治聊天点输入框弹起键盘透出首页界面
+   1. #app-chat.show 强制 fixed 钉死全屏视口，绝对禁止被拔起露空
+   2. 自带不透明基础底色，彻底遮挡下方的首页日历与桌面底栏
+   ========================================================================== */
+#app-chat.show {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 1000 !important;
+  background-color: #f5f5f7 !important;
+  box-sizing: border-box !important;
+}
+
+/* ==========================================================================
+   v878 紧急修复：彻底隐藏全屏穿透的 iOS 内存自愈提示调试层
+   强制钉死在屏幕最边缘之外，严格限制宽高防止全屏占位遮盖首页
+   ========================================================================== */
+#__akiniIosDiag,
+#__akiniIosDiag *,
+#__akiniDiag {
+  position: fixed !important;
+  bottom: auto !important;
+  right: auto !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 0 !important;
+  max-width: 1px !important;
+  max-height: 1px !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  opacity: 0 !important;
+  overflow: hidden !important;
+  z-index: -9999999 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  display: none !important;
+}

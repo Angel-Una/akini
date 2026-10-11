@@ -2762,16 +2762,21 @@ window._idbStore = (function () {
         } catch (e0) { wb = []; }
         if (!wb.length) return "";
         var valid = wb.filter(function (t) {
+          if (!t) return false;
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
-          return t && t.text && "pat" !== e && "pat" !== n;
+          if ("pat" === e || "pat" === n) return false;
+          // v879 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
+          var _tx = ("string" == typeof t) ? t : (t.text || t.content || "");
+          return "string" == typeof _tx && !!_tx.trim();
         });
         if (window.__wbFilter) valid = window.__wbFilter(valid, contactId);
         if (!valid.length) return "";
         var out = [];
         for (var i = 0; i < count; i++) {
           var idx = Math.floor(Math.random() * valid.length);
-          out.push(valid[idx].text);
+          var _vi = valid[idx];
+          out.push(("string" == typeof _vi) ? _vi : (_vi.text || _vi.content || ""));
         }
         return out.join("\n");
       };
@@ -4143,7 +4148,12 @@ window.akiniContacts = {
             return _out;
           })(),
           f = i("akini_wordbank", []).filter(function (t) {
-            return !t.tab || "main" === t.tab;
+            if (!t) return false;
+            if (t.tab && "main" !== t.tab) return false;
+            // v879 对齐 milk：抽到啥发啥——池内就是你添加的全部主字卡，仅排除空值，
+            // 绝不做长度/符号/内容过滤（手动打的任何文字都必须能被抽中发出）
+            var _txt = ("string" == typeof t) ? t : (t.text || t.content || "");
+            return "string" == typeof _txt && !!_txt.trim();
           });
         window.__wbFilter && (f = window.__wbFilter(f, c && c.id));
         if (0 === f.length && !o.forceText) return;
@@ -4298,12 +4308,18 @@ window.akiniContacts = {
           });
           replyCount = Math.max(1, replyCount - 1);
         }
+        // v879 对齐 milk：抽到啥发啥——仅保留 milk 同款防呆（text 非字符串/空时跳过，等价 milk 的 filter(Boolean)）
+        function __isValidTextCard(item) {
+          var txt = ("string" == typeof item) ? item : (item && (item.text || item.content)) || "";
+          return "string" == typeof txt && !!txt.trim();
+        }
         for (var ci = 0; ci < replyCount; ci++) {
           var q = o.forceText
               ? o.forceText
               : f[Math.floor(Math.random() * f.length)],
             j = "string" == typeof q ? q : q.text || q.content || "";
-          if (!j) continue;
+          // v879：池已对齐 milk，抽中的字卡直接发出（抽到啥发啥）
+          if (!__isValidTextCard(q)) continue;
           msgArr.push({ html: rt(j), text: B + j });
         }
         if (0 === msgArr.length) return;
@@ -4343,27 +4359,17 @@ window.akiniContacts = {
               : "") +
             _H +
             "</div>";
-          if (l && U) {
-            __akiniAppendMessageHTML(t, _p.outerHTML, {
-              lastMsg: item.text,
-              lastSenderAvatar: c.avatar,
-              lastSenderName: c.name,
-            });
+          // v879 吞消息根治：实时动态检测会话状态，统一通过 __akiniAppendMessageHTML 原子追加
+          var _curActive = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(t) : false);
+          __akiniAppendMessageHTML(t, _p.outerHTML, {
+            lastMsg: item.text.replace(/^【转账】/, "转账："),
+            lastSenderAvatar: c.avatar,
+            lastSenderName: c.name,
+            unread: _curActive ? ((window.akiniContacts.getSession(t)||{}).unread || 0) : (((window.akiniContacts.getSession(t)||{}).unread || 0) + 1)
+          });
+          if (_curActive && U) {
             S();
-            /* v550：多时段兜底滚底——图片/气泡加载撑高内容后仍保证最新消息贴住输入栏上沿 */
             (function(){var _sc=function(){try{U.scrollTop=U.scrollHeight;}catch(e){}};_sc();requestAnimationFrame(_sc);setTimeout(_sc,80);setTimeout(_sc,240);})();
-          } else {
-            var _G = window.akiniContacts.getSession(t);
-            var _R = __akiniStampMsgRows((_G.messagesHTML || "") + _p.outerHTML);
-            window.akiniContacts.updateSession(t, {
-              messagesHTML: _R,
-              lastMsg: item.text.replace(/^【转账】/, "转账："),
-              lastTime: Date.now(),
-              unread: __akiniIsChatActive(t) ? (_G.unread || 0) : ((_G.unread || 0) + 1),
-              lastSenderAvatar: c.avatar,
-              lastSenderName: c.name,
-            });
-            C(t, _R);
           }
           V();
           if ("function" == typeof window.showInAppNotif) {
@@ -5180,18 +5186,14 @@ window.akiniContacts = {
               lastSenderName: e.name,
             }));
         } else {
-          var c =
-              __akiniStampMsgRows(((v = window.akiniContacts.getSession(t)).messagesHTML || "") + n),
-            l = (v.unread || 0) + 1;
-          (window.akiniContacts.updateSession(t, {
-            messagesHTML: c,
+          var _curStkActive = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(t) : false);
+          var _stkSess = window.akiniContacts.getSession(t) || {};
+          __akiniAppendMessageHTML(t, n, {
             lastMsg: "【表情包】",
-            lastTime: Date.now(),
-            unread: l,
             lastSenderAvatar: e.avatar,
             lastSenderName: e.name,
-          }),
-            C(t, c));
+            unread: _curStkActive ? (_stkSess.unread || 0) : ((_stkSess.unread || 0) + 1)
+          });
         }
         if ((V(), "function" == typeof window.showInAppNotif)) {
           var s = {
@@ -5425,28 +5427,18 @@ window.akiniContacts = {
             : "") +
           "</div>" +
           "";
-        if (a && U) {
-          const n = document.createElement("div");
-          (__akiniAppendMessageHTML(t, p, {
-              lastMsg: f,
-              lastSenderAvatar: activeSender.avatar || e.avatar,
-              lastSenderName: activeSender.name || e.name,
-            }),
-            S());
-        } else {
-          var v;
-          c =
-            __akiniStampMsgRows(((v = window.akiniContacts.getSession(t)).messagesHTML || "") + p);
-          l = (v.unread || 0) + 1;
-          (window.akiniContacts.updateSession(t, {
-            messagesHTML: c,
-            lastMsg: f,
-            lastTime: Date.now(),
-            unread: l,
-            lastSenderAvatar: activeSender.avatar || e.avatar,
-            lastSenderName: activeSender.name || e.name,
-          }),
-            C(t, c));
+        // v879 吞消息根治：动态检测实时活跃状态，严禁闭包旧值 a 拦截追加
+        var _curActiveAt = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(t) : false);
+        var _vSess = window.akiniContacts.getSession(t) || {};
+        __akiniAppendMessageHTML(t, p, {
+          lastMsg: f,
+          lastSenderAvatar: activeSender.avatar || e.avatar,
+          lastSenderName: activeSender.name || e.name,
+          unread: _curActiveAt ? (_vSess.unread || 0) : ((_vSess.unread || 0) + 1)
+        });
+        if (_curActiveAt && U) {
+          S();
+          (function(){var _sc=function(){try{U.scrollTop=U.scrollHeight;}catch(e){}};_sc();requestAnimationFrame(_sc);setTimeout(_sc,80);setTimeout(_sc,240);})();
         }
         if ((V(), "function" == typeof window.showInAppNotif)) {
           var s = {
@@ -20112,9 +20104,13 @@ window.akiniContacts = {
       })(),
       (window.pickWordCards = function (t, contactId) {
         var e = i("akini_wordbank", []).filter(function (t) {
+          if (!t) return false;
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
-          return "pat" !== e && "pat" !== n;
+          if ("pat" === e || "pat" === n) return false;
+          // v879 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
+          var _tx = ("string" == typeof t) ? t : (t.text || t.content || "");
+          return "string" == typeof _tx && !!_tx.trim();
         });
         if (window.__wbFilter) e = window.__wbFilter(e, contactId);
         if (!e.length) {
@@ -20128,7 +20124,7 @@ window.akiniContacts = {
         return n
           .slice(0, a)
           .map(function (t) {
-            return t.text || t.content || "";
+            return ("string" == typeof t) ? t : (t.text || t.content || "");
           })
           .filter(Boolean)
           .join("\n");
@@ -30842,7 +30838,11 @@ window.handleS2CoverDirect = function(e) {
       if (!chat) return;
       var visible = chat.style.display !== "none" && (chat.offsetParent !== null || chat.getClientRects().length > 0);
       if (!visible) {
-        if (__akiniKbShift !== 0) { chat.style.transform = ""; __akiniKbShift = 0; }
+        if (__akiniKbShift !== 0) {
+          chat.style.transform = "";
+          chat.style.paddingBottom = "";
+          __akiniKbShift = 0;
+        }
         return;
       }
       var bar = chat.querySelector(".chat-input-bar-area") || chat.querySelector(".chat-input-bar");
@@ -30853,8 +30853,17 @@ window.handleS2CoverDirect = function(e) {
       var over = realBottom - vvBottom;
       var shift = over > 2 ? Math.min(over + 8, 420) : 0;
       if (shift !== __akiniKbShift) {
-        chat.style.transform = shift > 0 ? "translateY(" + (-shift) + "px)" : "";
+        // v879 根治键盘弹起露首页：坚决禁止 translateY 拔起整个容器导致底部露出底层首页！
+        // 改为纯 paddingBottom 垫高输入栏，容器始终固定贴满屏幕，绝不穿透露出首页
+        chat.style.transform = "";
+        chat.style.paddingBottom = shift > 0 ? (shift + "px") : "";
         __akiniKbShift = shift;
+        if (shift > 0) {
+          try {
+            var cb = document.getElementById("chatBody");
+            if (cb) cb.scrollTop = cb.scrollHeight;
+          } catch (_e) {}
+        }
       }
     } catch (e) {}
   }
