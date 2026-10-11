@@ -1,4 +1,4 @@
-const CACHE_NAME = 'akini-cache-20261011v890';
+const CACHE_NAME = 'akini-cache-20261011v892';
 const PRECACHE_ASSETS = [
   './akini.html',
   './akini-style.css',
@@ -46,7 +46,19 @@ self.addEventListener('fetch', function(event) {
   var url = new URL(req.url);
   var isNav = req.mode === 'navigate';
   var isSW = url.pathname.endsWith('service-worker.js');
-  var isMainAsset = /\/(akini\.html|akini-main\.js|akini-style\.css)(\?.*)?$/.test(url.pathname);
+  /* v892 版本锁根治：所有 akini 主资源（html/8个js模块/css）统一纳入网络优先。
+     原只有 3 个主资源走网络优先，其余 js 弱网走缓存优先+ignoreSearch——
+     可能匹配到任意旧版本 → 新html+旧js 版本错配 → 卡崩闪退（版本回退的真正机制） */
+  var isMainAsset = /\/(akini\.html|akini-style\.css|akini-[a-z0-9-]+\.js)(\?.*)?$/.test(url.pathname);
+
+  /* v892 版本锁核心：主资源缓存 key 规范化（去掉 ?v=xxx 版本 query）。
+     原逻辑 put 带完整 query 的 key + match 用 ignoreSearch——缓存里同一文件堆积 N 个版本副本，
+     ignoreSearch 匹配到哪个版本由浏览器实现决定（Safari 常返回旧的）→ 版本回退+错配。
+     规范化后每个文件缓存里只有一份（最近一次网络成功的版本），html 与其引用的 js 同一次
+     页面加载链上先后写入，版本天然对齐；新 SW activate 时清空旧 CACHE_NAME，
+     绝无多版本残留。弱网回退永远只回退到上一版且 html/js/css 版本一致，刷新即最新 */
+  var canonUrl = url.origin + url.pathname;
+  var canonReq = new Request(canonUrl);
 
   // 导航请求和 service worker 本身绝不走缓存
   if (isNav || isSW) {
@@ -60,12 +72,12 @@ self.addEventListener('fetch', function(event) {
         if (response && response.status === 200 && response.type === 'basic') {
           var clone = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, clone);
+            cache.put(canonReq, clone);
           }).catch(function(){});
         }
         return response;
       }).catch(function() {
-        return caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
+        return caches.match(canonUrl).then(function(cached) {
           return cached || fetch(event.request);
         });
       })
@@ -73,7 +85,7 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // 其他静态资源：缓存优先，后台更新
+  // 其他静态资源（favicon/localforage/manifest 等内容不变更）：缓存优先，后台更新
   event.respondWith(
     caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
       if (cached) return cached;

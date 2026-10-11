@@ -5174,17 +5174,19 @@ window.akiniContacts = {
           '" style="max-width:120px;max-height:120px;border-radius:8px;display:block;" data-preserve-inline="1"></div></div></div>' +
           "";
         if (a && U) {
-          const i = document.createElement("div");
-          ((i.innerHTML = n),
-            U.appendChild(i.firstChild),
-            (function(){var _sc=function(){try{U.scrollTop=U.scrollHeight;}catch(e){}};_sc();requestAnimationFrame(_sc);setTimeout(_sc,80);setTimeout(_sc,240);})(),
-            S(),
-            window.akiniContacts.updateSession(t, {
-              lastMsg: "【表情包】",
-              lastTime: Date.now(),
-              lastSenderAvatar: e.avatar,
-              lastSenderName: e.name,
-            }));
+          /* v891 表情包消失根治：原"聊天正打开"分支只把 DOM 直插 + lastMsg 元数据，
+             messagesHTML 与 C() 落盘全被跳过——退出聊天重进时 ct() 用持久层重绘，
+             这条表情包消息被整条冲掉（"联系人发的表情包消失"元凶）。
+             改为统一走 __akiniAppendMessageHTML（内部含 DOM 追加+updateSession+C() 落盘全链路） */
+          __akiniAppendMessageHTML(t, n, {
+            lastMsg: "【表情包】",
+            lastSenderAvatar: e.avatar,
+            lastSenderName: e.name,
+            unread: 0
+          });
+          (function(){var _sc=function(){try{U.scrollTop=U.scrollHeight;}catch(e){}};_sc();requestAnimationFrame(_sc);setTimeout(_sc,80);setTimeout(_sc,240);})();
+          S();
+          V();
         } else {
           var _curStkActive = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(t) : false);
           var _stkSess = window.akiniContacts.getSession(t) || {};
@@ -14295,7 +14297,27 @@ window.akiniContacts = {
               msgText +
               "</div></div>";
             var session = window.akiniContacts.getSession ? window.akiniContacts.getSession(t) : null;
+            /* v891 系统消息消失根治（v888 漏修的姊妹路径）：Me() 以 session.messagesHTML 为底拼新行，
+               若该聊天刚被 __akiniReleaseChatMemory 防闪退清空（>256KB 非活跃聊天），底子只剩空串/本条，
+               "只增不减"守卫判定 newRows<oldRows 整条拒绝——系统消息被彻底丢弃。
+               base 与 v888 __akiniAppendMessageHTML 同源：sess→内存权威E[t]→LS主→LS备份 择优最长，
+               LS 恢复的底子先过滤已删消息防复活 */
             var prevHTML = (session && session.messagesHTML) || "";
+            try {
+              var _meMem = (typeof window.__akiniGetChatMem === "function" ? window.__akiniGetChatMem(t) : "") || "";
+              if (_meMem && _meMem.length > prevHTML.length) prevHTML = _meMem;
+            } catch (eM1) {}
+            if (!prevHTML) {
+              try {
+                var _lsH1 = localStorage.getItem("akini_chat_history_" + t) || "";
+                var _lsH2 = localStorage.getItem("akini_chat_history_backup_" + t) || "";
+                var _lsBest2 = _lsH1.length >= _lsH2.length ? _lsH1 : _lsH2;
+                if (_lsBest2 && typeof window.__akiniFilterDeletedMsgs === "function") {
+                  _lsBest2 = window.__akiniFilterDeletedMsgs(t, _lsBest2);
+                }
+                if (_lsBest2 && _lsBest2.length > prevHTML.length) prevHTML = _lsBest2;
+              } catch (eM2) {}
+            }
             // 避免消息历史中连续重复的系统提示（按最近一条系统消息内容去重）
             var prevSystemText = "";
             try {
@@ -18497,7 +18519,13 @@ window.akiniContacts = {
         if (document.hidden) _saveVault();
       });
       window.addEventListener("pagehide", function () { _saveVault(); });
-      setInterval(_saveVault, 30000);
+      /* v892 Safari卡崩减负：原每30s无条件全量序列化所有 akini_* 键（可达数MB）
+         JSON.stringify + Cache API put，iOS 上是稳定内存压力源。
+         降频到 90s 且页面隐藏时跳过（visibilitychange/pagehide 已有即时保存兜底） */
+      setInterval(function () {
+        if (document.hidden) return;
+        _saveVault();
+      }, 90000);
       setTimeout(_saveVault, 3000); // 启动 3s 后立即落第一次，防止初次打开不久即退出
       setTimeout(_scheduleSave, 15000); // 启动 15s 后调度一次
       /* 恢复：核心键全空（疑似被系统清理）时从保险箱逐键回填；仅回填当前为空的键，绝不覆盖现有数据 */
