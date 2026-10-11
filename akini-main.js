@@ -3989,10 +3989,13 @@ window.akiniContacts = {
             lsVal.trim() &&
             "null" !== lsVal.trim() &&
             "undefined" !== lsVal.trim();
-          if (!lsValid) {
+          /* v893 头像闪旧根治：IDB 是头像权威源（上传即三层落盘）。原"仅 LS 无效才回填"
+             导致 LS 残留旧头像时首屏一直渲染旧头像、水合后又换新——肉眼闪烁。
+             改为 IDB 有效即采用并回写 LS，下次启动 LS 即新值，零闪烁 */
+          if (i) {
             u(t, i);
             try {
-              localStorage.setItem(e, i);
+              if (lsVal !== i) localStorage.setItem(e, i);
             } catch (t) {}
             if (n)
               try {
@@ -6817,6 +6820,8 @@ window.akiniContacts = {
     }
     function _applyPosts(parsed) {
       if (!Array.isArray(parsed) || !parsed.length) return;
+      /* v893：按删除标记过滤，防 vault/backup 旧快照复活已删动态 */
+      try { if (window.__akiniFilterDelPosts) parsed = window.__akiniFilterDelPosts(parsed); } catch (eF) {}
       if (!z || !z.length) {
         z = parsed;
       } else {
@@ -7178,6 +7183,8 @@ window.akiniContacts = {
       if (!window.__akiniIcityRecoverDone) {
         window.__akiniIcityRecoverDone = !0;
         if (!F || !F.length) F = i("akini_icity_diaries", []);
+        /* v893：按删除标记过滤已删日记 */
+        try { if (window.__akiniFilterDelIcity) F = window.__akiniFilterDelIcity(F); } catch (eFD2) {}
         try {
           var em = sessionStorage.getItem("akini_icity_diaries_emergency");
           if (em) {
@@ -7407,6 +7414,8 @@ window.akiniContacts = {
       try {
         var n = JSON.parse(t);
         if (!Array.isArray(n)) return !1;
+        /* v893：合并前按删除标记过滤，防旧备份把已删日记"只增不减"合并复活 */
+        try { if (window.__akiniFilterDelIcity) n = window.__akiniFilterDelIcity(n); } catch (eFD) {}
         var i = (F && F.length) || 0;
         if (e || n.length > i) {
           // 不变量保护：合并前后评论总数只增不减，任何一侧的评论都不允许丢失
@@ -13311,6 +13320,11 @@ window.akiniContacts = {
                 try {
                   var all = O();
                   var filtered = all.filter(function(p) { return String(p.id) !== String(target.id); });
+                  /* v893：记录删除标记，防 vault/IDB backup 旧快照复活已删动态 */
+                  try {
+                    var _dl = []; try { _dl = JSON.parse(localStorage.getItem('akini_deleted_posts') || '[]'); } catch (eD0) {}
+                    if (_dl.indexOf(String(target.id)) < 0) { _dl.push(String(target.id)); localStorage.setItem('akini_deleted_posts', JSON.stringify(_dl)); }
+                  } catch (eD1) {}
                   R(filtered, function() {
                     if (window._renderPosts) window._renderPosts();
                   });
@@ -30165,6 +30179,8 @@ function changeS1Photo() {
         // 保存到本地存储
         try {
           localStorage.setItem('akini_s1_photo', event.target.result);
+          /* v893：大图被 LS 拦截层挡住时，akiniStore 三层落盘(含IDB)兜底防重进初始化 */
+          try { window.akiniStore && window.akiniStore.set && window.akiniStore.set('akini_s1_photo', event.target.result); } catch (ePh0) {}
         } catch(e) {}
       }
     };
@@ -30193,6 +30209,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // 恢复保存的照片
   try {
     const photo = localStorage.getItem('akini_s1_photo');
+    /* v893：LS 被拦截为空时异步从 akiniStore/IDB 兜底回填并回写 LS */
+    if (!photo && window.akiniStore && window.akiniStore.get) {
+      try { window.akiniStore.get('akini_s1_photo', function (_pv) { if (_pv) { var _pe = document.getElementById('s1PolaroidImg'); if (_pe) _pe.style.backgroundImage = 'url("' + _pv + '")'; try { localStorage.setItem('akini_s1_photo', _pv); } catch (ePh1) {} } }); } catch (ePh2) {}
+    }
     if (photo) {
       const img = document.getElementById('s1PolaroidImg');
       if (img) {
@@ -30624,6 +30644,8 @@ function initHomeMusicPlayerSection() {
     } catch(e) {}
   }
 
+  /* v893：启动立即同步一次，不等首个800ms周期——消除"先显示旧值再变正确" */
+  try { syncHomeMusicUI(); } catch (eSy) {}
   setInterval(syncHomeMusicUI, 800);
 }
 
@@ -31016,4 +31038,72 @@ window.handleS2CoverDirect = function(e) {
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden) setTimeout(__akiniKbFix, 120);
   });
+})();
+
+/* ===== v893：删除标记过滤工具 + icity 删除自动记录 hook ===== */
+window.__akiniFilterDelPosts = function (arr) {
+  try {
+    if (!Array.isArray(arr) || !arr.length) return arr;
+    var dl = []; try { dl = JSON.parse(localStorage.getItem('akini_deleted_posts') || '[]'); } catch (e) {}
+    if (!Array.isArray(dl) || !dl.length) return arr;
+    var set = {}; dl.forEach(function (id) { set[String(id)] = 1; });
+    return arr.filter(function (p) { return !(p && p.id && set[String(p.id)]); });
+  } catch (e) { return arr; }
+};
+window.__akiniFilterDelIcity = function (arr) {
+  try {
+    if (!Array.isArray(arr) || !arr.length) return arr;
+    var dl = []; try { dl = JSON.parse(localStorage.getItem('akini_deleted_icity') || '[]'); } catch (e) {}
+    if (!Array.isArray(dl) || !dl.length) return arr;
+    var set = {}; dl.forEach(function (id) { set[String(id)] = 1; });
+    return arr.filter(function (d) { return !(d && d.id && set[String(d.id)]); });
+  } catch (e) { return arr; }
+};
+(function () {
+  if (window.__akiniIcityDelHook) return; window.__akiniIcityDelHook = 1;
+  try {
+    if (!window._idbStore || !window._idbStore.set) return;
+    var _orig = window._idbStore.set.bind(window._idbStore);
+    var snap = { posts: null, icity: null };
+    window._idbStore.set = function (k, v) {
+      try {
+        if (k === 'akini_posts' && typeof v === 'string') {
+          var cur = null; try { cur = JSON.parse(v); } catch (e) {}
+          if (Array.isArray(cur)) {
+            if (Array.isArray(snap.posts)) {
+              var map = {}; cur.forEach(function (p) { if (p && p.id) map[String(p.id)] = 1; });
+              var gone = [];
+              snap.posts.forEach(function (p) { if (p && p.id && !map[String(p.id)]) gone.push(String(p.id)); });
+              if (gone.length) {
+                var dl = []; try { dl = JSON.parse(localStorage.getItem('akini_deleted_posts') || '[]'); } catch (e2) {}
+                gone.forEach(function (g) { if (dl.indexOf(g) < 0) dl.push(g); });
+                try { localStorage.setItem('akini_deleted_posts', JSON.stringify(dl)); } catch (e3) {}
+              }
+            }
+            snap.posts = cur;
+          }
+        }
+        if (k === 'akini_icity_diaries' && typeof v === 'string') {
+          var cur2 = null; try { cur2 = JSON.parse(v); } catch (e4) {}
+          if (Array.isArray(cur2)) {
+            if (Array.isArray(snap.icity)) {
+              var map2 = {}; cur2.forEach(function (d) { if (d && d.id) map2[String(d.id)] = 1; });
+              var gone2 = [];
+              snap.icity.forEach(function (d) { if (d && d.id && !map2[String(d.id)]) gone2.push(String(d.id)); });
+              if (gone2.length) {
+                var dl2 = []; try { dl2 = JSON.parse(localStorage.getItem('akini_deleted_icity') || '[]'); } catch (e5) {}
+                gone2.forEach(function (g2) { if (dl2.indexOf(g2) < 0) dl2.push(g2); });
+                try { localStorage.setItem('akini_deleted_icity', JSON.stringify(dl2)); } catch (e6) {}
+              }
+            }
+            snap.icity = cur2;
+          }
+        }
+      } catch (eH) {}
+      return _orig(k, v);
+    };
+    /* 初始快照：当前存量基线 */
+    try { window._idbStore.get('akini_posts', function (v0) { try { if (v0) snap.posts = JSON.parse(v0); } catch (e) {} }); } catch (e) {}
+    try { window._idbStore.get('akini_icity_diaries', function (v1) { try { if (v1) snap.icity = JSON.parse(v1); } catch (e) {} }); } catch (e) {}
+  } catch (eO) {}
 })();
