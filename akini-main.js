@@ -7752,19 +7752,20 @@ window.akiniContacts = {
         if (Y) { Y.style.display = "none"; Y.classList.remove("show"); }
       };
     }
-    // ========== 首页防闪：数据未就绪前隐藏默认内容；切后台回来禁止整体下拉 ==========
+    // ========== 首页防闪：确保内容始终可见，杜绝开屏跳过后被误设 hidden 导致全页点不动 ==========
     (function () {
       if (document.getElementById("akiniNoFlashStyle")) return;
       var style = document.createElement("style");
       style.id = "akiniNoFlashStyle";
-      style.textContent = ".akini-content-hidden{opacity:0!important;visibility:hidden!important}.akini-content-fade{transition:opacity .25s ease,visibility .25s ease}";
+      style.textContent = ".akini-content-fade{transition:opacity .25s ease,visibility .25s ease}";
       document.head.appendChild(style);
       var cw = document.querySelector(".content-wrapper");
-      if (cw && !cw.classList.contains("akini-content-fade")) {
-        cw.classList.add("akini-content-fade", "akini-content-hidden");
+      if (cw) {
+        cw.classList.remove("akini-content-hidden");
+        cw.style.visibility = "visible";
+        cw.style.opacity = "1";
       }
       function resetScroll(){
-        // 开屏已彻底隐藏后不再强制重置滚动，避免切回前台时所有页面跳回顶部
         if (window.__akiniSplashDone && window.__akiniSplashRemoved) return;
         try { window.scrollTo(0,0); } catch(e){}
         try { document.documentElement.scrollTop = 0; } catch(e){}
@@ -7779,8 +7780,13 @@ window.akiniContacts = {
     })();
     window.__akiniShowContent = function () {
       var cw = document.querySelector(".content-wrapper");
-      if (cw) cw.classList.remove("akini-content-hidden");
+      if (cw) {
+        cw.classList.remove("akini-content-hidden");
+        cw.style.visibility = "visible";
+        cw.style.opacity = "1";
+      }
     };
+    try { window.__akiniShowContent(); } catch(e){}
     // ========== 开屏动画：进度条 + 收尾隐藏 ==========
     // 重复初始化全部幂等：进度/起点/时长一旦被重置，用户会看到进度条跳回重涨（开屏"闪"的根因之一）
     if (typeof window.__akiniSplashProgress !== "number") window.__akiniSplashProgress = 0;
@@ -14247,57 +14253,63 @@ window.akiniContacts = {
           }, 60000)));
     }
     function Me(t, e) {
-      if (window.akiniContacts) {
-        if (!t) {
-          var n = window.akiniContacts.getContacts();
-          n && n.length > 0 && (t = n[0].id);
-        }
-        if (t) {
-          var msgText = rt(e) || "";
-          var i =
-            '<div class="msg-row system"><div class="bubble">' +
-            msgText +
-            "</div></div>";
-          var session = window.akiniContacts.getSession(t);
-          var prevHTML = session.messagesHTML || "";
-          // 避免消息历史中连续重复的系统提示（按最近一条系统消息内容去重）
-          var prevSystemText = "";
-          try {
-            var tmpDiv = document.createElement("div");
-            tmpDiv.innerHTML = prevHTML;
-            var sysRows = tmpDiv.querySelectorAll(".msg-row.system");
-            if (sysRows.length > 0) {
-              var lastSys = sysRows[sysRows.length - 1];
-              var lastBubble = lastSys.querySelector(".bubble");
-              prevSystemText = (lastBubble ? lastBubble.textContent : lastSys.textContent) || "";
-              prevSystemText = prevSystemText.trim();
-            }
-          } catch (err) {}
-          if (prevSystemText !== msgText) {
-            var a = prevHTML + i;
-            window.akiniContacts.updateSession(t, {
-              messagesHTML: a,
-              lastTime: Date.now(),
-            });
-            C(t, a);
+      try {
+        if (window.akiniContacts) {
+          if (!t) {
+            var n = window.akiniContacts.getContacts();
+            n && n.length > 0 && (t = n[0].id);
           }
-          V();
-          if (U && window.akiniContacts.getActiveChatId() === t) {
-            var last = U.lastElementChild;
-            if (
-              !last ||
-              !last.classList.contains("system") ||
-              (last.textContent || "").trim() !== msgText
-            ) {
-              var o = document.createElement("div");
-              (o.className = "msg-row system"),
-                (o.innerHTML = '<div class="bubble">' + msgText + "</div>"),
-                U.appendChild(o),
-                (U.scrollHeight - U.scrollTop - U.clientHeight < 150) && (U.scrollTop = U.scrollHeight);
+          if (t) {
+            var msgText = rt(e) || "";
+            var i =
+              '<div class="msg-row system"><div class="bubble">' +
+              msgText +
+              "</div></div>";
+            var session = window.akiniContacts.getSession ? window.akiniContacts.getSession(t) : null;
+            var prevHTML = (session && session.messagesHTML) || "";
+            // 避免消息历史中连续重复的系统提示（按最近一条系统消息内容去重）
+            var prevSystemText = "";
+            try {
+              var tmpDiv = document.createElement("div");
+              tmpDiv.innerHTML = prevHTML;
+              var sysRows = tmpDiv.querySelectorAll(".msg-row.system");
+              if (sysRows.length > 0) {
+                var lastSys = sysRows[sysRows.length - 1];
+                var lastBubble = lastSys.querySelector(".bubble");
+                prevSystemText = (lastBubble ? lastBubble.textContent : lastSys.textContent) || "";
+                prevSystemText = prevSystemText.trim();
+              }
+            } catch (err) {}
+            if (prevSystemText !== msgText) {
+              var a = prevHTML + i;
+              if (window.akiniContacts.updateSession) {
+                window.akiniContacts.updateSession(t, {
+                  messagesHTML: a,
+                  lastTime: Date.now(),
+                });
+              }
+              if (typeof C === "function") C(t, a);
             }
+            if (typeof V === "function") V();
+            if (U && window.akiniContacts.getActiveChatId && window.akiniContacts.getActiveChatId() === t) {
+              var last = U.lastElementChild;
+              if (
+                !last ||
+                !last.classList.contains("system") ||
+                (last.textContent || "").trim() !== msgText
+              ) {
+                var o = document.createElement("div");
+                (o.className = "msg-row system"),
+                  (o.innerHTML = '<div class="bubble">' + msgText + "</div>"),
+                  U.appendChild(o),
+                  (U.scrollHeight - U.scrollTop - U.clientHeight < 150) && (U.scrollTop = U.scrollHeight);
+              }
+            }
+            "function" == typeof ot && ot();
           }
-          "function" == typeof ot && ot();
         }
+      } catch (meErr) {
+        console.warn("Me system notice err:", meErr);
       }
     }
     function Le() {
@@ -14412,17 +14424,24 @@ window.akiniContacts = {
             if (we && !we.answered) { t = we.isMyCalling ? "cancel" : "me_reject"; }
             Se(t);
           }
-          if (we) { we.active = false; we.answered = false; }
+        } catch(err) {
+          console.error("Hangup Se error:", err);
+        } finally {
+          if (we) { we.active = false; we.answered = false; we.isMinimized = false; }
           var appCall = document.getElementById("app-call");
-          if (appCall) appCall.style.display = "none";
+          if (appCall) {
+            appCall.style.display = "none";
+            appCall.classList.remove("call-expanded");
+          }
           var mini = document.getElementById("callMiniWindow");
           if (mini) mini.style.display = "none";
-        } catch(err) {
-          console.error("Hangup error:", err);
-          var ac = document.getElementById("app-call");
-          if (ac) ac.style.display = "none";
+          try {
+            var bd = document.body;
+            if (bd && bd.style.overflow === "hidden") bd.style.overflow = "";
+          } catch (_) {}
         }
       }
+      window.__akiniForceHangup = _doHangup;
       function _doAnswer(ev){
         if (ev) { try { ev.preventDefault(); ev.stopPropagation(); } catch(e){} }
         try {
@@ -14439,6 +14458,12 @@ window.akiniContacts = {
         hFull.addEventListener("click", _doHangup);
         hFull.addEventListener("touchend", _doHangup);
         hFull.addEventListener("pointerup", _doHangup);
+      }
+      var hSmall = document.getElementById("callHangupBtn");
+      if (hSmall) {
+        hSmall.addEventListener("click", _doHangup);
+        hSmall.addEventListener("touchend", _doHangup);
+        hSmall.addEventListener("pointerup", _doHangup);
       }
       var aFull = document.getElementById("callAnswerBtnFull");
       if (aFull) {
@@ -14748,8 +14773,8 @@ window.akiniContacts = {
       }
     }
     const Fe = "akini_call_mini_pos";
-    (Re(ge, Fe),
-      Re(document.getElementById("app-call"), "akini_call_full_pos"));
+    (Re(ge, Fe));
+    // v882: 全屏通话界面 app-call 坚决禁止绑定拖拽监听，杜绝移动端轻微触控被识别为拖拽导致界面卡死或移出屏幕
     a(document.getElementById("callBtn"), function () {
       if (we && we.active) {
         window.__akiniToast &&
