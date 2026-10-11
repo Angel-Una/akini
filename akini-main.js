@@ -6039,8 +6039,29 @@ window.akiniContacts = {
       var cleanNew = __akiniStampMsgRows(__akiniStripTypingRows(html));
       if (!cleanNew) return;
       var sess = window.akiniContacts.getSession(chatId) || {};
-      // v609: 增量清洗——sess.messagesHTML 即上次缓存原文，命中零正则；非追加场景自动全量回退
-      var fullHTML = __akiniIncTyping(sess.messagesHTML || "", chatId) + cleanNew;
+      /* v888 吞消息/聊天记录消失根治：__akiniReleaseChatMemory 为防闪退会把非活跃大聊天(>256KB)的
+         sess.messagesHTML 与内存权威 E[t] 清空。此时若直接以 sess.messagesHTML 为 base 追加，
+         fullHTML 只剩 1 条新消息，updateSession 的"只增不减"守卫判定 newRows<oldRows 整条拒绝——
+         新消息被彻底丢弃（弹窗有显示、点进聊天缺几条、正常聊天记录消失的元凶）。
+         修复：追加 base 取 sess.messagesHTML / 内存权威 E[t] / LS主键 / LS备份键 中最长非空者；
+         从 LS 恢复的 base 必须先过滤已删消息，绝不让已删消息复活。 */
+      var _base = sess.messagesHTML || "";
+      try {
+        var _mem = (typeof window.__akiniGetChatMem === "function" ? window.__akiniGetChatMem(chatId) : "") || "";
+        if (_mem && _mem.length > _base.length) _base = _mem;
+      } catch (eB1) {}
+      if (!_base) {
+        try {
+          var _ls1 = localStorage.getItem("akini_chat_history_" + chatId) || "";
+          var _ls2 = localStorage.getItem("akini_chat_history_backup_" + chatId) || "";
+          var _lsBest = _ls1.length >= _ls2.length ? _ls1 : _ls2;
+          if (_lsBest && typeof window.__akiniFilterDeletedMsgs === "function") {
+            _lsBest = window.__akiniFilterDeletedMsgs(chatId, _lsBest);
+          }
+          if (_lsBest && _lsBest.length > _base.length) _base = _lsBest;
+        } catch (eB2) {}
+      }
+      var fullHTML = __akiniIncTyping(_base, chatId) + cleanNew;
       var isCurActive = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(chatId) : false);
       var updatePayload = Object.assign({
         messagesHTML: fullHTML,
@@ -9306,9 +9327,14 @@ window.akiniContacts = {
         try {
           lsCrit = localStorage.getItem("akini_chat_critical_" + t) || "";
         } catch (e) {}
+        /* v886 吞消息彻底根治：
+           若此时内存权威 E[t] 或会话 session(t).messagesHTML 已经是最新权威记录，
+           直接使用它们与持久层合并，且绝不允许旧持久层（如尚未刷盘或行数更少）冲掉刚生成的新消息！ */
+        var curSessMsg = (window.akiniContacts.getSession(t) && window.akiniContacts.getSession(t).messagesHTML) || "";
+        var curMemMsg = (E && E[t]) || "";
         var r = tt(
-          window.akiniContacts.getSession(t).messagesHTML || "",
-          E[t] || "",
+          curSessMsg,
+          curMemMsg,
           ls1,
           ls2,
           lsCrit,
@@ -9352,12 +9378,14 @@ window.akiniContacts = {
           _idbStore.get("akini_chat_history_" + t, function (a) {
             if (window.akiniContacts.getActiveChatId() !== t) return;
             var cleanA = (a && typeof window.__akiniFilterDeletedMsgs === "function") ? window.__akiniFilterDeletedMsgs(t, a) : (a || "");
-            var o = tt(window.akiniContacts.getSession(t).messagesHTML || r, "", cleanA || "", lsCrit);
+            var curS = (window.akiniContacts.getSession(t) && window.akiniContacts.getSession(t).messagesHTML) || r || "";
+            var curM = (E && E[t]) || "";
+            var o = tt(curS, curM, cleanA || "", lsCrit);
             if (o && typeof window.__akiniFilterDeletedMsgs === "function") o = window.__akiniFilterDeletedMsgs(t, o);
             // 仅在消息行数真正变多时才重绘
-            var rTs = (typeof __akiniLastMsgTs === "function") ? __akiniLastMsgTs(r || "") : 0;
+            var rTs = (typeof __akiniLastMsgTs === "function") ? __akiniLastMsgTs(curS || "") : 0;
             var oTs = (typeof __akiniLastMsgTs === "function") ? __akiniLastMsgTs(o || "") : 0;
-            if (o && __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(r || "") && (rTs === 0 || oTs >= rTs || (rTs - oTs < 60000)))
+            if (o && __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(curS || "") && (rTs === 0 || oTs >= rTs || (rTs - oTs < 60000)))
               return (
                 window.akiniContacts.updateSession(t, { messagesHTML: o, allowShrink: true }),
                 void l(o)
@@ -9365,9 +9393,10 @@ window.akiniContacts = {
             _idbStore.get("akini_chat_history_backup_" + t, function (a) {
               if (window.akiniContacts.getActiveChatId() !== t) return;
               var cleanBk = (a && typeof window.__akiniFilterDeletedMsgs === "function") ? window.__akiniFilterDeletedMsgs(t, a) : (a || "");
-              (o = tt(U.innerHTML || "", window.akiniContacts.getSession(t).messagesHTML || r, "", cleanBk || "", lsCrit)) &&
+              var latestS = (window.akiniContacts.getSession(t) && window.akiniContacts.getSession(t).messagesHTML) || curS || "";
+              (o = tt(U.innerHTML || "", latestS, curM, cleanBk || "", lsCrit)) &&
                 (o = (typeof window.__akiniFilterDeletedMsgs === "function" ? window.__akiniFilterDeletedMsgs(t, o) : o)) &&
-                __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(r || "") &&
+                __akiniCountMsgRowsFast(o) > __akiniCountMsgRowsFast(latestS || "") &&
                 (rTs === 0 || (typeof __akiniLastMsgTs === "function" && __akiniLastMsgTs(o) >= rTs) || ((typeof __akiniLastMsgTs === "function") && rTs - __akiniLastMsgTs(o) < 60000)) &&
                 (window.akiniContacts.updateSession(t, { messagesHTML: o, allowShrink: true }),
                 l(o));
@@ -30122,9 +30151,13 @@ document.addEventListener('DOMContentLoaded', function() {
   try {
     const texts = JSON.parse(localStorage.getItem('akini_s1_texts') || '{}');
     for (let i = 1; i <= 4; i++) {
-      if (texts['line' + i]) {
+      /* v890 新键优先：akini_s1_custom_text_N 是用户最近编辑的权威值，旧键 JSON 仅兜底，
+         防止旧键残留/vault回填的旧值覆盖用户最新编辑 */
+      let _nv = null; try { _nv = localStorage.getItem('akini_s1_custom_text_' + i); } catch(_eN) {}
+      const _tv = (_nv !== null && _nv !== undefined && _nv !== '') ? _nv : texts['line' + i];
+      if (_tv) {
         const el = document.getElementById('s1Text' + i);
-        if (el) el.textContent = texts['line' + i];
+        if (el) el.textContent = _tv;
       }
     }
   } catch(e) {}
@@ -30144,10 +30177,19 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 头像联动：同步我自己的头像到第一屏
   function syncS1Avatar() {
+    // v889 Safari卡崩根治：页面隐藏时跳过（每2s读取大innerHTML字符串的分配也省掉）
+    if (document.hidden) return;
     const s1Avatar = document.getElementById('s1AvatarCircle');
     const myAvatar = document.querySelector('.my-avatar') || document.getElementById('myAvatar');
     if (s1Avatar && myAvatar) {
-      s1Avatar.innerHTML = myAvatar.innerHTML;
+      /* v889 Safari卡崩根治：原每2s无条件 innerHTML 重建——销毁旧img+base64重新解码，
+         iOS Safari 解码位图缓存不即时回收，内存线性增长最终被系统 jetsam 杀进程。
+         指纹守卫：内容（长度+尾段）未变绝不触碰 DOM */
+      var _raw = myAvatar.innerHTML;
+      var _fp = _raw.length + ":" + (_raw.length > 64 ? _raw.slice(-64) : _raw);
+      if (s1Avatar.__akiniSyncFp === _fp) return;
+      s1Avatar.__akiniSyncFp = _fp;
+      s1Avatar.innerHTML = _raw;
     }
   }
   
@@ -30158,13 +30200,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // v714 头像与数据双向同步
 function syncDualScreensData() {
+  // v889 Safari卡崩根治：页面隐藏时跳过一切 UI 轮询（Safari 后台节流补执行堆积）
+  if (document.hidden) return;
   // 1. 同步第一屏头像：优先用户自定义设置，未设置时保留图三默认白发动漫头像，绝不被第二屏空白头像覆盖
   try {
     const s1Avatar = document.getElementById('s1AvatarCircle');
     const custom = localStorage.getItem('akini_s1_avatar');
     if (s1Avatar) {
       if (custom) {
-        s1Avatar.innerHTML = `<img src="${custom}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        /* v889 Safari卡崩根治：原每1.5s无条件重写 innerHTML——销毁重建img+重解码base64位图，
+           iOS Safari 内存线性增长被 jetsam 杀进程。custom 未变绝不触碰 DOM */
+        if (s1Avatar.__akiniLastCustom !== custom) {
+          s1Avatar.__akiniLastCustom = custom;
+          s1Avatar.innerHTML = `<img src="${custom}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">`;
+        }
       }
     }
   } catch(e) {}
@@ -30453,20 +30502,25 @@ function initHomeMusicPlayerSection() {
 
   // 轮询与监听真实音乐播放状态
   function syncHomeMusicUI() {
+    // v889 Safari卡崩根治：页面隐藏时跳过一切 UI 轮询（Safari 后台补执行堆积）
+    if (document.hidden) return;
     const origSongName = document.getElementById('musicSongName');
     const origArtist = document.getElementById('musicArtist');
     const origCover = document.getElementById('musicCover');
     const origPlayBtn = document.getElementById('musicPlayBtn');
     const origListenTime = document.getElementById('musicPlayerListenTime');
 
+    /* v889 Safari卡崩根治：textContent/src 相同值赋值也会让 Safari 标记 DOM dirty 触发样式重算；
+       尤其 img.src 每800ms重设会重启 data URI 解码管线——位图泄漏是 iOS jetsam 杀进程主因。
+       全部加同值守卫：值未变绝不写入 */
     if (origSongName && titleEl && origSongName.textContent && origSongName.textContent !== '一起听') {
-      titleEl.textContent = origSongName.textContent;
+      if (titleEl.textContent !== origSongName.textContent) titleEl.textContent = origSongName.textContent;
     }
     if (origArtist && artistEl && origArtist.textContent && origArtist.textContent !== '点击右上角导入歌单') {
-      artistEl.textContent = origArtist.textContent;
+      if (artistEl.textContent !== origArtist.textContent) artistEl.textContent = origArtist.textContent;
     }
     if (origCover && coverEl && origCover.src && !origCover.src.includes('data:image/gif')) {
-      coverEl.src = origCover.src;
+      if (coverEl.src !== origCover.src) coverEl.src = origCover.src;
     }
 
     // 播放/暂停状态同步
@@ -30488,18 +30542,23 @@ function initHomeMusicPlayerSection() {
       return !!(origPlayBtn && origPlayBtn.classList.contains('playing'));
     })();
     if (playBtn) {
-      const playIcon = playBtn.querySelector('.play-icon');
-      const pauseIcon = playBtn.querySelector('.pause-icon');
-      if (isPlaying) {
-        if (playIcon) playIcon.style.display = 'none';
-        if (pauseIcon) pauseIcon.style.display = 'block';
-        playBtn.classList.add('playing');
-        if (discEl) discEl.style.animation = 'disc-spin 6s linear infinite';
-      } else {
-        if (playIcon) playIcon.style.display = 'block';
-        if (pauseIcon) pauseIcon.style.display = 'none';
-        playBtn.classList.remove('playing');
-        if (discEl) discEl.style.animation = 'none';
+      /* v889 Safari卡崩根治：播放状态未变时零写入——原每800ms重设 display/class/animation，
+         disc-spin 动画被反复重设重启，Safari 上累积样式重算+动画重启开销 */
+      if (playBtn.__akiniLastPlaying !== isPlaying) {
+        playBtn.__akiniLastPlaying = isPlaying;
+        const playIcon = playBtn.querySelector('.play-icon');
+        const pauseIcon = playBtn.querySelector('.pause-icon');
+        if (isPlaying) {
+          if (playIcon) playIcon.style.display = 'none';
+          if (pauseIcon) pauseIcon.style.display = 'block';
+          playBtn.classList.add('playing');
+          if (discEl) discEl.style.animation = 'disc-spin 6s linear infinite';
+        } else {
+          if (playIcon) playIcon.style.display = 'block';
+          if (pauseIcon) pauseIcon.style.display = 'none';
+          playBtn.classList.remove('playing');
+          if (discEl) discEl.style.animation = 'none';
+        }
       }
     }
 
@@ -30580,6 +30639,13 @@ window.editS1CustomText = function(index) {
   if (val !== null) {
     val = val.trim() || 'xxx';
     try { localStorage.setItem(key, val); } catch(e){}
+    /* v890 双写旧键：applyCoreUI/vault恢复等所有旧读取方只认 akini_s1_texts JSON，
+       单写新键导致重进被旧值覆盖或初始化。同步镜像，两套系统永远一致 */
+    try {
+      var _st = {}; try { _st = JSON.parse(localStorage.getItem('akini_s1_texts') || '{}'); } catch(_eS) {}
+      _st['line' + index] = val;
+      localStorage.setItem('akini_s1_texts', JSON.stringify(_st));
+    } catch(_eS2) {}
     if (index === 1) { const el = document.getElementById('s1Text1'); if (el) el.textContent = val; }
     else if (index === 2) { const el = document.getElementById('s1Text2'); if (el) el.textContent = val; }
     else if (index === 3) { const el = document.getElementById('s1Text3'); if (el) el.textContent = val; }
@@ -30591,10 +30657,16 @@ window.editS1CustomText = function(index) {
 window.editS1PolaroidNote = function() {
   var _pEl = document.getElementById('s1PolaroidNote');
   let cur = (_pEl && _pEl.textContent) ? _pEl.textContent : 'xxx';
-  let val = prompt('请输入小卡片左下角自定义文字：', cur === 'xxx' ? '' : cur);
+  var val = prompt('请输入小卡片左下角自定义文字：', cur === 'xxx' ? '' : cur);
   if (val !== null) {
     val = val.trim() || 'xxx';
     try { localStorage.setItem('akini_s1_polaroid_note', val); } catch(e){}
+    /* v890 双写旧键：note 同步镜像进 akini_s1_texts JSON，防旧读取方拿到空值 */
+    try {
+      var _st2 = {}; try { _st2 = JSON.parse(localStorage.getItem('akini_s1_texts') || '{}'); } catch(_eS3) {}
+      _st2['note'] = val;
+      localStorage.setItem('akini_s1_texts', JSON.stringify(_st2));
+    } catch(_eS4) {}
     const el = document.getElementById('s1PolaroidNote');
     if (el) el.textContent = val;
   }
@@ -30629,13 +30701,24 @@ window.loadS1SavedTexts = function() {
     const t5 = localStorage.getItem('akini_s1_custom_text_5');
     const note = localStorage.getItem('akini_s1_polaroid_note');
     const photo = localStorage.getItem('akini_s1_photo');
+    /* v890 择优恢复：新键优先；新键为 null（未设置/被清）时从旧键 JSON 兜底——
+       vault 恢复白名单已补齐新键，但旧版本 vault 快照只有旧键，双向兼容零丢失 */
+    var _old = {};
+    try { _old = JSON.parse(localStorage.getItem('akini_s1_texts') || '{}'); } catch(_eO) {}
+    var _pick = function(newV, oldV) { return (newV !== null && newV !== undefined && newV !== '') ? newV : (oldV || null); };
+    const v1 = _pick(t1, _old['line1']);
+    const v2 = _pick(t2, _old['line2']);
+    const v3 = _pick(t3, _old['line3']);
+    const v4 = _pick(t4, _old['line4']);
+    const v5 = _pick(t5, _old['line5']);
+    const vNote = _pick(note, _old['note']);
 
-    if (t1 && document.getElementById('s1Text1')) document.getElementById('s1Text1').textContent = t1;
-    if (t2 && document.getElementById('s1Text2')) document.getElementById('s1Text2').textContent = t2;
-    if (t3 && document.getElementById('s1Text3')) document.getElementById('s1Text3').textContent = t3;
-    if (t4 && document.getElementById('s1Text4')) document.getElementById('s1Text4').textContent = t4;
-    if (t5 && document.getElementById('s1TextLoc')) document.getElementById('s1TextLoc').textContent = t5;
-    if (note && document.getElementById('s1PolaroidNote')) document.getElementById('s1PolaroidNote').textContent = note;
+    if (v1 && document.getElementById('s1Text1')) document.getElementById('s1Text1').textContent = v1;
+    if (v2 && document.getElementById('s1Text2')) document.getElementById('s1Text2').textContent = v2;
+    if (v3 && document.getElementById('s1Text3')) document.getElementById('s1Text3').textContent = v3;
+    if (v4 && document.getElementById('s1Text4')) document.getElementById('s1Text4').textContent = v4;
+    if (v5 && document.getElementById('s1TextLoc')) document.getElementById('s1TextLoc').textContent = v5;
+    if (vNote && document.getElementById('s1PolaroidNote')) document.getElementById('s1PolaroidNote').textContent = vNote;
     if (photo && document.getElementById('s1PolaroidImg')) document.getElementById('s1PolaroidImg').style.backgroundImage = `url("${photo}")`;
   } catch(e){}
 };
