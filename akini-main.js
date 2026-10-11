@@ -2766,7 +2766,7 @@ window._idbStore = (function () {
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
           if ("pat" === e || "pat" === n) return false;
-          // v879 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
+          // v881 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
           var _tx = ("string" == typeof t) ? t : (t.text || t.content || "");
           return "string" == typeof _tx && !!_tx.trim();
         });
@@ -4150,7 +4150,7 @@ window.akiniContacts = {
           f = i("akini_wordbank", []).filter(function (t) {
             if (!t) return false;
             if (t.tab && "main" !== t.tab) return false;
-            // v879 对齐 milk：抽到啥发啥——池内就是你添加的全部主字卡，仅排除空值，
+            // v881 对齐 milk：抽到啥发啥——池内就是你添加的全部主字卡，仅排除空值，
             // 绝不做长度/符号/内容过滤（手动打的任何文字都必须能被抽中发出）
             var _txt = ("string" == typeof t) ? t : (t.text || t.content || "");
             return "string" == typeof _txt && !!_txt.trim();
@@ -4308,7 +4308,7 @@ window.akiniContacts = {
           });
           replyCount = Math.max(1, replyCount - 1);
         }
-        // v879 对齐 milk：抽到啥发啥——仅保留 milk 同款防呆（text 非字符串/空时跳过，等价 milk 的 filter(Boolean)）
+        // v881 对齐 milk：抽到啥发啥——仅保留 milk 同款防呆（text 非字符串/空时跳过，等价 milk 的 filter(Boolean)）
         function __isValidTextCard(item) {
           var txt = ("string" == typeof item) ? item : (item && (item.text || item.content)) || "";
           return "string" == typeof txt && !!txt.trim();
@@ -4318,7 +4318,7 @@ window.akiniContacts = {
               ? o.forceText
               : f[Math.floor(Math.random() * f.length)],
             j = "string" == typeof q ? q : q.text || q.content || "";
-          // v879：池已对齐 milk，抽中的字卡直接发出（抽到啥发啥）
+          // v881：池已对齐 milk，抽中的字卡直接发出（抽到啥发啥）
           if (!__isValidTextCard(q)) continue;
           msgArr.push({ html: rt(j), text: B + j });
         }
@@ -4359,7 +4359,7 @@ window.akiniContacts = {
               : "") +
             _H +
             "</div>";
-          // v879 吞消息根治：实时动态检测会话状态，统一通过 __akiniAppendMessageHTML 原子追加
+          // v881 吞消息根治：实时动态检测会话状态，统一通过 __akiniAppendMessageHTML 原子追加
           var _curActive = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(t) : false);
           __akiniAppendMessageHTML(t, _p.outerHTML, {
             lastMsg: item.text.replace(/^【转账】/, "转账："),
@@ -5427,7 +5427,7 @@ window.akiniContacts = {
             : "") +
           "</div>" +
           "";
-        // v879 吞消息根治：动态检测实时活跃状态，严禁闭包旧值 a 拦截追加
+        // v881 吞消息根治：动态检测实时活跃状态，严禁闭包旧值 a 拦截追加
         var _curActiveAt = (typeof window.__akiniIsChatActive === "function" ? window.__akiniIsChatActive(t) : false);
         var _vSess = window.akiniContacts.getSession(t) || {};
         __akiniAppendMessageHTML(t, p, {
@@ -20108,7 +20108,7 @@ window.akiniContacts = {
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
           if ("pat" === e || "pat" === n) return false;
-          // v879 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
+          // v881 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
           var _tx = ("string" == typeof t) ? t : (t.text || t.content || "");
           return "string" == typeof _tx && !!_tx.trim();
         });
@@ -30535,15 +30535,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 // v731 第一屏可点击编辑自定义文字与保存逻辑（默认xxx）
+// v881 兼容 vivo Y9s 等老内核机型（Chrome 70/Android 9）：坚决禁用可选链 ?.，改用原生兼容属性读取
 window.editS1CustomText = function(index) {
   let key = 'akini_s1_custom_text_' + index;
   let cur = '';
   let promptText = '请输入文字内容：';
-  if (index === 1) { cur = document.getElementById('s1Text1')?.textContent || 'xxx'; promptText = '请输入第一行昵称/文字：'; }
-  else if (index === 2) { cur = document.getElementById('s1Text2')?.textContent || 'xxx'; promptText = '请输入第二行文字：'; }
-  else if (index === 3) { cur = document.getElementById('s1Text3')?.textContent || 'xxx'; promptText = '请输入第三行文字：'; }
-  else if (index === 4) { cur = document.getElementById('s1Text4')?.textContent || 'xxx'; promptText = '请输入标点线条后的自定义文字：'; }
-  else if (index === 5) { cur = document.getElementById('s1TextLoc')?.textContent || 'xxx'; promptText = '请输入定位文字：'; }
+  var _el1 = document.getElementById('s1Text1');
+  var _el2 = document.getElementById('s1Text2');
+  var _el3 = document.getElementById('s1Text3');
+  var _el4 = document.getElementById('s1Text4');
+  var _elLoc = document.getElementById('s1TextLoc');
+  if (index === 1) { cur = (_el1 && _el1.textContent) ? _el1.textContent : 'xxx'; promptText = '请输入第一行昵称/文字：'; }
+  else if (index === 2) { cur = (_el2 && _el2.textContent) ? _el2.textContent : 'xxx'; promptText = '请输入第二行文字：'; }
+  else if (index === 3) { cur = (_el3 && _el3.textContent) ? _el3.textContent : 'xxx'; promptText = '请输入第三行文字：'; }
+  else if (index === 4) { cur = (_el4 && _el4.textContent) ? _el4.textContent : 'xxx'; promptText = '请输入标点线条后的自定义文字：'; }
+  else if (index === 5) { cur = (_elLoc && _elLoc.textContent) ? _elLoc.textContent : 'xxx'; promptText = '请输入定位文字：'; }
 
   let val = prompt(promptText, cur === 'xxx' ? '' : cur);
   if (val !== null) {
@@ -30558,7 +30564,8 @@ window.editS1CustomText = function(index) {
 };
 
 window.editS1PolaroidNote = function() {
-  let cur = document.getElementById('s1PolaroidNote')?.textContent || 'xxx';
+  var _pEl = document.getElementById('s1PolaroidNote');
+  let cur = (_pEl && _pEl.textContent) ? _pEl.textContent : 'xxx';
   let val = prompt('请输入小卡片左下角自定义文字：', cur === 'xxx' ? '' : cur);
   if (val !== null) {
     val = val.trim() || 'xxx';
@@ -30853,7 +30860,7 @@ window.handleS2CoverDirect = function(e) {
       var over = realBottom - vvBottom;
       var shift = over > 2 ? Math.min(over + 8, 420) : 0;
       if (shift !== __akiniKbShift) {
-        // v879 根治键盘弹起露首页：坚决禁止 translateY 拔起整个容器导致底部露出底层首页！
+        // v881 根治键盘弹起露首页：坚决禁止 translateY 拔起整个容器导致底部露出底层首页！
         // 改为纯 paddingBottom 垫高输入栏，容器始终固定贴满屏幕，绝不穿透露出首页
         chat.style.transform = "";
         chat.style.paddingBottom = shift > 0 ? (shift + "px") : "";

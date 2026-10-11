@@ -811,25 +811,25 @@ document.addEventListener("DOMContentLoaded", function() {
 </style>
 
 </head><body><script id="akini-boot-guard-v851">
-/* v879 根治版开机守卫：彻底注销旧版 Service Worker 并清全部旧缓存，network-first 强制取新版，杜绝版本回退与 iOS 缓存锁死 */
+/* v881 根治版开机守卫：彻底注销旧版 Service Worker 并清全部旧缓存，network-first 强制取新版，杜绝版本回退与 iOS 缓存锁死 */
 (function(){
-  var VER = "v879";
-  window.AKINI_VERSION = "v879";
+  var VER = "v881";
+  window.AKINI_VERSION = "v881";
   try {
     var seen = null;
     try { seen = localStorage.getItem("akini_boot_ver"); } catch(e){}
-    // v879：每次启动都检查并清掉一切非当前版本的缓存（根治 GitHub Pages 镜像旧 SW 锁死）
+    // v881：每次启动都检查并清掉一切非当前版本的缓存（根治 GitHub Pages 镜像旧 SW 锁死）
     if (window.caches && caches.keys) {
       caches.keys().then(function(ks){
         return Promise.all(ks.map(function(k){
           // 数据保险箱 akini-vault-v1 永不清；其余旧版本缓存一律删除
-          if (k !== "akini-vault-v1" && k.indexOf("akini-cache-") === 0 && k !== "akini-cache-20261011v879") {
+          if (k !== "akini-vault-v1" && k.indexOf("akini-cache-") === 0 && k !== "akini-cache-20261011v881") {
             return caches.delete(k);
           }
         }));
       }).catch(function(){});
     }
-    // v879：彻底注销旧 Service Worker（而非仅 update），下次访问即由新版 SW 接管，杜绝缓存优先死锁
+    // v881：彻底注销旧 Service Worker（而非仅 update），下次访问即由新版 SW 接管，杜绝缓存优先死锁
     if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
       navigator.serviceWorker.getRegistrations().then(function(rs){
         rs.forEach(function(r){
@@ -908,7 +908,7 @@ document.addEventListener("DOMContentLoaded", function() {
         </div>
       </div>
     </div>
-    <button class="akini-splash-enter" id="akiniSplashEnter" type="button" style="background:#111111 !important; color:#ffffff !important; border-radius:9999px !important; border:none !important; box-shadow:0 4px 16px rgba(0,0,0,0.25) !important;" onclick="try{window.__akiniCloseSplashNotice&&window.__akiniCloseSplashNotice();}catch(e){}">我已知晓并遵守规则</button>
+    <button class="akini-splash-enter" id="akiniSplashEnter" type="button" style="background:#111111 !important; color:#ffffff !important; border-radius:9999px !important; border:none !important; box-shadow:0 4px 16px rgba(0,0,0,0.25) !important;" onclick="try{if(window.__akiniCloseSplashNotice){window.__akiniCloseSplashNotice();}else if(window.__akiniEnterSite){window.__akiniEnterSite();}else{var s=document.getElementById('akiniSplash');if(s){s.style.display='none';s.style.pointerEvents='none';}try{localStorage.setItem('akini_splash_notice_agreed_v1','1');}catch(e){}}}catch(e){}">我已知晓并遵守规则</button>
   </div>
 </div>
 <style id="akiniSplashCompatStyle">
@@ -1077,9 +1077,9 @@ document.addEventListener("DOMContentLoaded", function() {
 })();
 </script>
 <style>
-#akiniSplash{position:fixed;inset:0;z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;opacity:0;transition:opacity .35s ease}
+#akiniSplash{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;inset:0;z-index:9999999;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#ffffff;font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;overflow:hidden;opacity:0;transition:opacity .35s ease}
 #akiniSplash.loaded{opacity:1}
-#akiniSplash.hidden{pointer-events:none;opacity:0;display:none}
+#akiniSplash.hidden{pointer-events:none !important;opacity:0 !important;display:none !important;visibility:hidden !important;z-index:-99999 !important}
 .akini-splash-inner{position:relative;z-index:2;width:min(520px,94vw);display:flex;flex-direction:column;align-items:center;padding:calc(18px + env(safe-area-inset-top, 0px)) 16px calc(18px + env(safe-area-inset-bottom, 0px));box-sizing:border-box;height:100%;max-height:100vh;animation:akiniSplashInnerIn .6s cubic-bezier(.22,1,.36,1) both}
 @keyframes akiniSplashInnerIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
 .akini-splash-top{display:flex;flex-direction:column;align-items:center;margin-bottom:12px;flex-shrink:0}
@@ -9849,8 +9849,8 @@ setInterval(function () { try { if (document.hidden) return; mirrorIcons(); if (
 })();
 </script>
 
-
-/* v879 iOS 内存崩溃自愈：JS 堆接近上限 / 前台超时未交互时主动降载，防 WebKit watchdog 强杀闪退 */
+<script>
+/* v881 iOS 内存崩溃自愈：JS 堆接近上限 / 前台超时未交互时主动降载，防 WebKit watchdog 强杀闪退 */
 (function(){
   if (!/iP(hone|ad|od)/.test(navigator.userAgent)) return; // 仅 iOS 需要
   var HEAP_LIMIT = 0.85;       // JS 堆达上限 85% 即触发
@@ -9871,7 +9871,7 @@ setInterval(function () { try { if (document.hidden) return; mirrorIcons(); if (
   function degrade(reason){
     if (degraded) return;
     degraded = true;
-    try { console.warn('[Akini v879] iOS 内存压力降载:', reason); } catch(e){}
+    try { console.warn('[Akini v881] iOS 内存压力降载:', reason); } catch(e){}
     // 停掉一切非核心定时器与动画，保留用户数据（只降 UI 渲染负载，绝不删数据）
     try { document.documentElement.classList.add('akini-low-mem'); } catch(e){}
     // 停止背景视频/动画
@@ -9889,6 +9889,8 @@ setInterval(function () { try { if (document.hidden) return; mirrorIcons(); if (
     if (!document.hidden && !degraded) lastInteraction = Date.now();
   });
 })();
+
+</script>
 
 </body></html>
 
