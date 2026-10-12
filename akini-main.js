@@ -4001,19 +4001,31 @@ window.akiniContacts = {
              导致 LS 残留旧头像时首屏一直渲染旧头像、水合后又换新——肉眼闪烁。
              改为 IDB 有效即采用并回写 LS，下次启动 LS 即新值，零闪烁 */
           if (i) {
-            u(t, i);
-            try {
-              if (lsVal !== i) localStorage.setItem(e, i);
-            } catch (t) {}
-            if (n)
+            /* v899 头像回退守卫：IDB 值可能陈旧（上传后 localforage 事务未提交即被系统回收）。
+               比对修改时间戳：本地(cookie/LS 侧车)记录比 IDB 侧车键新(3s 容差) → 该 IDB 值是旧的——
+               只用于本次显示，绝不回写 LS/内存（旧值一旦被巩固，云端新备份将永远无法回填） */
+            _idbStore.get("akini_wts_" + e, function (iw) {
+              var _lw = (window.__akiniImgWts && window.__akiniImgWts.local(e)) || 0;
+              var _iw2 = +(iw || 0) || 0;
+              if (_lw > _iw2 + 3000) {
+                try { window.__akiniAvatarCache[t] = i; } catch (e1) {}
+                try { Tn(); } catch (e2) {}
+                return;
+              }
+              u(t, i);
               try {
-                localStorage.setItem(n, i);
-              } catch (t) {}
-            if (window.__akiniSyncingAvatars) {
-              window.__akiniAvatarNeedsRefresh = !0;
-            } else {
-              Tn();
-            }
+                if (lsVal !== i) localStorage.setItem(e, i);
+              } catch (e3) {}
+              if (n)
+                try {
+                  localStorage.setItem(n, i);
+                } catch (e4) {}
+              if (window.__akiniSyncingAvatars) {
+                window.__akiniAvatarNeedsRefresh = !0;
+              } else {
+                Tn();
+              }
+            });
           } else {
             /* localStorage 已有有效值，仅同步缓存，不覆盖 */
             u(t, lsVal);
@@ -14050,16 +14062,27 @@ window.akiniContacts = {
           n = document.createElement("div");
           n.id = e;
           n.style.cssText = "position:fixed;inset:0;background:transparent;z-index:99999998;pointer-events:auto;touch-action:none;";
+          /* v900 通话卡住根治：遮罩只在弹出的瞬间防误触，用户主动再碰一下屏幕
+             就是想操作页面——首次 touchstart/click 立即放行，绝不锁死整页 15 秒 */
+          var _release = function () {
+            try {
+              var b = document.getElementById(e);
+              if (b) { b.style.display = "none"; b.removeEventListener("touchstart", _release); b.removeEventListener("click", _release); }
+            } catch (_) {}
+          };
+          n.addEventListener("touchstart", _release, { passive: !0 });
+          n.addEventListener("click", _release);
           document.body.appendChild(n);
         }
         n.style.display = "block";
         if (__akiniBlockOverlayTimer) { clearTimeout(__akiniBlockOverlayTimer); }
+        /* v900：兜底超时 15s→8s，防误触窗口足够，卡住感减半 */
         __akiniBlockOverlayTimer = setTimeout(function () {
           try {
             var b = document.getElementById("callBlockOverlay");
             if (b) { b.style.display = "none"; }
           } catch (_) {}
-        }, 15000);
+        }, 8000);
       } else {
         if (__akiniBlockOverlayTimer) { clearTimeout(__akiniBlockOverlayTimer); __akiniBlockOverlayTimer = null; }
         if (n) { n.style.display = "none"; }
@@ -14575,13 +14598,16 @@ window.akiniContacts = {
       }
       var mFull = document.getElementById("callMinimizeBtnFull");
       if (mFull) {
+        /* v900 通话卡住根治：最小化后绝不能挂 Be(true) 全屏遮罩——用户最小化就是
+           要操作页面，遮罩 pointer-events:auto 会把整页锁死 15 秒，表现为
+           "一打电话就卡住"。Ne() 已正确切换迷你窗，这里只做事件兜底 */
         mFull.addEventListener("click", function(ev){
           if (ev) { try { ev.preventDefault(); ev.stopPropagation(); } catch(e){} }
-          try { if (typeof Be === "function") Be(true); } catch(e){}
+          try { if (typeof Ne === "function") Ne(); } catch(e){}
         });
         mFull.addEventListener("touchend", function(ev){
           if (ev) { try { ev.preventDefault(); ev.stopPropagation(); } catch(e){} }
-          try { if (typeof Be === "function") Be(true); } catch(e){}
+          try { if (typeof Ne === "function") Ne(); } catch(e){}
         });
       }
     })();
@@ -18601,6 +18627,14 @@ window.akiniContacts = {
                     try {
                       var cur = localStorage.getItem(k);
                       if (cur != null && cur !== "" && cur !== "[]" && cur !== "{}") return; // 只补空缺
+                      /* v899 图像键时间戳仲裁：本地(cookie/LS 侧车)记录的写入时间比保险箱数据新，
+                         说明本机曾设置过更新的头像/背景——拒绝旧值回填（回退根因之三） */
+                      if (window.__akiniImgWts && window.__akiniImgWts.isImg(k)) {
+                        var _vlw = window.__akiniImgWts.local(k) || 0;
+                        var _vww = 0;
+                        try { _vww = +(data["akini_wts_" + k] || 0) || 0; } catch (e9) {}
+                        if (_vlw > _vww + 3000) return;
+                      }
                       if (window.akiniStore && window.akiniStore.set) window.akiniStore.set(k, data[k]);
                       else localStorage.setItem(k, data[k]);
                       restored++;

@@ -267,28 +267,73 @@
         var cloudKeys = Object.keys(cloud);
         _cloudKeyCount = cloudKeys.length;
         var missing = [];
+        /* v899 图像键回退修复：大图像键(头像/背景)不进 localStorage，启动早期(本地对账
+           restoreAll 未完成)时 LS+内存均为空——原逻辑在此刻误判"本地缺失"并回填云端
+           【旧值】，随后旧值被巩固进三层，新头像被永久覆盖(回退根因)。
+           修复：图像键全部进入延迟批，等 window.__akiniStorageRestored(对账完成)后再判断。 */
+        var pendingImgs = [];
         cloudKeys.forEach(function (k) {
+          if (!(cloud[k] && cloud[k] !== "null" && cloud[k] !== "undefined")) return;
+          var _isImg = !!(window.__akiniImgWts && window.__akiniImgWts.isImg(k));
+          if (_isImg && !window.__akiniStorageRestored) { pendingImgs.push(k); return; }
           var local = null;
           try { local = localStorage.getItem(k); } catch (e) {}
           var mem = null;
           try { if (window.akiniStore && window.akiniStore.memoryGet) mem = window.akiniStore.memoryGet(k); } catch (e) {}
-          /* v692：云端 payload 里的字面 "null"/"undefined" 脏值不回填——
-             否则会经 setItem 变成字符串 "null" 污染本地（气泡 CSS 变 null 元凶） */
-          if ((local == null || local === "") && (mem == null || mem === "") && cloud[k] &&
-              cloud[k] !== "null" && cloud[k] !== "undefined") {
-            missing.push(k);
-          }
+          if ((local == null || local === "") && (mem == null || mem === "")) missing.push(k);
         });
-        if (!missing.length) return; // 本地完整，无需恢复
-        // 回填缺失 key：localStorage + 内存 + IDB 三层同时写入
-        missing.forEach(function (k) {
+        /* v899 时间戳仲裁：本地(cookie/LS 侧车)记录的写入时间比云端新(3s 容差) →
+           云端是旧值，拒绝回填该键（本地曾有更新的数据） */
+        function _wtsOk(k) {
+          try {
+            if (!window.__akiniImgWts || !window.__akiniImgWts.isImg(k)) return true;
+            var lw = window.__akiniImgWts.local(k) || 0;
+            var cw = 0; try { cw = +(cloud["akini_wts_" + k] || 0) || 0; } catch (e1) {}
+            if (lw > cw + 3000) { console.warn("[云备份] 本地有更新记录，拒绝旧值回填: " + k); return false; }
+          } catch (e) {}
+          return true;
+        }
+        function _fill(k) {
           try { localStorage.setItem(k, cloud[k]); } catch (e) {}
           try { if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(k, cloud[k]); } catch (e) {}
           try { if (window._idbStore && window._idbStore.set) { window._idbStore.set(k, cloud[k]); window._idbStore.set(k + "_backup", cloud[k]); } } catch (e) {}
-        });
-        console.warn("[云备份] 已从云端恢复 " + missing.length + " 项缺失数据");
-        // 恢复完成后立即刷新界面（联系人/聊天/头像/预览），让恢复的数据即刻生效
-        try { if (window.__akiniOnCriticalRestored) window.__akiniOnCriticalRestored(); } catch (e) {}
+        }
+        missing = missing.filter(_wtsOk);
+        if (missing.length) {
+          // 回填缺失 key：localStorage + 内存 + IDB 三层同时写入
+          missing.forEach(_fill);
+          console.warn("[云备份] 已从云端恢复 " + missing.length + " 项缺失数据");
+          // 恢复完成后立即刷新界面（联系人/聊天/头像/预览），让恢复的数据即刻生效
+          try { if (window.__akiniOnCriticalRestored) window.__akiniOnCriticalRestored(); } catch (e) {}
+        }
+        // v899 图像键延迟批：本地对账完成后再判断（最多等 30s），含两条通道——
+        // ① 仍缺失且云端不旧于本地记录 → 回填；② 云端时间戳明显更新 → 即使本地非空也覆盖
+        //    （破解"IDB 旧值先被 restoreAll 巩固进内存，云端新值永远进不来"的死锁）
+        if (pendingImgs.length) {
+          var _tries = 0;
+          (function _waitStorage() {
+            if (!window.__akiniStorageRestored && _tries++ < 100) { setTimeout(_waitStorage, 300); return; }
+            var late = [], newer = [];
+            pendingImgs.forEach(function (k) {
+              var local = null;
+              try { local = localStorage.getItem(k); } catch (e) {}
+              var mem = null;
+              try { if (window.akiniStore && window.akiniStore.memoryGet) mem = window.akiniStore.memoryGet(k); } catch (e) {}
+              var empty = (local == null || local === "") && (mem == null || mem === "");
+              var lw = (window.__akiniImgWts && window.__akiniImgWts.local(k)) || 0;
+              var cw = 0; try { cw = +(cloud["akini_wts_" + k] || 0) || 0; } catch (e1) {}
+              if (cw > lw + 3000) { newer.push(k); return; } // 云端明显更新：覆盖本地(可能是被巩固的旧值)
+              if (empty && _wtsOk(k)) late.push(k);
+            });
+            var did = late.length + newer.length;
+            if (did > 0) {
+              late.forEach(_fill);
+              newer.forEach(_fill);
+              console.warn("[云备份] 图像键延迟批恢复 " + did + " 项" + (newer.length ? "（含 " + newer.length + " 项云端较新覆盖）" : ""));
+              try { if (window.__akiniOnCriticalRestored) window.__akiniOnCriticalRestored(); } catch (e) {}
+            }
+          })();
+        }
         // 缺失较多说明本地被清理过：回填后刷新一次让界面用上恢复的数据（防循环）
         if (missing.length >= 3) {
           try {

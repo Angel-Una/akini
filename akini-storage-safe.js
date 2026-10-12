@@ -59,6 +59,65 @@
   }
   // 图片/壁纸类大键：配额紧张时优先清理它们，为关键数据腾出空间
   var BIG_IMG_RE = /^akini_(chat_history_|home_bg|bubble_css|icity_|my_avatar|ta_avatar|contact_avatar_)/;
+  /* ===== v899 头像/背景图回退根治：图像键"修改时间戳"体系 =====
+     根因：大图像键(>200KB)只存内存+IDB，localStorage 恒空。启动早期（存储对账 restoreAll
+     尚未完成时）云备份/保险箱/IDB 兜底把"LS+内存为空"误判为"本地缺失"，把【旧值】回填
+     并巩固到三层——新头像被旧值永久覆盖（用户看到"回退到旧的去了"）。
+     方案：图像键每次写入时同步盖章：
+       ① LS 侧车小键 akini_wts_<key>（随云备份/保险箱 payload 上传，自带时间标记）；
+       ② cookie akini_wts（10 年，LS/IDB 被系统清理后唯一存活的"本机设置过更新的"凭据）。
+     所有恢复路径回填前对比：本地记录时间 > 恢复源数据时间(3s 容差) → 拒绝旧值回填。 */
+  var IMG_EXACT = {
+    akini_my_avatar: 1, akini_ta_avatar: 1, akini_icity_my_avatar: 1, akini_icity_ta_avatar: 1,
+    akini_home_bg: 1, akini_bg_img: 1, akini_cover_img: 1, akini_friends_bg: 1,
+    akini_call_bg: 1, akini_callmini_bg: 1, akini_chat_bg: 1,
+    akini_icity_my_bg: 1, akini_icity_ta_bg: 1, akini_music_bg: 1
+  };
+  var IMG_PREFIXES = ['akini_contact_avatar_', 'akini_chat_bg_', 'akini_icity_ta_bg_', 'akini_icity_my_bg_'];
+  function isImgKey(k) {
+    if (!k) return false;
+    var ks = String(k);
+    if (ks.indexOf('akini_wts_') === 0) return false;
+    if (IMG_EXACT[ks]) return true;
+    for (var _ip = 0; _ip < IMG_PREFIXES.length; _ip++) { if (ks.indexOf(IMG_PREFIXES[_ip]) === 0) return true; }
+    return false;
+  }
+  function _wtsCookieAll() {
+    try {
+      var m = (document.cookie || '').match(/(?:^|;\s*)akini_wts=([^;]+)/);
+      if (!m) return {};
+      var o = JSON.parse(decodeURIComponent(m[1]));
+      return (o && typeof o === 'object') ? o : {};
+    } catch (e) { return {}; }
+  }
+  function _stampImgKey(k, ts) {
+    try {
+      var t = ts || Date.now();
+      var wk = 'akini_wts_' + k;
+      // ① LS 侧车小键（几十字节；会随 collectAll/_collectVault 自动进入云端与保险箱）
+      if (origSet) origSet.call(rawLS, wk, String(t)); else rawLS.setItem(wk, String(t));
+      // ② IDB 镜像（与主键同批落盘，作为 IDB 值的时间标记）
+      if (_restored) queueIdbWrite(wk, String(t)); else _preRestorePending[wk] = String(t);
+      // ③ cookie 冗余（同步写、10 年有效；LS/IDB 被系统清理后唯一存活的新旧凭据）
+      var all = _wtsCookieAll();
+      all[k] = t;
+      var s = JSON.stringify(all);
+      if (s.length > 3500) { // 超 cookie 限制：只保留最新的 20 个键的时间戳
+        var arr = Object.keys(all).map(function (kk) { return { k: kk, t: all[kk] }; });
+        arr.sort(function (a, b) { return b.t - a.t; });
+        all = {};
+        for (var i = 0; i < arr.length && i < 20; i++) all[arr[i].k] = arr[i].t;
+        s = JSON.stringify(all);
+      }
+      document.cookie = 'akini_wts=' + encodeURIComponent(s) + ';path=/;max-age=315360000;SameSite=Lax';
+    } catch (e) {}
+  }
+  function _localImgWts(k) {
+    var t = 0;
+    try { var c = _wtsCookieAll()[k]; if (c) t = Math.max(t, +c || 0); } catch (e) {}
+    try { var l = lsGet('akini_wts_' + k); if (l) t = Math.max(t, +l || 0); } catch (e) {}
+    return t;
+  }
   function _evictBigKeys() {
     var removed = 0;
     try {
@@ -221,6 +280,8 @@
         return;
       }
     }
+    // v899: 图像键写入即盖章（记录修改时间，供恢复路径仲裁新旧）
+    if (isImgKey(k) && v && v.length > 10 && v !== 'null' && v !== 'undefined') { try { _stampImgKey(k); } catch (e0) {} }
     memSet(k, v);
     var lsOk = true;
     if (isBigVal(v)) {
@@ -276,6 +337,8 @@
           if (i >= targets.length) {
             if (!_restored) {
               _restored = true;
+              // v899: 对外暴露"启动对账已完成"门闩——云备份等恢复层据此判断大键是否真的缺失
+              try { window.__akiniStorageRestored = true; } catch (e0) {}
               // 启动期暂缓的写入落盘：强制写回 IndexedDB，确保用户数据落盘
               // v573 关键修复：空值（'[]'/'{}'/'null'）一律不落盘——防止任何遗漏路径把
               // 启动默认空值写回 IDB 覆盖真实数据（数据丢失双保险之二）
@@ -399,6 +462,8 @@
       try { if (_idbFlushTimer) { clearTimeout(_idbFlushTimer); _idbFlushTimer = null; } } catch (e) {}
     }
   };
+  // v899: 图像键时间戳仲裁接口（供云备份/保险箱/IDB 兜底等恢复路径使用）
+  window.__akiniImgWts = { isImg: isImgKey, local: _localImgWts, stamp: _stampImgKey };
 
   // ---- 拦截 localStorage 写入：先原始写入（绝不被中断），再镜像内存+IDB ----
   // 注意：origSet 为空说明 localStorage 是内存 shim（隐私模式/被禁用），其原型是 Object.prototype，
@@ -482,6 +547,8 @@
         try {
           if (self.isCritical(k)) {
             self.memSet(k, sv);
+            // v899: 图像键写入即盖章（拦截层覆盖所有 localStorage.setItem 调用路径）
+            if (isImgKey(k) && sv && sv.length > 10 && sv !== 'null' && sv !== 'undefined') { try { _stampImgKey(k); } catch (e9) {} }
             if (!_restored) { _preRestorePending[k] = sv; }
             else { self.queueIdbWrite(k, sv); }
             if (ok || big) { self.clearDirty(k); }
@@ -526,6 +593,8 @@
         try {
           if (isCriticalKey(k)) {
             memSet(k, sv);
+            // v899: 图像键写入即盖章（shim 分支同主拦截层）
+            if (isImgKey(k) && sv && sv.length > 10 && sv !== 'null' && sv !== 'undefined') { try { _stampImgKey(k); } catch (e8) {} }
             if (!_restored) { _preRestorePending[k] = sv; }
             else queueIdbWrite(k, sv);
           }
