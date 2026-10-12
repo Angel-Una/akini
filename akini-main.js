@@ -475,17 +475,21 @@ window.__akiniSafeAwait = function (p, fallback, label) {
     });
   } catch (e) { return Promise.resolve(fallback); }
 };
+/* v908 恢复放行 failsafe：IDB/快照对账因任何原因卡住时，3.5 秒强制放行 __akiniBootApp（与 boot 等待上限 12×250ms 对齐）——v907 的 10 秒上限在低配机上让开屏停 10 秒不消失，用户感知"卡在初始首页进不去" */
+setTimeout(function () { try { window.__akiniRestoreSettled = true; } catch (eF) {} }, 3500);
 /* v905 启动看门狗：主启动链若中途崩溃（未到达 boot-complete 标记），
    6 秒后自动补跑关键数据恢复与首屏渲染，保证页面始终可用——对齐 milk 的 allSettled 容错语义 */
 (function () {
   setTimeout(function () {
     try {
+      if (window.__akiniWatchdogRan) return;
+      window.__akiniWatchdogRan = true;
       if (window.__akiniBootComplete) return;
       try { console.warn("[Akini][watchdog] 主启动链未完成，自动补跑关键恢复"); } catch (_e) {}
       window.__akiniSafeCall(function () { window._akiniCacheStore && window._akiniCacheStore.restoreAll && window._akiniCacheStore.restoreAll(); }, "wd-cacheStore");
       window.__akiniSafeCall(function () { window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll(); }, "wd-idbStore");
       window.__akiniSafeCall(function () { window._akiniRestoreFromSnapshot && window._akiniRestoreFromSnapshot(); }, "wd-snapshot");
-      window.__akiniSafeCall(function () { window.loadS1SavedData && window.loadS1SavedData(); }, "wd-s1");
+      window.__akiniSafeCall(function () { window.__akiniRestoreSettled = true; }, "wd-settle");
       window.__akiniSafeCall(function () { var el = document.getElementById("akiniSettingsVersionText"); if (el) el.innerText = "当前版本 " + (window.AKINI_VERSION || "v905") + " (最新版)"; }, "wd-ver");
     } catch (e) {}
   }, 6000);
@@ -1463,6 +1467,10 @@ window._idbStore = (function () {
     })();
     !(function () {
         SNAPSHOT_KEY = "akini_localstorage_snapshot";
+        /* v907：CACHE_NAME 此前从未定义——整个 Cache 快照备份/恢复层一直是静默死代码
+           （caches.open(undefined) 抛 ReferenceError 被 try 吞掉）。现指向数据保险箱
+           缓存名（与 vault 模块同缓存、不同 URL），boot-guard 与 SW 均保留该缓存 */
+        var CACHE_NAME = "akini-vault-v1";
       window._akiniCacheStore = {
         backupAll: function (e) {
           /* v547 节流：低内存/iOS 120s，其他 60s */
@@ -1752,6 +1760,7 @@ window._idbStore = (function () {
               window._akiniRestoreFromSnapshot &&
                 window._akiniRestoreFromSnapshot(function () {
                   console.log("[Akini] cache+idb+snapshot restoreAll done");
+                  window.__akiniRestoreSettled = true; // v907：恢复链完成，放行 __akiniBootApp
                   // 恢复完成后的渲染与 _akiniDataRestored 开关统一交给 __akiniBootApp，
                   // 避免此处过早打开备份闸门导致空 localStorage 覆盖 IDB/Cache 真实数据
                 });
@@ -8002,7 +8011,26 @@ window.akiniContacts = {
     };
     function __akiniBootApp(t) {
       if (window.__akiniBooted) return;
+      /* v908 修复"卡在初始首页进不去"：挂载必须先于等待块——v907 把挂载放在等待块之后，
+         等待期间 HTML 的 destroySplash/doSkip 调 window.__akiniBootApp 全部静默 no-op，
+         开屏不消失、UI 不渲染，叠加 10 秒等待上限即"哪里都点不动" */
       try { window.__akiniBootApp = __akiniBootApp; } catch (e) {}
+      /* v907 核心修复：启动恢复（IDB 对账/快照回填）完成前延迟 boot——此前 __akiniBootApp 在
+         启动后 0~2000ms 抢跑，发现联系人为空就创建默认联系人/默认初始化，占住 akini_contacts
+         等核心键；随后完成的 IDB 恢复是"仅补缺失键"语义，被默认值挡住永远进不来——
+         这就是"重进数据消失/部分被初始化"的根因。
+         v908：等待上限 10s(33×300ms)→3s(12×250ms)——正常恢复链 <1.5s 完成即放行；
+         超过 3s 视为链路异常，放行优先保证可用（退回 v906 行为），后台恢复仍以
+         "仅补缺失键"语义继续，数据保护不劣于 v906 */
+      if (!window.__akiniRestoreSettled) {
+        window.__akiniBootWaitN = (window.__akiniBootWaitN || 0) + 1;
+        if (window.__akiniBootWaitN <= 12) {
+          try { window.__akiniSetSplashProgress && window.__akiniSetSplashProgress(70 + Math.min(18, window.__akiniBootWaitN), "正在恢复数据…"); } catch (eP) {}
+          setTimeout(function () { __akiniBootApp(t); }, 250);
+          return;
+        }
+        try { console.warn("[Akini] 恢复链 3s 未完成，超时放行 boot（后台恢复继续）"); } catch (eW) {}
+      }
       window.__akiniBooted = !0;
       setTimeout(function () {
         window._restoringData = !1;

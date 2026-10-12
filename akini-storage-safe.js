@@ -138,7 +138,14 @@
       bigs.sort(function (a, b) { return b.len - a.len; });
       // 最多清理最大的 8 个大键（它们在 IndexedDB 中有镜像，可按需水合恢复）
       for (var j = 0; j < bigs.length && j < 8; j++) {
-        try { lsRemoveRaw(bigs[j].k); removed++; } catch (e) {}
+        try {
+          /* v907：驱逐前先镜像到 IndexedDB（含 _backup 双副本）——
+             被驱逐的大键若无 IDB 镜像等于永久删除（"部分数据莫名消失"根因之一） */
+          var _ev = lsGet(bigs[j].k);
+          var _IDB = getIDB();
+          if (_ev && _IDB && _IDB.set) { try { _IDB.set(bigs[j].k, _ev); _IDB.set(bigs[j].k + '_backup', _ev); } catch (eM) {} }
+          lsRemoveRaw(bigs[j].k); removed++;
+        } catch (e) {}
       }
     } catch (e) {}
     return removed;
@@ -339,6 +346,7 @@
               _restored = true;
               // v899: 对外暴露"启动对账已完成"门闩——云备份等恢复层据此判断大键是否真的缺失
               try { window.__akiniStorageRestored = true; } catch (e0) {}
+              try { window.__akiniRestoreSettled = true; } catch (e1) {} // v907：启动对账完成，放行 __akiniBootApp（防默认值抢跑挡住真实数据恢复）
               // 启动期暂缓的写入落盘：强制写回 IndexedDB，确保用户数据落盘
               // v573 关键修复：空值（'[]'/'{}'/'null'）一律不落盘——防止任何遗漏路径把
               // 启动默认空值写回 IDB 覆盖真实数据（数据丢失双保险之二）

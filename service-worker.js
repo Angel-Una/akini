@@ -10,8 +10,9 @@ self.addEventListener('activate', function (event) {
     caches.keys().then(function (keys) {
       return Promise.all(
         keys.filter(function (key) {
-          /* 退役 SW 激活时清掉自己的一切代码缓存，仅保留数据保险箱 */
-          return key !== 'akini-vault-v1';
+          /* v907：只删 akini-cache-* 代码缓存前缀（对齐旧版 SW 语义）——
+             其他任何命名的缓存（含数据保险箱 akini-vault-v1）一律不动 */
+          return key.indexOf('akini-cache-') === 0;
         }).map(function (key) {
           return caches.delete(key);
         })
