@@ -1,210 +1,26 @@
-const CACHE_NAME = 'akini-cache-20261011v904';
-const PRECACHE_ASSETS = [
-  './akini.html',
-  './akini-style.css',
-  './akini-main.js',
-  './favicon.png',
-  './localforage.min.js',
-];
-
-self.addEventListener('install', function(event) {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(function(cache) {
-      return cache.addAll(PRECACHE_ASSETS);
-    }).catch(function(){})
-  );
+/* v905：Service Worker 已退役。
+   本文件仅作为占位保留——防止旧版本安装包中残留的 service-worker.js 请求 404。
+   新版页面永不注册 SW；boot-guard 启动时会注销一切存量注册并清理 akini-cache-* 缓存。
+   数据保险箱 akini-vault-v1 缓存由 storage-mgr 维护，与本文件无关。 */
+self.addEventListener('install', function (event) {
   self.skipWaiting();
 });
-
-self.addEventListener('activate', function(event) {
+self.addEventListener('activate', function (event) {
   event.waitUntil(
-    caches.keys().then(function(keys) {
+    caches.keys().then(function (keys) {
       return Promise.all(
-        keys.filter(function(key) {
-          // 数据保险箱缓存永不清除：它是 LS/IDB 被系统清理后的最后兜底
-          return key !== CACHE_NAME && key !== 'akini-vault-v1';
-        }).map(function(key) {
+        keys.filter(function (key) {
+          /* 退役 SW 激活时清掉自己的一切代码缓存，仅保留数据保险箱 */
+          return key !== 'akini-vault-v1';
+        }).map(function (key) {
           return caches.delete(key);
         })
       );
-    }).then(function() {
+    }).then(function () {
       return self.clients.claim();
+    }).then(function () {
+      /* 主动注销：让本 SW 立即退出，页面回归直连网络模式 */
+      return self.registration.unregister();
     })
   );
 });
-
-// v796: 带超时的网络请求——弱网下4秒内无响应立即回退缓存,进站/刷新不再白等
-function fetchWithTimeout(req, ms) {
-  return Promise.race([
-    fetch(req),
-    new Promise(function(_, reject) { setTimeout(function() { reject(new Error('akini-timeout')); }, ms); })
-  ]);
-}
-
-self.addEventListener('fetch', function(event) {
-  var req = event.request;
-  var url = new URL(req.url);
-  var isNav = req.mode === 'navigate';
-  var isSW = url.pathname.endsWith('service-worker.js');
-  /* v898 版本锁根治：所有 akini 主资源（html/8个js模块/css）统一纳入网络优先。
-     原只有 3 个主资源走网络优先，其余 js 弱网走缓存优先+ignoreSearch——
-     可能匹配到任意旧版本 → 新html+旧js 版本错配 → 卡崩闪退（版本回退的真正机制） */
-  var isMainAsset = /\/(akini\.html|akini-style\.css|akini-[a-z0-9-]+\.js)(\?.*)?$/.test(url.pathname);
-
-  /* v898 版本锁核心：主资源缓存 key 规范化（去掉 ?v=xxx 版本 query）。
-     原逻辑 put 带完整 query 的 key + match 用 ignoreSearch——缓存里同一文件堆积 N 个版本副本，
-     ignoreSearch 匹配到哪个版本由浏览器实现决定（Safari 常返回旧的）→ 版本回退+错配。
-     规范化后每个文件缓存里只有一份（最近一次网络成功的版本），html 与其引用的 js 同一次
-     页面加载链上先后写入，版本天然对齐；新 SW activate 时清空旧 CACHE_NAME，
-     绝无多版本残留。弱网回退永远只回退到上一版且 html/js/css 版本一致，刷新即最新 */
-  var canonUrl = url.origin + url.pathname;
-  var canonReq = new Request(canonUrl);
-
-  // 导航请求和 service worker 本身绝不走缓存
-  if (isNav || isSW) {
-    req = new Request(req.url, { method: req.method, mode: req.mode, cache: 'no-store' });
-  }
-
-  // 主资源采用 network-first：新版立即生效，网络不通时才用缓存
-  if (isNav || isSW || isMainAsset) {
-    event.respondWith(
-      fetchWithTimeout(req, isNav ? 5000 : 5000).then(function(response) {
-        if (response && response.status === 200 && response.type === 'basic') {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(canonReq, clone);
-          }).catch(function(){});
-        }
-        return response;
-      }).catch(function() {
-        return caches.match(canonUrl).then(function(cached) {
-          return cached || fetch(event.request);
-        });
-      })
-    );
-    return;
-  }
-
-  // 其他静态资源（favicon/localforage/manifest 等内容不变更）：缓存优先，后台更新
-  event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then(function(cached) {
-      if (cached) return cached;
-      return fetch(req).then(function(response) {
-        if (response && response.status === 200 && response.type === 'basic') {
-          var clone = response.clone();
-          caches.open(CACHE_NAME).then(function(cache) {
-            cache.put(event.request, clone);
-          }).catch(function(){});
-        }
-        return response;
-      }).catch(function() {
-        return cached;
-      });
-    })
-  );
-});
-
-/* zzzl：页面端已删除版本校验强制刷新，GET_CACHE_NAME 监听一并移除 */
-
-self.addEventListener('push', function(event) {
-  if (!event.data) return;
-  try {
-    const payload = event.data.json();
-    const title = payload.title || 'Akini';
-    const options = {
-      body: payload.body || '你有一条新消息',
-      icon: './favicon.png',
-      badge: './favicon.png',
-      tag: payload.tag || 'akini-default',
-      data: payload.data || {}
-    };
-    event.waitUntil(self.registration.showNotification(title, options));
-  } catch (e) {
-    const title = 'Akini';
-    const options = { body: '你有一条新消息', icon: './favicon.png' };
-    event.waitUntil(self.registration.showNotification(title, options));
-  }
-});
-
-// ---- 周期性后台同步：应用被系统冻结/杀死后，系统定时唤醒 SW 检查未读并发系统通知 ----
-function akiniIdbGet(key) {
-  return new Promise(function(resolve) {
-    try {
-      var req = indexedDB.open('AkiniApp');
-      req.onsuccess = function() {
-        try {
-          var db = req.result;
-          var tx = db.transaction('akini_data', 'readonly');
-          var g = tx.objectStore('akini_data').get(key);
-          g.onsuccess = function() { resolve(g.result != null ? g.result : null); };
-          g.onerror = function() { resolve(null); };
-        } catch (e) { resolve(null); }
-      };
-      req.onerror = function() { resolve(null); };
-    } catch (e) { resolve(null); }
-  });
-}
-self.addEventListener('periodicsync', function(event) {
-  if (event.tag !== 'akini-bg-check') return;
-  event.waitUntil(
-    (async function() {
-      try {
-        // 有页面在前台时不打扰
-        var cls = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        for (var i = 0; i < cls.length; i++) { if (cls[i].visibilityState === 'visible') return; }
-        var unread = 0;
-        var ss = await akiniIdbGet('akini_chat_sessions');
-        if (ss) {
-          try {
-            var obj = typeof ss === 'string' ? JSON.parse(ss) : ss;
-            Object.keys(obj || {}).forEach(function(k) { unread += (obj[k] && obj[k].unread) || 0; });
-          } catch (e) {}
-        }
-        var mails = await akiniIdbGet('akini_mail_received');
-        var seen = await akiniIdbGet('akini_mail_seen_count');
-        var mailUnread = 0;
-        if (mails) {
-          try {
-            var arr = typeof mails === 'string' ? JSON.parse(mails) : mails;
-            mailUnread = Math.max(0, (Array.isArray(arr) ? arr.length : 0) - (parseInt(seen, 10) || 0));
-          } catch (e) {}
-        }
-        var total = unread + mailUnread;
-        if (total > 0) {
-          await self.registration.showNotification('Akini 情侣空间', {
-            body: 'Ta 给你留了 ' + total + ' 条新消息，快回来看看',
-            icon: './favicon.png',
-            badge: './favicon.png',
-            tag: 'akini_bg_check_' + Date.now(),
-            data: { app: 'chat' },
-          });
-        }
-      } catch (e) {}
-    })()
-  );
-});
-
-self.addEventListener('notificationclick', function(event) {
-  event.notification.close();
-  // 解析 tag（akini_<app>_<chatId>_<ts>），点击后让页面跳转到对应聊天/信箱
-  var payload = { type: 'AKINI_NOTIF_TAP', app: '', chatId: '', ts: 0 };
-  try {
-    var m = String(event.notification && event.notification.tag || '').match(/^akini_([^_]+)_([^_]*)_(\d+)$/);
-    if (m) { payload.app = m[1]; payload.chatId = m[2]; payload.ts = +m[3] || 0; }
-  } catch(e){}
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-      for (var i = 0; i < clientList.length; i++) {
-        var client = clientList[i];
-        if (client.url && client.url.indexOf('/akini') > -1) {
-          try { client.postMessage(payload); } catch(e){}
-          return client.focus();
-        }
-      }
-      return self.clients.openWindow('./akini.html?notifApp=' + encodeURIComponent(payload.app || '') + '&notifChat=' + encodeURIComponent(payload.chatId || ''));
-    }).catch(function() {
-      return self.clients.openWindow('./akini.html?notifApp=' + encodeURIComponent(payload.app || '') + '&notifChat=' + encodeURIComponent(payload.chatId || ''));
-    })
-  );
-});
-

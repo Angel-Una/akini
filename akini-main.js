@@ -462,6 +462,34 @@ function __akiniShowBanner(msg, color) {
   b.textContent = msg;
 }
 window.__akiniBootStep = "start";
+/* v905 milk式容错改造：safeCall/safeAwait 全局工具——任何模块崩溃只损失该功能，不牵连整体启动 */
+window.__akiniSafeCall = function (fn, label) {
+  try { return typeof fn === "function" ? fn() : undefined; }
+  catch (e) { try { console.error("[Akini][safe]", label || "", e); } catch (_e) {} }
+};
+window.__akiniSafeAwait = function (p, fallback, label) {
+  try {
+    return Promise.resolve(p).then(function (v) { return v; }, function (e) {
+      try { console.error("[Akini][safe]", label || "", e); } catch (_e) {}
+      return fallback;
+    });
+  } catch (e) { return Promise.resolve(fallback); }
+};
+/* v905 启动看门狗：主启动链若中途崩溃（未到达 boot-complete 标记），
+   6 秒后自动补跑关键数据恢复与首屏渲染，保证页面始终可用——对齐 milk 的 allSettled 容错语义 */
+(function () {
+  setTimeout(function () {
+    try {
+      if (window.__akiniBootComplete) return;
+      try { console.warn("[Akini][watchdog] 主启动链未完成，自动补跑关键恢复"); } catch (_e) {}
+      window.__akiniSafeCall(function () { window._akiniCacheStore && window._akiniCacheStore.restoreAll && window._akiniCacheStore.restoreAll(); }, "wd-cacheStore");
+      window.__akiniSafeCall(function () { window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll(); }, "wd-idbStore");
+      window.__akiniSafeCall(function () { window._akiniRestoreFromSnapshot && window._akiniRestoreFromSnapshot(); }, "wd-snapshot");
+      window.__akiniSafeCall(function () { window.loadS1SavedData && window.loadS1SavedData(); }, "wd-s1");
+      window.__akiniSafeCall(function () { var el = document.getElementById("akiniSettingsVersionText"); if (el) el.innerText = "当前版本 " + (window.AKINI_VERSION || "v905") + " (最新版)"; }, "wd-ver");
+    } catch (e) {}
+  }, 6000);
+})();
 /* 尽早同步用户装扮，避免先显示默认再替换的闪烁 */
 (function () {
   try {
@@ -1889,6 +1917,7 @@ window._idbStore = (function () {
   // 恢复流程统一交给 __akiniBootApp；此处不再单独 set _akiniDataRestored 或 resetCache，
   // 避免与 4550 行的 IDB→tryRestoreFromBackup→__akiniBootApp 路径竞争导致数据被空值覆盖
   setTimeout(function() {
+    window.__akiniBootComplete = true; // v905：看门狗依据——主启动链到达此处即视为完成
     try {
       window._akiniCacheStore && window._akiniCacheStore.restoreAll && window._akiniCacheStore.restoreAll();
       window._idbStore && window._idbStore.restoreAll && window._idbStore.restoreAll();
@@ -20580,13 +20609,11 @@ window.akiniContacts = {
                   scheduleNext(false);
                   return;
                 }
-                // 硬性安全检查 2：活跃时段
-                if (!window.AKR.isInTimeRange("friends")) {
-                  window.__akiniPostLog && __akiniPostLog("friends", "跳过：不在活跃时段");
-                  scheduleNext(false);
-                  return;
-                }
-                // 硬性安全检查 3：绝对物理冷却（至少 5 分钟），防多端、切换后台或 catchUp 狂发
+                /* v906：删除活跃时段检查——对齐主动来信（triggerTaReplyOnce 仅查开关、无时段守卫）。
+                   用户要求：离线期间错过的发布，重进应用后按设置频率补发（catchUp 时间戳回溯计划时刻
+                   + backfill 锚点推算多条），不因"当前时刻不在活跃时段"被拦截。
+                   防狂发仍由：参数 clamp + 5 分钟硬冷却 + 并发锁 + backfill 上限 6 条保障 */
+                // 硬性安全检查 2：绝对物理冷却（至少 5 分钟），防多端、切换后台或 catchUp 狂发
                 var _lastRun = Math.max(
                   parseFloat(localStorage.getItem("akini_last_friendsPost_run") || "0") || 0,
                   parseFloat(localStorage.getItem("akini_last_friendsPost") || "0") || 0
@@ -21255,12 +21282,8 @@ window.akiniContacts = {
                         )),
                         alert("请在浏览器设置中允许通知权限"));
                     } else {
-                      // 确保 ServiceWorker 注册好，让安卓手机也能直接弹出系统通知
-                      try {
-                        if (navigator.serviceWorker && navigator.serviceWorker.register) {
-                          navigator.serviceWorker.register('./service-worker.js', { scope: './', updateViaCache: 'none' });
-                        }
-                      } catch (e) {}
+                      /* v905：Service Worker 已退役，不再注册——通知直接走页面 Notification，
+                         失败则由外层 showInAppNotif 应用内通知兜底 */
                       // 授权成功后自动开启保活，确保 iOS 主屏/安卓后台也能收到消息通知
                       try {
                         var ka = document.getElementById("keepAliveToggle");
@@ -21439,18 +21462,15 @@ window.akiniContacts = {
           } catch (e) { return false; }
         }
         try {
-          if ('serviceWorker' in navigator) {
-            var getReg = navigator.serviceWorker.ready || (navigator.serviceWorker.getRegistration ? navigator.serviceWorker.getRegistration() : null);
+          /* v905：SW 已退役。注意不能用 serviceWorker.ready——无注册时它永不 resolve 会挂死；
+             改用 getRegistration()（无注册时 resolve null），命中才用 SW 通道，否则页面通知兜底 */
+          if ('serviceWorker' in navigator && navigator.serviceWorker.getRegistration) {
+            var getReg = navigator.serviceWorker.getRegistration();
             if (getReg) {
               Promise.resolve(getReg).then(function (reg) {
                 try {
                   if (reg && reg.showNotification) {
                     reg.showNotification(title, opts);
-                  } else if (navigator.serviceWorker.register) {
-                    navigator.serviceWorker.register('./service-worker.js', { scope: './', updateViaCache: 'none' }).then(function(newReg){
-                      if (newReg && newReg.showNotification) newReg.showNotification(title, opts);
-                      else tryPageNotification();
-                    }).catch(function(){ tryPageNotification(); });
                   } else {
                     tryPageNotification();
                   }
@@ -22091,13 +22111,11 @@ window.akiniContacts = {
             scheduleNextIcity(false);
             return;
           }
-          // 硬性安全检查 2：活跃时段
-          if (!window.AKR.isInTimeRange("icity")) {
-            window.__akiniPostLog && __akiniPostLog("icity", "跳过：不在活跃时段");
-            scheduleNextIcity(false);
-            return;
-          }
-          // 硬性安全检查 3：绝对物理冷却（至少 5 分钟），防多端、切换后台或 catchUp 狂发
+          /* v906：删除活跃时段检查——对齐主动来信（仅查开关、无时段守卫）。
+             离线期间错过的发布，重进应用后按设置频率补发（catchUp 时间戳回溯计划时刻
+             + backfill 锚点推算多条），不因"当前时刻不在活跃时段"被拦截。
+             防狂发仍由：参数 clamp + 5 分钟硬冷却 + 并发锁 + backfill 上限 6 条保障 */
+          // 硬性安全检查 2：绝对物理冷却（至少 5 分钟），防多端、切换后台或 catchUp 狂发
           var _lastRun = Math.max(
             parseFloat(localStorage.getItem("akini_last_icityPost_run") || "0") || 0,
             parseFloat(localStorage.getItem("akini_last_icityPost") || "0") || 0
