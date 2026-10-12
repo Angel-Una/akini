@@ -64,7 +64,94 @@ try{
   window.__akiniLowMem = ((navigator.deviceMemory||8) <= 4) || ((navigator.hardwareConcurrency||8) <= 4) || (/iPad|iPhone|iPod/.test(_ua) && !(window.MSStream)) || _isOldAndroid || _isLemur || _isVivo;
   if(window.__akiniLowMem) document.documentElement.classList.add("low-mem");
 }catch(e){}
-</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><script>/* 版本标记已移除：清理历史 akini_ver 版本缓存，不再写入任何版本数据 */(function(){ try { localStorage.removeItem('akini_ver'); } catch(e){} })();</script><meta charset="utf-8"/><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,shrink-to-fit=no" name="viewport"/>
+</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><script>/* 版本标记已移除：清理历史 akini_ver 版本缓存，不再写入任何版本数据 */(function(){ try { localStorage.removeItem('akini_ver'); } catch(e){} })();</script><script id="akini-v915-write-through">
+/* ===== v915 核心键写穿透镜像（根治背景图/头像/自定义文字等一切"回退旧数据"） =====
+   根因：这些键此前只写 localStorage 主键；恢复源（vault 60s 轮询 / IDB snap_ / LS 快照）
+   躺的是旧值——崩溃丢键后回填旧值，用户就看到"设置回到旧数据"。
+   修复（对齐 milk/syy 数据只增不降）：
+   1. 白名单键每次 setItem 同步镜像 IDB snap_/snap2_ → 恢复源永远等于最新值；
+   2. removeItem 同步删镜像 → 已删除的背景/文字不会被恢复源复活；
+   3. 每次写/删登记 akini_key_mtime → 恢复侧守卫：快照比当前动作旧就绝不回填。 */
+(function () {
+  "use strict";
+  var CORE = {
+    akini_home_bg: 1, akini_cover_bg: 1, akini_day_bg: 1, akini_music_bg: 1,
+    akini_s1_cover: 1, akini_s1_photo: 1, akini_s1_avatar: 1, akini_s1_texts: 1,
+    akini_s1_polaroid_note: 1,
+    akini_my_avatar: 1, akini_ta_avatar: 1, akini_avatar_left: 1, akini_avatar_right: 1,
+    akini_signature: 1, akini_bubble_color: 1, akini_day_label: 1, akini_start_date: 1
+  };
+  function isCore(k) {
+    if (CORE[k]) return true;
+    if (k && k.indexOf("akini_s1_custom_text_") === 0) return true;
+    return false;
+  }
+  var _origSet = localStorage.setItem.bind(localStorage);
+  var _origRemove = localStorage.removeItem.bind(localStorage);
+  var _origGet = localStorage.getItem.bind(localStorage);
+  var _inPatch = false;
+  function touchMtime(k) {
+    try {
+      var m = {};
+      try { m = JSON.parse(_origGet("akini_key_mtime") || "{}") || {}; } catch (e) { m = {}; }
+      m[k] = Date.now();
+      _inPatch = true;
+      try { _origSet("akini_key_mtime", JSON.stringify(m)); } finally { _inPatch = false; }
+    } catch (e2) {}
+  }
+  localStorage.setItem = function (k, v) {
+    _origSet(k, v);
+    if (_inPatch || !isCore(k)) return;
+    touchMtime(k);
+    try {
+      var s = String(v);
+      if (window._idbStore && window._idbStore.set) {
+        window._idbStore.set("snap_" + k, s);
+        window._idbStore.set("snap2_" + k, s);
+      }
+    } catch (e) {}
+  };
+  localStorage.removeItem = function (k) {
+    _origRemove(k);
+    if (_inPatch || !isCore(k)) return;
+    touchMtime(k);
+    try {
+      if (window._idbStore && window._idbStore.remove) {
+        window._idbStore.remove("snap_" + k);
+        window._idbStore.remove("snap2_" + k);
+      }
+    } catch (e) {}
+  };
+  function mirrorAllCore() {
+    try {
+      var keys = Object.keys(CORE);
+      for (var i = 0; i < localStorage.length; i++) {
+        var lk = localStorage.key(i);
+        if (lk && isCore(lk)) keys.push(lk);
+      }
+      keys.forEach(function (k) {
+        try {
+          var v = _origGet(k);
+          if (v == null || v === "" || v === "null" || v === "undefined") return;
+          if (window._idbStore && window._idbStore.set) {
+            window._idbStore.set("snap_" + k, String(v));
+            window._idbStore.set("snap2_" + k, String(v));
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+  }
+  // 头部执行时 _idbStore 尚未就绪：轮询等待，就绪后全量补镜像一次（此后写穿透即时镜像）
+  var _waitIdb = setInterval(function () {
+    if (window._idbStore && window._idbStore.set) {
+      clearInterval(_waitIdb);
+      mirrorAllCore();
+    }
+  }, 500);
+  setTimeout(function () { try { clearInterval(_waitIdb); } catch (e) {} }, 30000);
+  window.__akiniCoreWriteThrough = { isCore: isCore, touchMtime: touchMtime, mirrorAllCore: mirrorAllCore };
+})();
+</script><meta charset="utf-8"/><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><meta content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover,shrink-to-fit=no" name="viewport"/>
 
 
 
@@ -78,7 +165,7 @@ try{
   } catch (e) {}
 })();
 </script>
-<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=window.localStorage;try{t.removeItem("__aktest__");}catch(_e0){}t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var _n=e&&(e.name||"");var _c=(e&&typeof e.code==="number")?e.code:-1;var _quota=(_n==="QuotaExceededError"||_n==="NS_ERROR_DOM_STORAGE_QUOTA_REACHED"||_n==="QuotaExceeded"||_c===22||_c===1014);if(_quota){try{window.localStorage.removeItem("__aktest__");}catch(_e1){}console.warn("[Akini] localStorage 配额已满：保留原生存储，旧数据仍可读写");return;}var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20261013v912" id="akini-style" rel="stylesheet"/><script>function hideEmojiPanel(){var e=document.getElementById("emojiPanel");e&&(e.style.display="none",e.style.visibility="hidden",e.style.pointerEvents="none")}function getMyLatestMessageText(t){if(!window.akiniContacts)return"";var e=window.akiniContacts.getSession(t||window.akiniContacts.getActiveChatId()),n=e&&e.messagesHTML||"";if(!n)return"";var i=document.createElement("div");i.innerHTML=n;var a=Array.from(i.querySelectorAll(".msg-row.me")),texts=[];for(var o=a.length-1;o>=0;o--){var r=a[o].querySelector(".bubble");if(r&&!r.classList.contains("transfer-bubble")){if(r.querySelector("img")&&!(r.textContent||"").trim()){texts.push("【表情包】");continue}if(!r.querySelector("img")){var c=r.textContent.trim();if(c)texts.push(c)}}}if(!texts.length)return"";return texts[Math.floor(Math.random()*texts.length)]}</script><style id="akiniTopCardOpacityStyle"></style>
+<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=window.localStorage;try{t.removeItem("__aktest__");}catch(_e0){}t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var _n=e&&(e.name||"");var _c=(e&&typeof e.code==="number")?e.code:-1;var _quota=(_n==="QuotaExceededError"||_n==="NS_ERROR_DOM_STORAGE_QUOTA_REACHED"||_n==="QuotaExceeded"||_c===22||_c===1014);if(_quota){try{window.localStorage.removeItem("__aktest__");}catch(_e1){}console.warn("[Akini] localStorage 配额已满：保留原生存储，旧数据仍可读写");return;}var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20261013v915" id="akini-style" rel="stylesheet"/><script>function hideEmojiPanel(){var e=document.getElementById("emojiPanel");e&&(e.style.display="none",e.style.visibility="hidden",e.style.pointerEvents="none")}function getMyLatestMessageText(t){if(!window.akiniContacts)return"";var e=window.akiniContacts.getSession(t||window.akiniContacts.getActiveChatId()),n=e&&e.messagesHTML||"";if(!n)return"";var i=document.createElement("div");i.innerHTML=n;var a=Array.from(i.querySelectorAll(".msg-row.me")),texts=[];for(var o=a.length-1;o>=0;o--){var r=a[o].querySelector(".bubble");if(r&&!r.classList.contains("transfer-bubble")){if(r.querySelector("img")&&!(r.textContent||"").trim()){texts.push("【表情包】");continue}if(!r.querySelector("img")){var c=r.textContent.trim();if(c)texts.push(c)}}}if(!texts.length)return"";return texts[Math.floor(Math.random()*texts.length)]}</script><style id="akiniTopCardOpacityStyle"></style>
 
 <script>
 /* ==========================================================================
@@ -657,6 +744,44 @@ window.closeChatMenuModal = function() {
 };
 
 document.addEventListener("DOMContentLoaded", function() {
+  // 绑定聊天设置空白背景点击与触摸关闭（三保险：menuBg + chatMenuOverlay 自身）
+  var bindMenuOverlayClose = function() {
+    var cmo = document.getElementById("chatMenuOverlay");
+    var menuBg = document.getElementById("menuBg");
+    var doClose = function(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      window.closeChatMenuModal();
+    };
+    if (menuBg && !menuBg._close_bound) {
+      menuBg._close_bound = true;
+      menuBg.addEventListener("click", doClose);
+      menuBg.addEventListener("touchend", doClose);
+    }
+    if (cmo && !cmo._close_bound) {
+      cmo._close_bound = true;
+      var onCmoTap = function(e) {
+        // 仅当点击目标就是 overlay 蒙层本身或非面板内部区域时才关闭
+        if (e.target === cmo || e.target.id === "menuBg" || e.target.classList.contains("menu-bg")) {
+          doClose(e);
+        }
+      };
+      cmo.addEventListener("click", onCmoTap);
+      cmo.addEventListener("touchend", onCmoTap);
+    }
+    // 阻止 panel 内部冒泡触发蒙层关闭
+    var panel = document.getElementById("chatMenuPanel");
+    if (panel && !panel._stop_bound) {
+      panel._stop_bound = true;
+      var stopEvt = function(e) { e.stopPropagation(); };
+      panel.addEventListener("click", stopEvt);
+      panel.addEventListener("touchend", stopEvt);
+    }
+  };
+  bindMenuOverlayClose();
+  setInterval(function(){ if(!document.hidden) bindMenuOverlayClose(); }, 3000);
   // 绑定聊天右上角展开按钮及昵称条
   var bindMenuBtns = function() {
     var btns = document.querySelectorAll("#chatContactMenuBtn, .chat-contact-menu-btn, #chatTaName, .ta-name-pill");
@@ -907,7 +1032,7 @@ document.addEventListener("DOMContentLoaded", function() {
 /* v907 milk式架构：Service Worker 彻底退役——启动即注销一切存量 SW 注册（数据保险箱 akini-vault-v1 永不触碰），
    从此页面永远直连网络取最新版，版本回退/缓存锁死在物理上不可能发生 */
 (function(){
-  window.AKINI_VERSION = "v912";
+  window.AKINI_VERSION = "v915";
   try {
     try { localStorage.removeItem("akini_boot_ver"); } catch(e){}
     // v907：注销一切 Service Worker 注册（SW 已退役，通知改走页面 Notification）
@@ -3022,8 +3147,8 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
   setTimeout(function(){
     try{
       var libs = [
-        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20261013v912',
-        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20261013v912'
+        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20261013v915',
+        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20261013v915'
       ];
       libs.forEach(function(u){
         var s = document.createElement('script');
@@ -3033,7 +3158,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
     }catch(e){}
   }, 5000);
 })();
-</script><script src="localforage.min.js?v=20261013v912"></script><script src="akini-storage-safe.js?v=20261013v912"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="1.5"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="1.5" stroke-linecap="round"/></svg>');};</script>
+</script><script src="localforage.min.js?v=20261013v915"></script><script src="akini-storage-safe.js?v=20261013v915"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="1.5"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="1.5" stroke-linecap="round"/></svg>');};</script>
 
 <!-- ===== zzw：陪伴页 ===== -->
 <div id="app-companion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;flex-direction:column;background:#f7f7f7;color:#1a1a1a">
@@ -3173,7 +3298,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
 </div>
 </div>
 <input accept="image/*" class="akini-file-offscreen" id="novelCoverInput" type="file"/>
-<script id="akini-main" src="akini-main.js?v=20261013v912"></script><script src="akini-moments-engine.js?v=20261013v912"></script><script src="akini-mail-engine.js?v=20261013v912"></script><script src="akini-backup.js?v=20261013v912"></script><script src="akini-ta-phone.js?v=20261013v912"></script><script src="akini-storage-mgr.js?v=20261013v912"></script><script src="akini-cloud-backup.js?v=20261013v912"></script><script src="akini-novel-companion.js?v=20261013v912"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","akiniProbArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
+<script id="akini-main" src="akini-main.js?v=20261013v915"></script><script src="akini-moments-engine.js?v=20261013v915"></script><script src="akini-mail-engine.js?v=20261013v915"></script><script src="akini-backup.js?v=20261013v915"></script><script src="akini-ta-phone.js?v=20261013v915"></script><script src="akini-storage-mgr.js?v=20261013v915"></script><script src="akini-cloud-backup.js?v=20261013v915"></script><script src="akini-novel-companion.js?v=20261013v915"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","akiniProbArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
     _akiniCleanPopups();_hideApps.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});_hideAreas.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});var _cmo=document.getElementById("chatMenuOverlay");if(_cmo){_cmo.style.display="none";_cmo.classList.remove("show");}var _camo=document.querySelector(".chat-list-add-menu-overlay");if(_camo){_camo.classList.remove("show");setTimeout(function(){_camo.remove();},200);}};window.showEl=function showEl(id,z){var e=document.getElementById(id);if(e){e.style.zIndex=z||"999999";e.style.display="flex";e.classList.add("show");return e;}return e;};window.showArea=function showArea(id){var e=document.getElementById(id);if(e){e.style.zIndex="999999";e.style.display="flex";e.classList.add("show");}};function navTo(app){try{window.hideAll();if(app==="chat-list"){__akiniShowAppContainer("chat-list");return}if(app==="music"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}__akiniShowAppContainer("music");var _cp=document.getElementById("musicContactPicker");if(_cp){_cp.style.display="flex";_cp.style.zIndex="1000000";}return}if(app==="survey"){if(window._openSurveyList){window._openSurveyList();return}var _sm=document.getElementById("surveyListModal");if(_sm){_sm.style.display="flex";_sm.style.zIndex="1000001";}return}if(["friends","call","add-contact","contact-detail","create-group"].indexOf(app)>=0){
   if(app==="friends"){ try{ window.__akiniClearFeatureUnread && window.__akiniClearFeatureUnread("friends"); }catch(e){} }
   __akiniShowAppContainer(app);return
@@ -4362,8 +4487,14 @@ function it(t,e){
       });
     })();
     // iOS/localStorage 被清空时：优先从 IDB 快照恢复全部 akini_ 数据
+    // 严格防回滚：如果 localStorage 中已存在联系人等核心数据，绝对禁止从旧备份快照静默恢复！
     window._idbStore.get("akini_localstorage_snapshot_backup",function(snap){
       if(!snap)return;
+      var existingC = null;
+      try { existingC = localStorage.getItem("akini_contacts"); } catch(e){}
+      if (existingC && existingC.length > 10 && existingC !== "[]") {
+        return; // 当前数据完好，绝不用旧快照覆盖！
+      }
       var data;try{data=JSON.parse(snap);}catch(e){return;}
       if(!data||typeof data!=="object")return;
       var restored=false;
@@ -4372,7 +4503,7 @@ function it(t,e){
         var k=keys[i];
         var cur=localStorage.getItem(k);
         var sv=data[k];
-        // 仅当 localStorage 中该键完全不存在时才恢复（避免用旧快照覆盖运行中新数据）
+        // 仅当 localStorage 中该键完全不存在且非空时才恢复（避免用旧快照覆盖运行中新数据）
         if(sv&&sv!==""&&sv!=="null"&&sv!=="undefined"&&cur===null){
           try{localStorage.setItem(k,sv);restored=true;}catch(e){}
         }
@@ -5674,240 +5805,234 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
   }
 
   function showSurveyDetail(idx, memberId, fromChat){
-    var s = surveys[idx];
-    if(!s) return;
-    var modal = document.getElementById("surveyDetailModal");
-    var titleEl = document.getElementById("surveyDetailTitle");
-    var bodyEl = document.getElementById("surveyDetailBody");
-    if(!modal || !titleEl || !bodyEl) return;
-    // 记录返回目标：问卷列表当前打开则返回列表，否则返回聊天上下文
-    var listModal = document.getElementById("surveyListModal");
-    window._surveyDetailReturn = (listModal && listModal.style.display === "flex") ? "list" : "chat";
-    titleEl.textContent = (s.title || "").trim() || "问卷详情";
-    var html = "";
-    var target = s.targetId && window.akiniContacts.getChatTarget ? window.akiniContacts.getChatTarget(s.targetId) : null;
-    var isGroup = s.chatType === "group" || (s.selectedMembers && s.selectedMembers.length > 1) || (target && target.type === "group");
-    var replyToShow = null;
-    if(memberId && s.replies){
-      replyToShow = s.replies.find(function(r){ return r.memberId === memberId; });
-    }
-    if(!replyToShow && s.replies && s.replies.length === 1 && !isGroup){
-      replyToShow = s.replies[0];
-    }
-    (s.questions || []).forEach(function(q, qIdx){
-      var opts = (q.options || []).filter(function(o){ return (o || "").trim(); });
-      if(q.type === "yesno") opts = ["是", "否"];
-      var ans = replyToShow ? replyToShow.answers[qIdx] : undefined;
-      var _multiQ = (q.type === "multi") || Array.isArray(ans);
-      html += '<div style="margin-bottom:16px;background:#f9f9f9;border-radius:10px;padding:12px">';
-      html += '<div style="font-size:15px;font-weight:600;color:#111;margin-bottom:10px">'+(qIdx+1)+'. '+escapeHtml(q.text || "未命名问题")+'</div>';
-      if(opts.length >= 2){
-        html += '<div style="display:flex;flex-direction:column;gap:8px">';
-        var singlePickedIndex = -1;
-        if(!_multiQ && ans !== undefined && ans !== null && ans !== ""){
-          if(typeof ans === "number" && ans >= 0 && ans < opts.length){
-            singlePickedIndex = ans;
-          } else if(/^\d+$/.test(String(ans)) && parseInt(ans, 10) >= 0 && parseInt(ans, 10) < opts.length){
-            singlePickedIndex = parseInt(ans, 10);
-          } else {
-            var cCode = String(ans).trim().toUpperCase().charCodeAt(0) - 65;
-            if(cCode >= 0 && cCode < opts.length && String(ans).trim().length === 1){
-              singlePickedIndex = cCode;
+    try {
+      var s = surveys[idx];
+      if(!s) return;
+      var modal = document.getElementById("surveyDetailModal");
+      var titleEl = document.getElementById("surveyDetailTitle");
+      var bodyEl = document.getElementById("surveyDetailBody");
+      if(!modal || !titleEl || !bodyEl) return;
+      // 记录返回目标：问卷列表当前打开则返回列表，否则返回聊天上下文
+      var listModal = document.getElementById("surveyListModal");
+      window._surveyDetailReturn = (listModal && listModal.style.display === "flex") ? "list" : "chat";
+      titleEl.textContent = (s.title || "").trim() || "问卷详情";
+      var html = "";
+      var target = (s.targetId && window.akiniContacts && window.akiniContacts.getChatTarget) ? window.akiniContacts.getChatTarget(s.targetId) : null;
+      var isGroup = s.chatType === "group" || (s.selectedMembers && s.selectedMembers.length > 1) || (target && target.type === "group");
+      var replyToShow = null;
+      if(memberId && s.replies && Array.isArray(s.replies)){
+        replyToShow = s.replies.find(function(r){ return r && r.memberId === memberId; });
+      }
+      if(!replyToShow && s.replies && s.replies.length === 1 && !isGroup){
+        replyToShow = s.replies[0];
+      }
+      (s.questions || []).forEach(function(q, qIdx){
+        if (!q) return;
+        var opts = (q.options || []).filter(function(o){ return (o || "").trim(); });
+        if(q.type === "yesno") opts = ["是", "否"];
+        var ans = (replyToShow && replyToShow.answers) ? replyToShow.answers[qIdx] : undefined;
+        var _multiQ = (q.type === "multi") || Array.isArray(ans);
+        html += '<div style="margin-bottom:16px;background:#f9f9f9;border-radius:10px;padding:12px">';
+        html += '<div style="font-size:15px;font-weight:600;color:#111;margin-bottom:10px">'+(qIdx+1)+'. '+escapeHtml(q.text || "未命名问题")+'</div>';
+        if(opts.length >= 2){
+          html += '<div style="display:flex;flex-direction:column;gap:8px">';
+          var singlePickedIndex = -1;
+          if(!_multiQ && ans !== undefined && ans !== null && ans !== ""){
+            if(typeof ans === "number" && ans >= 0 && ans < opts.length){
+              singlePickedIndex = ans;
+            } else if(/^\d+$/.test(String(ans)) && parseInt(ans, 10) >= 0 && parseInt(ans, 10) < opts.length){
+              singlePickedIndex = parseInt(ans, 10);
             } else {
-              for(var _si = 0; _si < opts.length; _si++){
-                if(String(opts[_si]).trim() === String(ans).trim()){
-                  singlePickedIndex = _si;
-                  break;
+              var cCode = String(ans).trim().toUpperCase().charCodeAt(0) - 65;
+              if(cCode >= 0 && cCode < opts.length && String(ans).trim().length === 1){
+                singlePickedIndex = cCode;
+              } else {
+                for(var _si = 0; _si < opts.length; _si++){
+                  if(String(opts[_si]).trim() === String(ans).trim()){
+                    singlePickedIndex = _si;
+                    break;
+                  }
                 }
               }
             }
           }
-        }
-        opts.forEach(function(opt, oIdx){
-          if(_multiQ){
-            var picked = Array.isArray(ans) && ans.indexOf(opt) >= 0;
-            var boxStyle = picked
-              ? 'width:18px;height:18px;border-radius:50%;background:#000000;border:none;flex-shrink:0'
-              : 'width:18px;height:18px;border-radius:50%;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0';
-            var boxTextStyle = picked ? 'font-size:15px;color:#000000;font-weight:600' : 'font-size:15px;color:#111111;font-weight:400';
-            var mLabel = String.fromCharCode(65 + oIdx);
-            html += '<div style="display:flex;align-items:center;gap:12px;min-height:36px">'+
-              '<div style="'+boxStyle+'"></div>'+
-              '<span style="'+boxTextStyle+'"><b style="margin-right:6px">'+mLabel+'.</b>'+escapeHtml(opt)+'</span>'+
-            '</div>';
-            return;
-          }
-          var selected = (oIdx === singlePickedIndex);
-          var circleStyle = selected
-            ? 'width:18px;height:18px;border-radius:50%;background:#000000;border:none;flex-shrink:0'
-            : 'width:18px;height:18px;border-radius:50%;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0';
-          var textStyle = selected ? 'font-size:15px;color:#000000;font-weight:600' : 'font-size:15px;color:#111111;font-weight:400';
-          var label = String.fromCharCode(65 + oIdx);
-          html += '<div style="display:flex;align-items:center;gap:12px;min-height:36px">'+
-            '<div style="'+circleStyle+'"></div>'+
-            '<span style="'+textStyle+'"><b style="margin-right:6px">'+label+'.</b>'+escapeHtml(opt)+'</span>'+
-          '</div>';
-        });
-        html += '</div>';
-      } else {
-        html += '<div style="font-size:14px;color:#333">'+escapeHtml(Array.isArray(ans) ? ans.join("、") : (ans || "未回答"))+'</div>';
-      }
-      html += '</div>';
-    });
-    // 单人详情把备注单独显示在问题下方，无备注不显示
-    if(replyToShow && replyToShow.note && String(replyToShow.note).trim()){
-      html += '<div style="margin-top:12px;padding:12px;background:#fff;border-radius:10px;border:1px solid #e8e8e8">';
-      html += '<div style="font-size:13px;color:#666;margin-bottom:6px">备注</div>';
-      html += '<div style="font-size:14px;color:#333">'+escapeHtml(replyToShow.note)+'</div>';
-      html += '</div>';
-    }
-    // 回答记录只保留在群聊问卷详情中，聊天卡片详情不重复展示
-    if(isGroup && !fromChat){
-      if(s.replies && s.replies.length){
-        html += '<div style="margin-top:12px;padding:12px;background:#fff;border-radius:10px;border:1px solid #e8e8e8">';
-        html += '<div style="font-size:13px;color:#666;margin-bottom:8px">回答记录</div>';
-        s.replies.forEach(function(r){
-          var member = window.akiniContacts.getChatTarget(r.memberId);
-          var name = member ? member.name : "对方";
-          var ansText = (s.questions || []).map(function(q, qIdx){
-            return (qIdx+1) + "." + (r.answers[qIdx] || "未回答");
-          }).join("；");
-          html += '<div style="margin-bottom:8px;padding:8px;background:#f5f5f5;border-radius:8px">';
-          html += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:4px">'+escapeHtml(name)+'</div>';
-          html += '<div style="font-size:12px;color:#666">'+escapeHtml(ansText)+'</div>';
-          if(r.note && String(r.note).trim()){
-            html += '<div style="font-size:12px;color:#999;margin-top:2px">备注：'+escapeHtml(String(r.note).trim())+'</div>';
-          }
-          html += '</div>';
-        });
-        html += '</div>';
-      } else {
-        html += '<div style="text-align:center;color:#999;font-size:14px;padding:10px">暂无回答</div>';
-      }
-    }
-    // 收到的未回答问卷在详情页增加“回答”入口，防止用户误以为没有回答选项
-    if(s.direction === "receive" && !s.replied){
-      html += '<button type="button" id="surveyDetailReplyBtn" data-idx="'+idx+'" style="width:100%;margin-top:14px;padding:12px;border:none;border-radius:10px;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">回答</button>';
-    }
-    bodyEl.innerHTML = html;
-    modal.style.display = "flex"; modal.style.zIndex = "1000000005";
-    bodyEl.querySelectorAll(".survey-reply-radio").forEach(function(rad){
-      rad.addEventListener("change", function(){
-        var q = this.getAttribute("data-q");
-        bodyEl.querySelectorAll(".survey-reply-option-item[data-q='"+q+"']").forEach(function(lbl){
-          var r = lbl.querySelector(".survey-reply-radio");
-          var dot = lbl.querySelector(".survey-custom-radio-dot");
-          if(r && dot){
-            if(r.checked){
-              dot.style.background = "#000000";
-              dot.style.border = "none";
-            } else {
-              dot.style.background = "#ffffff";
-              dot.style.border = "1.8px solid #000000";
+          opts.forEach(function(opt, oIdx){
+            if(_multiQ){
+              var picked = Array.isArray(ans) && ans.indexOf(opt) >= 0;
+              var boxStyle = picked
+                ? 'width:18px;height:18px;border-radius:50%;background:#000000;border:none;flex-shrink:0'
+                : 'width:18px;height:18px;border-radius:50%;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0';
+              var boxTextStyle = picked ? 'font-size:15px;color:#000000;font-weight:600' : 'font-size:15px;color:#111111;font-weight:400';
+              var mLabel = String.fromCharCode(65 + oIdx);
+              html += '<div style="display:flex;align-items:center;gap:12px;min-height:36px">'+
+                '<div style="'+boxStyle+'"></div>'+
+                '<span style="'+boxTextStyle+'"><b style="margin-right:6px">'+mLabel+'.</b>'+escapeHtml(opt)+'</span>'+
+              '</div>';
+              return;
             }
-          }
+            var selected = (oIdx === singlePickedIndex);
+            var circleStyle = selected
+              ? 'width:18px;height:18px;border-radius:50%;background:#000000;border:none;flex-shrink:0'
+                : 'width:18px;height:18px;border-radius:50%;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0';
+            var textStyle = selected ? 'font-size:15px;color:#000000;font-weight:600' : 'font-size:15px;color:#111111;font-weight:400';
+            var label = String.fromCharCode(65 + oIdx);
+            html += '<div style="display:flex;align-items:center;gap:12px;min-height:36px">'+
+              '<div style="'+circleStyle+'"></div>'+
+              '<span style="'+textStyle+'"><b style="margin-right:6px">'+label+'.</b>'+escapeHtml(opt)+'</span>'+
+            '</div>';
+          });
+          html += '</div>';
+        } else {
+          html += '<div style="font-size:14px;color:#333">'+escapeHtml(Array.isArray(ans) ? ans.join("、") : (ans || "未回答"))+'</div>';
+        }
+        html += '</div>';
+      });
+      // 单人详情把备注单独显示在问题下方，无备注不显示
+      if(replyToShow && replyToShow.note && String(replyToShow.note).trim()){
+        html += '<div style="margin-top:12px;padding:12px;background:#fff;border-radius:10px;border:1px solid #e8e8e8">';
+        html += '<div style="font-size:13px;color:#666;margin-bottom:6px">备注</div>';
+        html += '<div style="font-size:14px;color:#333">'+escapeHtml(replyToShow.note)+'</div>';
+        html += '</div>';
+      }
+      // 回答记录只保留在群聊问卷详情中，聊天卡片详情不重复展示
+      if(isGroup && !fromChat){
+        if(s.replies && s.replies.length){
+          html += '<div style="margin-top:12px;padding:12px;background:#fff;border-radius:10px;border:1px solid #e8e8e8">';
+          html += '<div style="font-size:13px;color:#666;margin-bottom:8px">回答记录</div>';
+          s.replies.forEach(function(r){
+            if (!r) return;
+            var member = (window.akiniContacts && window.akiniContacts.getChatTarget) ? window.akiniContacts.getChatTarget(r.memberId) : null;
+            var name = member ? member.name : "对方";
+            var ansText = (s.questions || []).map(function(q, qIdx){
+              var singleAns = (r.answers && r.answers[qIdx]) ? r.answers[qIdx] : "未回答";
+              return (qIdx+1) + "." + (Array.isArray(singleAns) ? singleAns.join("、") : singleAns);
+            }).join("；");
+            html += '<div style="margin-bottom:8px;padding:8px;background:#f5f5f5;border-radius:8px">';
+            html += '<div style="font-size:13px;font-weight:600;color:#333;margin-bottom:4px">'+escapeHtml(name)+'</div>';
+            html += '<div style="font-size:12px;color:#666">'+escapeHtml(ansText)+'</div>';
+            if(r.note && String(r.note).trim()){
+              html += '<div style="font-size:12px;color:#999;margin-top:2px">备注：'+escapeHtml(String(r.note).trim())+'</div>';
+            }
+            html += '</div>';
+          });
+          html += '</div>';
+        } else {
+          html += '<div style="text-align:center;color:#999;font-size:14px;padding:10px">暂无回答</div>';
+        }
+      }
+      // 收到的未回答问卷在详情页增加“回答”入口，防止用户误以为没有回答选项
+      if(s.direction === "receive" && !s.replied){
+        html += '<button type="button" id="surveyDetailReplyBtn" data-idx="'+idx+'" style="width:100%;margin-top:14px;padding:12px;border:none;border-radius:10px;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">回答</button>';
+      }
+      bodyEl.innerHTML = html;
+      modal.style.display = "flex"; modal.style.zIndex = "1000000005";
+      var replyBtn = document.getElementById("surveyDetailReplyBtn");
+      if(replyBtn){
+        replyBtn.addEventListener("click", function(){
+          var i = parseInt(this.getAttribute("data-idx"), 10);
+          openSurveyReply(i);
         });
-      });
-    });
-    var replyBtn = document.getElementById("surveyDetailReplyBtn");
-    if(replyBtn){
-      replyBtn.addEventListener("click", function(){
-        var i = parseInt(this.getAttribute("data-idx"));
-        openSurveyReply(i);
-      });
+      }
+    } catch (eErr) {
+      console.error("[survey] showSurveyDetail error:", eErr);
     }
   }
 
   // ===== 我回答联系人发来的问卷（可选答案 + 备注 + 完成发送卡片）=====
   function openSurveyReply(idx){
-    var s = surveys[idx];
-    if(!s || s.replied) return;
-    var modal = document.getElementById("surveyDetailModal");
-    var titleEl = document.getElementById("surveyDetailTitle");
-    var bodyEl = document.getElementById("surveyDetailBody");
-    if(!modal || !titleEl || !bodyEl) return;
-    var surveyMainTitle = (s.title || "").trim() || "问卷调查";
-    titleEl.textContent = surveyMainTitle;
-    var html = "";
-    (s.questions || []).forEach(function(q, qIdx){
-      html += '<div style="margin-bottom:16px;background:#f9f9f9;border-radius:10px;padding:12px">';
-      var curType = q.type || s.qType || "single";
-      var typeDesc = "";
-      if(curType === "multi") typeDesc = "（多选）";
-      else if(curType === "yesno") typeDesc = "（判断）";
-      else if(curType === "text") typeDesc = "（问答）";
-      else typeDesc = "（单选）";
-      
-      html += '<div style="font-size:15px;font-weight:600;color:#111;margin-bottom:8px">'+(qIdx+1)+'. '+escapeHtml(q.text || "未命名问题")+' <span style="font-size:12px;color:#888;font-weight:normal">'+typeDesc+'</span></div>';
-      
-      var opts = (q.options || []).filter(function(o){ return (o || "").trim(); });
-      if(curType === "yesno") opts = ["是", "否"];
+    try {
+      var s = surveys[idx];
+      if(!s || s.replied) return;
+      var modal = document.getElementById("surveyDetailModal");
+      var titleEl = document.getElementById("surveyDetailTitle");
+      var bodyEl = document.getElementById("surveyDetailBody");
+      if(!modal || !titleEl || !bodyEl) return;
+      var surveyMainTitle = (s.title || "").trim() || "问卷调查";
+      titleEl.textContent = surveyMainTitle;
+      var html = "";
+      (s.questions || []).forEach(function(q, qIdx){
+        if (!q) return;
+        html += '<div style="margin-bottom:16px;background:#f9f9f9;border-radius:10px;padding:12px">';
+        var curType = q.type || s.qType || "single";
+        var typeDesc = "";
+        if(curType === "multi") typeDesc = "（多选）";
+        else if(curType === "yesno") typeDesc = "（判断）";
+        else if(curType === "text") typeDesc = "（问答）";
+        else typeDesc = "（单选）";
+        
+        html += '<div style="font-size:15px;font-weight:600;color:#111;margin-bottom:8px">'+(qIdx+1)+'. '+escapeHtml(q.text || "未命名问题")+' <span style="font-size:12px;color:#888;font-weight:normal">'+typeDesc+'</span></div>';
+        
+        var opts = (q.options || []).filter(function(o){ return (o || "").trim(); });
+        if(curType === "yesno") opts = ["是", "否"];
 
-      if(curType === "text" || opts.length === 0){
-        html += '<input type="text" class="survey-reply-text" data-q="'+qIdx+'" placeholder="请输入你的回答" style="width:100%;height:38px;border:1px solid #e8e8e8;border-radius:8px;padding:0 10px;font-size:14px;outline:0;color:#333;box-sizing:border-box;background:#fff">';
-      } else if(curType === "multi"){
-        html += '<div style="display:flex;flex-direction:column;gap:8px">';
-        opts.forEach(function(opt, oIdx){
-          var label = String.fromCharCode(65 + oIdx);
-          html += '<label class="survey-reply-option-item" data-q="'+qIdx+'" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #e8e8e8;cursor:pointer">';
-          html += '<input type="checkbox" name="survey-q-'+qIdx+'" class="survey-reply-checkbox" data-q="'+qIdx+'" data-opt="'+oIdx+'" value="'+escapeHtml(opt)+'" style="display:none">';
-          html += '<div class="survey-custom-radio-dot" style="width:18px;height:18px;border-radius:4px;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0"></div>';
-          html += '<span style="font-size:14px;color:#333"><b style="margin-right:6px">'+label+'.</b>'+escapeHtml(opt)+'</span>';
-          html += '</label>';
-        });
+        if(curType === "text" || opts.length === 0){
+          html += '<input type="text" class="survey-reply-text" data-q="'+qIdx+'" placeholder="请输入你的回答" style="width:100%;height:38px;border:1px solid #e8e8e8;border-radius:8px;padding:0 10px;font-size:14px;outline:0;color:#333;box-sizing:border-box;background:#fff">';
+        } else if(curType === "multi"){
+          html += '<div style="display:flex;flex-direction:column;gap:8px">';
+          opts.forEach(function(opt, oIdx){
+            var label = String.fromCharCode(65 + oIdx);
+            html += '<label class="survey-reply-option-item" data-q="'+qIdx+'" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #e8e8e8;cursor:pointer">';
+            html += '<input type="checkbox" name="survey-q-'+qIdx+'" class="survey-reply-checkbox" data-q="'+qIdx+'" data-opt="'+oIdx+'" value="'+escapeHtml(opt)+'" style="display:none">';
+            html += '<div class="survey-custom-radio-dot" style="width:18px;height:18px;border-radius:4px;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0"></div>';
+            html += '<span style="font-size:14px;color:#333"><b style="margin-right:6px">'+label+'.</b>'+escapeHtml(opt)+'</span>';
+            html += '</label>';
+          });
+          html += '</div>';
+        } else {
+          // single 或者 yesno 单选
+          html += '<div style="display:flex;flex-direction:column;gap:8px">';
+          opts.forEach(function(opt, oIdx){
+            var label = String.fromCharCode(65 + oIdx);
+            html += '<label class="survey-reply-option-item" data-q="'+qIdx+'" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #e8e8e8;cursor:pointer">';
+            html += '<input type="radio" name="survey-q-'+qIdx+'" class="survey-reply-radio" data-q="'+qIdx+'" data-opt="'+oIdx+'" value="'+escapeHtml(opt)+'" style="display:none">';
+            html += '<div class="survey-custom-radio-dot" style="width:18px;height:18px;border-radius:50%;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0"></div>';
+            html += '<span style="font-size:14px;color:#333"><b style="margin-right:6px">'+label+'.</b>'+escapeHtml(opt)+'</span>';
+            html += '</label>';
+          });
+          html += '</div>';
+        }
         html += '</div>';
-      } else {
-        // single 或者 yesno 单选
-        html += '<div style="display:flex;flex-direction:column;gap:8px">';
-        opts.forEach(function(opt, oIdx){
-          var label = String.fromCharCode(65 + oIdx);
-          html += '<label class="survey-reply-option-item" data-q="'+qIdx+'" style="display:flex;align-items:center;gap:10px;min-height:44px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #e8e8e8;cursor:pointer">';
-          html += '<input type="radio" name="survey-q-'+qIdx+'" class="survey-reply-radio" data-q="'+qIdx+'" data-opt="'+oIdx+'" value="'+escapeHtml(opt)+'" style="display:none">';
-          html += '<div class="survey-custom-radio-dot" style="width:18px;height:18px;border-radius:50%;border:1.8px solid #000000;background:#ffffff;box-sizing:border-box;flex-shrink:0"></div>';
-          html += '<span style="font-size:14px;color:#333"><b style="margin-right:6px">'+label+'.</b>'+escapeHtml(opt)+'</span>';
-          html += '</label>';
-        });
-        html += '</div>';
-      }
+      });
+      html += '<div style="margin-top:8px">';
+      html += '<div style="font-size:13px;color:#666;margin-bottom:6px">备注</div>';
+      html += '<textarea id="surveyReplyNote" placeholder="可填写备注（选填）" style="width:100%;height:64px;border:1px solid #e8e8e8;border-radius:8px;padding:10px;font-size:14px;outline:0;color:#333;box-sizing:border-box;resize:none"></textarea>';
       html += '</div>';
-    });
-    html += '<div style="margin-top:8px">';
-    html += '<div style="font-size:13px;color:#666;margin-bottom:6px">备注</div>';
-    html += '<textarea id="surveyReplyNote" placeholder="可填写备注（选填）" style="width:100%;height:64px;border:1px solid #e8e8e8;border-radius:8px;padding:10px;font-size:14px;outline:0;color:#333;box-sizing:border-box;resize:none"></textarea>';
-    html += '</div>';
-    html += '<button type="button" id="surveyReplyDoneBtn" style="width:100%;margin-top:14px;padding:12px;border:none;border-radius:10px;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">确定回答</button>';
-    bodyEl.innerHTML = html;
-    modal.style.display = "flex"; modal.style.zIndex = "1000000005";
-    bodyEl.querySelectorAll(".survey-reply-radio").forEach(function(rad){
-      rad.addEventListener("change", function(){
-        var q = this.getAttribute("data-q");
-        bodyEl.querySelectorAll(".survey-reply-option-item[data-q='"+q+"']").forEach(function(lbl){
-          var r = lbl.querySelector(".survey-reply-radio");
-          var dot = lbl.querySelector(".survey-custom-radio-dot");
-          if(r && dot){
-            if(r.checked){
-              dot.style.background = "#000000";
-              dot.style.border = "none";
-            } else {
-              dot.style.background = "#ffffff";
-              dot.style.border = "1.8px solid #000000";
+      html += '<button type="button" id="surveyReplyDoneBtn" style="width:100%;margin-top:14px;padding:12px;border:none;border-radius:10px;background:#1a1a1a;color:#fff;font-size:15px;font-weight:600;cursor:pointer">确定回答</button>';
+      bodyEl.innerHTML = html;
+      modal.style.display = "flex"; modal.style.zIndex = "1000000005";
+      bodyEl.querySelectorAll(".survey-reply-radio").forEach(function(rad){
+        rad.addEventListener("change", function(){
+          var q = this.getAttribute("data-q");
+          bodyEl.querySelectorAll(".survey-reply-option-item[data-q='"+q+"']").forEach(function(lbl){
+            var r = lbl.querySelector(".survey-reply-radio");
+            var dot = lbl.querySelector(".survey-custom-radio-dot");
+            if(r && dot){
+              if(r.checked){
+                dot.style.background = "#000000";
+                dot.style.border = "none";
+              } else {
+                dot.style.background = "#ffffff";
+                dot.style.border = "1.8px solid #000000";
+              }
             }
+          });
+        });
+      });
+      bodyEl.querySelectorAll(".survey-reply-checkbox").forEach(function(chk){
+        chk.addEventListener("change", function(){
+          var lbl = chk.closest(".survey-reply-option-item");
+          var box = lbl ? lbl.querySelector(".survey-custom-radio-dot") : null;
+          if(box){
+            if(chk.checked){ box.style.background = "#000000"; box.style.border = "none"; }
+            else { box.style.background = "#ffffff"; box.style.border = "1.8px solid #000000"; }
           }
         });
       });
-    });
-    bodyEl.querySelectorAll(".survey-reply-checkbox").forEach(function(chk){
-      chk.addEventListener("change", function(){
-        var lbl = chk.closest(".survey-reply-option-item");
-        var box = lbl ? lbl.querySelector(".survey-custom-radio-dot") : null;
-        if(box){
-          if(chk.checked){ box.style.background = "#000000"; box.style.border = "none"; }
-          else { box.style.background = "#ffffff"; box.style.border = "1.8px solid #000000"; }
-        }
-      });
-    });
-    var doneBtn = document.getElementById("surveyReplyDoneBtn");
-    if(doneBtn) doneBtn.addEventListener("click", function(){ submitSurveyReply(idx); });
+      var doneBtn = document.getElementById("surveyReplyDoneBtn");
+      if(doneBtn) doneBtn.addEventListener("click", function(){ submitSurveyReply(idx); });
+    } catch(eOpen) {
+      console.error("[survey] openSurveyReply error:", eOpen);
+    }
   }
 
   // ===== Submit reply (manual) =====
@@ -6322,35 +6447,13 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
     }
   }
 
-  // ===== v898：TA 回答问卷 30 秒限时查看倒计时 =====
+  // ===== v898：TA 回答问卷 30 秒限时查看倒计时（v915 已彻底移除顶部黑条，保留空函数防未捕获异常） =====
   window.__akiniSurveyCountdown = function (surveyId, taName) {
     try {
-      if (window.__akiniSrvCdOn) return; window.__akiniSrvCdOn = 1;
-      var old = document.getElementById('akiniSrvCdBar'); if (old) old.remove();
-      var bar = document.createElement('div');
-      bar.id = 'akiniSrvCdBar';
-      bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483000;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-top,0px));font-size:14px;font-weight:600;cursor:pointer;';
-      var left = 30;
-      bar.innerHTML = '<span>' + (taName || 'TA') + ' 刚刚回答了你的问卷！请在 30 秒内查看回应</span><span id="akiniSrvCdNum" style="background:#e04040;border-radius:10px;min-width:42px;text-align:center;padding:1px 8px;font-size:15px;font-weight:700;">30s</span>';
-      document.body.appendChild(bar);
-      var tick = setInterval(function () {
-        left--;
-        var n = document.getElementById('akiniSrvCdNum');
-        if (n) n.textContent = left + 's';
-        if (left <= 0) {
-          clearInterval(tick);
-          bar.style.background = '#666';
-          bar.innerHTML = '<span>超时啦…回复已保留，点击仍可查看</span>';
-          setTimeout(function () { if (bar.parentNode) bar.remove(); window.__akiniSrvCdOn = 0; }, 4000);
-        }
-      }, 1000);
-      bar.onclick = function () {
-        clearInterval(tick);
-        if (bar.parentNode) bar.remove();
-        window.__akiniSrvCdOn = 0;
-        if (window.__akiniOpenSurveyById) window.__akiniOpenSurveyById(surveyId, '', true);
-      };
-    } catch (e) {}
+      var old = document.getElementById('akiniSrvCdBar');
+      if (old) old.remove();
+      window.__akiniSrvCdOn = 0;
+    } catch(e) {}
   };
   // ===== Helper: Build survey card HTML =====
   // 问卷卡片线条图标（剪贴板轮廓 SVG，替代 emoji）
@@ -6532,18 +6635,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       var avatarCol = '<div class="avatar-col" style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:38px;"><div class="msg-avatar">' + avatar + '</div>' + tsHtml + '</div>';
 
       var cardStatus = statusText || (isReply ? "已回答" : "待回答");
-      /* v898：TA 回答了我的问卷 → 30 秒限时查看倒计时（每份问卷只触发一次） */
-      if (isReply && !isMe && window.__akiniSurveyCountdown) {
-        try {
-          var _cdSeen = window.__akiniSrvCdSeen || (window.__akiniSrvCdSeen = {});
-          try { var _cdRaw = localStorage.getItem('akini_srv_cd_seen'); if (_cdRaw) { var _cdP = JSON.parse(_cdRaw); if (_cdP && typeof _cdP === 'object') { for (var _k in _cdP) _cdSeen[_k] = 1; } } } catch (eCd0) {}
-          if (!_cdSeen[survey.id]) {
-            _cdSeen[survey.id] = 1;
-            try { localStorage.setItem('akini_srv_cd_seen', JSON.stringify(_cdSeen)); } catch (eCd1) {}
-            window.__akiniSurveyCountdown(survey.id, target ? target.name : "");
-          }
-        } catch (eCd2) {}
-      }
+      /* v915：彻底移除顶部黑条倒计时，原顶部通知不再显示 */
       var bubbleHtml = '<div class="bubble-wrap" style="flex-shrink:0;width:auto;min-width:180px;max-width:220px;margin:0;"><div class="bubble survey-bubble" style="width:auto;min-width:180px;max-width:220px;box-sizing:border-box;margin:0;background:#ffffff !important;background-color:#ffffff !important;color:#1a1a1a !important;border:1px solid #e8e8e8 !important;" data-survey-id="' + survey.id + '" data-survey-reply="' + (isReply ? "1" : "0") + '"' + (isReply && memberId ? ' data-member-id="' + memberId + '"' : "") + '">'
         + buildSurveyCardHtml(survey, isReply, cardStatus, target ? target.name : "")
         + '</div></div>';
@@ -6707,6 +6799,11 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       /* v898：问卷回答不再秒发——TA 在 30 秒内（22~28s 随机）回答，模拟真实等待感 */
       selectedMembers.forEach(function(mid, idx){
         var replyDelay = 22000 + idx * 3000 + Math.random() * 6000;
+        /* v915：在卡片发出前 4~8 秒提前展示「对方正在输入...」动态 */
+        var typingLead = Math.min(replyDelay * 0.35, 6000);
+        setTimeout(function(){
+          try { if (window.showTypingBubble) window.showTypingBubble(targetId, mid); } catch (eTyp) {}
+        }, Math.max(1000, replyDelay - typingLead));
         setTimeout(function(){
           simulateReply(survey.id, targetId, mid);
         }, replyDelay);
@@ -6751,6 +6848,11 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       selectedMembers.forEach(function(mid, i){
         /* v898：30 秒内回答，不再秒发 */
         var replyDelay = 22000 + i * 3000 + Math.random() * 6000;
+        /* v915：在卡片发出前 4~8 秒提前展示「对方正在输入...」动态 */
+        var typingLead = Math.min(replyDelay * 0.35, 6000);
+        setTimeout(function(){
+          try { if (window.showTypingBubble) window.showTypingBubble(targetId, mid); } catch (eTyp) {}
+        }, Math.max(1000, replyDelay - typingLead));
         setTimeout(function(){ simulateReply(copy.id, targetId, mid); }, replyDelay);
       });
     }, 300);
@@ -6895,6 +6997,8 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       }
       saveSurveys();
       if(allReplied) updateSurveyBubbleStatus(surveyId, "已回答");
+      /* v915：TA 回答问卷卡片发出前也先展示输入动态，再投递卡片，避免凭空跳出卡片 */
+      try { if (window.hideTypingBubble) window.hideTypingBubble(targetId); } catch (eHTyp2) {}
       insertSurveyBubble(survey, true, "已回答", targetId, memberId);
       /* v898：TA 回答问卷的卡片到达时走通知（前台弹窗+后台系统推送），与聊天消息一致 */
       try {
@@ -7089,8 +7193,8 @@ window.__akiniRegisterSW = function(){
 /* v907：开机守卫已注销一切存量 SW；此处不再注册新 SW，也不再延迟触发任何注册 */
 </script>
 
-<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20261013v912"></script>
-<script defer src="akini-compat-bridge.js?v=20261013v912"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20261013v915"></script>
+<script defer src="akini-compat-bridge.js?v=20261013v915"></script>
 <script>
 // 兼容旧版 JSON 备份的轻量兜底：如果 core 风格备份引擎未加载，仍允许导出基础 JSON
 (function(){
@@ -8145,7 +8249,8 @@ window.markMailAsRead = function(mailId) {
 
 (function() {
   /* v835：修复首页播放器一起听时长清零（原逻辑读从未赋值的 window.__musicStartTime）。
-     v845：首页播放器时长跟随美化页「播放器联系人」所选联系人——切换谁就显示谁的累计听歌时长。 */
+     v845/v915：首页播放器时长与一起听界面完全统一计算源头：
+     优先按所选联系人分账累计时长（加当前正在听的 delta），两处计算规则、文案格式 100% 相同！ */
   function fmtSec(total) {
     var n = Math.floor(total / 60), hh = Math.floor(n / 60), a = "";
     if (hh > 0) a += hh + " 小时 ";
@@ -8154,12 +8259,14 @@ window.markMailAsRead = function(mailId) {
   }
   function computeFromStore() {
     try {
-      /* v845：统一与一起听界面基准相同，计算当前选中联系人累计时长或会话总时长 */
       var listenMap = JSON.parse(localStorage.getItem("akini_music_listen_together") || "{}");
       var T = JSON.parse(localStorage.getItem("akini_music_selected_contacts") || "[]");
       var I = parseInt(localStorage.getItem("akini_music_listen_seconds") || "0", 10) || 0;
+      var selContactId = localStorage.getItem("akini_music_player_right_contact") || "";
       var sel = 0;
-      if (T && T.length) {
+      if (selContactId && listenMap[selContactId]) {
+        sel = listenMap[selContactId];
+      } else if (T && T.length) {
         T.forEach(function(ct){
           if (ct && ct.id) sel += (listenMap[ct.id] || 0);
         });
@@ -8173,9 +8280,9 @@ window.markMailAsRead = function(mailId) {
     var el = document.getElementById("musicPlayerListenTime");
     if (!el) return;
     var current = null;
-    /* lt() 快照 5s 内更新过 = 一起听模块正实时驱动（快照已按播放器所选联系人优先计算），直接采信 */
+    /* lt() 快照 10s 内更新过 = 一起听模块正实时驱动，直接采信 */
     try {
-      if (window.__akiniMusicListenText && (Date.now() - (window.__akiniMusicListenTextAt || 0)) < 5000) {
+      if (window.__akiniMusicListenText && (Date.now() - (window.__akiniMusicListenTextAt || 0)) < 10000) {
         current = window.__akiniMusicListenText;
       }
     } catch (e) {}
@@ -8185,7 +8292,7 @@ window.markMailAsRead = function(mailId) {
   }
   /* v845：暴露给美化页选择器——切换联系人后立即刷新首页播放器时长 */
   window.__akiniUpdatePlayerListenTime = updateMusicListenTime;
-  setInterval(updateMusicListenTime, 60000);
+  setInterval(updateMusicListenTime, 5000);
   document.addEventListener("DOMContentLoaded", updateMusicListenTime);
 })();
 </script>
@@ -9213,9 +9320,21 @@ window.markMailAsRead = function(mailId) {
         .then(function (pack) {
           if (!pack || !pack.data) return;
           var fixed = 0;
+          /* v915 mtime 守卫：当前 LS 的 akini_key_mtime 比 vault 保存时刻新 →
+             vault 值过旧，坚决不回填（防用户改过的背景图/头像/自定义文字被旧 vault 覆盖） */
+          var _vm = {};
+          try { _vm = JSON.parse(pack.data["akini_key_mtime"] || "{}") || {}; } catch (eVm) { _vm = {}; }
+          var _cm = {};
+          try { _cm = JSON.parse(localStorage.getItem("akini_key_mtime") || "{}") || {}; } catch (eCm) { _cm = {}; }
           miss.forEach(function (k) {
             var v = pack.data[k];
-            if (v && v !== "null") { try { localStorage.setItem(k, v); fixed++; } catch (e) {} }
+            if (!v || v === "null" || k === "akini_key_mtime") return;
+            try {
+              var _curT = Number(_cm[k]) || 0;
+              var _vaultT = Number(_vm[k]) || Number(pack.ts) || 0;
+              if (_curT && _curT > _vaultT) return; // 用户动作晚于 vault：vault 过旧，跳过
+            } catch (eG) {}
+            try { localStorage.setItem(k, v); fixed++; } catch (e) {}
           });
           if (fixed > 0) { restoreIcons(); applyCoreUI(); }
         }).catch(function () {});
@@ -10029,8 +10148,14 @@ setInterval(function () { try { if (document.hidden) return; mirrorIcons(); if (
         } catch(e){}
         window.__akiniAllSurveys = window.__akiniAllSurveys || {};
         window.__akiniAllSurveys[cloned.id] = cloned;
-        window.insertSurveyBubble(cloned, false, "待回答", chatId);
-        if(window._saveChat) window._saveChat();
+        /* v915：联系人发送问卷卡片前先显示输入动态，延迟后投递到消息流 */
+        var svTypingMs = 3500 + Math.random() * 2500;
+        try { if (window.showTypingBubble) window.showTypingBubble(chatId, null); } catch (eTypSv) {}
+        setTimeout(function(){
+          try { if (window.hideTypingBubble) window.hideTypingBubble(chatId); } catch (eHTyp) {}
+          window.insertSurveyBubble(cloned, false, "待回答", chatId);
+          if(window._saveChat) window._saveChat();
+        }, svTypingMs);
         return;
       }
     }

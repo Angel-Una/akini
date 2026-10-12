@@ -1595,9 +1595,22 @@ window._idbStore = (function () {
             try { localStorage.removeItem("akini_localstorage_snapshot_backup"); } catch (e4) {}
           } catch (e) {}
         }
-        // 页面隐藏/关闭前立即强制全量备份（绕过 30s 节流），防系统回收页面时丢失最后改动
+        /* v915 切后台卡崩根治（对齐 milk：pagehide 只做轻量应急备份）：
+           pagehide 的系统时间预算极短（移动端常 <1s），原在此同步跑
+           「全量快照 + IDB 全量备份 + Cache 全量备份」三连重活，是切后台卡崩闪退主因。
+           全量三连挪到 visibilitychange(hidden)——触发更早、App 仍在前台、CPU 预算充足
+           （微信内置浏览器 hidden 亦可靠触发，见 v605 注释）；8s 节流防短时双跑。 */
         window.addEventListener("pagehide", function () {
           if (!window._akiniDataRestored) return;
+          try { window.__akiniFlushPendingSaves && window.__akiniFlushPendingSaves(); } catch (e) {}
+          try { window._akiniEmergencySnapshot && window._akiniEmergencySnapshot(); } catch (e) {}
+        });
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState !== "hidden") return;
+          if (!window._akiniDataRestored) return;
+          var _nowHid = Date.now();
+          if (window.__akiniHiddenFullBackupAt && _nowHid - window.__akiniHiddenFullBackupAt < 8000) return;
+          window.__akiniHiddenFullBackupAt = _nowHid;
           try { snapshotLs(); } catch (e) {}
           try { window._idbStore && window._idbStore.backupAll && window._idbStore.backupAll(true); } catch (e) {}
           try { window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll(); } catch (e) {}
@@ -1691,8 +1704,16 @@ window._idbStore = (function () {
             var data = JSON.parse(src);
             if (data && "object" == typeof data) {
               var restored = 0;
+              /* v915 防回退守卫（对齐 milk「备份不比当前新就绝不覆盖」）：
+                 akini_key_mtime 登记每个核心键的最后修改/删除时刻；当前 LS 的 mtime
+                 晚于快照内嵌 mtime → 快照值是旧的 → 坚决不回填（宁缺勿旧），
+                 根治背景图/头像/自定义文字等被旧快照回填导致的"回退旧数据" */
+              var _curM = {};
+              try { _curM = JSON.parse(localStorage.getItem("akini_key_mtime") || "{}") || {}; } catch (eM) { _curM = {}; }
+              var _snapM = {};
+              try { _snapM = JSON.parse(data["akini_key_mtime"] || "{}") || {}; } catch (eM2) { _snapM = {}; }
               for (var k in data) {
-                if (data.hasOwnProperty(k) && k.indexOf("akini_") === 0) {
+                if (data.hasOwnProperty(k) && k.indexOf("akini_") === 0 && k !== "akini_key_mtime") {
                   try {
                     var cur = localStorage.getItem(k);
                     if (
@@ -1703,6 +1724,9 @@ window._idbStore = (function () {
                       cur === "[]" ||
                       cur === "{}"
                     ) {
+                      var _cm = Number(_curM[k]) || 0;
+                      var _sm = Number(_snapM[k]) || 0;
+                      if (_cm && Math.abs(_cm) > _sm) continue; // 当前动作晚于快照：快照过旧，禁止回填
                       localStorage.setItem(k, data[k]);
                       restored++;
                     }
@@ -3529,13 +3553,22 @@ window.akiniContacts = {
       return "";
     }
     function __akiniFormatMsgTime(t) {
-      const e = new Date(t || Date.now()),
-        hh = String(e.getHours()).padStart(2, "0"),
-        mm = String(e.getMinutes()).padStart(2, "0");
+      const e = new Date(t || Date.now());
       var fmt = localStorage.getItem("akini_timeFormat") || "24";
-      var time = hh + ":" + mm;
-      if (fmt === "24s") return time + ":" + String(e.getSeconds()).padStart(2, "0");
-      return time + " AM";
+      var h24 = e.getHours();
+      var m = String(e.getMinutes()).padStart(2, "0");
+      var s = String(e.getSeconds()).padStart(2, "0");
+      if (fmt === "24s") {
+        return String(h24).padStart(2, "0") + ":" + m + ":" + s;
+      }
+      if (fmt === "12PM" || fmt === "12AM") {
+        var isPM = h24 >= 12;
+        var h12 = h24 % 12;
+        if (h12 === 0) h12 = 12;
+        return String(h12).padStart(2, "0") + ":" + m + (isPM ? " PM" : " AM");
+      }
+      // 默认 24 小时制 "24" (12:00)
+      return String(h24).padStart(2, "0") + ":" + m;
     }
     // 全局时间格式化辅助：其他场景保持 24 小时制，不带后缀
     window.__akiniFormatTimePart = function (date) {
@@ -6996,9 +7029,15 @@ window.akiniContacts = {
       } catch (t) {
         console.warn("[Akini] akini_posts 写入 localStorage 失败（配额超限），已存入 IndexedDB", t && t.name);
       }
-      (window._idbStore &&
-        window._idbStore.backupAll &&
-        window._idbStore.backupAll(),
+      /* v915：朋友圈保存同样加 30s 节流——原每次保存都全量 backupAll，切后台连环全库重写是卡崩源 */
+      ((function () {
+        try {
+          if (!window._idbStore || !window._idbStore.backupAll) return;
+          if (window.__postsBackupAllAt && Date.now() - window.__postsBackupAllAt < 30000) return;
+          window.__postsBackupAllAt = Date.now();
+          window._idbStore.backupAll();
+        } catch (ePB) {}
+      })(),
         e &&
           setTimeout(function () {
             e();
@@ -7508,9 +7547,16 @@ window.akiniContacts = {
       // 同步写 sessionStorage 应急兜底：iOS Safari 刷新/返回时 localStorage/IDB 异步事务可能未落盘，sessionStorage 同步可靠
       try { sessionStorage.setItem("akini_icity_diaries_emergency", n); } catch (x) {}
       console.log("[iCity] 持久化,日记数:", F.length, "评论总数:", (F||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
-      (window._idbStore &&
-        window._idbStore.backupAll &&
-        window._idbStore.backupAll(),
+      /* v915：原每次保存日记都全量 backupAll（全库 IDB 重写）——切后台(hidden)必跑，隐性重活。
+         加 30s 节流：日记主/备/emergency 四写已保数据，全库备份无需每次跟跑 */
+      ((function () {
+        try {
+          if (!window._idbStore || !window._idbStore.backupAll) return;
+          if (window.__jBackupAllAt && Date.now() - window.__jBackupAllAt < 30000) return;
+          window.__jBackupAllAt = Date.now();
+          window._idbStore.backupAll();
+        } catch (eBA) {}
+      })(),
         e &&
           setTimeout(function () {
             e();
@@ -7776,6 +7822,18 @@ window.akiniContacts = {
       } catch (e) {}
       return backups;
     }
+    /* v915：切后台(hidden)瞬间绝不做 iCity 全量重渲染——DOM 重建在 hidden 的极短预算内
+       纯属浪费且是卡崩源；数据已同步落盘，渲染只影响显示，标记 pending 回前台再补。 */
+    function _icityRenderSafe() {
+      if (document.hidden) { window.__icityMergeRenderPending = true; return; }
+      if (typeof window._renderIcity === "function") { try { window._renderIcity(); } catch (eR) {} }
+    }
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden && window.__icityMergeRenderPending) {
+        window.__icityMergeRenderPending = false;
+        try { if (typeof window._renderIcity === "function") window._renderIcity(); } catch (eRV) {} 
+      }
+    });
     function _icitySafetyMerge() {
       // v506：全量合并（6+源解析→去重→两次 JSON.stringify 全量→双写→全量重渲染）非常重，
       // 一次生命周期内最多执行 2 次（原为 3 次定时器 + pagehide 1 次 = 4 次），是全机型卡崩主因
@@ -7834,7 +7892,7 @@ window.akiniContacts = {
           window._idbStore.set("akini_icity_diaries", json);
           window._idbStore.set("akini_icity_diaries_backup", json);
         }
-        if (typeof window._renderIcity === "function") window._renderIcity();
+        _icityRenderSafe();
       }
       if (window._idbStore && window._idbStore.get) {
         window._idbStore.get("akini_icity_diaries", function (v) {
@@ -7855,7 +7913,7 @@ window.akiniContacts = {
               window._idbStore.set("akini_icity_diaries", json);
               window._idbStore.set("akini_icity_diaries_backup", json);
             }
-            if (typeof window._renderIcity === "function") window._renderIcity();
+            _icityRenderSafe();
           });
         });
       } else {
@@ -9279,11 +9337,10 @@ window.akiniContacts = {
                       : e.lastTime - t.lastTime;
                 }),
                 l.forEach(function (t) {
+                  /* v915：会话列表时间改走 __akiniFormatMsgTime——原 toLocaleTimeString("zh-CN")
+                     永远是 24 小时制，时间格式设置对会话列表完全失效（"时间戳都是24小时制"根因） */
                   var e = t.lastTime
-                      ? new Date(t.lastTime).toLocaleTimeString("zh-CN", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })
+                      ? __akiniFormatMsgTime(Number(t.lastTime))
                       : "",
                     n = t.displayAvatar || t.avatar,
                     i = t.unread ? '<span class="cli-unread-badge" data-count="' + t.unread + '" style="display:inline-flex;visibility:visible;opacity:1;">' + (t.unread > 99 ? "99+" : String(t.unread)) + "</span>" : "",
@@ -10647,9 +10704,14 @@ window.akiniContacts = {
         syncChatMenuUI();
       }),
       Q &&
-        Q.addEventListener("click", function () {
-          Y && ((Y.style.display = "none"), (Y.style.pointerEvents = "none"));
-        })));
+        (function(){
+          var doCloseQ = function(e){
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            if (Y) { Y.style.display = "none"; Y.classList.remove("show"); Y.style.pointerEvents = "none"; }
+          };
+          Q.addEventListener("click", doCloseQ);
+          Q.addEventListener("touchend", doCloseQ);
+        })()));
     delCtcBtn &&
       a(delCtcBtn, function () {
         var t = window.akiniContacts
@@ -15756,12 +15818,18 @@ window.akiniContacts = {
             ((o.className = "msg-row system"),
               (o.innerHTML = `<div class="bubble">${rt(x)}${e ? "已退回转账" : "已收款"}</div>`),
               U.appendChild(o),
-              __akiniProcessMsgMeta(o),
-              __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
-              S(),
-              (U.scrollTop = U.scrollHeight),
-              b(),
-              window.akiniTriggerReply && window.akiniTriggerReply());
+              __akiniProcessMsgMeta(o));
+            var _curCid = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+            if (_curCid) {
+              __akiniAppendMessageHTML(_curCid, o.outerHTML, {
+                lastMsg: `[系统消息] ${rt(x)}${e ? "已退回转账" : "已收款"}`,
+                lastTime: Date.now()
+              });
+            }
+            S(),
+            (U.scrollTop = U.scrollHeight),
+            b(),
+            window.akiniTriggerReply && window.akiniTriggerReply();
           }, t);
         } else {
           const t = 1e3 * (3 + 7 * Math.random()),
@@ -15778,12 +15846,18 @@ window.akiniContacts = {
             ((o.className = "msg-row system"),
               (o.innerHTML = `<div class="bubble">${e ? l + "已退回转账" : l + "已收款"}</div>`),
               U.appendChild(o),
-              __akiniProcessMsgMeta(o),
-              __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
-              S(),
-              (U.scrollTop = U.scrollHeight),
-              b(),
-              window.akiniTriggerReply && window.akiniTriggerReply());
+              __akiniProcessMsgMeta(o));
+            var _curCid2 = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+            if (_curCid2) {
+              __akiniAppendMessageHTML(_curCid2, o.outerHTML, {
+                lastMsg: `[系统消息] ${e ? l + "已退回转账" : l + "已收款"}`,
+                lastTime: Date.now()
+              });
+            }
+            S(),
+            (U.scrollTop = U.scrollHeight),
+            b(),
+            window.akiniTriggerReply && window.akiniTriggerReply();
           }, t);
         }
       else if (c && m && "me" !== m) {
@@ -15801,12 +15875,18 @@ window.akiniContacts = {
           ((o.className = "msg-row system"),
             (o.innerHTML = `<div class="bubble">${rt(x)}${e ? "已退回转账" : "已收款"}</div>`),
             U.appendChild(o),
-            __akiniProcessMsgMeta(o),
-            __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, o),
-            S(),
-            (U.scrollTop = U.scrollHeight),
-            b(),
-            window.akiniTriggerReply && window.akiniTriggerReply());
+            __akiniProcessMsgMeta(o));
+          var _curCid3 = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+          if (_curCid3) {
+            __akiniAppendMessageHTML(_curCid3, o.outerHTML, {
+              lastMsg: `[系统消息] ${rt(x)}${e ? "已退回转账" : "已收款"}`,
+              lastTime: Date.now()
+            });
+          }
+          S(),
+          (U.scrollTop = U.scrollHeight),
+          b(),
+          window.akiniTriggerReply && window.akiniTriggerReply();
         }, t);
       }
       return v;
@@ -15918,10 +15998,17 @@ window.akiniContacts = {
         ((a.className = "msg-row system"),
           (a.innerHTML = '<div class="bubble">你已收款</div>'),
           U.appendChild(a),
-          __akiniProcessMsgMeta(a),
-          __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, a),
-          S(),
-          (U.scrollTop = U.scrollHeight));
+          __akiniProcessMsgMeta(a));
+        var _curChatId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+        if (!_curChatId && e && e.targetId) _curChatId = e.targetId;
+        if (_curChatId) {
+          __akiniAppendMessageHTML(_curChatId, a.outerHTML, {
+            lastMsg: "[系统消息] 你已收款",
+            lastTime: Date.now()
+          });
+        }
+        S();
+        (U.scrollTop = U.scrollHeight);
         window.akiniTriggerReply && window.akiniTriggerReply();
       }),
       (window.refundTransfer = function (t) {
@@ -15936,10 +16023,17 @@ window.akiniContacts = {
         ((a.className = "msg-row system"),
           (a.innerHTML = '<div class="bubble">你已退回转账</div>'),
           U.appendChild(a),
-          __akiniProcessMsgMeta(a),
-          __akiniPersistMsgRow(window.akiniContacts ? window.akiniContacts.getActiveChatId() : null, a),
-          S(),
-          (U.scrollTop = U.scrollHeight));
+          __akiniProcessMsgMeta(a));
+        var _curChatId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+        if (!_curChatId && e && e.targetId) _curChatId = e.targetId;
+        if (_curChatId) {
+          __akiniAppendMessageHTML(_curChatId, a.outerHTML, {
+            lastMsg: "[系统消息] 你已退回转账",
+            lastTime: Date.now()
+          });
+        }
+        S();
+        (U.scrollTop = U.scrollHeight);
         window.akiniTriggerReply && window.akiniTriggerReply();
       }),
       (window.taInitiateTransfer = function (t, e) {
@@ -18618,6 +18712,7 @@ window.akiniContacts = {
       }
       function _saveVault() {
         try {
+          window.__akiniVaultSavedAt = Date.now();
           if (!window.caches || !caches.open) return;
           var data = _collectVault();
           if (!Object.keys(data).length) return;
@@ -18643,7 +18738,11 @@ window.akiniContacts = {
       document.addEventListener("visibilitychange", function () {
         if (document.hidden) _saveVault();
       });
-      window.addEventListener("pagehide", function () { _saveVault(); });
+      /* v915：hidden 必先于 pagehide 触发且已完成 vault 保存；pagehide 预算极短，
+         8s 内已保存过就跳过，消除切后台双跑「全量收集+Cache put」的卡崩源 */
+      window.addEventListener("pagehide", function () {
+        if (Date.now() - (window.__akiniVaultSavedAt || 0) > 8000) _saveVault();
+      });
       /* v892 Safari卡崩减负：原每30s无条件全量序列化所有 akini_* 键（可达数MB）
          JSON.stringify + Cache API put，iOS 上是稳定内存压力源。
          降频到 90s 且页面隐藏时跳过（visibilitychange/pagehide 已有即时保存兜底） */
@@ -21641,6 +21740,21 @@ window.akiniContacts = {
                 try {
                   cur = k; localStorage.setItem("akini_timeFormat", k); syncFmt();
                   if (window.__renderMail) window.__renderMail();
+                  // v915：会话列表时间同步按新格式重渲染（原来只刷聊天气泡，列表时间恒 24h）
+                  try { if (typeof window.renderChatList === "function") window.renderChatList(); } catch (eRcl) {}
+                  // 实时刷新当前打开的聊天界面所有消息的时间戳
+                  var curActiveChatId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
+                  if (curActiveChatId && typeof window.openChat === "function") {
+                    window.openChat(curActiveChatId, true);
+                  } else {
+                    document.querySelectorAll(".msg-row .msg-ts").forEach(function(el){
+                      var row = el.closest(".msg-row");
+                      var rawTs = row ? (row.getAttribute("data-ts") || row.getAttribute("data-raw-time")) : null;
+                      if (rawTs) {
+                        el.textContent = __akiniFormatMsgTime(parseInt(rawTs, 10));
+                      }
+                    });
+                  }
                 } catch (e) {}
               });
             })(key);
@@ -24782,15 +24896,19 @@ window.akiniContacts = {
       }
       function lt() {
         var selectedSeconds = 0;
-        if (T && T.length > 0) {
-          var nowDelta = x ? Math.floor((Date.now() - x) / 1e3) : 0;
+        var nowDelta = x ? Math.floor((Date.now() - x) / 1e3) : 0;
+        var rightContactId = "";
+        try { rightContactId = localStorage.getItem("akini_music_player_right_contact") || ""; } catch(e){}
+        if (rightContactId && listenMap[rightContactId] !== undefined) {
+          selectedSeconds = (listenMap[rightContactId] || 0) + nowDelta;
+        } else if (T && T.length > 0) {
           T.forEach(function (ct) {
             if (ct && ct.id) {
               selectedSeconds += (listenMap[ct.id] || 0) + nowDelta;
             }
           });
         }
-        var totalDisplay = selectedSeconds > 0 ? selectedSeconds : I + (x ? Math.floor((Date.now() - x) / 1e3) : 0);
+        var totalDisplay = selectedSeconds > 0 ? selectedSeconds : I + nowDelta;
         var n = Math.floor(totalDisplay / 60),
           i = Math.floor(n / 60),
           a = "";
@@ -24804,13 +24922,11 @@ window.akiniContacts = {
         var timeText = "一起听了 " + (a += (n % 60) + " 分钟");
         var fullText = "TA就在你的身边 " + timeText;
         e.distanceText && (e.distanceText.textContent = fullText);
-        /* v836：首页播放器时长跟随美化页「播放器联系人」所选联系人（listenMap 按人分账累计）；
-           所选联系人正在一起听时叠加实时增量，未在选择时显示其存量累计；未选联系人则保持原一起听逻辑 */
-        /* v843：统一首页播放器与一起听歌界面的时长计算源头。
-           用户明确指出：“首页播放器显示的一起听时间和我在个人一起听歌界面的根本不一样！”
-           因此两处统一使用 timeText（当前一起听界面的权威累计时长），保证两处数字毫秒级完全一致！ */
+        /* v843/v915：统一首页播放器与一起听歌界面的时长计算源头。两处统一使用 timeText */
         var homeText = timeText;
         e.listenTime && (e.listenTime.textContent = homeText);
+        var homeEl = document.getElementById("musicPlayerListenTime");
+        if (homeEl && homeEl.textContent !== homeText) homeEl.textContent = homeText;
         /* 同步权威时长快照与时间戳给首页轮询与页面恢复 */
         try { window.__akiniMusicListenText = homeText; window.__akiniMusicListenTextAt = Date.now(); } catch (t) {}
       }
@@ -25447,6 +25563,15 @@ window.akiniContacts = {
         // 进度与时间即刻归零
         if (e.progress) e.progress.value = 0;
         if (e.curTime) e.curTime.textContent = "0:00";
+        /* v913：切歌或更新当前曲目UI时，立即同步刷新首页播放器卡片，杜绝曲目不一致 */
+        try {
+          var hpTitle = document.getElementById('musicPlayerTitle');
+          var hpArtist = document.getElementById('musicPlayerArtist');
+          var hpCover = document.getElementById('musicPlayerCoverImg');
+          if (hpTitle && trackTitle) hpTitle.textContent = trackTitle;
+          if (hpArtist && trackArtist) hpArtist.textContent = trackArtist;
+          if (hpCover && i) hpCover.src = i;
+        } catch (eHpSync) {}
         // 同步触发滚动文本检查
         try {
           if (typeof window.akiniCheckScrollText === "function") {
@@ -30703,14 +30828,37 @@ function initHomeMusicPlayerSection() {
     /* v889 Safari卡崩根治：textContent/src 相同值赋值也会让 Safari 标记 DOM dirty 触发样式重算；
        尤其 img.src 每800ms重设会重启 data URI 解码管线——位图泄漏是 iOS jetsam 杀进程主因。
        全部加同值守卫：值未变绝不写入 */
-    if (origSongName && titleEl && origSongName.textContent && origSongName.textContent !== '一起听') {
-      if (titleEl.textContent !== origSongName.textContent) titleEl.textContent = origSongName.textContent;
+    var _curSongTitle = (origSongName && origSongName.textContent && origSongName.textContent !== '一起听') ? origSongName.textContent : '';
+    var _curArtistName = (origArtist && origArtist.textContent && origArtist.textContent !== '点击右上角导入歌单') ? origArtist.textContent : '';
+    var _curCoverSrc = (origCover && origCover.src && !origCover.src.includes('data:image/gif')) ? origCover.src : '';
+
+    /* v913：如果全屏播放器尚未初始化或为空，优先从歌单存储当前歌曲回填，杜绝首屏对不上 */
+    if (!_curSongTitle || !_curCoverSrc) {
+      try {
+        var _plRaw = localStorage.getItem('akini_music_playlist');
+        var _idxRaw = parseInt(localStorage.getItem('akini_music_index') || '0', 10) || 0;
+        if (_plRaw) {
+          var _pl = JSON.parse(_plRaw);
+          if (Array.isArray(_pl) && _pl.length > 0) {
+            var _curTrk = _pl[_idxRaw] || _pl[0];
+            if (_curTrk) {
+              if (!_curSongTitle && _curTrk.title) _curSongTitle = _curTrk.title;
+              if (!_curArtistName && _curTrk.artist) _curArtistName = _curTrk.artist;
+              if (!_curCoverSrc && _curTrk.cover) _curCoverSrc = _curTrk.cover;
+            }
+          }
+        }
+      } catch (eTrk) {}
     }
-    if (origArtist && artistEl && origArtist.textContent && origArtist.textContent !== '点击右上角导入歌单') {
-      if (artistEl.textContent !== origArtist.textContent) artistEl.textContent = origArtist.textContent;
+
+    if (_curSongTitle && titleEl) {
+      if (titleEl.textContent !== _curSongTitle) titleEl.textContent = _curSongTitle;
     }
-    if (origCover && coverEl && origCover.src && !origCover.src.includes('data:image/gif')) {
-      if (coverEl.src !== origCover.src) coverEl.src = origCover.src;
+    if (_curArtistName && artistEl) {
+      if (artistEl.textContent !== _curArtistName) artistEl.textContent = _curArtistName;
+    }
+    if (_curCoverSrc && coverEl) {
+      if (coverEl.src !== _curCoverSrc) coverEl.src = _curCoverSrc;
     }
 
     // 播放/暂停状态同步
