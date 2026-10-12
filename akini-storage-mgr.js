@@ -14,9 +14,9 @@
 
     body.innerHTML =
       '<div class="settings-card"><div class="card-title">版本与代码更新</div>' +
-        '<div class="ak-hint" style="margin-top:0">当前最新版本：<b>' + (window.AKINI_VERSION || "v909") + '</b>。如果您的手机显示旧版或修复未生效，是因为手机浏览器/桌面图标缓存了旧版代码。点击下方按钮可强制清除代码缓存并拉取最新版本（<b>绝不会丢失</b>您的聊天记录与联系人数据）。</div>' +
+        '<div class="ak-hint" style="margin-top:0">当前最新版本：<b>' + (window.AKINI_VERSION || "v912") + '</b>。如果您的手机显示旧版或修复未生效，是因为手机浏览器/桌面图标缓存了旧版代码。点击下方按钮可强制清除代码缓存并拉取最新版本（<b>绝不会丢失</b>您的聊天记录与联系人数据）。</div>' +
         '<div class="ak-btn-col">' +
-          '<button class="ak-stor-btn" id="akStorForceUpdate" style="background:#1a1a1a;color:#fff;font-weight:600" type="button">一键清缓存并强制更新至 ' + (window.AKINI_VERSION || "v909") + '</button>' +
+          '<button class="ak-stor-btn" id="akStorForceUpdate" style="background:#1a1a1a;color:#fff;font-weight:600" type="button">一键清缓存并强制更新至 ' + (window.AKINI_VERSION || "v912") + '</button>' +
         "</div>" +
       "</div>" +
 
@@ -78,7 +78,7 @@
           }
         } catch (e) {}
         try { localStorage.removeItem("__akini_entry_cleaned_v881"); } catch (e) {}
-        var __curVer = window.AKINI_VERSION || "v909";
+        var __curVer = window.AKINI_VERSION || "v912";
         var go = function () {
           location.replace("index.html?t=" + Date.now() + "&v=20261011" + __curVer);
         };

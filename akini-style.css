@@ -12507,7 +12507,7 @@ body, .phone-frame, .content-wrapper {
   font-weight: 700 !important;
   color: #111111 !important;
 }
-.s1-text-line3, .s1-text-line4 {
+.s1-text-line2, .s1-text-line3 {
   font-size: 13px !important;
   color: #333333 !important;
 }
@@ -12828,8 +12828,8 @@ body, .phone-frame, .content-wrapper {
   color: #111111 !important;
 }
 
+.s1-text-line2,
 .s1-text-line3,
-.s1-text-line4,
 .s1-text-loc,
 .s1-loc-row .s1-text-loc {
   font-size: 13px !important;
