@@ -21927,32 +21927,37 @@ window.akiniContacts = {
         t = t || window.akiniContacts.getActiveChatId();
         const e = window.akiniContacts.getChatTarget(t);
         if (!e) return;
-        const n = _();
-        if ("none" === n.type) return;
-        const i = document.getElementById("typingIndicator"),
-          a = t === window.akiniContacts.getActiveChatId();
-        a &&
-          i &&
-          showTypingBubble(
-            t,
-            "group" === e.type ? (e.memberIds || [])[0] : null,
-          );
-        var s = 1e3;
-        if ("number" == typeof delay) s = delay;
-        else {
-          const o = parseFloat(
-              localStorage.getItem("akini_num_activeMsgMin") || "5",
-            ),
-            r = parseFloat(
-              localStorage.getItem("akini_num_activeMsgMax") || "10",
-            ),
-            c = 60 * o * 1e3,
-            l = 60 * r * 1e3;
-          s = c + Math.random() * Math.max(0, l - c);
+        /* v909 单聊专属硬约束：群聊严禁主动发消息（对齐 milk——其主动发送仅作用于单聊对象，
+           群聊会话不触发、不展示该功能行为） */
+        if ("group" === e.type) return;
+        const a = t === window.akiniContacts.getActiveChatId();
+        /* v909 按 milk（simulateReply）逻辑重做主动发消息：
+           ① 到点即发：删除旧版内部再调度 5~10 分钟的二次等待（旧版一轮实际等 10~20 分钟）
+           ② 单轮条数加权随机（milk 同款公式）：75% 发 1 条 / 约 24% 发 2 条 / 约 1% 发 3 条
+           ③ 每条独立走 AKR.pickReplyBehavior 概率系统——文本/表情包/引用/emoji 融入/转账/
+              问卷/商店卡按各自开关与概率页配置触发；字卡库为空时不发送不空转（对齐 milk
+              "回复库为空提示并终止本轮"）
+           ④ 每条之间按「消息回复延迟」设置随机间隔（拟真节奏），发送前显示输入动态，
+              I 落地出消息时自动隐藏输入动态（打字→出一条→打字→出一条，比 milk 更拟真） */
+        var _rc = Math.random() < 0.75 ? 1 : (Math.random() < 0.95 ? 2 : 3);
+        var _dm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
+            _dx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
+        if (!(_dm > 0)) _dm = 3;
+        if (!(_dx >= _dm)) _dx = Math.max(_dm, 7);
+        var _lead = 600 + Math.random() * 900; // 首条前小幅等待，让输入动态先出现
+        if ("number" == typeof delay && delay > 0) _lead = Math.max(_lead, delay);
+        function _sendOne(idx) {
+          if (idx >= _rc) return;
+          var n = _();
+          if (!n || "none" === n.type) return; // 已读不回/无行为：终止本轮，等待下一周期
+          a && showTypingBubble(t, null);
+          var _gap = 1e3 * (_dm + Math.random() * (_dx - _dm));
+          window._akiniTimer.schedule("activeMsgReply", function () {
+            try { I(t, e, n); } catch (eI) {}
+            setTimeout(function () { _sendOne(idx + 1); }, 500 + Math.random() * 700);
+          }, idx === 0 ? _lead : _gap);
         }
-        window._akiniTimer.schedule("activeMsgReply", function () {
-          I(t, e, n);
-        }, s);
+        _sendOne(0);
       }),
       (window.getContactStickersSync = function (t) {
         var e = "akini_stickers_" + t;
@@ -22039,12 +22044,12 @@ window.akiniContacts = {
               return;
             }
             var _targetId = (function () {
-              var t = window.akiniContacts.getContacts(),
-                e = window.akiniContacts.getGroups(),
-                n = t.concat(e);
-              return 0 === n.length
+              /* v909 单聊专属：目标池仅联系人（contacts），彻底排除全部群聊（groups）——
+                 对齐 milk 主动发送只作用于单聊对象；群聊不参与主动发消息引擎的任何分支 */
+              var t = window.akiniContacts.getContacts();
+              return 0 === t.length
                 ? null
-                : n[Math.floor(Math.random() * n.length)].id;
+                : t[Math.floor(Math.random() * t.length)].id;
             })();
             if (!_targetId) return void __amt(false);
             var n = window.akiniContacts.getChatTarget(_targetId);
@@ -22052,32 +22057,12 @@ window.akiniContacts = {
               __amt(false);
               return;
             }
-            if (!isCallOngoing() && !(we && we.active) && Math.random() < window.AKR.getProb("groupCall") && n) {
+            /* v909：来电分支仅对单聊联系人生效（目标池已无群聊，群来电分支随之移除）；
+               其余情况走 triggerTaReplyOnce（内部已硬禁群聊）按 milk 逻辑发 1~3 条 */
+            if (!isCallOngoing() && !(we && we.active) && Math.random() < window.AKR.getProb("groupCall") && n && n.type !== "group") {
               var i = { targetId: _targetId };
-              if ("group" === n.type) {
-                ((i.isGroupCall = !0),
-                  (i.groupName = n.name),
-                  (i.groupAvatar = n.avatar));
-                var a = n.memberIds || [],
-                  o =
-                    a.length > 0
-                      ? a[Math.floor(Math.random() * a.length)]
-                      : null,
-                  r = o ? window.akiniContacts.getChatTarget(o) : null;
-                r
-                  ? ((i.callerName = r.name), (i.callerAvatar = r.avatar))
-                  : ((i.callerName = n.name), (i.callerAvatar = n.avatar));
-                i.selectedMembers = a
-                  .map(function (mid) {
-                    var m = window.akiniContacts.getChatTarget(mid);
-                    return m
-                      ? { id: m.id, name: m.name, avatar: m.avatar }
-                      : { id: mid, name: mid, avatar: "" };
-                  })
-                  .filter(function (m) {
-                    return m.id !== o;
-                  });
-              } else ((i.callerName = n.name), (i.callerAvatar = n.avatar));
+              i.callerName = n.name;
+              i.callerAvatar = n.avatar;
               Te(n.name, !1, i);
             } else if ("function" == typeof window.triggerTaReplyOnce)
               window.triggerTaReplyOnce(_targetId);
