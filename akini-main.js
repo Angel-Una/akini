@@ -619,6 +619,14 @@ window.AKR = (function () {
     missCall: 0.30,
     refundTransfer: 0.2,
     poke: 0.03,
+    /* v897：以下 4 个原硬编码概率接入概率系统，可在设置页自定义 */
+    pinyinCard: 0.35,
+    emojiMixMsg: 0.2,
+    replySticker: 0.2,
+    postWithSticker: 0.1,
+    /* v898：问卷邀请/商店卡片（原 __akiniTriggerInteractiveCards 硬编码 20%）接入概率系统 */
+    surveyInvite: 0.2,
+    shopCard: 0.2,
   };
   function getProb(name) {
     try {
@@ -716,7 +724,7 @@ window.AKR = (function () {
     var extra = {
       poke: pokeOn && Math.random() < getProb("poke"),
       quote: quoteOn && Math.random() < getProb("quote"),
-      sticker: Math.random() < 0.2,
+      sticker: Math.random() < getProb("replySticker"),
       transfer: transferOn && Math.random() < getProb("taTransfer"),
       emojiMix: emojiMixOn
     };
@@ -4295,6 +4303,22 @@ window.akiniContacts = {
               lastSenderName: c.name,
             }),
               C(t, R));
+            /* v897：联系人给我发的转账卡片也走通知（与文本消息/表情包一致：
+               前台弹窗 + 后台系统推送），原来只有文本回复有 */
+            if ("function" == typeof window.showInAppNotif) {
+              try {
+                window.showInAppNotif({
+                  app: "微信",
+                  appIcon: "💳",
+                  avatar: c.avatar,
+                  name: c.name,
+                  fullContent: !0,
+                  msg: "【转账】" + L,
+                  chatId: t,
+                  onTap: function () { ct(t); },
+                });
+              } catch (eNtf) {}
+            }
           }
           return (V(), { mentionSender: k });
         }
@@ -4912,11 +4936,18 @@ window.akiniContacts = {
           window._akiniTimer.catchUp(actions);
         }
       });
-      /* 首次加载也补一次，处理应用关闭期间错过的定时任务 */
+      /* 首次加载也补一次，处理应用关闭期间错过的定时任务；
+         随后跑离线持续补发（朋友圈/iCity 对齐写信引擎：离线多久补多少，上限 6 条） */
       setTimeout(function () {
         try {
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
+        try {
+          window.__akiniFriendsBackfill && window.__akiniFriendsBackfill();
+        } catch (eFb) {}
+        try {
+          window.__akiniIcityBackfill && window.__akiniIcityBackfill();
+        } catch (eIb) {}
       }, 15000);
       /* 后台/低功耗设备可能丢定时器，周期性 catch-up 确保任务不遗漏
          性能优化：8s→15s，60s→120s，减少频繁定时器导致的卡顿 */
@@ -5261,7 +5292,7 @@ window.akiniContacts = {
       // compat 照搬「拼字卡」：30% 概率从字卡库随机抽 min~max 句，用「，」拼成一条发出
       // 拼字卡模式：智能抽取 2~3 句，作为独立气泡依序发送（真正自然的情侣断句，绝不硬用逗号拼成一条）
       var _pinyinCards = null;
-      if (window.__akiniToggleOn("pinyinCardToggle", false) && Math.random() < 0.35 && window.pickWordCards) {
+      if (window.__akiniToggleOn("pinyinCardToggle", false) && Math.random() < (window.AKR ? window.AKR.getProb("pinyinCard") : 0.35) && window.pickWordCards) {
         var _pcMin = Math.max(2, parseInt(localStorage.getItem("akini_num_pinyinCardMin") || "2", 10) || 2),
           _pcMax = Math.max(_pcMin, parseInt(localStorage.getItem("akini_num_pinyinCardMax") || "3", 10) || 3),
           _pcCount = _pcMin + Math.floor(Math.random() * (_pcMax - _pcMin + 1));
@@ -5367,8 +5398,8 @@ window.akiniContacts = {
       }
       function mixEmojiToText(text) {
         if (!ex.emojiMix || !text) return text;
-        /* 对齐 core（core.js）：emoji 融入按 20% 概率触发，不是每条消息都夹带 */
-        if (Math.random() >= 0.2) return text;
+        /* v897：emoji 融入概率接入 AKR 概率系统（默认 20%，设置页可调） */
+        if (Math.random() >= (window.AKR ? window.AKR.getProb("emojiMixMsg") : 0.2)) return text;
         var emojis = [];
         try {
           var wb = i("akini_wordbank", []);
@@ -9369,8 +9400,14 @@ window.akiniContacts = {
             } catch (eF) {}
           }
         }
-        // 严格隔离各会话：切换时清空旧残留，若无记录则初始化为空，绝不继承上一个会话的 DOM
-        if (U) U.innerHTML = "";
+        /* v897 防闪烁：仅当切换到不同会话时才清空 DOM；同一会话重进交由
+           __akiniRenderChatBody 的防闪烁守卫（同内容跳过重绘）处理——
+           原来无条件清空再全量重建，每次点进聊天所有头像/表情包/图片 img
+           全部销毁重建，正是“闪烁消失再出现”的根因 */
+        if (U) {
+          var __prevCid = U.getAttribute("data-rendered-chat-id");
+          if (__prevCid !== t) U.innerHTML = "";
+        }
         (r
           ? (window.akiniContacts.updateSession(t, { messagesHTML: r }), l(r))
           : l(""),
@@ -20588,8 +20625,8 @@ window.akiniContacts = {
                     comments: [],
                   };
                   window.__akiniPostLog && __akiniPostLog("friends", "已发布：" + String(a || "").slice(0, 20));
-                  // 联系人发朋友圈，10% 概率带专属表情包
-                  var _stkProbPost = 0.1;
+                  /* v897：朋友圈带专属表情包概率接入 AKR（默认 10%，设置页可调） */
+                  var _stkProbPost = window.AKR ? window.AKR.getProb("postWithSticker") : 0.1;
                   if (Math.random() < _stkProbPost && _poster.id) {
                     var stickers = typeof window.__akiniStickerSrcs === "function"
                       ? window.__akiniStickerSrcs(_poster.id)
@@ -20626,6 +20663,63 @@ window.akiniContacts = {
             }
 
             window._akiniFriendsPostAction = friendsPostAction;
+            /* v897 离线持续补发（对齐写信引擎）：上次发布锚点 + 最小间隔推算离线期间
+               应发条数（上限 6 条防离线太久刷屏），逐条回溯发布、时间戳还原离线期间。
+               runIfDue/catchUp 原逻辑只补 1 条就重排到未来，离线 2 天=只补 1 条，
+               而写信引擎离线 2 天会补齐多条——这就是用户说"不一样"的根因 */
+            window.__akiniFriendsBackfill = function () {
+              try {
+                if (!window.__akiniToggleOn("contactFriendsToggle", false)) return;
+                var _anchor = parseFloat(localStorage.getItem("akini_last_friendsPost_run") || "0") || 0;
+                if (!_anchor) return;
+                var intervals = getSafePostIntervals();
+                var gapMs = intervals.min * 60 * 1000;
+                var elapsed = Date.now() - _anchor;
+                if (elapsed < gapMs * 1.2) return; // 未明显离线
+                var due = Math.min(6, Math.floor(elapsed / gapMs));
+                if (due < 1) return;
+                var _poster = r();
+                if (!_poster) return;
+                var _lastTs = _anchor;
+                (function _bf(i) {
+                  if (i >= due) {
+                    window.__akiniPostLog && __akiniPostLog("friends", "离线补发完成，共 " + due + " 条");
+                    return;
+                  }
+                  // 每条错开 8~15s，避免同秒刷屏
+                  setTimeout(function () {
+                    try {
+                      var _pts = _lastTs + gapMs + Math.floor(Math.random() * Math.max(1, (intervals.max - intervals.min)) * 60000);
+                      if (_pts > Date.now() - 60000) _pts = Date.now() - 60000 - Math.floor(Math.random() * 30000);
+                      var _txt = c(Math.floor(Math.random() * 5) + 1);
+                      if (_txt) {
+                        var l2 = O();
+                        var post = {
+                          author: _poster.name,
+                          authorId: _poster.id,
+                          text: _txt,
+                          date: __akiniFormatDateTime(new Date(_pts)),
+                          ts: _pts,
+                          likes: [],
+                          comments: [],
+                        };
+                        var _stkP2 = window.AKR ? window.AKR.getProb("postWithSticker") : 0.1;
+                        if (Math.random() < _stkP2 && _poster.id) {
+                          var stks = typeof window.__akiniStickerSrcs === "function" ? window.__akiniStickerSrcs(_poster.id) : [];
+                          if (stks.length > 0) post.img = stks[Math.floor(Math.random() * stks.length)];
+                        }
+                        l2.unshift(post);
+                        R(l2);
+                        if (window._renderPosts) window._renderPosts();
+                        _lastTs = _pts;
+                        window.__akiniPostLog && __akiniPostLog("friends", "离线补发第 " + (i + 1) + " 条（时间戳 " + new Date(_pts).toLocaleTimeString() + "）");
+                      }
+                    } catch (eBf) {}
+                    _bf(i + 1);
+                  }, 8000 + Math.floor(Math.random() * 7000));
+                })(0);
+              } catch (eAll) { console.warn("[Akini 朋友圈] 离线补发异常", eAll); }
+            };
             window._akiniRescheduleFriendsPost = function () {
               try { localStorage.removeItem("akini_next_friendsPost"); } catch (e) {}
               if (!window.__akiniToggleOn("contactFriendsToggle", false)) return;
@@ -22083,6 +22177,59 @@ window.akiniContacts = {
       }
 
       window._akiniIcityPostAction = icityPostAction;
+      /* v897 离线持续补发（对齐写信引擎），机制同朋友圈：锚点+最小间隔推算条数，上限 6 条 */
+      window.__akiniIcityBackfill = function () {
+        try {
+          if (!window.__akiniToggleOn("contactIcityToggle", false)) return;
+          var _anchor = parseFloat(localStorage.getItem("akini_last_icityPost_run") || "0") || 0;
+          if (!_anchor) return;
+          var _iv = getSafeIcityIntervals ? getSafeIcityIntervals() : null;
+          var gapMs = (_iv && _iv.min ? _iv.min : 30) * 60 * 1000;
+          var elapsed = Date.now() - _anchor;
+          if (elapsed < gapMs * 1.2) return;
+          var due = Math.min(6, Math.floor(elapsed / gapMs));
+          if (due < 1) return;
+          var _lastTs = _anchor;
+          (function _bi(i) {
+            if (i >= due) {
+              window.__akiniPostLog && __akiniPostLog("icity", "离线补发完成，共 " + due + " 条");
+              return;
+            }
+            setTimeout(function () {
+              try {
+                var _pts = _lastTs + gapMs + Math.floor(Math.random() * Math.max(1, ((_iv && _iv.max ? _iv.max : 60) - (_iv && _iv.min ? _iv.min : 30))) * 60000);
+                if (_pts > Date.now() - 60000) _pts = Date.now() - 60000 - Math.floor(Math.random() * 30000);
+                var _diary = Dn(0);
+                if (_diary) {
+                  var _nn = window.akiniContacts ? window.akiniContacts.getContacts() : [];
+                  var _cc = _nn.length ? _nn[Math.floor(Math.random() * _nn.length)] : null;
+                  if (_cc) {
+                    var _oo = getIcityContactProfile(_cc.id);
+                    var _ss = q();
+                    _ss.push({
+                      id: _pts + "_" + Math.floor(1e3 * Math.random()),
+                      who: _cc.id,
+                      author: (_oo && _oo.name) || _cc.name,
+                      authorId: _cc.id,
+                      text: _diary.replace(/\n/g, " "),
+                      ts: _pts,
+                      likes: 0,
+                      likers: [],
+                      comments: [],
+                      liked: !1,
+                    });
+                    j(_ss);
+                    if (window._renderIcity) window._renderIcity();
+                    _lastTs = _pts;
+                    window.__akiniPostLog && __akiniPostLog("icity", "离线补发第 " + (i + 1) + " 条");
+                  }
+                }
+              } catch (eBi) {}
+              _bi(i + 1);
+            }, 8000 + Math.floor(Math.random() * 7000));
+          })(0);
+        } catch (eAll) { console.warn("[Akini iCity] 离线补发异常", eAll); }
+      };
       window._akiniRescheduleIcityPost = function (backdateTs) {
         try { localStorage.removeItem("akini_next_icityPost"); } catch (e) {}
         // 开关关闭时不重新排计划——避免「未开启时上线秒发」
@@ -25881,6 +26028,11 @@ window.akiniContacts = {
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) return;
       if (window._restoringData || window._restoringChatHistory) return;
+      /* v896 对齐 syy/milk：内存被系统回收是分钟级事件，恢复对比加 30s 节流——
+         避免频繁前后台切换时每次都遍历全部会话+逐会话 IDB 读取 */
+      var _vcNow = Date.now();
+      if (window.__akiniVcRecoverTs && _vcNow - window.__akiniVcRecoverTs < 30000) return;
+      window.__akiniVcRecoverTs = _vcNow;
       try {
         if (window.akiniContacts && window.akiniContacts.getContacts) {
           var contactsEmpty = window.akiniContacts.getContacts().length === 0;
@@ -29015,7 +29167,7 @@ window.__akiniNowTs = function () {
             _msgInp.placeholder = 'iMessage信息';
           }
         } catch (_) {}
-      }, 300);
+      }, 2000);
     }
   } catch (_) {}
   function _markPending(input, key, src) {
@@ -30243,7 +30395,8 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 初始同步 + 定期同步
   syncS1Avatar();
-  setInterval(syncS1Avatar, 2000);
+  /* v895：头像变化是低频事件，2s轮询降5s+隐藏跳过 */
+  setInterval(function(){ if(!document.hidden) syncS1Avatar(); }, 5000);
 });
 
 // v714 头像与数据双向同步
@@ -30279,7 +30432,8 @@ function syncDualScreensData() {
 
 document.addEventListener('DOMContentLoaded', function() {
   syncDualScreensData();
-  setInterval(syncDualScreensData, 1500);
+  /* v895：双屏数据同步降频4s+隐藏跳过（内部已有innerHTML脏检查） */
+  setInterval(function(){ if(!document.hidden) syncDualScreensData(); }, 4000);
 });
 
 // v715 第一屏背景图与头像单独更换
@@ -30646,7 +30800,8 @@ function initHomeMusicPlayerSection() {
 
   /* v893：启动立即同步一次，不等首个800ms周期——消除"先显示旧值再变正确" */
   try { syncHomeMusicUI(); } catch (eSy) {}
-  setInterval(syncHomeMusicUI, 800);
+  /* v895：播放器UI轮询800ms降2s+隐藏跳过（同值守卫已在，启动已立即同步） */
+  setInterval(function(){ if(!document.hidden) syncHomeMusicUI(); }, 2000);
 }
 
 // 5. 点击 phoneFrame 空白区域快速更换主页壁纸
