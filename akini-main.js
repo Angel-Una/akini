@@ -14054,39 +14054,16 @@ window.akiniContacts = {
     }
     /* v648: 通话全屏防误触遮罩加固 - 增加 15s 强制超时熔断，且一旦通话结束或非 active 状态强制隐藏 */
     var __akiniBlockOverlayTimer = null;
-    function Be(t) {
-      var e = "callBlockOverlay",
-        n = document.getElementById(e);
-      if (t) {
-        if (!n) {
-          n = document.createElement("div");
-          n.id = e;
-          n.style.cssText = "position:fixed;inset:0;background:transparent;z-index:99999998;pointer-events:auto;touch-action:none;";
-          /* v900 通话卡住根治：遮罩只在弹出的瞬间防误触，用户主动再碰一下屏幕
-             就是想操作页面——首次 touchstart/click 立即放行，绝不锁死整页 15 秒 */
-          var _release = function () {
-            try {
-              var b = document.getElementById(e);
-              if (b) { b.style.display = "none"; b.removeEventListener("touchstart", _release); b.removeEventListener("click", _release); }
-            } catch (_) {}
-          };
-          n.addEventListener("touchstart", _release, { passive: !0 });
-          n.addEventListener("click", _release);
-          document.body.appendChild(n);
-        }
-        n.style.display = "block";
-        if (__akiniBlockOverlayTimer) { clearTimeout(__akiniBlockOverlayTimer); }
-        /* v900：兜底超时 15s→8s，防误触窗口足够，卡住感减半 */
-        __akiniBlockOverlayTimer = setTimeout(function () {
-          try {
-            var b = document.getElementById("callBlockOverlay");
-            if (b) { b.style.display = "none"; }
-          } catch (_) {}
-        }, 8000);
-      } else {
+    /* v901 通话锁死根治：Be(true) 曾挂出的全屏透明防误触遮罩(callBlockOverlay, z 夹在
+       全屏通话 99999999 与迷你窗 2147483647 之间、pointer-events:auto)——通话中任何场景
+       都会把「下方页面」整片点不动，且不会随状态解除，全量退役。
+       防误触由全屏通话自己的界面负责，页面永不挂载遮罩。 */
+    function Be() {
+      try {
         if (__akiniBlockOverlayTimer) { clearTimeout(__akiniBlockOverlayTimer); __akiniBlockOverlayTimer = null; }
-        if (n) { n.style.display = "none"; }
-      }
+        var b = document.getElementById("callBlockOverlay");
+        if (b) b.style.display = "none";
+      } catch (_) {}
     }
     function isCallOngoing() {
       try {
@@ -14352,7 +14329,6 @@ window.akiniContacts = {
           h && h.parentElement && (h.parentElement.style.display = ""),
           pe && (pe.style.display = "block"),
           w && (w.style.display = "block"),
-          Be(!0),
           (Ee = setTimeout(function () {
             we.active && !we.answered && Se("timeout");
           }, 60000)));
@@ -15347,24 +15323,9 @@ window.akiniContacts = {
                   ye && (ye.style.display = "none"),
                   ve && (ve.style.display = "block"),
                   he && (he.innerText = "来电中...")),
-              Be(!0));
-          we.answered && xe
-            ? (ke = setInterval(function () {
-                const t = Math.max(0, Date.now() - xe),
-                  e = Math.floor(t / 6e4),
-                  n = Math.floor((t % 6e4) / 1e3),
-                  i =
-                    String(e).padStart(2, "0") +
-                    ":" +
-                    String(n).padStart(2, "0"),
-                  a = document.getElementById("callTimeDisplay");
-                a && (a.innerText = i);
-                const o = document.getElementById("callTimeDisplayFull");
-                o && (o.innerText = i);
-              }, 1e3))
-            : (Ee = setTimeout(function () {
+              (Ee = setTimeout(function () {
                 we.active && !we.answered && Se("timeout");
-              }, 60000));
+              }, 60000)));
         }
     })(),
       document.addEventListener("visibilitychange", function () {
