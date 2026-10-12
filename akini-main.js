@@ -696,7 +696,8 @@ window.AKR = (function () {
     try {
       readNoReply = localStorage.getItem("akini_toggle_readNoReplyToggle") === "1";
     } catch (e) {}
-    if (readNoReply && Math.random() < getProb("noReply")) {
+    var noReplyProb = getProb("noReply");
+    if (readNoReply && noReplyProb > 0 && Math.random() < noReplyProb) {
       return { type: "none", extra: {} };
     }
 
@@ -10936,12 +10937,16 @@ window.akiniContacts = {
     const plusMenuBtn = document.getElementById("plusMenuBtn"),
       plusMenu = document.getElementById("plusMenu");
     function hidePlusMenu() {
-      plusMenu &&
-        ((plusMenu.style.display = ""), plusMenu.classList.remove("show"));
+      if (plusMenu) {
+        plusMenu.style.display = "none";
+        plusMenu.classList.remove("show");
+      }
     }
     function showPlusMenu() {
-      plusMenu &&
-        ((plusMenu.style.display = ""), plusMenu.classList.add("show"));
+      if (plusMenu) {
+        plusMenu.style.display = "flex";
+        plusMenu.classList.add("show");
+      }
       typeof hideEmojiPanel === "function" && hideEmojiPanel();
     }
     (plusMenuBtn &&

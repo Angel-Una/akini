@@ -182,15 +182,11 @@
     }
   }
 
-  // 派生/快照键：不进入备份文件——它们是运行时自动再生的冗余副本，
-  // 导入旧快照反而会覆盖新数据；真正的 _backup 数据键（如完整聊天记录）不在此列
+  // 派生/快照键：仅排除极少数短生命周期的临时状态键，确保所有用户自定义背景、头像、设置、字卡、信件、记录等完整导出
   function isDerivedKey(k) {
     return (
-      /^snap2?_/.test(k) ||
-      k === "akini_localstorage_snapshot" ||
-      k === "akini_localstorage_snapshot_backup" ||
-      k === "akini_idb_full_snapshot" ||
-      k === "akini_ls_dirty"
+      k === "akini_ls_dirty" ||
+      k === "__aktest__"
     );
   }
 
@@ -549,13 +545,13 @@
   }
 
   function fallbackJson(payload, dateStr) {
-    var fileName = "akini-backup-" + dateStr + ".json";
+    var fileName = "akini-backup-all-" + dateStr + ".json";
     var str = "\uFEFF" + JSON.stringify(payload);
     var blob = new Blob([str], { type: "application/json;charset=utf-8" });
     saveBlobSmart(blob, fileName, function () {
       notify(
         "导出成功",
-        "已导出 JSON 备份文件，可随时导入恢复",
+        "已全量导出所有设置与内容（含头像、背景图、聊天、字卡、自定义文字等全部数据）",
         "success"
       );
     });
