@@ -1595,7 +1595,7 @@ window._idbStore = (function () {
             try { localStorage.removeItem("akini_localstorage_snapshot_backup"); } catch (e4) {}
           } catch (e) {}
         }
-        /* v921 切后台卡崩根治（对齐 milk：pagehide 只做轻量应急备份）：
+        /* v922 切后台卡崩根治（对齐 milk：pagehide 只做轻量应急备份）：
            pagehide 的系统时间预算极短（移动端常 <1s），原在此同步跑
            「全量快照 + IDB 全量备份 + Cache 全量备份」三连重活，是切后台卡崩闪退主因。
            全量三连挪到 visibilitychange(hidden)——触发更早、App 仍在前台、CPU 预算充足
@@ -1704,7 +1704,7 @@ window._idbStore = (function () {
             var data = JSON.parse(src);
             if (data && "object" == typeof data) {
               var restored = 0;
-              /* v921 防回退守卫（对齐 milk「备份不比当前新就绝不覆盖」）：
+              /* v922 防回退守卫（对齐 milk「备份不比当前新就绝不覆盖」）：
                  akini_key_mtime 登记每个核心键的最后修改/删除时刻；当前 LS 的 mtime
                  晚于快照内嵌 mtime → 快照值是旧的 → 坚决不回填（宁缺勿旧），
                  根治背景图/头像/自定义文字等被旧快照回填导致的"回退旧数据" */
@@ -3329,15 +3329,26 @@ window.akiniContacts = {
               // 头像值是原始字符串（data URI 或 emoji），不能 JSON.parse，直接用 _idbStore.get 取原始值
               _idbStore.get(k, function (v) {
                 if (v && "string" == typeof v && v.trim() && v !== "null" && v !== "undefined") {
-                  try {
-                    var cur = localStorage.getItem(k) || "";
-                    // IDB 为权威主存储：有值时直接覆盖本地（防止本地写满残留旧头像）
-                    if (!cur || cur === "null" || cur === "undefined" || cur !== v) {
-                      localStorage.setItem(k, v);
-                      if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(k, v);
-                      d = !0;
-                    }
-                  } catch (e) {}
+                  /* v922 头像回退根治：restoreAvatars 原来"IDB 有值且与 LS 不同就覆盖 LS"完全裸奔——
+                     新头像的 IDB 异步落盘还没 commit 时（或被系统打断），这里读到的是【上一个头像】，
+                     反手把 LS/内存里的新头像盖掉 → 用户看到"换完头像回退成上一个"。
+                     对齐 m() 的 v899 守卫：本地写侧车比 IDB 侧车新(3s容差) → IDB 值是旧的，绝不覆盖 */
+                  var _lw = (window.__akiniImgWts && window.__akiniImgWts.local(k)) || 0;
+                  _idbStore.get("akini_wts_" + k, function (iw) {
+                    var _iw = +(iw || 0) || 0;
+                    if (_lw > _iw + 3000) { u--; f(); return; }
+                    try {
+                      var cur = localStorage.getItem(k) || "";
+                      if (!cur || cur === "null" || cur === "undefined" || cur !== v) {
+                        localStorage.setItem(k, v);
+                        if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(k, v);
+                        d = !0;
+                      }
+                    } catch (e) {}
+                    u--;
+                    f();
+                  });
+                  return;
                 }
                 u--;
                 f();
@@ -3570,7 +3581,7 @@ window.akiniContacts = {
       // 默认 24 小时制 "24" (12:00)
       return String(h24).padStart(2, "0") + ":" + m;
     }
-    /* v921：暴露给 index.html 日历卡——日历时间与消息时间戳 100% 同源，杜绝两套格式逻辑各改各的 */
+    /* v922：暴露给 index.html 日历卡——日历时间与消息时间戳 100% 同源，杜绝两套格式逻辑各改各的 */
     window.__akiniFormatMsgTime = __akiniFormatMsgTime;
     // 全局时间格式化辅助：其他场景保持 24 小时制，不带后缀
     window.__akiniFormatTimePart = function (date) {
@@ -4553,7 +4564,7 @@ window.akiniContacts = {
       ((o.className = "msg-row me"),
         (o.innerHTML =
           '<div class="msg-content-line"><div class="bubble">' +
-          /* v921 根治"发完消息显示不完整，返回重进才完整"：原文直插 innerHTML，
+          /* v922 根治"发完消息显示不完整，返回重进才完整"：原文直插 innerHTML，
              含 < > & " 时被浏览器当成标签吃掉一部分；统一转义后与重渲染路径一致 */
           (function(_s){ _s = String(_s == null ? "" : _s);
             return _s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); })(t) +
@@ -6721,6 +6732,13 @@ window.akiniContacts = {
         }
       }
 
+      // v922：图片/头像键写入即登记本地侧车（wts），供 restoreAvatars/m 的防回退守卫比对
+      try {
+        if (window.__akiniImgWts && window.__akiniImgWts.isImg && window.__akiniImgWts.isImg(t) && window.__akiniImgWts.stamp) {
+          window.__akiniImgWts.stamp(t);
+        }
+      } catch (eW) {}
+
       // localforage 持久化写入
       try {
         _idbStore.set(t, e, function () {
@@ -7034,7 +7052,7 @@ window.akiniContacts = {
       } catch (t) {
         console.warn("[Akini] akini_posts 写入 localStorage 失败（配额超限），已存入 IndexedDB", t && t.name);
       }
-      /* v921：朋友圈保存同样加 30s 节流——原每次保存都全量 backupAll，切后台连环全库重写是卡崩源 */
+      /* v922：朋友圈保存同样加 30s 节流——原每次保存都全量 backupAll，切后台连环全库重写是卡崩源 */
       ((function () {
         try {
           if (!window._idbStore || !window._idbStore.backupAll) return;
@@ -7552,7 +7570,7 @@ window.akiniContacts = {
       // 同步写 sessionStorage 应急兜底：iOS Safari 刷新/返回时 localStorage/IDB 异步事务可能未落盘，sessionStorage 同步可靠
       try { sessionStorage.setItem("akini_icity_diaries_emergency", n); } catch (x) {}
       console.log("[iCity] 持久化,日记数:", F.length, "评论总数:", (F||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
-      /* v921：原每次保存日记都全量 backupAll（全库 IDB 重写）——切后台(hidden)必跑，隐性重活。
+      /* v922：原每次保存日记都全量 backupAll（全库 IDB 重写）——切后台(hidden)必跑，隐性重活。
          加 30s 节流：日记主/备/emergency 四写已保数据，全库备份无需每次跟跑 */
       ((function () {
         try {
@@ -7827,7 +7845,7 @@ window.akiniContacts = {
       } catch (e) {}
       return backups;
     }
-    /* v921：切后台(hidden)瞬间绝不做 iCity 全量重渲染——DOM 重建在 hidden 的极短预算内
+    /* v922：切后台(hidden)瞬间绝不做 iCity 全量重渲染——DOM 重建在 hidden 的极短预算内
        纯属浪费且是卡崩源；数据已同步落盘，渲染只影响显示，标记 pending 回前台再补。 */
     function _icityRenderSafe() {
       if (document.hidden) { window.__icityMergeRenderPending = true; return; }
@@ -9342,7 +9360,7 @@ window.akiniContacts = {
                       : e.lastTime - t.lastTime;
                 }),
                 l.forEach(function (t) {
-                  /* v921：会话列表时间改走 __akiniFormatMsgTime——原 toLocaleTimeString("zh-CN")
+                  /* v922：会话列表时间改走 __akiniFormatMsgTime——原 toLocaleTimeString("zh-CN")
                      永远是 24 小时制，时间格式设置对会话列表完全失效（"时间戳都是24小时制"根因） */
                   var e = t.lastTime
                       ? __akiniFormatMsgTime(Number(t.lastTime))
@@ -11481,7 +11499,7 @@ window.akiniContacts = {
           bc = new Set();
         function l() {
           var _v = i("akini_wordbank", []);
-          /* v921 字卡丢失根因修复：字卡库是文本数据可能超 200KB → akiniSet 会【删除 LS 副本】
+          /* v922 字卡丢失根因修复：字卡库是文本数据可能超 200KB → akiniSet 会【删除 LS 副本】
              只留内存+IDB(500ms 防抖)；重进时内存空、LS 空 → 读到 [] 显示"字卡全没了"。
              修复：读到空时异步从 IDB 镜像链兜底回填（内存+LS+重渲染），每次启动最多查一次。 */
           if ((!Array.isArray(_v) || _v.length === 0) && !l._idbChecked) {
@@ -11508,7 +11526,7 @@ window.akiniContacts = {
         function s(t) {
           if (window.akiniStore && window.akiniStore.setJson) {
             window.akiniStore.setJson("akini_wordbank", t);
-            /* v921：字卡是用户核心资产——保存后【立即落盘 IDB】（不等 500ms 防抖，
+            /* v922：字卡是用户核心资产——保存后【立即落盘 IDB】（不等 500ms 防抖，
                杜绝导入后秒退/闪退丢全部字卡），并强制写一份 LS 文本副本（≤1MB），
                让重进读取链（内存→LS）永远拿得到 */
             try { if (window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (eF) {}
@@ -11532,7 +11550,7 @@ window.akiniContacts = {
           var k = "akini_wb_groups_" + t;
           if (window.akiniStore && window.akiniStore.setJson) {
             window.akiniStore.setJson(k, g);
-            /* v921：分组数据同字卡——立即落盘 IDB + 强制 LS 副本，杜绝防抖窗口丢数据 */
+            /* v922：分组数据同字卡——立即落盘 IDB + 强制 LS 副本，杜绝防抖窗口丢数据 */
             try { if (window.akiniStore.flushIdb) window.akiniStore.flushIdb(); } catch (eF) {}
             try {
               var _s3 = JSON.stringify(g);
@@ -15853,14 +15871,14 @@ window.akiniContacts = {
         if (c && m && "me" !== m) {
           const t = 1e3 * (3 + 7 * Math.random()),
             e = Math.random() < window.AKR.getProb("refundTransfer");
-          /* v921 根治"给A转账收款消息却出现在B聊天"：定时器触发时抓的是【当前打开聊天】，
+          /* v922 根治"给A转账收款消息却出现在B聊天"：定时器触发时抓的是【当前打开聊天】，
              转账后 3~10s 内点开别人聊天，系统消息就串过去了。改为锁死转账目标会话 o。
              注意回调内 const o 会 TDZ 遮蔽外层 o，必须在此先捕获 */
           var _trChatId = o;
           setTimeout(function () {
             const t = window._transferStates[v];
             if (!t) return;
-            /* v921 幂等：同一转账的系统消息只进一次（重复触发/重进恢复都不再追加第二条） */
+            /* v922 幂等：同一转账的系统消息只进一次（重复触发/重进恢复都不再追加第二条） */
             if (t.sysMsgDone) return;
             t.sysMsgDone = true;
             const n = document.getElementById(w),
@@ -15888,11 +15906,11 @@ window.akiniContacts = {
         } else {
           const t = 1e3 * (3 + 7 * Math.random()),
             e = Math.random() < window.AKR.getProb("refundTransfer");
-          var _trChatId = o; /* v921：同块1，锁死转账目标会话 */
+          var _trChatId = o; /* v922：同块1，锁死转账目标会话 */
           setTimeout(function () {
             const t = window._transferStates[v];
             if (!t) return;
-            if (t.sysMsgDone) return; /* v921 幂等 */
+            if (t.sysMsgDone) return; /* v922 幂等 */
             t.sysMsgDone = true;
             const n = document.getElementById(w),
               i = document.getElementById(k),
@@ -15920,11 +15938,11 @@ window.akiniContacts = {
       else if (c && m && "me" !== m) {
         const t = 1e3 * (3 + 7 * Math.random()),
           e = Math.random() < window.AKR.getProb("refundTransfer");
-        var _trChatId = o; /* v921：同块1，锁死转账目标会话 */
+        var _trChatId = o; /* v922：同块1，锁死转账目标会话 */
         setTimeout(function () {
           const t = window._transferStates[v];
           if (!t) return;
-          if (t.sysMsgDone) return; /* v921 幂等 */
+          if (t.sysMsgDone) return; /* v922 幂等 */
           t.sysMsgDone = true;
           const n = document.getElementById(w),
             i = document.getElementById(k),
@@ -18798,7 +18816,7 @@ window.akiniContacts = {
       document.addEventListener("visibilitychange", function () {
         if (document.hidden) _saveVault();
       });
-      /* v921：hidden 必先于 pagehide 触发且已完成 vault 保存；pagehide 预算极短，
+      /* v922：hidden 必先于 pagehide 触发且已完成 vault 保存；pagehide 预算极短，
          8s 内已保存过就跳过，消除切后台双跑「全量收集+Cache put」的卡崩源 */
       window.addEventListener("pagehide", function () {
         if (Date.now() - (window.__akiniVaultSavedAt || 0) > 8000) _saveVault();
@@ -19150,7 +19168,7 @@ window.akiniContacts = {
                       break;
                     }
                   }
-                  /* v921：日期+内容+发件人三元组可能因格式差异匹配不上——
+                  /* v922：日期+内容+发件人三元组可能因格式差异匹配不上——
                      兜底用 ts 匹配（信件必有 ts），再不行按对象引用直接改
                      （allRecv 与渲染数组同源），确保本次点击的已读 100% 进持久化数组 */
                   if (!_matchOk) {
@@ -19162,7 +19180,7 @@ window.akiniContacts = {
                     }
                     if (!_matchOk && allRecv.indexOf(e) >= 0) { e.read = true; e.isRead = true; _matchOk = true; }
                   }
-                  // v921：已读瞬间推进游标——重启后任何旧快照都无法让这封信再变未读
+                  // v922：已读瞬间推进游标——重启后任何旧快照都无法让这封信再变未读
                   try { localStorage.setItem("akini_mail_latest_read_ts", String(Date.now())); } catch (eTs) {}
                   saveMailReceived(allRecv);
                 } catch(err) {}
@@ -19435,7 +19453,7 @@ window.akiniContacts = {
         window._idbStore.set("akini_mail_received", e);
         window._idbStore.set("akini_mail_received_backup", e);
       }
-      // v921：已读游标随每次已读落盘同步推进——任何"ts ≤ 游标"的旧快照回填都无效
+      // v922：已读游标随每次已读落盘同步推进——任何"ts ≤ 游标"的旧快照回填都无效
       var _lrt = 0;
       try {
         (t || []).forEach(function (m) {
@@ -20862,7 +20880,7 @@ window.akiniContacts = {
                   return;
                 }
                 // 2. 活跃时间范围检查（严格按用户设置的时段执行，不在时间范围内直接跳过，重新排期）
-                /* v921 离线/迟到补发语义：补发触发或定时器迟到（计划已到期）时，计划排定本就在范围内，
+                /* v922 离线/迟到补发语义：补发触发或定时器迟到（计划已到期）时，计划排定本就在范围内，
                    绝不因"现在"不在范围而吞掉离线期间应发的内容 */
                 var _isCatchUp = !!window.__akiniFriendsCatchUp;
                 window.__akiniFriendsCatchUp = false;
@@ -20952,7 +20970,7 @@ window.akiniContacts = {
             }
 
             window._akiniFriendsPostAction = friendsPostAction;
-            /* v921 离线补发回归（用户明确诉求：好久不上线，回来要有离线期间的内容，对齐主动写信）：
+            /* v922 离线补发回归（用户明确诉求：好久不上线，回来要有离线期间的内容，对齐主动写信）：
                启动/切回前台时若计划已到期 → 2~6s 后补发一次（时间戳由 action 按 v912 逻辑还原为
                离线期间的应发时刻）；每次启动只补一次，action 自带冷却防连发 */
             window.__akiniFriendsBackfill = function () {
@@ -21844,7 +21862,7 @@ window.akiniContacts = {
             } catch (e) { console.warn("syncFmt", e); }
           }
           try { syncFmt(); } catch (e) {}
-          /* v921：时间格式按钮显示各自格式的【实时当前时间】（每秒刷新），取代原来的固定样例文字
+          /* v922：时间格式按钮显示各自格式的【实时当前时间】（每秒刷新），取代原来的固定样例文字
              "12:00 / 12:00PM / 12:00AM / 12:00:00"——用户看到"固定的12:00:00 AM"误以为设置无效，
              live 化后选哪个格式，按钮上就实时预览哪个格式的现在时刻，与消息/日历 100% 一致 */
           function tickFmtLabels() {
@@ -21877,10 +21895,10 @@ window.akiniContacts = {
               btn.addEventListener("click", function(){
                 try {
                   cur = k; localStorage.setItem("akini_timeFormat", k); syncFmt();
-                  /* v921：同标签页内 storage 事件不会触发，点完直接手动刷日历 */
+                  /* v922：同标签页内 storage 事件不会触发，点完直接手动刷日历 */
                   try { if (typeof window.updateS1Calendar === "function") window.updateS1Calendar(); } catch (eCal) {}
                   if (window.__renderMail) window.__renderMail();
-                  // v921：会话列表时间同步按新格式重渲染（原来只刷聊天气泡，列表时间恒 24h）
+                  // v922：会话列表时间同步按新格式重渲染（原来只刷聊天气泡，列表时间恒 24h）
                   try { if (typeof window.renderChatList === "function") window.renderChatList(); } catch (eRcl) {}
                   // 实时刷新当前打开的聊天界面所有消息的时间戳
                   var curActiveChatId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
@@ -22380,7 +22398,7 @@ window.akiniContacts = {
             return;
           }
           // 2. 活跃时间范围检查（严格按用户设置的时段执行，不在时间范围内直接跳过，重新排期）
-          /* v921 离线/迟到补发语义：同朋友圈 */
+          /* v922 离线/迟到补发语义：同朋友圈 */
           var _isCatchUp = !!window.__akiniIcityCatchUp;
           window.__akiniIcityCatchUp = false;
           var _plannedEarly = parseFloat(localStorage.getItem("akini_next_icityPost") || "0") || 0;
@@ -22476,7 +22494,7 @@ window.akiniContacts = {
 
       window._akiniIcityPostAction = icityPostAction;
       // 彻底废弃离线回溯补发：对齐信箱机制，仅在在线运行到期且处于时间范围内时发布
-      /* v921 离线补发回归：同朋友圈机制 */
+      /* v922 离线补发回归：同朋友圈机制 */
       window.__akiniIcityBackfill = function () {
         try {
           if (window.__akiniIcityCatchUpDone) return;
@@ -25083,7 +25101,7 @@ window.akiniContacts = {
         var timeText = "一起听了 " + (a += (n % 60) + " 分钟");
         var fullText = "TA就在你的身边 " + timeText;
         e.distanceText && (e.distanceText.textContent = fullText);
-        /* v843/v921：统一首页播放器与一起听歌界面的时长计算源头。两处统一使用 timeText */
+        /* v843/v922：统一首页播放器与一起听歌界面的时长计算源头。两处统一使用 timeText */
         var homeText = timeText;
         e.listenTime && (e.listenTime.textContent = homeText);
         var homeEl = document.getElementById("musicPlayerListenTime");
@@ -27518,7 +27536,7 @@ window.akiniContacts = {
         localStorage.removeItem("akini_mail_seen_count");
       }
     } catch (e) {}
-    /* v921：已读游标兜底——任何"未读但 ts ≤ 游标"的信一律强制已读（旧快照回填的脏数据） */
+    /* v922：已读游标兜底——任何"未读但 ts ≤ 游标"的信一律强制已读（旧快照回填的脏数据） */
     try {
       var _curs = parseFloat(localStorage.getItem("akini_mail_latest_read_ts") || "0") || 0;
       if (_curs > 0) {
@@ -27533,7 +27551,7 @@ window.akiniContacts = {
         if (_ch) localStorage.setItem("akini_mail_received", JSON.stringify(_m2));
       }
     } catch (e2) {}
-    /* v921 第二道：同步修正内存镜像——避免下次 render 拿旧缓存显示未读角标 */
+    /* v922 第二道：同步修正内存镜像——避免下次 render 拿旧缓存显示未读角标 */
     try {
       var _curs2 = parseFloat(localStorage.getItem("akini_mail_latest_read_ts") || "0") || 0;
       var _mm = null;

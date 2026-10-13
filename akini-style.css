@@ -13468,3 +13468,18 @@ html body .chat-body .msg-row.ta .msg-content-line > .bubble-wrap {
   visibility: hidden !important;
   display: none !important;
 }
+
+/* ==========================================================================
+   v922：iOS「添加到主屏幕」(webclip) 底栏遮挡修复
+   底栏(.fit-mod.fit-bottom)是 position:fixed 贴视口底，首页流内容不预留其高度，
+   主屏幕模式下安全区+视口差异导致应用网格被底栏压住。流内预留底栏高度，超出可滚。 */
+.content-wrapper {
+  padding-bottom: calc(108px + env(safe-area-inset-bottom, 0px)) !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+@media (display-mode: standalone) {
+  .fit-mod.fit-bottom {
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}

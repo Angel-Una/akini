@@ -32,7 +32,7 @@
     }
     return Array.isArray(v) ? v : [];
   }
-  /* v921：raw LS 权威读优先（内存镜像可能滞后：别处直写 LS 后内存仍是旧数组，
+  /* v922：raw LS 权威读优先（内存镜像可能滞后：别处直写 LS 后内存仍是旧数组，
      一读一写就把新信覆盖消失——"显示已读后信不见了"根因）。LS 无值再退内存/IDB */
   function _rawFirst(key) {
     try {
