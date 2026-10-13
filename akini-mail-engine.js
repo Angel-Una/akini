@@ -281,7 +281,10 @@
         }
       } catch (e0) {}
       try {
-        if (window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("mail")) {
+        /* v924：离线错过的信件(_anchorLastSent到期)豁免上线瞬时的活跃时段检查，
+           确保用户即使在清晨6点上线也能顺利收到离线期间本该送达的信件 */
+        var _isLateMail = _anchorLastSent > 0 && (Date.now() - _anchorLastSent >= minMs);
+        if (!_isLateMail && window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("mail")) {
           manageAutoSendTimer();
           return;
         }

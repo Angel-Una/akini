@@ -521,16 +521,9 @@ setTimeout(function () { try { window.__akiniRestoreSettled = true; } catch (eF)
           try { __bgOk = localStorage.getItem("akini_home_bg_ok") === "1"; } catch (e0) {}
           var __bgBootKey = "__akiniBgBootN";
           var __bgBootN = 0;
-          if (!__bgSkipped) {
-            try { __bgBootN = parseInt(sessionStorage.getItem(__bgBootKey) || "0", 10) || 0; } catch (e0) {}
-            __bgBootN += 1;
-            try { sessionStorage.setItem(__bgBootKey, String(__bgBootN)); } catch (e0) {}
-            if (__bgBootN >= 3 && !__bgOk) {
-              try { localStorage.setItem("akini_home_bg_skip", String(bg.length)); } catch (e0) {}
-              __bgSkipped = true;
-              try { console.warn("[Akini] 背景图疑似导致闪退，本次启动已跳过；更换或清除壁纸后自动恢复"); } catch (e0) {}
-            }
-          }
+          /* v924：移除激进的背景图 skip 看门狗，防止用户手机重载时误跳过背景导致背景消失 */
+          try { localStorage.removeItem("akini_home_bg_skip"); } catch (e0) {}
+          __bgSkipped = false;
           if (!__bgSkipped) {
             var __bgApply = function (dataUrl) {
               try {
@@ -10826,6 +10819,15 @@ window.akiniContacts = {
           (G(t, function (t) {
             (u("my", t),
               L("akini_my_avatar", t),
+              (function(){
+                try {
+                  localStorage.setItem("akini_s1_avatar", t);
+                  var s1El = document.getElementById("s1AvatarImg");
+                  if (s1El) s1El.src = t;
+                  var s1Wrap = document.getElementById("s1AvatarCircle");
+                  if (s1Wrap) s1Wrap.innerHTML = '<img src="' + t + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%;">';
+                } catch(e){}
+              })(),
               Tn(t),
               Y &&
                 ((Y.style.display = "none"), (Y.style.pointerEvents = "none")),
@@ -20979,9 +20981,12 @@ window.akiniContacts = {
                 var _next = parseFloat(localStorage.getItem("akini_next_friendsPost") || "0") || 0;
                 if (_next > 0 && Date.now() >= _next) {
                   window.__akiniFriendsCatchUpDone = true;
+                  console.log("[Akini 朋友圈] 检测到离线到期，排期补发朋友圈");
                   setTimeout(function () {
                     try { window.__akiniFriendsCatchUp = true; friendsPostAction(); } catch (e) {}
-                  }, 2000 + Math.floor(Math.random() * 4000));
+                  }, 2000 + Math.floor(Math.random() * 3000));
+                } else {
+                  scheduleNext(!_next);
                 }
               } catch (e) {}
             };
@@ -20993,8 +20998,7 @@ window.akiniContacts = {
               scheduleNext(false);
             };
 
-            // 首次启动调度（同主动写信，等待首次间隔后触发，绝不突脸连发）
-            scheduleNext(true);
+            // v924：优先检测离线到期补发，决不先调用 scheduleNext 覆盖原有到期时间戳！
             window.__akiniFriendsBackfill();
           })(),
           (function t() {
@@ -22501,9 +22505,12 @@ window.akiniContacts = {
           var _next = parseFloat(localStorage.getItem("akini_next_icityPost") || "0") || 0;
           if (_next > 0 && Date.now() >= _next) {
             window.__akiniIcityCatchUpDone = true;
+            console.log("[Akini iCity] 检测到离线到期，排期补发日记");
             setTimeout(function () {
               try { window.__akiniIcityCatchUp = true; icityPostAction(); } catch (e) {}
-            }, 3000 + Math.floor(Math.random() * 4000));
+            }, 2500 + Math.floor(Math.random() * 3000));
+          } else {
+            scheduleNextIcity(!_next);
           }
         } catch (e) {}
       };
@@ -22515,8 +22522,7 @@ window.akiniContacts = {
         scheduleNextIcity(false);
       };
 
-      // 首次启动调度（同主动写信，等待首次间隔后触发，绝不突脸连发）
-      scheduleNextIcity(true);
+      // v924：优先检测离线到期补发，决不先调用 scheduleNextIcity 覆盖原有到期时间戳！
       window.__akiniIcityBackfill();
       var t = {};
       function e(t, e) {
