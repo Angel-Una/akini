@@ -292,15 +292,23 @@
     memSet(k, v);
     var lsOk = true;
     if (isBigVal(v)) {
-      // 大键：跳过 localStorage，并清掉 LS 里的旧残留，防止旧值遮蔽新值
-      lsRemoveRaw(k);
+      /* v920 图片大键（背景/头像 dataURL）崩溃窗口回退根因修复：此前直接删 LS 副本、
+         只靠 500ms 防抖 IDB——崩溃/强杀落在窗口内 = 新值蒸发、旧值复活（网易云背景回退旧数据同款）。
+         修复：图片键 ≤1.5MB 时尽力直写 LS（lsSet 自带配额满驱逐重试），写不进才删旧残留防遮蔽 */
+      if (isImgKey(k)) {
+        var _imgLsOk = false;
+        if (v.length <= 1572864) { try { _imgLsOk = lsSet(k, v); } catch (eB) {} }
+        if (!_imgLsOk) lsRemoveRaw(k);
+      } else {
+        lsRemoveRaw(k);
+      }
     } else {
       lsOk = lsSet(k, v);
       if (lsOk) clearDirty(k); else markDirty(k);
     }
     if (isCriticalKey(k)) {
       if (!_restored) { _preRestorePending[k] = v; }
-      else queueIdbWrite(k, v);
+      else { queueIdbWrite(k, v); if (isImgKey(k)) flushIdbQueue(); }
     }
     // localStorage 写失败（配额满等）时立即落盘 IDB，不等 500ms 防抖，防退出丢数据
     if (!lsOk && _restored) flushIdbQueue();
@@ -327,7 +335,7 @@
   //  ② 大键驻留预算：>200KB 的键驻留总量 ≤4GB 设备 12MB / 其他 24MB，超预算的键
   //     不驻留内存（记入 __akiniDeferredKeys），读取时按需从 IDB 异步水合。
   var _restored = false;
-  /* v917 安全模式：上次启动 JS 出错标记 / iOS / 低内存机型 → 大键驻留预算收紧到 5MB、
+  /* v920 安全模式：上次启动 JS 出错标记 / iOS / 低内存机型 → 大键驻留预算收紧到 5MB、
      恢复批次 2 键/60ms——直接压低启动内存峰值，针对"开屏即崩/闪退死循环" */
   var _bootTight = false;
   try {
@@ -556,7 +564,16 @@
         var ok = true;
         // 1) 原始写入永远先执行（大键跳过 LS 并清残留，防撑爆配额）；任何异常都不影响镜像
         if (big) {
-          try { self.origRemove.call(this, k); } catch (e) {}
+          if (isImgKey(k)) {
+            /* v920：图片大键尽力保留 LS 副本（≤1.5MB），配合镜像层立即刷盘，新值绝不丢 */
+            var _imgLsOk2 = false;
+            if (String(v).length <= 1572864) {
+              try { self.origSet.call(this, k, v); _imgLsOk2 = true; } catch (eW) {}
+            }
+            if (!_imgLsOk2) { try { self.origRemove.call(this, k); } catch (e) {} }
+          } else {
+            try { self.origRemove.call(this, k); } catch (e) {}
+          }
         } else {
           try { self.origSet.call(this, k, v); } catch (e) {
             // 配额满：清理大体积图片键后重试，避免关键数据静默丢失
@@ -574,7 +591,7 @@
             // v899: 图像键写入即盖章（拦截层覆盖所有 localStorage.setItem 调用路径）
             if (isImgKey(k) && sv && sv.length > 10 && sv !== 'null' && sv !== 'undefined') { try { _stampImgKey(k); } catch (e9) {} }
             if (!_restored) { _preRestorePending[k] = sv; }
-            else { self.queueIdbWrite(k, sv); }
+            else { self.queueIdbWrite(k, sv); if (big && isImgKey(k)) flushIdbQueue(); }
             if (ok || big) { self.clearDirty(k); }
             else { self.markDirty(k); if (_restored) flushIdbQueue(); }
           }
