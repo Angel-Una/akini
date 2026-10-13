@@ -327,7 +327,23 @@
   //  ② 大键驻留预算：>200KB 的键驻留总量 ≤4GB 设备 12MB / 其他 24MB，超预算的键
   //     不驻留内存（记入 __akiniDeferredKeys），读取时按需从 IDB 异步水合。
   var _restored = false;
-  var BIG_MEM_BUDGET = ((typeof navigator !== 'undefined' && navigator.deviceMemory) || 4) <= 4 ? 12 * 1024 * 1024 : 24 * 1024 * 1024;
+  /* v917 安全模式：上次启动 JS 出错标记 / iOS / 低内存机型 → 大键驻留预算收紧到 5MB、
+     恢复批次 2 键/60ms——直接压低启动内存峰值，针对"开屏即崩/闪退死循环" */
+  var _bootTight = false;
+  try {
+    if (sessionStorage.getItem('akini_crash_mark') === '1') {
+      _bootTight = true;
+      window.__akiniCrashBoot = true;
+      try { sessionStorage.removeItem('akini_crash_mark'); } catch (eC) {}
+    }
+  } catch (eC2) {}
+  try {
+    var _uaBoot = navigator.userAgent || '';
+    if (/iPad|iPhone|iPod/.test(_uaBoot) || window.__akiniLowMem) _bootTight = true;
+  } catch (eC3) {}
+  var BIG_MEM_BUDGET = _bootTight ? 5 * 1024 * 1024 : (((typeof navigator !== 'undefined' && navigator.deviceMemory) || 4) <= 4 ? 12 * 1024 * 1024 : 24 * 1024 * 1024);
+  var _BOOT_BATCH = _bootTight ? 2 : 4;
+  var _BOOT_BATCH_DELAY = _bootTight ? 60 : 25;
   var _bigMemUsed = 0;
   if (!window.__akiniDeferredKeys) window.__akiniDeferredKeys = {};
   function restoreAll() {
@@ -364,8 +380,8 @@
             }
             return;
           }
-          var batch = targets.slice(i, i + 4);
-          i += 4;
+          var batch = targets.slice(i, i + _BOOT_BATCH);
+          i += _BOOT_BATCH;
           var pending = batch.length;
           batch.forEach(function (k) {
             idbGet(k, function (v) {
@@ -385,7 +401,7 @@
                   if (_idbEmpty && ls != null && ls !== '' && ls !== '[]' && ls !== '{}' && ls !== 'null') {
                     memSet(k, ls);
                     queueIdbWrite(k, ls); // 回写 IDB 纠正陈旧空值
-                    if (--pending === 0) setTimeout(nextBatch, 25);
+                    if (--pending === 0) setTimeout(nextBatch, _BOOT_BATCH_DELAY);
                     return;
                   }
                   var big = isBigVal(v);
@@ -400,11 +416,11 @@
                         memSet(k, pendingVal);
                         lsSet(k, pendingVal);
                         queueIdbWrite(k, pendingVal);
-                        if (--pending === 0) setTimeout(nextBatch, 25);
+                        if (--pending === 0) setTimeout(nextBatch, _BOOT_BATCH_DELAY);
                         return;
                       }
                     }
-                    if (big && _bigMemUsed + ls.length > BIG_MEM_BUDGET) {
+                    if (big && (ls.length > 4194304 || _bigMemUsed + ls.length > BIG_MEM_BUDGET)) {
                       window.__akiniDeferredKeys[k] = 1; // 超预算：不驻留，按需水合
                     } else {
                       memSet(k, ls);
@@ -413,7 +429,7 @@
                     if (ls !== v) queueIdbWrite(k, ls); // LS 与 IDB 不一致，以 LS 回写 IDB
                   } else if (big) {
                     // 大键不回填 LS（防回填又撑爆配额）；预算内驻留内存，超预算按需水合
-                    if (_bigMemUsed + v.length > BIG_MEM_BUDGET) {
+                    if (v.length > 4194304 || _bigMemUsed + v.length > BIG_MEM_BUDGET) {
                       window.__akiniDeferredKeys[k] = 1;
                     } else {
                       memSet(k, v);
@@ -427,7 +443,7 @@
                   }
                 }
               } catch (e) {}
-              if (--pending <= 0) setTimeout(nextBatch, 25);
+              if (--pending <= 0) setTimeout(nextBatch, _BOOT_BATCH_DELAY);
             });
           });
         })();
