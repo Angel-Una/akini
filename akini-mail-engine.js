@@ -44,6 +44,12 @@
   }
   function saveSent(arr) {
     var n = JSON.stringify(arr || []);
+    // v916 核心修复：原只写 akiniStore（大键拦截层跳过 localStorage）——重启恢复链
+    // 从 IDB 镜像/快照拿到的可能是【旧值】，已读/已回信状态被旧数据回填覆盖
+    // （用户看到"点了已读下次又未读"的根因）。统一走 window.saveMailSent 全链路
+    // 双通道落盘（LS + IDB 主/备），并登记 akini_key_mtime 供防回退守卫比对。
+    if (typeof window.saveMailSent === "function") { window.saveMailSent(arr); return; }
+    try { localStorage.setItem("akini_mail_sent", n); } catch (eLS) {}
     if (window.akiniStore && window.akiniStore.set) window.akiniStore.set("akini_mail_sent", n);
     else if (window._idbStore && window._idbStore.set) {
       window._idbStore.set("akini_mail_sent", n);
@@ -52,11 +58,22 @@
   }
   function saveReceived(arr) {
     var n = JSON.stringify(arr || []);
+    // v916 核心修复（同 saveSent）：全链路双通道落盘 + mtime 登记，杜绝已读状态被旧值覆盖
+    if (typeof window.saveMailReceived === "function") { window.saveMailReceived(arr); return; }
+    try { localStorage.setItem("akini_mail_received", n); } catch (eLR) {}
     if (window.akiniStore && window.akiniStore.set) window.akiniStore.set("akini_mail_received", n);
     else if (window._idbStore && window._idbStore.set) {
       window._idbStore.set("akini_mail_received", n);
       window._idbStore.set("akini_mail_received_backup", n);
     }
+  }
+  /* v916 已读游标：每次读信都登记最新已读时刻，重启后任何"未读时间戳 ≤ 游标"的信
+     强制视为已读——ID 匹配之外再加一道时间游标保险，双保险根治"点了已读下次又未读" */
+  function stampLatestRead() {
+    try { localStorage.setItem("akini_mail_latest_read_ts", String(Date.now())); } catch (e) {}
+  }
+  function latestReadTs() {
+    return parseFloat(localStorage.getItem("akini_mail_latest_read_ts") || "0") || 0;
   }
 
   // 生成随机来信内容（compat envelope 式合成：字卡库随机 5-12 句，句号连接成段，
@@ -145,6 +162,35 @@
         }
       }
       if (changed) saveSent(sent);
+      // v916：每次投递/状态变更后推进已读游标（同 saveMailReceived 内逻辑）
+      var _lrt2 = 0;
+      try {
+        (sent || []).forEach(function (m) {
+          if (m && (m.read || m.isRead) && m.ts && m.ts > _lrt2) _lrt2 = m.ts;
+        });
+      } catch (eL3) {}
+      if (_lrt2 > 0) {
+        try {
+          var _cur2 = parseFloat(localStorage.getItem("akini_mail_latest_read_ts") || "0") || 0;
+          if (_lrt2 > _cur2) localStorage.setItem("akini_mail_latest_read_ts", String(_lrt2));
+        } catch (eL4) {}
+      }
+      // v916 已读游标兜底：任何"未读但 ts ≤ 游标"的信（旧快照回填的）一律强制已读——
+      // 用户明明读过，绝不允许旧数据让它再变未读
+      try {
+        var _curs = latestReadTs();
+        if (_curs > 0) {
+          var _recv = getReceived();
+          var _recvChanged = false;
+          for (var _ri = 0; _ri < _recv.length; _ri++) {
+            var _rm = _recv[_ri];
+            if (_rm && !(_rm.read || _rm.isRead) && _rm.ts && _rm.ts <= _curs) {
+              _rm.read = true; _rm.isRead = true; _recvChanged = true;
+            }
+          }
+          if (_recvChanged) saveReceived(_recv);
+        }
+      } catch (eCur) {}
       // 通知 UI（离线错过的回信静默入库：不弹通知不弹窗，就像它早就在信箱里）
       for (var d = 0; d < delivered.length; d++) {
         var s2 = delivered[d];

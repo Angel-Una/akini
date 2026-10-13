@@ -64,8 +64,8 @@ try{
   window.__akiniLowMem = ((navigator.deviceMemory||8) <= 4) || ((navigator.hardwareConcurrency||8) <= 4) || (/iPad|iPhone|iPod/.test(_ua) && !(window.MSStream)) || _isOldAndroid || _isLemur || _isVivo;
   if(window.__akiniLowMem) document.documentElement.classList.add("low-mem");
 }catch(e){}
-</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><script>/* 版本标记已移除：清理历史 akini_ver 版本缓存，不再写入任何版本数据 */(function(){ try { localStorage.removeItem('akini_ver'); } catch(e){} })();</script><script id="akini-v915-write-through">
-/* ===== v915 核心键写穿透镜像（根治背景图/头像/自定义文字等一切"回退旧数据"） =====
+</script><meta content="no-cache, no-store, must-revalidate" http-equiv="Cache-Control"/><meta content="no-cache" http-equiv="Pragma"/><meta content="0" http-equiv="Expires"/><script>/* 版本标记已移除：清理历史 akini_ver 版本缓存，不再写入任何版本数据 */(function(){ try { localStorage.removeItem('akini_ver'); } catch(e){} })();</script><script id="akini-v916-write-through">
+/* ===== v916 核心键写穿透镜像（根治背景图/头像/自定义文字等一切"回退旧数据"） =====
    根因：这些键此前只写 localStorage 主键；恢复源（vault 60s 轮询 / IDB snap_ / LS 快照）
    躺的是旧值——崩溃丢键后回填旧值，用户就看到"设置回到旧数据"。
    修复（对齐 milk/syy 数据只增不降）：
@@ -165,7 +165,7 @@ try{
   } catch (e) {}
 })();
 </script>
-<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=window.localStorage;try{t.removeItem("__aktest__");}catch(_e0){}t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var _n=e&&(e.name||"");var _c=(e&&typeof e.code==="number")?e.code:-1;var _quota=(_n==="QuotaExceededError"||_n==="NS_ERROR_DOM_STORAGE_QUOTA_REACHED"||_n==="QuotaExceeded"||_c===22||_c===1014);if(_quota){try{window.localStorage.removeItem("__aktest__");}catch(_e1){}console.warn("[Akini] localStorage 配额已满：保留原生存储，旧数据仍可读写");return;}var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20261013v915" id="akini-style" rel="stylesheet"/><script>function hideEmojiPanel(){var e=document.getElementById("emojiPanel");e&&(e.style.display="none",e.style.visibility="hidden",e.style.pointerEvents="none")}function getMyLatestMessageText(t){if(!window.akiniContacts)return"";var e=window.akiniContacts.getSession(t||window.akiniContacts.getActiveChatId()),n=e&&e.messagesHTML||"";if(!n)return"";var i=document.createElement("div");i.innerHTML=n;var a=Array.from(i.querySelectorAll(".msg-row.me")),texts=[];for(var o=a.length-1;o>=0;o--){var r=a[o].querySelector(".bubble");if(r&&!r.classList.contains("transfer-bubble")){if(r.querySelector("img")&&!(r.textContent||"").trim()){texts.push("【表情包】");continue}if(!r.querySelector("img")){var c=r.textContent.trim();if(c)texts.push(c)}}}if(!texts.length)return"";return texts[Math.floor(Math.random()*texts.length)]}</script><style id="akiniTopCardOpacityStyle"></style>
+<meta content="telephone=no" name="format-detection"/><meta content="no" name="wap-font-scale"/><meta content="no" name="wap-font-scale-size"/><script>document.addEventListener("gesturestart",function(e){e.preventDefault()});document.addEventListener("gesturechange",function(e){e.preventDefault()});document.addEventListener("gestureend",function(e){e.preventDefault()});document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});</script><script>(function(){try{var t=window.localStorage;try{t.removeItem("__aktest__");}catch(_e0){}t.setItem("__aktest__","1");t.removeItem("__aktest__");}catch(e){var _n=e&&(e.name||"");var _c=(e&&typeof e.code==="number")?e.code:-1;var _quota=(_n==="QuotaExceededError"||_n==="NS_ERROR_DOM_STORAGE_QUOTA_REACHED"||_n==="QuotaExceeded"||_c===22||_c===1014);if(_quota){try{window.localStorage.removeItem("__aktest__");}catch(_e1){}console.warn("[Akini] localStorage 配额已满：保留原生存储，旧数据仍可读写");return;}var s={};Object.defineProperty(window,"localStorage",{value:{getItem:function(k){return s[k]||null;},setItem:function(k,v){s[k]=String(v);},removeItem:function(k){delete s[k];},clear:function(){s={};},key:function(i){return Object.keys(s)[i]||null;},get length(){return Object.keys(s).length;}},writable:true,configurable:true});window.__akiniLocalStorageBlocked=true;console.warn("[Akini] localStorage 不可用，已启用内存模式（数据不会持久化）");}})();</script><script>(function(){window.__akiniFormatDateTime=function(d){if(!d) d=new Date();var pad=function(n){return n<10?'0'+n:n;};return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());};})();</script><script>(function(){try{if(window.self!==window.top){var t=window.top.location.href;if(t&&t.indexOf(window.location.pathname)>=0){}else{window.top.location.href=window.location.href;}}else if(document.referrer&&document.referrer.indexOf(window.location.origin)<0&&window.self===window.top){}}catch(e){try{window.top.location.href=window.location.href;}catch(_){}}})();</script><meta content="#000000" name="theme-color"/><link href="favicon-96.png" rel="icon" sizes="96x96" type="image/png"/><title>Akini</title><link href="manifest.json" rel="manifest"/><link href="akini-style.css?v=20261013v916" id="akini-style" rel="stylesheet"/><script>function hideEmojiPanel(){var e=document.getElementById("emojiPanel");e&&(e.style.display="none",e.style.visibility="hidden",e.style.pointerEvents="none")}function getMyLatestMessageText(t){if(!window.akiniContacts)return"";var e=window.akiniContacts.getSession(t||window.akiniContacts.getActiveChatId()),n=e&&e.messagesHTML||"";if(!n)return"";var i=document.createElement("div");i.innerHTML=n;var a=Array.from(i.querySelectorAll(".msg-row.me")),texts=[];for(var o=a.length-1;o>=0;o--){var r=a[o].querySelector(".bubble");if(r&&!r.classList.contains("transfer-bubble")){if(r.querySelector("img")&&!(r.textContent||"").trim()){texts.push("【表情包】");continue}if(!r.querySelector("img")){var c=r.textContent.trim();if(c)texts.push(c)}}}if(!texts.length)return"";return texts[Math.floor(Math.random()*texts.length)]}</script><style id="akiniTopCardOpacityStyle"></style>
 
 <script>
 /* ==========================================================================
@@ -1032,7 +1032,7 @@ document.addEventListener("DOMContentLoaded", function() {
 /* v907 milk式架构：Service Worker 彻底退役——启动即注销一切存量 SW 注册（数据保险箱 akini-vault-v1 永不触碰），
    从此页面永远直连网络取最新版，版本回退/缓存锁死在物理上不可能发生 */
 (function(){
-  window.AKINI_VERSION = "v915";
+  window.AKINI_VERSION = "v916";
   try {
     try { localStorage.removeItem("akini_boot_ver"); } catch(e){}
     // v907：注销一切 Service Worker 注册（SW 已退役，通知改走页面 Notification）
@@ -3147,8 +3147,8 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
   setTimeout(function(){
     try{
       var libs = [
-        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20261013v915',
-        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20261013v915'
+        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js?v=20261013v916',
+        'https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js?v=20261013v916'
       ];
       libs.forEach(function(u){
         var s = document.createElement('script');
@@ -3158,7 +3158,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
     }catch(e){}
   }, 5000);
 })();
-</script><script src="localforage.min.js?v=20261013v915"></script><script src="akini-storage-safe.js?v=20261013v915"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="1.5"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="1.5" stroke-linecap="round"/></svg>');};</script>
+</script><script src="localforage.min.js?v=20261013v916"></script><script src="akini-storage-safe.js?v=20261013v916"></script><script>/* 时序桩：main.js 启动渲染可能先于内联头像助手定义，先占位避免 ReferenceError 中断启动链；真正的实现紧随其后会覆盖它 */window.__akiniAvOrLine=window.__akiniAvOrLine||function(v){var s=String(v==null?"":v).trim();return s?s:"data:image/svg+xml;charset=utf-8,"+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" fill="#f7f8fa"/><circle cx="40" cy="29" r="14" fill="none" stroke="#5a5e66" stroke-width="1.5"/><path d="M12 76c4-17 14-26 28-26s24 9 28 26" fill="none" stroke="#5a5e66" stroke-width="1.5" stroke-linecap="round"/></svg>');};</script>
 
 <!-- ===== zzw：陪伴页 ===== -->
 <div id="app-companion" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:999999;flex-direction:column;background:#f7f7f7;color:#1a1a1a">
@@ -3298,7 +3298,7 @@ try{ Object.defineProperty(window,"__navBack",{configurable:false,writable:false
 </div>
 </div>
 <input accept="image/*" class="akini-file-offscreen" id="novelCoverInput" type="file"/>
-<script id="akini-main" src="akini-main.js?v=20261013v915"></script><script src="akini-moments-engine.js?v=20261013v915"></script><script src="akini-mail-engine.js?v=20261013v915"></script><script src="akini-backup.js?v=20261013v915"></script><script src="akini-ta-phone.js?v=20261013v915"></script><script src="akini-storage-mgr.js?v=20261013v915"></script><script src="akini-cloud-backup.js?v=20261013v915"></script><script src="akini-novel-companion.js?v=20261013v915"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","akiniProbArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
+<script id="akini-main" src="akini-main.js?v=20261013v916"></script><script src="akini-moments-engine.js?v=20261013v916"></script><script src="akini-mail-engine.js?v=20261013v916"></script><script src="akini-backup.js?v=20261013v916"></script><script src="akini-ta-phone.js?v=20261013v916"></script><script src="akini-storage-mgr.js?v=20261013v916"></script><script src="akini-cloud-backup.js?v=20261013v916"></script><script src="akini-novel-companion.js?v=20261013v916"></script><script>(function(){var _hideApps=["app-chat","app-chat-list","app-friends","app-mail","app-music","app-call","app-add-contact","app-contact-detail","app-create-group","app-shop","app-novel","app-novel-reader","app-companion"];var _hideAreas=["settingsArea","akiniProbArea","beautifyArea","icityArea","storageArea","wordbankOverlay","wbExclOverlay","surveyListModal","surveyCreateModal","surveyDetailModal","surveyCreatedListModal"];window.hideAll=function hideAll(){
     _akiniCleanPopups();_hideApps.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});_hideAreas.forEach(function(id){var e=document.getElementById(id);if(e){e.style.display="none";e.classList.remove("show");}});var _cmo=document.getElementById("chatMenuOverlay");if(_cmo){_cmo.style.display="none";_cmo.classList.remove("show");}var _camo=document.querySelector(".chat-list-add-menu-overlay");if(_camo){_camo.classList.remove("show");setTimeout(function(){_camo.remove();},200);}};window.showEl=function showEl(id,z){var e=document.getElementById(id);if(e){e.style.zIndex=z||"999999";e.style.display="flex";e.classList.add("show");return e;}return e;};window.showArea=function showArea(id){var e=document.getElementById(id);if(e){e.style.zIndex="999999";e.style.display="flex";e.classList.add("show");}};function navTo(app){try{window.hideAll();if(app==="chat-list"){__akiniShowAppContainer("chat-list");return}if(app==="music"){__akiniShowAppContainer("music");if(window._showMusicContactPicker){window._showMusicContactPicker();return}__akiniShowAppContainer("music");var _cp=document.getElementById("musicContactPicker");if(_cp){_cp.style.display="flex";_cp.style.zIndex="1000000";}return}if(app==="survey"){if(window._openSurveyList){window._openSurveyList();return}var _sm=document.getElementById("surveyListModal");if(_sm){_sm.style.display="flex";_sm.style.zIndex="1000001";}return}if(["friends","call","add-contact","contact-detail","create-group"].indexOf(app)>=0){
   if(app==="friends"){ try{ window.__akiniClearFeatureUnread && window.__akiniClearFeatureUnread("friends"); }catch(e){} }
   __akiniShowAppContainer(app);return
@@ -6447,7 +6447,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
     }
   }
 
-  // ===== v898：TA 回答问卷 30 秒限时查看倒计时（v915 已彻底移除顶部黑条，保留空函数防未捕获异常） =====
+  // ===== v898：TA 回答问卷 30 秒限时查看倒计时（v916 已彻底移除顶部黑条，保留空函数防未捕获异常） =====
   window.__akiniSurveyCountdown = function (surveyId, taName) {
     try {
       var old = document.getElementById('akiniSrvCdBar');
@@ -6635,7 +6635,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       var avatarCol = '<div class="avatar-col" style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:38px;"><div class="msg-avatar">' + avatar + '</div>' + tsHtml + '</div>';
 
       var cardStatus = statusText || (isReply ? "已回答" : "待回答");
-      /* v915：彻底移除顶部黑条倒计时，原顶部通知不再显示 */
+      /* v916：彻底移除顶部黑条倒计时，原顶部通知不再显示 */
       var bubbleHtml = '<div class="bubble-wrap" style="flex-shrink:0;width:auto;min-width:180px;max-width:220px;margin:0;"><div class="bubble survey-bubble" style="width:auto;min-width:180px;max-width:220px;box-sizing:border-box;margin:0;background:#ffffff !important;background-color:#ffffff !important;color:#1a1a1a !important;border:1px solid #e8e8e8 !important;" data-survey-id="' + survey.id + '" data-survey-reply="' + (isReply ? "1" : "0") + '"' + (isReply && memberId ? ' data-member-id="' + memberId + '"' : "") + '">'
         + buildSurveyCardHtml(survey, isReply, cardStatus, target ? target.name : "")
         + '</div></div>';
@@ -6799,7 +6799,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       /* v898：问卷回答不再秒发——TA 在 30 秒内（22~28s 随机）回答，模拟真实等待感 */
       selectedMembers.forEach(function(mid, idx){
         var replyDelay = 22000 + idx * 3000 + Math.random() * 6000;
-        /* v915：在卡片发出前 4~8 秒提前展示「对方正在输入...」动态 */
+        /* v916：在卡片发出前 4~8 秒提前展示「对方正在输入...」动态 */
         var typingLead = Math.min(replyDelay * 0.35, 6000);
         setTimeout(function(){
           try { if (window.showTypingBubble) window.showTypingBubble(targetId, mid); } catch (eTyp) {}
@@ -6848,7 +6848,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       selectedMembers.forEach(function(mid, i){
         /* v898：30 秒内回答，不再秒发 */
         var replyDelay = 22000 + i * 3000 + Math.random() * 6000;
-        /* v915：在卡片发出前 4~8 秒提前展示「对方正在输入...」动态 */
+        /* v916：在卡片发出前 4~8 秒提前展示「对方正在输入...」动态 */
         var typingLead = Math.min(replyDelay * 0.35, 6000);
         setTimeout(function(){
           try { if (window.showTypingBubble) window.showTypingBubble(targetId, mid); } catch (eTyp) {}
@@ -6997,7 +6997,7 @@ window.AKINI_NETEASE_PROXY="https://api.mc666.org.cn";
       }
       saveSurveys();
       if(allReplied) updateSurveyBubbleStatus(surveyId, "已回答");
-      /* v915：TA 回答问卷卡片发出前也先展示输入动态，再投递卡片，避免凭空跳出卡片 */
+      /* v916：TA 回答问卷卡片发出前也先展示输入动态，再投递卡片，避免凭空跳出卡片 */
       try { if (window.hideTypingBubble) window.hideTypingBubble(targetId); } catch (eHTyp2) {}
       insertSurveyBubble(survey, true, "已回答", targetId, memberId);
       /* v898：TA 回答问卷的卡片到达时走通知（前台弹窗+后台系统推送），与聊天消息一致 */
@@ -7193,8 +7193,8 @@ window.__akiniRegisterSW = function(){
 /* v907：开机守卫已注销一切存量 SW；此处不再注册新 SW，也不再延迟触发任何注册 */
 </script>
 
-<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20261013v915"></script>
-<script defer src="akini-compat-bridge.js?v=20261013v915"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js?v=20261013v916"></script>
+<script defer src="akini-compat-bridge.js?v=20261013v916"></script>
 <script>
 // 兼容旧版 JSON 备份的轻量兜底：如果 core 风格备份引擎未加载，仍允许导出基础 JSON
 (function(){
@@ -8249,7 +8249,7 @@ window.markMailAsRead = function(mailId) {
 
 (function() {
   /* v835：修复首页播放器一起听时长清零（原逻辑读从未赋值的 window.__musicStartTime）。
-     v845/v915：首页播放器时长与一起听界面完全统一计算源头：
+     v845/v916：首页播放器时长与一起听界面完全统一计算源头：
      优先按所选联系人分账累计时长（加当前正在听的 delta），两处计算规则、文案格式 100% 相同！ */
   function fmtSec(total) {
     var n = Math.floor(total / 60), hh = Math.floor(n / 60), a = "";
@@ -9320,7 +9320,7 @@ window.markMailAsRead = function(mailId) {
         .then(function (pack) {
           if (!pack || !pack.data) return;
           var fixed = 0;
-          /* v915 mtime 守卫：当前 LS 的 akini_key_mtime 比 vault 保存时刻新 →
+          /* v916 mtime 守卫：当前 LS 的 akini_key_mtime 比 vault 保存时刻新 →
              vault 值过旧，坚决不回填（防用户改过的背景图/头像/自定义文字被旧 vault 覆盖） */
           var _vm = {};
           try { _vm = JSON.parse(pack.data["akini_key_mtime"] || "{}") || {}; } catch (eVm) { _vm = {}; }
@@ -10148,7 +10148,7 @@ setInterval(function () { try { if (document.hidden) return; mirrorIcons(); if (
         } catch(e){}
         window.__akiniAllSurveys = window.__akiniAllSurveys || {};
         window.__akiniAllSurveys[cloned.id] = cloned;
-        /* v915：联系人发送问卷卡片前先显示输入动态，延迟后投递到消息流 */
+        /* v916：联系人发送问卷卡片前先显示输入动态，延迟后投递到消息流 */
         var svTypingMs = 3500 + Math.random() * 2500;
         try { if (window.showTypingBubble) window.showTypingBubble(chatId, null); } catch (eTypSv) {}
         setTimeout(function(){

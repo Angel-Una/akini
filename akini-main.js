@@ -1595,7 +1595,7 @@ window._idbStore = (function () {
             try { localStorage.removeItem("akini_localstorage_snapshot_backup"); } catch (e4) {}
           } catch (e) {}
         }
-        /* v915 切后台卡崩根治（对齐 milk：pagehide 只做轻量应急备份）：
+        /* v916 切后台卡崩根治（对齐 milk：pagehide 只做轻量应急备份）：
            pagehide 的系统时间预算极短（移动端常 <1s），原在此同步跑
            「全量快照 + IDB 全量备份 + Cache 全量备份」三连重活，是切后台卡崩闪退主因。
            全量三连挪到 visibilitychange(hidden)——触发更早、App 仍在前台、CPU 预算充足
@@ -1704,7 +1704,7 @@ window._idbStore = (function () {
             var data = JSON.parse(src);
             if (data && "object" == typeof data) {
               var restored = 0;
-              /* v915 防回退守卫（对齐 milk「备份不比当前新就绝不覆盖」）：
+              /* v916 防回退守卫（对齐 milk「备份不比当前新就绝不覆盖」）：
                  akini_key_mtime 登记每个核心键的最后修改/删除时刻；当前 LS 的 mtime
                  晚于快照内嵌 mtime → 快照值是旧的 → 坚决不回填（宁缺勿旧），
                  根治背景图/头像/自定义文字等被旧快照回填导致的"回退旧数据" */
@@ -7029,7 +7029,7 @@ window.akiniContacts = {
       } catch (t) {
         console.warn("[Akini] akini_posts 写入 localStorage 失败（配额超限），已存入 IndexedDB", t && t.name);
       }
-      /* v915：朋友圈保存同样加 30s 节流——原每次保存都全量 backupAll，切后台连环全库重写是卡崩源 */
+      /* v916：朋友圈保存同样加 30s 节流——原每次保存都全量 backupAll，切后台连环全库重写是卡崩源 */
       ((function () {
         try {
           if (!window._idbStore || !window._idbStore.backupAll) return;
@@ -7547,7 +7547,7 @@ window.akiniContacts = {
       // 同步写 sessionStorage 应急兜底：iOS Safari 刷新/返回时 localStorage/IDB 异步事务可能未落盘，sessionStorage 同步可靠
       try { sessionStorage.setItem("akini_icity_diaries_emergency", n); } catch (x) {}
       console.log("[iCity] 持久化,日记数:", F.length, "评论总数:", (F||[]).reduce(function(s,d){return s+((d&&d.comments)||[]).length;},0));
-      /* v915：原每次保存日记都全量 backupAll（全库 IDB 重写）——切后台(hidden)必跑，隐性重活。
+      /* v916：原每次保存日记都全量 backupAll（全库 IDB 重写）——切后台(hidden)必跑，隐性重活。
          加 30s 节流：日记主/备/emergency 四写已保数据，全库备份无需每次跟跑 */
       ((function () {
         try {
@@ -7822,7 +7822,7 @@ window.akiniContacts = {
       } catch (e) {}
       return backups;
     }
-    /* v915：切后台(hidden)瞬间绝不做 iCity 全量重渲染——DOM 重建在 hidden 的极短预算内
+    /* v916：切后台(hidden)瞬间绝不做 iCity 全量重渲染——DOM 重建在 hidden 的极短预算内
        纯属浪费且是卡崩源；数据已同步落盘，渲染只影响显示，标记 pending 回前台再补。 */
     function _icityRenderSafe() {
       if (document.hidden) { window.__icityMergeRenderPending = true; return; }
@@ -9337,7 +9337,7 @@ window.akiniContacts = {
                       : e.lastTime - t.lastTime;
                 }),
                 l.forEach(function (t) {
-                  /* v915：会话列表时间改走 __akiniFormatMsgTime——原 toLocaleTimeString("zh-CN")
+                  /* v916：会话列表时间改走 __akiniFormatMsgTime——原 toLocaleTimeString("zh-CN")
                      永远是 24 小时制，时间格式设置对会话列表完全失效（"时间戳都是24小时制"根因） */
                   var e = t.lastTime
                       ? __akiniFormatMsgTime(Number(t.lastTime))
@@ -18738,7 +18738,7 @@ window.akiniContacts = {
       document.addEventListener("visibilitychange", function () {
         if (document.hidden) _saveVault();
       });
-      /* v915：hidden 必先于 pagehide 触发且已完成 vault 保存；pagehide 预算极短，
+      /* v916：hidden 必先于 pagehide 触发且已完成 vault 保存；pagehide 预算极短，
          8s 内已保存过就跳过，消除切后台双跑「全量收集+Cache put」的卡崩源 */
       window.addEventListener("pagehide", function () {
         if (Date.now() - (window.__akiniVaultSavedAt || 0) > 8000) _saveVault();
@@ -19077,6 +19077,7 @@ window.akiniContacts = {
                     badge.style.color = "#666";
                   }
                   var allRecv = i("akini_mail_received", []);
+                  var _matchOk = false;
                   for (var idx = 0; idx < allRecv.length; idx++) {
                     if (
                       allRecv[idx].date === e.date &&
@@ -19085,9 +19086,24 @@ window.akiniContacts = {
                     ) {
                       allRecv[idx].read = true;
                       allRecv[idx].isRead = true;
+                      _matchOk = true;
                       break;
                     }
                   }
+                  /* v916：日期+内容+发件人三元组可能因格式差异匹配不上——
+                     兜底用 ts 匹配（信件必有 ts），再不行按对象引用直接改
+                     （allRecv 与渲染数组同源），确保本次点击的已读 100% 进持久化数组 */
+                  if (!_matchOk) {
+                    for (var idx2 = 0; idx2 < allRecv.length; idx2++) {
+                      if (allRecv[idx2] === e) { allRecv[idx2].read = true; allRecv[idx2].isRead = true; _matchOk = true; break; }
+                      if (e.ts && allRecv[idx2].ts === e.ts && allRecv[idx2].from === e.from) {
+                        allRecv[idx2].read = true; allRecv[idx2].isRead = true; _matchOk = true; break;
+                      }
+                    }
+                    if (!_matchOk && allRecv.indexOf(e) >= 0) { e.read = true; e.isRead = true; _matchOk = true; }
+                  }
+                  // v916：已读瞬间推进游标——重启后任何旧快照都无法让这封信再变未读
+                  try { localStorage.setItem("akini_mail_latest_read_ts", String(Date.now())); } catch (eTs) {}
                   saveMailReceived(allRecv);
                 } catch(err) {}
               }
@@ -19358,6 +19374,19 @@ window.akiniContacts = {
       if (window._idbStore && window._idbStore.set) {
         window._idbStore.set("akini_mail_received", e);
         window._idbStore.set("akini_mail_received_backup", e);
+      }
+      // v916：已读游标随每次已读落盘同步推进——任何"ts ≤ 游标"的旧快照回填都无效
+      var _lrt = 0;
+      try {
+        (t || []).forEach(function (m) {
+          if (m && (m.read || m.isRead) && m.ts && m.ts > _lrt) _lrt = m.ts;
+        });
+      } catch (eL) {}
+      if (_lrt > 0) {
+        try {
+          var _cur = parseFloat(localStorage.getItem("akini_mail_latest_read_ts") || "0") || 0;
+          if (_lrt > _cur) localStorage.setItem("akini_mail_latest_read_ts", String(_lrt));
+        } catch (eL2) {}
       }
     }
     window.__akiniBootStep = "dom-ready:mail";
@@ -21740,7 +21769,7 @@ window.akiniContacts = {
                 try {
                   cur = k; localStorage.setItem("akini_timeFormat", k); syncFmt();
                   if (window.__renderMail) window.__renderMail();
-                  // v915：会话列表时间同步按新格式重渲染（原来只刷聊天气泡，列表时间恒 24h）
+                  // v916：会话列表时间同步按新格式重渲染（原来只刷聊天气泡，列表时间恒 24h）
                   try { if (typeof window.renderChatList === "function") window.renderChatList(); } catch (eRcl) {}
                   // 实时刷新当前打开的聊天界面所有消息的时间戳
                   var curActiveChatId = window.akiniContacts ? window.akiniContacts.getActiveChatId() : null;
@@ -24922,7 +24951,7 @@ window.akiniContacts = {
         var timeText = "一起听了 " + (a += (n % 60) + " 分钟");
         var fullText = "TA就在你的身边 " + timeText;
         e.distanceText && (e.distanceText.textContent = fullText);
-        /* v843/v915：统一首页播放器与一起听歌界面的时长计算源头。两处统一使用 timeText */
+        /* v843/v916：统一首页播放器与一起听歌界面的时长计算源头。两处统一使用 timeText */
         var homeText = timeText;
         e.listenTime && (e.listenTime.textContent = homeText);
         var homeEl = document.getElementById("musicPlayerListenTime");
@@ -27357,6 +27386,40 @@ window.akiniContacts = {
         localStorage.removeItem("akini_mail_seen_count");
       }
     } catch (e) {}
+    /* v916：已读游标兜底——任何"未读但 ts ≤ 游标"的信一律强制已读（旧快照回填的脏数据） */
+    try {
+      var _curs = parseFloat(localStorage.getItem("akini_mail_latest_read_ts") || "0") || 0;
+      if (_curs > 0) {
+        var _m2 = JSON.parse(localStorage.getItem("akini_mail_received") || "[]");
+        var _ch = false;
+        for (var _i2 = 0; _i2 < _m2.length; _i2++) {
+          var _m = _m2[_i2];
+          if (_m && !(_m.read || _m.isRead) && _m.ts && _m.ts <= _curs) {
+            _m.read = true; _m.isRead = true; _ch = true;
+          }
+        }
+        if (_ch) localStorage.setItem("akini_mail_received", JSON.stringify(_m2));
+      }
+    } catch (e2) {}
+    /* v916 第二道：同步修正内存镜像——避免下次 render 拿旧缓存显示未读角标 */
+    try {
+      var _curs2 = parseFloat(localStorage.getItem("akini_mail_latest_read_ts") || "0") || 0;
+      var _mm = null;
+      try { _mm = window.akiniStore && window.akiniStore.memoryGet ? window.akiniStore.memoryGet("akini_mail_received") : null; } catch (eM1) {}
+      if (_curs2 > 0 && _mm) {
+        var _arr = JSON.parse(_mm);
+        var _ch2 = false;
+        for (var _j = 0; _j < _arr.length; _j++) {
+          var _x = _arr[_j];
+          if (_x && !(_x.read || _x.isRead) && _x.ts && _x.ts <= _curs2) { _x.read = true; _x.isRead = true; _ch2 = true; }
+        }
+        if (_ch2) {
+          var _n2 = JSON.stringify(_arr);
+          try { localStorage.setItem("akini_mail_received", _n2); } catch (eN) {}
+          try { if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet("akini_mail_received", _n2); } catch (eN2) {}
+        }
+      }
+    } catch (e3) {}
   }
   function _fmtTs(ts) {
     try {
