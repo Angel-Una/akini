@@ -32,16 +32,21 @@
     }
     return Array.isArray(v) ? v : [];
   }
-  function getSent() {
+  /* v921：raw LS 权威读优先（内存镜像可能滞后：别处直写 LS 后内存仍是旧数组，
+     一读一写就把新信覆盖消失——"显示已读后信不见了"根因）。LS 无值再退内存/IDB */
+  function _rawFirst(key) {
+    try {
+      if (window.akiniStore && window.akiniStore.rawLSGet) {
+        var raw = window.akiniStore.rawLSGet(key);
+        if (raw) return _asArr(raw);
+      }
+    } catch (e) {}
     return _asArr(window.akiniStore && window.akiniStore.getSync
-      ? window.akiniStore.getSync("akini_mail_sent", [])
+      ? window.akiniStore.getSync(key, [])
       : []);
   }
-  function getReceived() {
-    return _asArr(window.akiniStore && window.akiniStore.getSync
-      ? window.akiniStore.getSync("akini_mail_received", [])
-      : []);
-  }
+  function getSent() { return _rawFirst("akini_mail_sent"); }
+  function getReceived() { return _rawFirst("akini_mail_received"); }
   function saveSent(arr) {
     var n = JSON.stringify(arr || []);
     // v916 核心修复：原只写 akiniStore（大键拦截层跳过 localStorage）——重启恢复链

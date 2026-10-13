@@ -292,7 +292,7 @@
     memSet(k, v);
     var lsOk = true;
     if (isBigVal(v)) {
-      /* v920 图片大键（背景/头像 dataURL）崩溃窗口回退根因修复：此前直接删 LS 副本、
+      /* v921 图片大键（背景/头像 dataURL）崩溃窗口回退根因修复：此前直接删 LS 副本、
          只靠 500ms 防抖 IDB——崩溃/强杀落在窗口内 = 新值蒸发、旧值复活（网易云背景回退旧数据同款）。
          修复：图片键 ≤1.5MB 时尽力直写 LS（lsSet 自带配额满驱逐重试），写不进才删旧残留防遮蔽 */
       if (isImgKey(k)) {
@@ -335,7 +335,7 @@
   //  ② 大键驻留预算：>200KB 的键驻留总量 ≤4GB 设备 12MB / 其他 24MB，超预算的键
   //     不驻留内存（记入 __akiniDeferredKeys），读取时按需从 IDB 异步水合。
   var _restored = false;
-  /* v920 安全模式：上次启动 JS 出错标记 / iOS / 低内存机型 → 大键驻留预算收紧到 5MB、
+  /* v921 安全模式：上次启动 JS 出错标记 / iOS / 低内存机型 → 大键驻留预算收紧到 5MB、
      恢复批次 2 键/60ms——直接压低启动内存峰值，针对"开屏即崩/闪退死循环" */
   var _bootTight = false;
   try {
@@ -483,6 +483,10 @@
       try { if (origSet) origSet.call(rawLS, k, v); else rawLS.setItem(k, v); return true; }
       catch (e) { return false; }
     },
+    /* v921：原始 LS 读（绕过内存镜像）——邮箱 getSent/getReceived 权威读，杜绝"内存旧数组回写覆盖新信" */
+    rawLSGet: function (k) {
+      try { return origGet ? origGet.call(rawLS, k) : rawLS.getItem(k); } catch (e) { return null; }
+    },
     // 清除数据专用：清空内存镜像 + IDB 待写队列 + 启动前暂存 + 脏键集合，
     // 防止清除后内存/队列里的旧数据在刷新前的间隙被重新落盘
     wipeMemory: function () {
@@ -565,7 +569,7 @@
         // 1) 原始写入永远先执行（大键跳过 LS 并清残留，防撑爆配额）；任何异常都不影响镜像
         if (big) {
           if (isImgKey(k)) {
-            /* v920：图片大键尽力保留 LS 副本（≤1.5MB），配合镜像层立即刷盘，新值绝不丢 */
+            /* v921：图片大键尽力保留 LS 副本（≤1.5MB），配合镜像层立即刷盘，新值绝不丢 */
             var _imgLsOk2 = false;
             if (String(v).length <= 1572864) {
               try { self.origSet.call(this, k, v); _imgLsOk2 = true; } catch (eW) {}
