@@ -1067,7 +1067,7 @@ document.addEventListener("DOMContentLoaded", function() {
 /* v907 milk式架构：Service Worker 彻底退役——启动即注销一切存量 SW 注册（数据保险箱 akini-vault-v1 永不触碰），
    从此页面永远直连网络取最新版，版本回退/缓存锁死在物理上不可能发生 */
 (function(){
-  window.AKINI_VERSION = "v955";
+  window.AKINI_VERSION = "v956";
   try {
     try { localStorage.removeItem("akini_boot_ver"); } catch(e){}
     // v954：注册通知专用 SW（不缓存资源，只处理通知点击）

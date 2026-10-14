@@ -21505,7 +21505,8 @@ window.akiniContacts = {
               }
               if ("Notification" in window) {
                 if ("default" === Notification.permission)
-                  Notification.requestPermission().then(function (t) {
+                  Notification.requestPermission()
+                    .then(function (t) {
                     if ("granted" !== t) {
                       var e = document.getElementById("pushNotifyToggle");
                       (e &&
@@ -21540,6 +21541,11 @@ window.akiniContacts = {
                         }, 500);
                       } catch (e) {}
                     }
+                  })
+                  .catch(function (t) {
+                    var _e = document.getElementById("pushNotifyToggle");
+                    _e && (_e.classList.remove("on"),
+                      localStorage.setItem("akini_toggle_pushNotifyToggle", "0"));
                   });
                 else if ("denied" === Notification.permission) {
                   var t = document.getElementById("pushNotifyToggle");
@@ -26450,7 +26456,7 @@ window.akiniContacts = {
       };
       try {
         var _pr = Notification.requestPermission(function (p) { _onPerm(p); });
-        if (_pr && _pr.then) _pr.then(_onPerm);
+        if (_pr && _pr.then) _pr.then(_onPerm).catch(function () { _onPerm(Notification.permission); });
       } catch (e) { _onPerm(Notification.permission); }
       setTimeout(function () { if (!_done) _onPerm(Notification.permission); }, 6000);
     });
@@ -31643,9 +31649,19 @@ window.__akiniErrorLog = window.__akiniErrorLog || [];
   });
   window.addEventListener('unhandledrejection', function(e){
     try {
+      /* 过滤用户主动拒绝权限、平台策略限制等预期内的非代码行为，
+         避免这类正常平台反馈被误记为致命 JS 错误 */
+      var _r = e && e.reason;
+      var _msg = (_r && _r.message) ? String(_r.message) : String(_r || '');
+      var _name = (_r && _r.name) ? String(_r.name) : '';
+      var _benign = /user denied permission|not allowed by the user agent|NotAllowedError|AbortError|NotAllowed|denied/i.test(_msg + ' ' + _name);
+      if (_benign) {
+        try { e.preventDefault(); } catch(_) {}
+        return;
+      }
       window.__akiniErrorLog.push({
         time: new Date().toISOString(),
-        msg: 'Promise rejection: ' + ((e && e.reason && e.reason.message) || (e && e.reason) || 'unknown'),
+        msg: 'Promise rejection: ' + ((_r && _r.message) || _r || 'unknown'),
         src: '', line: 0, col: 0
       });
       if (window.__akiniErrorLog.length > 50) window.__akiniErrorLog.shift();
