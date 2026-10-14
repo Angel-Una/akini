@@ -165,6 +165,49 @@
       return false;
     }
   }
+  /* v972 启动瘦身：扫描 localStorage，清除已失效/冗余的旧媒体备份，为关键数据腾出配额。
+     清理目标：
+     1) akini_media_*_backup 系列（含 _backup_backup 冗余副本）——媒体主键由 IDB/rawLS 镜像兜底，
+        这些冗余 LS 副本是配额爆满（lsTotalBytes>3.8MB）的元凶；
+     2) 体积超过 300KB 的超大值 akini_* 键（多为巨型 base64 图片，早期未压缩遗留）。
+     仅在接近配额上限（>3.8MB）或检测到大量冗余备份时触发，普通设备无副作用。 */
+  function startupSlim() {
+    try {
+      var keys = lsKeys();
+      if (!keys || !keys.length) return 0;
+      var total = 0, backupCount = 0;
+      for (var i = 0; i < keys.length; i++) {
+        try {
+          var v = lsGet(keys[i]);
+          if (v && typeof v === 'string') {
+            total += v.length;
+            if (String(keys[i]).indexOf('akini_media_') === 0 && String(keys[i]).indexOf('_backup') > 0) backupCount++;
+          }
+        } catch (e) {}
+      }
+      // 不紧张（<3.8MB 且无冗余备份）则跳过，避免无谓清理
+      if (total < 3840 * 1024 && backupCount === 0) return 0;
+      var removed = 0;
+      for (var j = 0; j < keys.length; j++) {
+        var k = keys[j];
+        if (!k) continue;
+        var ks = String(k);
+        // 清除媒体冗余备份键（主键由 IDB/rawLS 镜像兜底，删冗余副本不影响读取）
+        if (ks.indexOf('akini_media_') === 0 && ks.indexOf('_backup') > 0) {
+          lsRemoveRaw(k); removed++; continue;
+        }
+        // 清除超大残留图片值（>300KB），避免单键撑爆配额（这些值会由 IDB 兜底恢复）
+        var bigV = lsGet(k);
+        if (bigV && typeof bigV === 'string' && bigV.length > 300 * 1024 && ks.indexOf('akini_') === 0) {
+          // 先确保有 IDB 镜像再删 LS 残留，避免丢图
+          try { var IDB = getIDB(); if (IDB && IDB.set) IDB.set(k, bigV); } catch (eM) {}
+          lsRemoveRaw(k); removed++;
+        }
+      }
+      if (removed > 0) console.warn('[存储] 启动瘦身：清理了 ' + removed + ' 个冗余/超大键（总占用约 ' + Math.round(total / 1024) + 'KB）');
+      return removed;
+    } catch (e) { return 0; }
+  }
   function lsRemoveRaw(k) {
     try { if (origRemove) origRemove.call(rawLS, k); else rawLS.removeItem(k); return true; } catch (e) { return false; }
   }
@@ -721,6 +764,8 @@
   document.addEventListener('touchend', _persistGestureHandler, true);
 
   // ---- 启动恢复：等 _idbStore 就绪后全量对账 ----
+  /* v972：启动第一时间瘦身 localStorage（清冗余媒体备份 + 超大残留），缓解配额爆满导致的写入失败与闪退 */
+  try { startupSlim(); } catch (eS) {}
   var _restoreTimer = null;
   function tryRestore() { if (getIDB() && getIDB().keys) { restoreAll(); return true; } return false; }
   if (!tryRestore()) {

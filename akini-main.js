@@ -24813,8 +24813,23 @@ window.akiniContacts = {
       function K() {
         (x || (x = Date.now()), Y());
       }
+      /* v972：与外部（设置/其他标签页）写入的存储值对账——若存储中的秒数与内存 I 不一致，
+         说明被外部修改过，先采纳存储最新值再累加，避免定时器用旧内存值覆盖写回（设置回退根因）。 */
+      function reconcileListen() {
+        try {
+          var _sv = parseInt(localStorage.getItem("akini_music_listen_seconds") || "0", 10) || 0;
+          if (_sv !== I) I = _sv;
+        } catch (e) {}
+        try {
+          var _rm = JSON.parse(localStorage.getItem("akini_music_listen_together") || "{}");
+          if (_rm && typeof _rm === "object") {
+            for (var _k in _rm) if (_rm[_k] !== listenMap[_k]) listenMap[_k] = _rm[_k];
+          }
+        } catch (e2) {}
+      }
       function X() {
         if (!x) return;
+        reconcileListen();
         var delta = Math.floor((Date.now() - x) / 1e3);
         if (delta > 0) {
           I += delta;
@@ -24832,6 +24847,7 @@ window.akiniContacts = {
       }
       setInterval(function () {
         if (d && x) {
+          reconcileListen();
           var delta = Math.floor((Date.now() - x) / 1e3);
           if (delta > 0) {
             I += delta;
@@ -24848,6 +24864,22 @@ window.akiniContacts = {
           }
         }
       }, 10000);
+      /* v972：暴露统一的时长写入接口——设置中自定义修改一起听时长时调用，
+         同步更新内存 I 与 listenMap，避免下一 tick 以旧 I 覆盖（设置回退根因）。 */
+      window.__akiniSetMusicListenSeconds = function (v) {
+        try {
+          I = parseInt(v, 10) || 0;
+          localStorage.setItem("akini_music_listen_seconds", String(I));
+        } catch (e) {}
+      };
+      window.__akiniSetMusicListenTogether = function (id, v) {
+        try {
+          if (!id) return;
+          listenMap[id] = parseInt(v, 10) || 0;
+          localStorage.setItem("akini_music_listen_together", JSON.stringify(listenMap));
+        } catch (e) {}
+      };
+      window.__akiniGetMusicListenSeconds = function () { return I; };
       /* v843：挂后台防一起听时长丢失——hidden 时落盘当前累计并以最后结算基准 x 记时间戳（补时无缝覆盖最后 tick 之后全程）；
          页面存活切回：x 基准未动，下一 tick 的 delta 自动补上后台全程（原有自愈保留）；
          页面被杀重载：由启动补时逻辑（akini_music_listen_active/ts）补回，杜绝时间缩短 */

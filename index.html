@@ -615,13 +615,15 @@ window.handleS1CoverDirect = function(e) {
   var reader = new FileReader();
   reader.onload = function(evt) {
     var url = evt.target.result;
-    var el = document.getElementById('s1CoverBg');
-    if (el) {
-      el.style.backgroundImage = 'url("' + url + '")';
-      el.style.backgroundSize = 'cover';
-      el.style.backgroundPosition = 'center';
-    }
-    try { localStorage.setItem('akini_s1_cover', url); } catch(err){}
+    window.compressImageDataUrl(url, function(c) {
+      var el = document.getElementById('s1CoverBg');
+      if (el) {
+        el.style.backgroundImage = 'url("' + c + '")';
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+      }
+      try { localStorage.setItem('akini_s1_cover', c); } catch(err){}
+    });
   };
   reader.readAsDataURL(file);
 };
@@ -632,13 +634,15 @@ window.handleS1PhotoDirect = function(e) {
   var reader = new FileReader();
   reader.onload = function(evt) {
     var url = evt.target.result;
-    var el = document.getElementById('s1PolaroidImg');
-    if (el) {
-      el.style.backgroundImage = 'url("' + url + '")';
-      el.style.backgroundSize = 'cover';
-      el.style.backgroundPosition = 'center';
-    }
-    try { localStorage.setItem('akini_s1_photo', url); } catch(err){}
+    window.compressImageDataUrl(url, function(c) {
+      var el = document.getElementById('s1PolaroidImg');
+      if (el) {
+        el.style.backgroundImage = 'url("' + c + '")';
+        el.style.backgroundSize = 'cover';
+        el.style.backgroundPosition = 'center';
+      }
+      try { localStorage.setItem('akini_s1_photo', c); } catch(err){}
+    });
   };
   reader.readAsDataURL(file);
 };
@@ -897,6 +901,45 @@ document.addEventListener("DOMContentLoaded", function() {
   } catch(e){}
 });
 
+// v970 图片防撑爆：限制最大边 1280px、质量压缩至 0.8，杜绝单图 1MB+ 撑爆 localStorage。
+// 用内存 canvas 压缩后回调压缩后的 dataURL（webp/jpeg），失败时回退原图。
+window.compressImageDataUrl = function(dataUrl, callback, opts) {
+  opts = opts || {};
+  var maxEdge = opts.maxEdge || 1280;
+  var quality = (typeof opts.quality === 'number') ? opts.quality : 0.8;
+  var maxBytes = opts.maxBytes || 150 * 1024;
+  var usePng = (dataUrl || "").indexOf("data:image/png") === 0;
+  var img = new Image();
+  img.onload = function() {
+    try {
+      var w = img.naturalWidth || img.width || 0;
+      var h = img.naturalHeight || img.height || 0;
+      if (!w || !h) { callback(dataUrl); return; }
+      var scale = 1;
+      var longest = Math.max(w, h);
+      if (longest > maxEdge) scale = maxEdge / longest;
+      var cw = Math.round(w * scale);
+      var ch = Math.round(h * scale);
+      var canvas = document.createElement('canvas');
+      canvas.width = cw; canvas.height = ch;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, cw, ch);
+      var mime = usePng ? 'image/png' : 'image/jpeg';
+      var tryCompress = function(q) {
+        var url = canvas.toDataURL(mime, q);
+        // 还太大就继续降质量（最多到 0.3），png 不可降则直接返回
+        if (!usePng && url.length > maxBytes && q > 0.3) {
+          return tryCompress(Math.round((q - 0.1) * 100) / 100);
+        }
+        return url;
+      };
+      callback(tryCompress(quality));
+    } catch (e) { callback(dataUrl); }
+  };
+  img.onerror = function() { callback(dataUrl); };
+  img.src = dataUrl;
+};
+
 // 2. 通用可靠的相册选择并处理函数
 window.triggerPickImage = function(targetKey, callback) {
   var input = document.getElementById("akini_universal_picker");
@@ -914,10 +957,13 @@ window.triggerPickImage = function(targetKey, callback) {
     var reader = new FileReader();
     reader.onload = function(evt) {
       var dataUrl = evt.target.result;
-      if (targetKey) {
-        try { localStorage.setItem(targetKey, dataUrl); } catch(ex){}
-      }
-      if (callback) callback(dataUrl);
+      // 压缩后再保存，避免单图撑爆 localStorage
+      window.compressImageDataUrl(dataUrl, function(compressed) {
+        if (targetKey) {
+          try { localStorage.setItem(targetKey, compressed); } catch(ex){}
+        }
+        if (callback) callback(compressed);
+      });
     };
     reader.readAsDataURL(file);
     input.value = "";
@@ -932,9 +978,11 @@ window.handleS1CoverDirect = function(e) {
   var reader = new FileReader();
   reader.onload = function(evt) {
     var dataUrl = evt.target.result;
-    var el = document.getElementById("s1CoverBg");
-    if (el) el.style.backgroundImage = "url(" + dataUrl + ")";
-    try { localStorage.setItem("akini_s1_cover_bg", dataUrl); } catch(ex){}
+    window.compressImageDataUrl(dataUrl, function(c) {
+      var el = document.getElementById("s1CoverBg");
+      if (el) el.style.backgroundImage = "url(" + c + ")";
+      try { localStorage.setItem("akini_s1_cover_bg", c); } catch(ex){}
+    });
   };
   reader.readAsDataURL(file);
 };
@@ -945,9 +993,11 @@ window.handleS1PhotoDirect = function(e) {
   var reader = new FileReader();
   reader.onload = function(evt) {
     var dataUrl = evt.target.result;
-    var el = document.getElementById("s1PolaroidImg");
-    if (el) el.style.backgroundImage = "url(" + dataUrl + ")";
-    try { localStorage.setItem("akini_s1_polaroid_img", dataUrl); } catch(ex){}
+    window.compressImageDataUrl(dataUrl, function(c) {
+      var el = document.getElementById("s1PolaroidImg");
+      if (el) el.style.backgroundImage = "url(" + c + ")";
+      try { localStorage.setItem("akini_s1_polaroid_img", c); } catch(ex){}
+    });
   };
   reader.readAsDataURL(file);
 };
@@ -958,14 +1008,16 @@ window.handleS2CoverDirect = function(e) {
   var reader = new FileReader();
   reader.onload = function(evt) {
     var dataUrl = evt.target.result;
-    var el = document.getElementById("coverAreaMain");
-    if (el) {
-      el.style.setProperty("background-image", "url(" + dataUrl + ")", "important");
-      el.style.setProperty("background-color", "transparent", "important");
-      el.style.setProperty("background-size", "cover", "important");
-      el.style.setProperty("background-position", "center", "important");
-    }
-    try { localStorage.setItem("akini_cover_bg", dataUrl); } catch(ex){}
+    window.compressImageDataUrl(dataUrl, function(c) {
+      var el = document.getElementById("coverAreaMain");
+      if (el) {
+        el.style.setProperty("background-image", "url(" + c + ")", "important");
+        el.style.setProperty("background-color", "transparent", "important");
+        el.style.setProperty("background-size", "cover", "important");
+        el.style.setProperty("background-position", "center", "important");
+      }
+      try { localStorage.setItem("akini_cover_bg", c); } catch(ex){}
+    });
   };
   reader.readAsDataURL(file);
 };
@@ -976,17 +1028,19 @@ window.handleS2DayBgDirect = function(e) {
   var reader = new FileReader();
   reader.onload = function(evt) {
     var dataUrl = evt.target.result;
-    var el = document.getElementById("bgArea");
-    if (el) {
-      el.style.setProperty("background-image", "url(" + dataUrl + ")", "important");
-      el.style.setProperty("background-color", "transparent", "important");
-      el.style.setProperty("background-size", "cover", "important");
-      el.style.setProperty("background-position", "center", "important");
-    }
-    try {
-      localStorage.setItem("akini_day_bg", dataUrl);
-      localStorage.setItem("akini_anniv_bg", dataUrl);
-    } catch(ex){}
+    window.compressImageDataUrl(dataUrl, function(c) {
+      var el = document.getElementById("bgArea");
+      if (el) {
+        el.style.setProperty("background-image", "url(" + c + ")", "important");
+        el.style.setProperty("background-color", "transparent", "important");
+        el.style.setProperty("background-size", "cover", "important");
+        el.style.setProperty("background-position", "center", "important");
+      }
+      try {
+        localStorage.setItem("akini_day_bg", c);
+        localStorage.setItem("akini_anniv_bg", c);
+      } catch(ex){}
+    });
   };
   reader.readAsDataURL(file);
 };
@@ -1067,7 +1121,7 @@ document.addEventListener("DOMContentLoaded", function() {
 /* v907 milk式架构：Service Worker 彻底退役——启动即注销一切存量 SW 注册（数据保险箱 akini-vault-v1 永不触碰），
    从此页面永远直连网络取最新版，版本回退/缓存锁死在物理上不可能发生 */
 (function(){
-  window.AKINI_VERSION = "v956";
+  window.AKINI_VERSION = "v958";
   try {
     try { localStorage.removeItem("akini_boot_ver"); } catch(e){}
     // v954：注册通知专用 SW（不缓存资源，只处理通知点击）
@@ -8737,16 +8791,19 @@ window.markMailAsRead = function(mailId) {
     var r = new FileReader();
     r.onload = function(ev) {
       var d = ev.target.result;
-      applyBg('coverAreaMain', d);
-      saveAll(COVER_KEYS, d);
-      /* v823 存储加固：同步写入 IDB 权威层(内存+localforage)，LS 配额满/大图被 shim
-         分流时仍持久；并回读验证，失败明确提示而非静默丢图 */
-      try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set('akini_cover_img', d); } catch(e2) {}
-      var __ok = false;
-      try {
-        __ok = !!(firstValid(COVER_KEYS) || (window.akiniStore && window.akiniStore.memoryGet && window.akiniStore.memoryGet('akini_cover_img')));
-      } catch(e3) {}
-      if (!__ok && window.akiniToast) window.akiniToast('存储空间不足，底图可能未保存，请到设置-数据管理清理后重试');
+      window.compressImageDataUrl(d, function(c){
+        var cc = c || d;
+        applyBg('coverAreaMain', cc);
+        saveAll(COVER_KEYS, cc);
+        /* v823 存储加固：同步写入 IDB 权威层(内存+localforage)，LS 配额满/大图被 shim
+           分流时仍持久；并回读验证，失败明确提示而非静默丢图 */
+        try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set('akini_cover_img', cc); } catch(e2) {}
+        var __ok = false;
+        try {
+          __ok = !!(firstValid(COVER_KEYS) || (window.akiniStore && window.akiniStore.memoryGet && window.akiniStore.memoryGet('akini_cover_img')));
+        } catch(e3) {}
+        if (!__ok && window.akiniToast) window.akiniToast('存储空间不足，底图可能未保存，请到设置-数据管理清理后重试');
+      });
     };
     r.readAsDataURL(f); e.target.value = '';
   };
@@ -8755,15 +8812,18 @@ window.markMailAsRead = function(mailId) {
     var r = new FileReader();
     r.onload = function(ev) {
       var d = ev.target.result;
-      applyBg('bgArea', d);
-      saveAll(DAY_KEYS, d);
-      /* v823 同上：纪念日底图同步 IDB 权威层 + 回读验证 */
-      try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set('akini_bg_img', d); } catch(e2) {}
-      var __ok2 = false;
-      try {
-        __ok2 = !!(firstValid(DAY_KEYS) || (window.akiniStore && window.akiniStore.memoryGet && window.akiniStore.memoryGet('akini_bg_img')));
-      } catch(e3) {}
-      if (!__ok2 && window.akiniToast) window.akiniToast('存储空间不足，底图可能未保存，请到设置-数据管理清理后重试');
+      window.compressImageDataUrl(d, function(c){
+        var cc = c || d;
+        applyBg('bgArea', cc);
+        saveAll(DAY_KEYS, cc);
+        /* v823 同上：纪念日底图同步 IDB 权威层 + 回读验证 */
+        try { if (window.akiniStore && window.akiniStore.set) window.akiniStore.set('akini_bg_img', cc); } catch(e2) {}
+        var __ok2 = false;
+        try {
+          __ok2 = !!(firstValid(DAY_KEYS) || (window.akiniStore && window.akiniStore.memoryGet && window.akiniStore.memoryGet('akini_bg_img')));
+        } catch(e3) {}
+        if (!__ok2 && window.akiniToast) window.akiniToast('存储空间不足，底图可能未保存，请到设置-数据管理清理后重试');
+      });
     };
     r.readAsDataURL(f); e.target.value = '';
   };
@@ -8802,44 +8862,82 @@ window.markMailAsRead = function(mailId) {
 </script>
 
 <script>
-/* v803 跨设备等比缩放：任何手机/浏览器/平板，首页两屏整体等比缩放至完全装下，不滚动、不缺失、不重叠（syy 式完整显示） */
+/* ==========================================================================
+   v971 终极等比例缩放引擎：小屏等比缩小，大屏等比放大，一屏完整展示绝不滑动
+   纯等比：只使用 transform: scale(s)，横纵同比例，绝不拉长拉宽
+   ========================================================================== */
 (function(){
   function __akiniFitScale(){
     try {
       var boxes = document.querySelectorAll('.home-screen > .fit-scale-box');
       if (!boxes || !boxes.length) return;
-      var vh = window.innerHeight, maxH = 0, i;
-      for (i = 0; i < boxes.length; i++) { boxes[i].style.transform = ''; boxes[i].style.width = ''; boxes[i].style.marginLeft = ''; }
-      for (i = 0; i < boxes.length; i++) { maxH = Math.max(maxH, boxes[i].scrollHeight); }
-      if (!maxH || maxH < 200) return;
-      var avail = vh - 96; /* 预留状态栏区与底栏避让空间 */
-      var s = avail / maxH;
-      if (s >= 1) {
-        /* 大屏原样完整显示，不放大，不滚动 */
-        for (i = 0; i < boxes.length; i++) {
-          var sc = boxes[i].closest('.home-screen');
-          if (sc) sc.classList.add('fit-no-scroll');
-        }
-        return;
+      var i;
+      // 临时移除变换以精确测量内容未受缩放影响时的自然滚动高度
+      for (i = 0; i < boxes.length; i++) {
+        boxes[i].style.removeProperty('transform');
+        boxes[i].style.removeProperty('width');
+        boxes[i].style.removeProperty('margin-left');
       }
-      if (s < 0.3) s = 0.3; /* 极端小屏保护下限，防退化 */
+      var vh = window.innerHeight || document.documentElement.clientHeight || 667;
+      var maxH = 0;
+      for (i = 0; i < boxes.length; i++) {
+        var h = Math.max(boxes[i].scrollHeight || 0, boxes[i].offsetHeight || 0);
+        if (h > maxH) maxH = h;
+      }
+      if (!maxH || maxH < 200) return;
+      
+      // 底部空间避让：底栏 + 82px 双向指示点 + 缓冲间距（共 112px）
+      var bottomReserve = 112;
+      var isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+      if (isStandalone) bottomReserve = 118;
+      
+      var availH = vh - bottomReserve;
+      if (availH < 220) availH = 220;
+      
+      // 等比缩放系数：小屏 < 1 缩小，大屏 > 1 放大
+      var s = availH / maxH;
+      // 安全范围保护：最小 0.35，最大 1.35
+      if (s < 0.35) s = 0.35;
+      if (s > 1.35) s = 1.35;
+      
       for (i = 0; i < boxes.length; i++) {
         var b = boxes[i];
-        /* 宽度补偿 + margin-left:50% + translateX(-50%)：缩放后精确居中满宽，绝不偏右 */
-        b.style.width = (100 / s) + '%';
-        b.style.marginLeft = '50%';
-        b.style.transform = 'translateX(-50%) scale(' + s + ')';
-        var sc2 = b.closest('.home-screen');
-        if (sc2) sc2.classList.add('fit-no-scroll');
+        /* v971 纯等比缩放：width 始终 100%，居中，只缩放 transform，杜绝拉长拉宽 */
+        b.style.setProperty('width', '100%', 'important');
+        b.style.setProperty('margin', '0 auto', 'important');
+        b.style.setProperty('transform-origin', 'top center', 'important');
+        b.style.setProperty('transform', 'scale(' + s + ')', 'important');
+        var sc = b.closest('.home-screen');
+        if (sc) {
+          sc.style.setProperty('overflow', 'hidden', 'important');
+          sc.style.setProperty('overflow-y', 'hidden', 'important');
+          sc.style.setProperty('overflow-x', 'hidden', 'important');
+        }
       }
     } catch (e) {}
   }
+  window.__akiniFitScale = __akiniFitScale;
   window.addEventListener('resize', __akiniFitScale);
-  window.addEventListener('orientationchange', function(){ setTimeout(__akiniFitScale, 350); });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function(){ setTimeout(__akiniFitScale, 60); });
-  else setTimeout(__akiniFitScale, 60);
-  setTimeout(__akiniFitScale, 700);
-  setTimeout(__akiniFitScale, 1600);
+  window.addEventListener('orientationchange', function(){ setTimeout(__akiniFitScale, 300); });
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){
+      __akiniFitScale();
+      setTimeout(__akiniFitScale, 60);
+      setTimeout(__akiniFitScale, 200);
+      setTimeout(__akiniFitScale, 600);
+      setTimeout(__akiniFitScale, 1500);
+    });
+  } else {
+    __akiniFitScale();
+    setTimeout(__akiniFitScale, 60);
+    setTimeout(__akiniFitScale, 200);
+    setTimeout(__akiniFitScale, 600);
+    setTimeout(__akiniFitScale, 1500);
+  }
+  window.addEventListener('load', function(){
+    __akiniFitScale();
+    setTimeout(__akiniFitScale, 300);
+  });
 })();
 </script>
 <script>

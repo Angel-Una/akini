@@ -32208,3 +32208,31 @@ html body .chat-body .msg-row.ta .msg-content-line > .bubble-wrap {
   padding: 4px 12px !important;
   background: transparent !important;
 }
+
+
+/* ==========================================================================
+   v957：一屏完整展示绝不滑动 + fit-scale-box 终极等比自适应
+   ========================================================================== */
+
+/* 彻底禁止首页屏幕上下滚动，一屏完整收纳 */
+html, body, #phoneFrame, .content-wrapper, #homeScreens, .home-slider {
+  overflow: hidden !important;
+}
+
+.home-screen, #screen1, #screen2 {
+  overflow: hidden !important;
+  overflow-y: hidden !important;
+  overflow-x: hidden !important;
+}
+
+.fit-scale-box {
+  transform-origin: top center !important;
+  max-width: none !important;
+  will-change: transform !important;
+}
+
+/* 确保第一屏底部拍立得与四图标紧凑，不产生多余外边距 */
+.s1-bottom-fig3 {
+  margin-top: auto !important;
+  margin-bottom: 4px !important;
+}
