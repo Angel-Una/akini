@@ -335,23 +335,25 @@
   //  ② 大键驻留预算：>200KB 的键驻留总量 ≤4GB 设备 12MB / 其他 24MB，超预算的键
   //     不驻留内存（记入 __akiniDeferredKeys），读取时按需从 IDB 异步水合。
   var _restored = false;
-  /* v922 安全模式：上次启动 JS 出错标记 / iOS / 低内存机型 → 大键驻留预算收紧到 5MB、
-     恢复批次 2 键/60ms——直接压低启动内存峰值，针对"开屏即崩/闪退死循环" */
+  /* v927：彻底移除"安全模式"——iOS 不再无条件收紧预算，crash_mark 不再影响行为。
+     根因链：iOS webview 的 unhandledrejection（IDB事务中断/fetch超时）几乎每次启动都有
+     → crash_mark=1 → _bootTight=true → 预算 5MB → 头像/背景图大键被 deferred →
+     iOS IDB 事务不 commit → 读到旧值/空值 → 用户看到头像回退+背景图丢失。
+     milk/syy 参考包没有任何此类机制，直接读写 localStorage，从不闪退从不回退。
+     v927 对齐 milk/syy：只保留 deviceMemory<=1 才收紧（真正的极低内存设备），
+     其余一律用标准预算 12MB，crash_mark 仅记日志不再触发任何行为变化。 */
   var _bootTight = false;
   try {
     if (sessionStorage.getItem('akini_crash_mark') === '1') {
-      _bootTight = true;
-      window.__akiniCrashBoot = true;
       try { sessionStorage.removeItem('akini_crash_mark'); } catch (eC) {}
     }
   } catch (eC2) {}
   try {
-    var _uaBoot = navigator.userAgent || '';
-    if (/iPad|iPhone|iPod/.test(_uaBoot) || window.__akiniLowMem) _bootTight = true;
+    if (window.__akiniLowMem) _bootTight = true;
   } catch (eC3) {}
-  var BIG_MEM_BUDGET = _bootTight ? 5 * 1024 * 1024 : (((typeof navigator !== 'undefined' && navigator.deviceMemory) || 4) <= 4 ? 12 * 1024 * 1024 : 24 * 1024 * 1024);
-  var _BOOT_BATCH = _bootTight ? 2 : 4;
-  var _BOOT_BATCH_DELAY = _bootTight ? 60 : 25;
+  var BIG_MEM_BUDGET = _bootTight ? 8 * 1024 * 1024 : (((typeof navigator !== 'undefined' && navigator.deviceMemory) || 4) <= 4 ? 12 * 1024 * 1024 : 24 * 1024 * 1024);
+  var _BOOT_BATCH = 4;
+  var _BOOT_BATCH_DELAY = 25;
   var _bigMemUsed = 0;
   if (!window.__akiniDeferredKeys) window.__akiniDeferredKeys = {};
   function restoreAll() {
@@ -428,28 +430,40 @@
                         return;
                       }
                     }
-                    /* v925：chat_history 键无论多大都强制 memSet 驻留内存，绝不走 deferredKeys。
-                       用户反馈"iOS 卡退后聊天记录清空两次"——根因是安全模式下预算收紧到 5MB，
-                       chat_history 大键被 deferred 后走 idbGet 异步水合，
-                       若 iOS 切后台时 IDB 事务未 commit（微信 webview 常见），
-                       水合读到空值 → 聊天记录显示为空。强制驻留内存保底。 */
-                    var _isChatHist = String(k).indexOf('akini_chat_history_') === 0;
-                    if (!_isChatHist && big && (ls.length > 4194304 || _bigMemUsed + ls.length > BIG_MEM_BUDGET)) {
+                    /* v927：chat_history + 头像 + 背景图键强制驻留内存，绝不走 deferredKeys */
+                    var _ks2 = String(k);
+                    var _isCritKey = _ks2.indexOf('akini_chat_history_') === 0
+                      || _ks2.indexOf('akini_my_avatar') === 0
+                      || _ks2.indexOf('akini_ta_avatar') === 0
+                      || _ks2.indexOf('akini_icity_my_avatar') === 0
+                      || _ks2.indexOf('akini_icity_ta_avatar') === 0
+                      || _ks2.indexOf('akini_s1_avatar') === 0
+                      || _ks2.indexOf('akini_home_bg') === 0
+                      || _ks2.indexOf('akini_bg') === 0;
+                    if (!_isCritKey && big && (ls.length > 4194304 || _bigMemUsed + ls.length > BIG_MEM_BUDGET)) {
                       window.__akiniDeferredKeys[k] = 1; // 超预算：不驻留，按需水合
                     } else {
                       memSet(k, ls);
-                      if (big && !_isChatHist) _bigMemUsed += ls.length;
+                      if (big && !_isCritKey) _bigMemUsed += ls.length;
                     }
                     if (ls !== v) queueIdbWrite(k, ls); // LS 与 IDB 不一致，以 LS 回写 IDB
                   } else if (big) {
                     // 大键不回填 LS（防回填又撑爆配额）；预算内驻留内存，超预算按需水合
-                    /* v925：chat_history 键强制驻留内存，绝不 deferred */
-                    var _isChatHist2 = String(k).indexOf('akini_chat_history_') === 0;
-                    if (!_isChatHist2 && (v.length > 4194304 || _bigMemUsed + v.length > BIG_MEM_BUDGET)) {
+                    /* v927：chat_history + 头像 + 背景图键强制驻留内存，绝不 deferred */
+                    var _ks3 = String(k);
+                    var _isCritKey2 = _ks3.indexOf('akini_chat_history_') === 0
+                      || _ks3.indexOf('akini_my_avatar') === 0
+                      || _ks3.indexOf('akini_ta_avatar') === 0
+                      || _ks3.indexOf('akini_icity_my_avatar') === 0
+                      || _ks3.indexOf('akini_icity_ta_avatar') === 0
+                      || _ks3.indexOf('akini_s1_avatar') === 0
+                      || _ks3.indexOf('akini_home_bg') === 0
+                      || _ks3.indexOf('akini_bg') === 0;
+                    if (!_isCritKey2 && (v.length > 4194304 || _bigMemUsed + v.length > BIG_MEM_BUDGET)) {
                       window.__akiniDeferredKeys[k] = 1;
                     } else {
                       memSet(k, v);
-                      if (!_isChatHist2) _bigMemUsed += v.length;
+                      if (!_isCritKey2) _bigMemUsed += v.length;
                     }
                     lsRemoveRaw(k);
                   } else {

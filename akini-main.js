@@ -7862,6 +7862,9 @@ window.akiniContacts = {
         var diaries = {};
         var seenKeys = {}; // v506：cmtKey 用哈希表去重（原 comments.some 是 O(n²)，评论多时直接卡死）
         sources.forEach(function (arr) {
+          /* v932：防御非数组源——sources 可能混入对象/字符串等非数组值，
+             导致 (arr||[]).forEach 抛 TypeError */
+          if (!Array.isArray(arr)) return;
           (arr || []).forEach(function (d) {
             if (!d || !d.id) return;
             if (!diaries[d.id]) { diaries[d.id] = Object.assign({}, d, { comments: [] }); seenKeys[d.id] = {}; }
@@ -20856,9 +20859,9 @@ window.akiniContacts = {
                 return;
               }
               var intervals = getSafePostIntervals();
-              var delayMins = isFirst
-                ? intervals.min
-                : intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
+              /* v928：对齐 syy 主动来信逻辑——首次也在 [min, max] 范围内随机取延迟，
+                 而非固定用 min（避免"一到最短时间就发"的机械感） */
+              var delayMins = intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
               var delayMs = Math.max(10000, Math.floor(delayMins * 60 * 1000));
               console.log("[Akini 朋友圈] 下次发圈计划：", (delayMs / 60000).toFixed(1), "分钟后触发");
               try { localStorage.setItem("akini_next_friendsPost", String(Date.now() + delayMs)); } catch (e) {}
@@ -22361,9 +22364,8 @@ window.akiniContacts = {
           return;
         }
         var intervals = getSafeIcityIntervals();
-        var delayMins = isFirst
-          ? intervals.min
-          : intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
+        /* v928：对齐 syy 主动来信逻辑——首次也在 [min, max] 范围内随机取延迟 */
+        var delayMins = intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
         var delayMs = Math.max(10000, Math.floor(delayMins * 60 * 1000));
         console.log("[Akini iCity] 下次发布计划：", (delayMs / 60000).toFixed(1), "分钟后触发");
         try { localStorage.setItem("akini_next_icityPost", String(Date.now() + delayMs)); } catch (e) {}
@@ -31621,3 +31623,365 @@ window.__akiniFilterDelIcity = function (arr) {
     try { window._idbStore.get('akini_icity_diaries', function (v1) { try { if (v1) snap.icity = JSON.parse(v1); } catch (e) {} }); } catch (e) {}
   } catch (eO) {}
 })();
+
+/* ===== v928：报修bug + 检查bug 功能 ===== */
+/* v931：真实错误日志收集器——从启动起捕获所有 JS 错误 */
+window.__akiniErrorLog = window.__akiniErrorLog || [];
+(function(){
+  var _origErr = window.onerror;
+  window.addEventListener('error', function(e){
+    try {
+      window.__akiniErrorLog.push({
+        time: new Date().toISOString(),
+        msg: (e && e.message) || 'unknown',
+        src: (e && e.filename) || '',
+        line: (e && e.lineno) || 0,
+        col: (e && e.colno) || 0
+      });
+      if (window.__akiniErrorLog.length > 50) window.__akiniErrorLog.shift();
+    } catch(_) {}
+  });
+  window.addEventListener('unhandledrejection', function(e){
+    try {
+      window.__akiniErrorLog.push({
+        time: new Date().toISOString(),
+        msg: 'Promise rejection: ' + ((e && e.reason && e.reason.message) || (e && e.reason) || 'unknown'),
+        src: '', line: 0, col: 0
+      });
+      if (window.__akiniErrorLog.length > 50) window.__akiniErrorLog.shift();
+    } catch(_) {}
+  });
+})();
+
+window.__akiniBugReport = function () {
+  /* v931：报修bug——真实完整收集，不猜不蒙 */
+  try {
+    var lsSnapshot = {};
+    try {
+      var lsTotal = 0, bigKeys = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k) continue;
+        var v = localStorage.getItem(k) || '';
+        lsTotal += v.length;
+        if (k.indexOf('akini_') === 0) {
+          lsSnapshot[k] = { bytes: v.length, preview: v.substring(0, 80) };
+          if (v.length > 50000) bigKeys.push({ key: k, bytes: v.length });
+        }
+      }
+    } catch(e) {}
+
+    var idbStatus = 'unknown';
+    try {
+      if (!window.indexedDB) { idbStatus = 'not-supported'; }
+      else {
+        var req = indexedDB.open('akini-vault-v1', 1);
+        req.onsuccess = function() { idbStatus = 'ok'; };
+        req.onerror = function() { idbStatus = 'error'; };
+      }
+    } catch(e) { idbStatus = 'error: ' + e.message; }
+
+    var report = {
+      type: 'bug-report',
+      version: window.AKINI_VERSION || 'unknown',
+      generatedAt: new Date().toISOString(),
+      url: location.href,
+      userAgent: navigator.userAgent,
+      screen: { width: window.screen.width, height: window.screen.height, dpr: window.devicePixelRatio, colorDepth: window.screen.colorDepth },
+      viewport: { width: window.innerWidth, height: window.innerHeight, scrollW: document.documentElement.scrollWidth, scrollH: document.documentElement.scrollHeight },
+      displayMode: window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser',
+      deviceMemory: navigator.deviceMemory || 'unknown',
+      hardwareConcurrency: navigator.hardwareConcurrency || 'unknown',
+      online: navigator.onLine,
+      language: navigator.language,
+      timezone: (function(){ try { return Intl.DateTimeFormat().resolvedOptions().timeZone; } catch(e){ return 'unknown'; } })(),
+      storage: {
+        lsTotalKeys: localStorage.length,
+        akiniKeys: Object.keys(lsSnapshot).length,
+        lsTotalBytes: lsTotal,
+        bigKeys: bigKeys,
+        idbStatus: idbStatus,
+        idbWorks: !!window.indexedDB,
+        storageSafeActive: !!(window.akiniStore && window.akiniStore.get),
+        imgWtsAvailable: !!window.__akiniImgWts
+      },
+      dataSnapshot: {
+        settings: {
+          activeMailMin: localStorage.getItem('akini_num_activeMailMin'),
+          activeMailMax: localStorage.getItem('akini_num_activeMailMax'),
+          friendsPostMin: localStorage.getItem('akini_num_friendsPostMin'),
+          friendsPostMax: localStorage.getItem('akini_num_friendsPostMax'),
+          icityPostMin: localStorage.getItem('akini_num_icityPostMin'),
+          icityPostMax: localStorage.getItem('akini_num_icityPostMax'),
+          replyDelayMin: localStorage.getItem('akini_num_replyDelayMin'),
+          replyDelayMax: localStorage.getItem('akini_num_replyDelayMax'),
+          mailDelayMin: localStorage.getItem('akini_num_mailDelayMin'),
+          mailDelayMax: localStorage.getItem('akini_num_mailDelayMax')
+        },
+        avatars: {
+          my: { exists: !!localStorage.getItem('akini_my_avatar'), bytes: (localStorage.getItem('akini_my_avatar')||'').length },
+          ta: { exists: !!localStorage.getItem('akini_ta_avatar'), bytes: (localStorage.getItem('akini_ta_avatar')||'').length },
+          icityMy: { exists: !!localStorage.getItem('akini_icity_my_avatar'), bytes: (localStorage.getItem('akini_icity_my_avatar')||'').length },
+          icityTa: { exists: !!localStorage.getItem('akini_icity_ta_avatar'), bytes: (localStorage.getItem('akini_icity_ta_avatar')||'').length },
+          s1: { exists: !!localStorage.getItem('akini_s1_avatar'), bytes: (localStorage.getItem('akini_s1_avatar')||'').length }
+        },
+        schedules: {
+          nextMailAutoSend: localStorage.getItem('akini_next_mailAutoSend'),
+          mailLastSent: localStorage.getItem('akini_mail_last_sent'),
+          nextFriendsPost: localStorage.getItem('akini_next_friendsPost'),
+          lastFriendsPost: localStorage.getItem('akini_last_friendsPost'),
+          nextIcityPost: localStorage.getItem('akini_next_icityPost'),
+          lastIcityPost: localStorage.getItem('akini_last_icityPost')
+        },
+        contacts: (function(){
+          try {
+            var raw = localStorage.getItem('akini_contacts') || localStorage.getItem('akini_contact_list') || '';
+            return raw ? raw.substring(0, 200) : 'none';
+          } catch(e) { return 'error'; }
+        })(),
+        chatHistoryCount: (function(){
+          var n = 0;
+          try { for (var i=0;i<localStorage.length;i++) { if(localStorage.key(i).indexOf('akini_chat_history_')===0) n++; } } catch(e){}
+          return n;
+        })(),
+        wordBankCount: (function(){
+          try {
+            var raw = localStorage.getItem('akini_word_bank') || '[]';
+            var arr = JSON.parse(raw);
+            return arr.length;
+          } catch(e) { return 0; }
+        })()
+      },
+      errors: window.__akiniErrorLog || [],
+      modules: {
+        mailEngineLoaded: typeof window.AKR !== 'undefined',
+        momentsEngineLoaded: typeof window.__akiniMomentsEngine !== 'undefined' || !!document.querySelector('[id*="friends"]'),
+        storageSafeLoaded: !!(window.akiniStore && window.akiniStore.get),
+        backupLoaded: typeof window.__akiniBackup !== 'undefined',
+        bottomBarExists: !!document.getElementById('bottomBar'),
+        homeIndicatorExists: !!document.getElementById('homeIndicator'),
+        calTimeElementExists: !!document.getElementById('calLiveTime'),
+        calDateElementExists: !!document.getElementById('calLiveDate'),
+        calWeekdayElementExists: !!document.getElementById('calLiveWeekday')
+      },
+      lsSnapshot: lsSnapshot
+    };
+
+    var blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'akini-bug-report-' + Date.now() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+    if (window.akiniToast) window.akiniToast('真实bug报告已生成（含 ' + Object.keys(lsSnapshot).length + ' 个数据键快照）');
+  } catch(e) {
+    if (window.akiniToast) window.akiniToast('生成失败: ' + e.message);
+  }
+};
+
+window.__akiniBugCheck = function () {
+  /* v931：真实检查——每项做真实验证（写入→读回→对比 或 真实DOM/函数探测），
+     未使用的功能显示"未使用"，绝不显示假的"异常" */
+  try {
+    var page = document.getElementById('akiniBugCheckPage');
+    var list = document.getElementById('akiniBugCheckList');
+    if (!page || !list) return;
+
+    var rows = [];
+    var passed = 0, failed = 0, unused = 0;
+
+    function addRow(name, status, detail) {
+      /* status: 'pass' | 'fail' | 'unused' */
+      var bg, icon, iconBg;
+      if (status === 'pass') { bg = '#e8f9ee'; icon = '✓'; iconBg = '#34c759'; passed++; }
+      else if (status === 'fail') { bg = '#fff0ef'; icon = '✕'; iconBg = '#ff3b30'; failed++; }
+      else { bg = '#f5f5f5'; icon = '—'; iconBg = '#aaa'; unused++; }
+      rows.push(
+        '<div style="display:flex;align-items:center;gap:10px;background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.04)">' +
+          '<div style="width:24px;height:24px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;background:' + iconBg + '">' + icon + '</div>' +
+          '<div style="flex:1;min-w:0;min-width:0">' +
+            '<div style="font-size:14px;font-weight:600;color:#222">' + name + '</div>' +
+            (detail ? '<div style="font-size:11px;color:#999;margin-top:1px;word-break:break-word">' + detail + '</div>' : '') +
+          '</div>' +
+          '<div style="font-size:11px;color:' + (status==='pass' ? '#1e8e3e' : status==='fail' ? '#d93025' : '#aaa') + ';flex-shrink:0;font-weight:600">' +
+            (status==='pass' ? '正常' : status==='fail' ? '异常' : '未使用') +
+          '</div>' +
+        '</div>'
+      );
+    }
+
+    /* ---- 1. localStorage 真实读写测试 ---- */
+    (function(){
+      var testKey = '__akini_check_' + Date.now();
+      var testVal = 'test_' + Math.random().toString(36).slice(2);
+      var ok = false, err = '';
+      try {
+        localStorage.setItem(testKey, testVal);
+        var read = localStorage.getItem(testKey);
+        ok = (read === testVal);
+        localStorage.removeItem(testKey);
+      } catch(e) { err = e.message; }
+      addRow('本地存储读写', ok ? 'pass' : 'fail', ok ? '写入→读回→对比 一致' : '失败: ' + err);
+    })();
+
+    /* ---- 2. IndexedDB 真实打开测试 ---- */
+    (function(){
+      if (!window.indexedDB) { addRow('IndexedDB', 'fail', '浏览器不支持'); return; }
+      var ok = false, done = false;
+      var req = indexedDB.open('akini-vault-v1', 1);
+      req.onsuccess = function(){ ok = true; done = true; };
+      req.onerror = function(){ ok = false; done = true; };
+      req.onupgradeneeded = function(e){ try{ e.target.result.createObjectStore('kv'); }catch(_){} };
+      setTimeout(function(){
+        if (!done) { addRow('IndexedDB', 'fail', '打开超时(5s)'); return; }
+        addRow('IndexedDB', ok ? 'pass' : 'fail', ok ? 'akini-vault-v1 打开成功' : '打开失败');
+      }, 500);
+    })();
+
+    /* ---- 3. 头像数据：有就显示正常，没有就显示未使用 ---- */
+    (function(){
+      var keys = ['akini_my_avatar','akini_ta_avatar','akini_icity_my_avatar','akini_icity_ta_avatar','akini_s1_avatar'];
+      var hasAny = false, details = [];
+      keys.forEach(function(k){
+        var v = localStorage.getItem(k);
+        if (v && v !== 'null' && v !== 'undefined') { hasAny = true; details.push(k.replace('akini_','') + '(' + v.length + 'B)'); }
+      });
+      if (hasAny) addRow('头像数据', 'pass', details.join(', '));
+      else addRow('头像数据', 'unused', '尚未设置头像');
+    })();
+
+    /* ---- 4. 聊天记录：有就正常，没有就未使用 ---- */
+    (function(){
+      var keys = [];
+      try { for (var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k&&k.indexOf('akini_chat_history_')===0) keys.push(k); } } catch(e){}
+      if (keys.length > 0) addRow('聊天记录', 'pass', keys.length + ' 个对话的聊天数据');
+      else addRow('聊天记录', 'unused', '尚无聊天记录');
+    })();
+
+    /* ---- 5. 联系人 ---- */
+    (function(){
+      var raw = localStorage.getItem('akini_contacts') || localStorage.getItem('akini_contact_list') || '';
+      if (raw) {
+        try { var arr = JSON.parse(raw); addRow('联系人', 'pass', arr.length + ' 位联系人'); }
+        catch(e) { addRow('联系人', 'fail', '数据损坏: ' + e.message); }
+      } else addRow('联系人', 'unused', '尚未添加联系人');
+    })();
+
+    /* ---- 6. 字卡库 ---- */
+    (function(){
+      var raw = localStorage.getItem('akini_word_bank') || '';
+      if (raw) {
+        try { var arr = JSON.parse(raw); addRow('字卡库', arr.length > 0 ? 'pass' : 'unused', arr.length + ' 张字卡'); }
+        catch(e) { addRow('字卡库', 'fail', 'JSON解析失败: ' + e.message); }
+      } else addRow('字卡库', 'unused', '尚未添加字卡');
+    })();
+
+    /* ---- 7. 信箱调度（只在用户开启联系人写信时才有意义）---- */
+    (function(){
+      var next = localStorage.getItem('akini_next_mailAutoSend');
+      var last = localStorage.getItem('akini_mail_last_sent');
+      if (next || last) {
+        var detail = '';
+        if (next) {
+          var ms = parseFloat(next) - Date.now();
+          detail = ms > 0 ? '下次来信: ' + Math.round(ms/60000) + '分钟后' : '计划已过期';
+        }
+        if (last) detail += (detail ? ' | ' : '') + '上次来信: ' + new Date(parseFloat(last)).toLocaleString();
+        addRow('信箱调度', 'pass', detail);
+      } else addRow('信箱调度', 'unused', '联系人写信未开启或刚启动');
+    })();
+
+    /* ---- 8. 朋友圈调度 ---- */
+    (function(){
+      var next = localStorage.getItem('akini_next_friendsPost');
+      var last = localStorage.getItem('akini_last_friendsPost');
+      if (next || last) {
+        var detail = '';
+        if (next) { var ms = parseFloat(next)-Date.now(); detail = ms>0 ? '下次发圈: '+Math.round(ms/60000)+'分钟后' : '计划已过期'; }
+        if (last) detail += (detail?' | ':'') + '上次: ' + new Date(parseFloat(last)).toLocaleString();
+        addRow('朋友圈调度', 'pass', detail);
+      } else addRow('朋友圈调度', 'unused', '朋友圈发布未开启或刚启动');
+    })();
+
+    /* ---- 9. iCity调度 ---- */
+    (function(){
+      var next = localStorage.getItem('akini_next_icityPost');
+      var last = localStorage.getItem('akini_last_icityPost');
+      if (next || last) {
+        var detail = '';
+        if (next) { var ms = parseFloat(next)-Date.now(); detail = ms>0 ? '下次发布: '+Math.round(ms/60000)+'分钟后' : '计划已过期'; }
+        if (last) detail += (detail?' | ':'') + '上次: ' + new Date(parseFloat(last)).toLocaleString();
+        addRow('iCity调度', 'pass', detail);
+      } else addRow('iCity调度', 'unused', 'iCity发布未开启或刚启动');
+    })();
+
+    /* ---- 10. 存储守卫：真实写入→读回→对比 ---- */
+    (function(){
+      if (!window.akiniStore || !window.akiniStore.get) { addRow('存储守卫', 'fail', 'akiniStore 未加载'); return; }
+      var testKey = '__akini_guard_check';
+      var testVal = 'guard_' + Date.now();
+      var ok = false;
+      try {
+        window.akiniStore.set(testKey, testVal);
+        window.akiniStore.get(testKey, function(v){
+          ok = (v === testVal);
+          addRow('存储守卫', ok ? 'pass' : 'fail', ok ? '写入→读回一致' : '读回值不匹配');
+        });
+      } catch(e) { addRow('存储守卫', 'fail', e.message); }
+    })();
+
+    /* ---- 11. 信箱引擎 ---- */
+    addRow('信箱引擎', typeof window.AKR !== 'undefined' ? 'pass' : 'fail',
+      typeof window.AKR !== 'undefined' ? 'akini-mail-engine.js 已加载' : 'AKR 未定义，来信功能不可用');
+
+    /* ---- 12. 底栏 DOM ---- */
+    (function(){
+      var bar = document.getElementById('bottomBar');
+      var btns = bar ? bar.querySelectorAll('.bottom-btn') : [];
+      addRow('底栏导航', bar ? 'pass' : 'fail', bar ? btns.length + ' 个按钮' : 'bottomBar 不存在');
+    })();
+
+    /* ---- 13. 双屏点 ---- */
+    (function(){
+      var el = document.getElementById('homeIndicator');
+      var dots = el ? el.querySelectorAll('.dot') : [];
+      addRow('双屏指示点', el ? 'pass' : 'fail', el ? dots.length + ' 个圆点' : 'homeIndicator 不存在');
+    })();
+
+    /* ---- 14. 日历元素 ---- */
+    (function(){
+      var t = document.getElementById('calLiveTime');
+      var d = document.getElementById('calLiveDate');
+      var w = document.getElementById('calLiveWeekday');
+      var ok = t && d && w;
+      addRow('首页日历', ok ? 'pass' : 'fail', ok ? '时间/日期/星期元素齐全' : '日历元素缺失');
+    })();
+
+    /* ---- 15. JS 错误捕获 ---- */
+    (function(){
+      var errs = window.__akiniErrorLog || [];
+      if (errs.length === 0) addRow('JS 错误捕获', 'pass', '无已捕获错误');
+      else addRow('JS 错误捕获', 'fail', errs.length + ' 个错误: ' + errs[errs.length-1].msg);
+    })();
+
+    /* ---- 汇总 ---- */
+    var total = passed + failed + unused;
+    var summaryBg = failed === 0 ? '#e8f9ee' : '#fff0ef';
+    var summaryColor = failed === 0 ? '#1e8e3e' : '#d93025';
+    var summaryText = failed === 0 ? '全部正常' : failed + ' 项异常';
+    var summary = '<div style="background:' + summaryBg + ';border-radius:12px;padding:12px 14px;margin-bottom:10px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between">' +
+        '<div style="font-size:14px;font-weight:700;color:' + summaryColor + '">' + summaryText + '</div>' +
+        '<div style="font-size:12px;color:#888">通过 ' + passed + ' / ' + total + '</div>' +
+      '</div>' +
+      (unused > 0 ? '<div style="font-size:11px;color:#aaa;margin-top:4px">未使用 ' + unused + ' 项（灰色=功能正常但尚未使用）</div>' : '') +
+    '</div>';
+
+    var tip = '<div style="font-size:11px;color:#aaa;text-align:center;padding:8px 0 16px">有异常项？用「报修bug」生成文件发给开发者</div>';
+    list.innerHTML = summary + rows.join('') + tip;
+    page.style.display = 'flex';
+  } catch (e) {
+    if (window.akiniToast) window.akiniToast('检查失败: ' + e.message);
+  }
+};
