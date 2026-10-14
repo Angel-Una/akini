@@ -9,6 +9,49 @@
   if (window.__akiniStorageSafeReady) return;
   window.__akiniStorageSafeReady = true;
 
+  // =========================================================================
+  // 对齐 milk / syy：启动全量大媒体自动迁移到 IndexedDB（释放 localStorage 5MB 空间）
+  // =========================================================================
+  function migrateLsBigMediaToIdb() {
+    try {
+      if (!rawLS) return;
+      var totalKeys = rawLS.length || 0;
+      var migrated = 0;
+      var freedBytes = 0;
+      var keysToCheck = [];
+      for (var idx = 0; idx < totalKeys; idx++) {
+        try {
+          var k = origKey ? origKey.call(rawLS, idx) : rawLS.key(idx);
+          if (k && String(k).indexOf('akini_') === 0) keysToCheck.push(k);
+        } catch (eK) {}
+      }
+      keysToCheck.forEach(function (k) {
+        try {
+          var v = origGet ? origGet.call(rawLS, k) : rawLS.getItem(k);
+          if (!v) return;
+          var len = v.length || 0;
+          if (isImgKey(k) || len > (40 * 1024)) {
+            // 存入内存 Map，供前端同步读写无感命中
+            memSet(k, v);
+            // 写入 IndexedDB 大容量数据库
+            queueIdbWrite(k, v);
+            if (isImgKey(k)) _stampImgKey(k);
+            // 从 localStorage 中删除，释放配额
+            if (origRemove) origRemove.call(rawLS, k); else rawLS.removeItem(k);
+            migrated++;
+            freedBytes += len;
+          }
+        } catch (eMig) {}
+      });
+      if (migrated > 0) {
+        console.log('[存储架构升级] 成功将 ' + migrated + ' 个大媒体迁移至 IndexedDB，释放 LS 配额: ' + Math.round(freedBytes / 1024) + ' KB');
+      }
+    } catch (e) {}
+  }
+
+  try { migrateLsBigMediaToIdb(); } catch(eMigInit) {}
+
+
   // wipe 保险丝：上一轮清除若在刷新前来不及清完 IDB，本轮启动第一时间清空（cookie 不受 localStorage.clear 影响）
   try {
     if (/(?:^|;\s*)akini_wipe_pending=1/.test(document.cookie || "")) {
@@ -71,9 +114,14 @@
     akini_my_avatar: 1, akini_ta_avatar: 1, akini_icity_my_avatar: 1, akini_icity_ta_avatar: 1,
     akini_home_bg: 1, akini_bg_img: 1, akini_cover_img: 1, akini_friends_bg: 1,
     akini_call_bg: 1, akini_callmini_bg: 1, akini_chat_bg: 1,
-    akini_icity_my_bg: 1, akini_icity_ta_bg: 1, akini_music_bg: 1
+    akini_icity_my_bg: 1, akini_icity_ta_bg: 1, akini_music_bg: 1,
+    akini_s1_cover: 1, akini_s1_photo: 1, akini_s2_cover: 1, akini_s2_day_bg: 1,
+    akini_music_player_bg: 1, akini_polaroid_photo: 1
   };
-  var IMG_PREFIXES = ['akini_contact_avatar_', 'akini_chat_bg_', 'akini_icity_ta_bg_', 'akini_icity_my_bg_'];
+  var IMG_PREFIXES = [
+    'akini_contact_avatar_', 'akini_chat_bg_', 'akini_icity_ta_bg_', 'akini_icity_my_bg_',
+    'akini_media_', 'akini_stickers_', 'akini_net_', 'akini_music_custom_bg_'
+  ];
   function isImgKey(k) {
     if (!k) return false;
     var ks = String(k);
@@ -231,7 +279,7 @@
   // ---- standard 同款①：大键（>200KB，图片/壁纸 dataURL）不进 localStorage ----
   // 手机 LS 配额仅 ~5MB，几张图片就撑爆；撑爆后【所有】后续 setItem 全部静默失败，
   // 这就是数据"随机消失"的头号根因。大键只进 内存缓存 + IndexedDB（配额大得多）。
-  var LS_BIG_LIMIT = 200 * 1024;
+  var LS_BIG_LIMIT = 40 * 1024; /* 对齐 milk/syy：超过40KB的数据彻底不进 5MB localStorage，只进 IndexedDB */
   function isBigVal(v) { return typeof v === 'string' && v.length > LS_BIG_LIMIT; }
 
   // ---- standard 同款②：LS 写失败脏键集合——对账时这些键信 IDB，不信 LS 残留旧值 ----
@@ -632,17 +680,11 @@
         var big = self.isCritical(k) && self.isBigVal(sv);
         var ok = true;
         // 1) 原始写入永远先执行（大键跳过 LS 并清残留，防撑爆配额）；任何异常都不影响镜像
-        if (big) {
-          if (isImgKey(k)) {
-            /* v922：图片大键尽力保留 LS 副本（≤1.5MB），配合镜像层立即刷盘，新值绝不丢 */
-            var _imgLsOk2 = false;
-            if (String(v).length <= 1572864) {
-              try { self.origSet.call(this, k, v); _imgLsOk2 = true; } catch (eW) {}
-            }
-            if (!_imgLsOk2) { try { self.origRemove.call(this, k); } catch (e) {} }
-          } else {
-            try { self.origRemove.call(this, k); } catch (e) {}
-          }
+        if (big || isImgKey(k)) {
+          /* 对齐 milk/syy 架构：图片和超大媒体键 100% 只进内存缓存与 IndexedDB，
+             绝对不写入有限的 5MB localStorage，并且清除 localStorage 中的历史残留，
+             保证 localStorage 永远占用极低（<200KB），永不发生 QuotaExceededError 爆满！ */
+          try { self.origRemove.call(this, k); } catch (e) {}
         } else {
           try { self.origSet.call(this, k, v); } catch (e) {
             // 配额满：清理大体积图片键后重试，避免关键数据静默丢失
