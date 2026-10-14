@@ -477,6 +477,9 @@
               } catch (e) {}
               _preRestorePending = {};
               try { if (typeof window.__akiniOnCriticalRestored === 'function') window.__akiniOnCriticalRestored(); } catch (e) {}
+              /* v972 修复单人模块背景图/拍立得/头像灰白不显示：启动早期大图从 LS 迁移到 IDB，
+                 同步读取必为空；对账恢复完成后重新渲染首屏大图，确保不残留灰白 */
+              try { if (typeof window.loadS1SavedData === 'function') window.loadS1SavedData(); } catch (eLS) {}
               console.log('[存储] 启动恢复完成，共同步', targets.length, '个键，大键驻留', Math.round(_bigMemUsed / 1024), 'KB');
             }
             return;

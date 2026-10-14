@@ -294,9 +294,24 @@
           return true;
         }
         function _fill(k) {
-          try { localStorage.setItem(k, cloud[k]); } catch (e) {}
-          try { if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(k, cloud[k]); } catch (e) {}
-          try { if (window._idbStore && window._idbStore.set) { window._idbStore.set(k, cloud[k]); window._idbStore.set(k + "_backup", cloud[k]); } } catch (e) {}
+          var val = cloud[k];
+          /* v961 根治：严禁把图片大键(头像/背景/media/会话Base64)回填到 localStorage——
+             localStorage 恒空(大键已迁移到IndexedDB)，原逻辑误判"本地缺失"回填【旧值】，
+             既覆盖了用户最新修改(回退旧数据)，又把数MB Base64塞进LS撑爆5MB配额导致闪退卡崩。
+             图片键只写入内存+IndexedDB，绝不碰 localStorage。 */
+          var _isImg = !!(window.__akiniImgWts && window.__akiniImgWts.isImg(k)) || k.indexOf("akini_media_") === 0 || k.indexOf("akini_s1_") === 0 || k.indexOf("akini_s2_") === 0 || k.indexOf("avatar") >= 0 || k.indexOf("_bg") >= 0;
+          if (!_isImg) {
+            try {
+              /* v961：杜绝向 localStorage 写入超过 40KB 的数据，防止 QuotaExceeded 崩溃 */
+              if (typeof val === "string" && val.length > 40 * 1024) {
+                console.warn("[云备份] 跳过向 localStorage 写入过大数据: " + k + " (" + Math.round(val.length / 1024) + "KB)");
+              } else {
+                localStorage.setItem(k, val);
+              }
+            } catch (e) {}
+          }
+          try { if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet(k, val); } catch (e) {}
+          try { if (window._idbStore && window._idbStore.set) { window._idbStore.set(k, val); window._idbStore.set(k + "_backup", val); } } catch (e) {}
         }
         missing = missing.filter(_wtsOk);
         if (missing.length) {

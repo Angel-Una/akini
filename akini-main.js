@@ -25978,89 +25978,17 @@ window.akiniContacts = {
       /* 防止下一行 IIFE 被解析为上一语句的函数调用（ASI 陷阱） */
       ;
       (function () {
+        /* v961：用户明确要求——退出网站重进后永远停留在首页，
+           不再自动跳转到上一次停留的二级页面。彻底禁用 akini_last_page_state
+           的记录与恢复逻辑。 */
         var t = "akini_last_page_state";
-        function e() {
-          for (
-            var e = "",
-              n = [
-                "chat",
-                "chat-list",
-                "create-group",
-                "friends",
-                "mail",
-                "music",
-                "settings",
-                "beautify",
-                "call",
-                "icity",
-                "add-contact",
-                "contact-detail",
-                "novel",
-                "shop",
-              ],
-              i = 0;
-            i < n.length;
-            i++
-          ) {
-            var a = document.getElementById("app-" + n[i]);
-            if (a && "none" !== a.style.display) {
-              e = n[i];
-              break;
-            }
-          }
-          var o = "";
-          [
-            "settingsArea",
-            "beautifyArea",
-            "icityArea",
-            "wordbankOverlay",
-          ].forEach(function (t) {
-            var e = document.getElementById(t);
-            e && "none" !== e.style.display && (o = t);
-          });
-          try {
-            localStorage.setItem(
-              t,
-              JSON.stringify({ page: e, area: o, ts: Date.now() }),
-            );
-          } catch (t) {}
-        }
+        function e() {}
         function n() {
-          /* v843：恢复最后页面状态——挂后台被系统杀页重载后不再"重进"首页，
-             30 分钟内回到切出前停留的界面；等待主 boot 完成后执行，避免时序竞争 */
-          try {
-            var raw = null;
-            try { raw = localStorage.getItem(t); } catch (eR) {}
-            if (!raw) return;
-            var st = null;
-            try { st = JSON.parse(raw); } catch (eP) {}
-            if (!st || (!st.page && !st.area)) return;
-            var age = Date.now() - (st.ts || 0);
-            if (age < 0 || age > 30 * 60 * 1000) return;
-            var tries = 0;
-            (function waitBoot() {
-              try {
-                if (window.__akiniBooted || tries > 120) {
-                  if (st.page && window.showPage) {
-                    try { window.showPage(st.page); } catch (eO) {}
-                  } else if (st.page) {
-                    var appEl = document.getElementById("app-" + st.page);
-                    if (appEl) { try { appEl.style.display = "flex"; appEl.classList.add("show"); } catch (eD) {} }
-                  }
-                  if (st.area && window.showArea) {
-                    try { window.showArea(st.area); } catch (eA) {}
-                  }
-                  return;
-                }
-              } catch (eW) {}
-              tries++;
-              setTimeout(waitBoot, 100);
-            })();
-          } catch (eN) {}
+          try { localStorage.removeItem(t); } catch (eR) {}
+          return;
         }
-        (document.addEventListener("visibilitychange", function () {
-          "hidden" === document.visibilityState && e();
-        }),
+        n();
+        (document.addEventListener("visibilitychange", function () {}),
           window.addEventListener("pagehide", e),
           "complete" === document.readyState ||
           "interactive" === document.readyState
