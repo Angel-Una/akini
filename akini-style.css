@@ -8021,20 +8021,14 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   box-shadow: none !important;
 }
 
-/* ===== v519: 首页禁止上下滑动，底部模块更贴近屏幕底，底栏保持原样 ===== */
+/* ===== v519: 首页禁止左右滑动，左右边距保留 =====
+   v925：删除 padding-bottom:0 和 fit-bottom margin-top:auto ——
+   这些旧规则与 v924 底栏 fixed 贴底重构冲突，导致底栏与 app-grid 重叠错乱 */
 .content-wrapper {
   touch-action: pan-y !important;
   padding-left: 14px !important;
   padding-right: 14px !important;
   box-sizing: border-box !important;
-  padding-bottom: 0 !important;
-}
-.fit-bottom {
-  margin-top: auto !important;
-  padding-bottom: 0 !important;
-}
-.bottom-bar {
-  padding: 2px 16px max(2px, env(safe-area-inset-bottom, 0px)) !important;
 }
 .bottom-btn-container {
   background: transparent !important;

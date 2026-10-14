@@ -428,20 +428,28 @@
                         return;
                       }
                     }
-                    if (big && (ls.length > 4194304 || _bigMemUsed + ls.length > BIG_MEM_BUDGET)) {
+                    /* v925：chat_history 键无论多大都强制 memSet 驻留内存，绝不走 deferredKeys。
+                       用户反馈"iOS 卡退后聊天记录清空两次"——根因是安全模式下预算收紧到 5MB，
+                       chat_history 大键被 deferred 后走 idbGet 异步水合，
+                       若 iOS 切后台时 IDB 事务未 commit（微信 webview 常见），
+                       水合读到空值 → 聊天记录显示为空。强制驻留内存保底。 */
+                    var _isChatHist = String(k).indexOf('akini_chat_history_') === 0;
+                    if (!_isChatHist && big && (ls.length > 4194304 || _bigMemUsed + ls.length > BIG_MEM_BUDGET)) {
                       window.__akiniDeferredKeys[k] = 1; // 超预算：不驻留，按需水合
                     } else {
                       memSet(k, ls);
-                      if (big) _bigMemUsed += ls.length;
+                      if (big && !_isChatHist) _bigMemUsed += ls.length;
                     }
                     if (ls !== v) queueIdbWrite(k, ls); // LS 与 IDB 不一致，以 LS 回写 IDB
                   } else if (big) {
                     // 大键不回填 LS（防回填又撑爆配额）；预算内驻留内存，超预算按需水合
-                    if (v.length > 4194304 || _bigMemUsed + v.length > BIG_MEM_BUDGET) {
+                    /* v925：chat_history 键强制驻留内存，绝不 deferred */
+                    var _isChatHist2 = String(k).indexOf('akini_chat_history_') === 0;
+                    if (!_isChatHist2 && (v.length > 4194304 || _bigMemUsed + v.length > BIG_MEM_BUDGET)) {
                       window.__akiniDeferredKeys[k] = 1;
                     } else {
                       memSet(k, v);
-                      _bigMemUsed += v.length;
+                      if (!_isChatHist2) _bigMemUsed += v.length;
                     }
                     lsRemoveRaw(k);
                   } else {

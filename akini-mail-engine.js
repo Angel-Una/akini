@@ -135,10 +135,6 @@
       for (var i = 0; i < sent.length; i++) {
         var s = sent[i];
         if (s && s.replyTime && !s.repliedByTa && now >= s.replyTime) {
-          // 仅在信箱活跃时段投递（与原逻辑一致，非活跃时段顺延到下次检查）
-          if (window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("mail")) {
-            continue;
-          }
           var recv = getReceived();
           recv.push({
             content: s.replyContent || genReplyText() || genLetter(),
@@ -281,13 +277,6 @@
         }
       } catch (e0) {}
       try {
-        /* v924：离线错过的信件(_anchorLastSent到期)豁免上线瞬时的活跃时段检查，
-           确保用户即使在清晨6点上线也能顺利收到离线期间本该送达的信件 */
-        var _isLateMail = _anchorLastSent > 0 && (Date.now() - _anchorLastSent >= minMs);
-        if (!_isLateMail && window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("mail")) {
-          manageAutoSendTimer();
-          return;
-        }
         // 防连发：距上次来信不足最小间隔的 80% 则顺延到「上次来信+最小间隔」再试
         // （原来直接 manageAutoSendTimer() 重排会算出秒级补发延迟，定时器空转死循环）
         var _lastRun = parseFloat(localStorage.getItem("akini_mail_last_sent") || "0");

@@ -4962,10 +4962,6 @@ window.akiniContacts = {
       }
       var s = 1e3 * (_bMin + Math.random() * Math.max(0, _bMax - _bMin));
       function replyAction() {
-        if (!window.AKR.isInTimeRange("reply")) {
-          hideTypingBubble(t);
-          return;
-        }
         if ("group" !== e.type) I(t, e, n);
         else {
           // 群聊回复：支持多个群成员参与回复
@@ -15380,8 +15376,7 @@ window.akiniContacts = {
           if (
             !isCallOngoing() &&
             !we.active &&
-            Math.random() < window.AKR.getProb("incomingCall") &&
-            window.AKR.isInTimeRange("reply")
+            Math.random() < window.AKR.getProb("incomingCall")
           ) {
             const t = window.akiniContacts
                 ? window.akiniContacts.getActiveChatId()
@@ -20848,11 +20843,10 @@ window.akiniContacts = {
 
             var _friendsPostTimer = null;
 
-            /* v911 彻底对齐主动写信调度机制：
-               1. 严格检查活跃时间范围（window.AKR.isInTimeRange("friends")），不在时间范围内绝不发布；
-               2. 独立闭包递归调度，绝无离线无脑补发；
-               3. 动态时间戳 100% 严格使用当前时间 Date.now()，动态显示为"刚刚"，彻底杜绝"两天前"；
-               4. 增加未读红点角标并弹出通知，点击进入自动清除。 */
+            /* v926 调度机制（时段限制已彻底移除）：
+               1. 独立闭包递归调度，用户自定义的发布间隔时间一到立即发布，无任何时段拦截；
+               2. 动态时间戳 100% 严格使用当前时间 Date.now()，动态显示为"刚刚"，彻底杜绝"两天前"；
+               3. 增加未读红点角标并弹出通知，点击进入自动清除。 */
             function scheduleNext(isFirst) {
               try {
                 if (_friendsPostTimer) clearTimeout(_friendsPostTimer);
@@ -20881,19 +20875,7 @@ window.akiniContacts = {
                   scheduleNext(false);
                   return;
                 }
-                // 2. 活跃时间范围检查（严格按用户设置的时段执行，不在时间范围内直接跳过，重新排期）
-                /* v922 离线/迟到补发语义：补发触发或定时器迟到（计划已到期）时，计划排定本就在范围内，
-                   绝不因"现在"不在范围而吞掉离线期间应发的内容 */
-                var _isCatchUp = !!window.__akiniFriendsCatchUp;
-                window.__akiniFriendsCatchUp = false;
-                var _plannedEarly = parseFloat(localStorage.getItem("akini_next_friendsPost") || "0") || 0;
-                var _isLate = _plannedEarly > 0 && _plannedEarly <= Date.now();
-                if (!_isCatchUp && !_isLate && window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("friends")) {
-                  console.log("[Akini 朋友圈] 当前不在用户设置的时间范围内，跳过本次发圈");
-                  window.__akiniPostLog && __akiniPostLog("friends", "跳过：当前不在设置的时间范围内");
-                  scheduleNext(false);
-                  return;
-                }
+                // 2. v926：彻底移除活跃时段限制——用户自定义的发布间隔时间一到立即发布
                 // 3. 冷却检查：距上次实际发布不足最小间隔则跳过
                 var intervals = getSafePostIntervals();
                 var _minGap = intervals.min * 60 * 1000 * 0.9;
@@ -20983,7 +20965,7 @@ window.akiniContacts = {
                   window.__akiniFriendsCatchUpDone = true;
                   console.log("[Akini 朋友圈] 检测到离线到期，排期补发朋友圈");
                   setTimeout(function () {
-                    try { window.__akiniFriendsCatchUp = true; friendsPostAction(); } catch (e) {}
+                    try { friendsPostAction(); } catch (e) {}
                   }, 2000 + Math.floor(Math.random() * 3000));
                 } else {
                   scheduleNext(!_next);
@@ -21311,9 +21293,7 @@ window.akiniContacts = {
                 __willRecurse = !1;
                 t(false);
               }
-              if (!window.AKR.isInTimeRange("mail")) {
-                return __recurse();
-              }
+              // v926：彻底移除活跃时段限制——用户自定义的写信间隔时间一到立即写信
               if (!window.__akiniToggleOn("contactMailToggle", true)) {
                 return __recurse();
               }
@@ -22368,11 +22348,10 @@ window.akiniContacts = {
         return { min: mn, max: mx };
       }
 
-      /* v911 彻底对齐主动写信调度机制：
-         1. 严格检查活跃时间范围（window.AKR.isInTimeRange("icity")），不在时间范围内绝不发布；
-         2. 独立闭包递归调度，绝无离线无脑补发；
-         3. 日记时间戳 100% 严格使用当前时间 Date.now()，日记显示为"刚刚"，彻底杜绝"两天前"；
-         4. 增加未读红点角标并弹出通知，点击进入自动清除。 */
+      /* v926 调度机制（时段限制已彻底移除）：
+         1. 独立闭包递归调度，用户自定义的发布间隔时间一到立即发布，无任何时段拦截；
+         2. 日记时间戳 100% 严格使用当前时间 Date.now()，日记显示为"刚刚"，彻底杜绝"两天前"；
+         3. 增加未读红点角标并弹出通知，点击进入自动清除。 */
       function scheduleNextIcity(isFirst) {
         try {
           if (_icityPostTimer) clearTimeout(_icityPostTimer);
@@ -22401,18 +22380,7 @@ window.akiniContacts = {
             scheduleNextIcity(false);
             return;
           }
-          // 2. 活跃时间范围检查（严格按用户设置的时段执行，不在时间范围内直接跳过，重新排期）
-          /* v922 离线/迟到补发语义：同朋友圈 */
-          var _isCatchUp = !!window.__akiniIcityCatchUp;
-          window.__akiniIcityCatchUp = false;
-          var _plannedEarly = parseFloat(localStorage.getItem("akini_next_icityPost") || "0") || 0;
-          var _isLate = _plannedEarly > 0 && _plannedEarly <= Date.now();
-          if (!_isCatchUp && !_isLate && window.AKR && typeof window.AKR.isInTimeRange === "function" && !window.AKR.isInTimeRange("icity")) {
-            console.log("[Akini iCity] 当前不在用户设置的时间范围内，跳过本次发布");
-            window.__akiniPostLog && __akiniPostLog("icity", "跳过：当前不在设置的时间范围内");
-            scheduleNextIcity(false);
-            return;
-          }
+          // 2. v926：彻底移除活跃时段限制——用户自定义的发布间隔时间一到立即发布
           // 3. 冷却检查：距上次实际发布不足最小间隔则跳过
           var intervals = getSafeIcityIntervals();
           var _minGap = intervals.min * 60 * 1000 * 0.9;
@@ -22507,7 +22475,7 @@ window.akiniContacts = {
             window.__akiniIcityCatchUpDone = true;
             console.log("[Akini iCity] 检测到离线到期，排期补发日记");
             setTimeout(function () {
-              try { window.__akiniIcityCatchUp = true; icityPostAction(); } catch (e) {}
+              try { icityPostAction(); } catch (e) {}
             }, 2500 + Math.floor(Math.random() * 3000));
           } else {
             scheduleNextIcity(!_next);
