@@ -13359,28 +13359,13 @@ window.akiniContacts = {
               '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;"><div style="display:inline-flex;align-items:center;"><div class="post-time" style="font-size:12px;color:#999;line-height:16px;">' +
               (function (t) {
                 if (!t) return "";
-                var e = new Date(t.replace(/\//g, "-"));
-                if (isNaN(e.getTime())) return t;
-                /* v963：发布时间自然过渡——同一天内 刚刚/X分钟前/X小时前；
-                   跨天按自然日显示 昨天/前天；更早显示 X月X日（跨年带年份） */
-                var _now = new Date();
-                var n = Math.floor((_now.getTime() - e.getTime()) / 1e3);
-                if (n < 0) n = 0;
-                var _t0 = new Date(_now.getFullYear(), _now.getMonth(), _now.getDate());
-                var _d0 = new Date(e.getFullYear(), e.getMonth(), e.getDate());
-                var _days = Math.floor((_t0.getTime() - _d0.getTime()) / 864e5);
-                if (_days <= 0) {
-                  return n < 60
-                    ? "刚刚"
-                    : n < 3600
-                      ? Math.floor(n / 60) + "分钟前"
-                      : Math.floor(n / 3600) + "小时前";
+                /* v978：发布时间统一走 __akiniNaturalTime——
+                   刚刚→N分钟前→N小时前(含十几个小时)→昨天→前天→M月D日→YYYY年M月D日 */
+                if (window.__akiniNaturalTime) {
+                  var _r = window.__akiniNaturalTime(t);
+                  if (_r) return _r;
                 }
-                if (_days === 1) return "昨天";
-                if (_days === 2) return "前天";
-                if (e.getFullYear() !== _now.getFullYear())
-                  return e.getFullYear() + "年" + (e.getMonth() + 1) + "月" + e.getDate() + "日";
-                return e.getMonth() + 1 + "月" + e.getDate() + "日";
+                return t;
               })(t.date || __akiniFormatDateTime(new Date(t.ts))) +
               '</div><button type="button" class="post-delete-btn" data-pidx="' + n + '" data-post-id="' + (t.id || '') + '" style="background:none;border:none;padding:0;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;position:relative;top:3px;vertical-align:middle;" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;display:block;pointer-events:none;"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M10 11v6M14 11v6"/></svg></button></div><div style="position:relative;display:flex;align-items:center;"><div class="post-action-popup" data-pidx="' + n + '" data-post-id="' + (t.id || '') + '" style="display:none;position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);background:#ffffff;border:1px solid #e0e0e0;border-radius:8px;padding:6px 14px;z-index:100;gap:12px;align-items:center;white-space:nowrap;box-shadow:0 4px 18px rgba(0,0,0,0.12);"><button type="button" data-action="like" data-pidx="' + n + '" style="background:none;border:none;padding:0;cursor:pointer;font-size:14px;color:#333333;outline:none;display:flex;align-items:center;gap:4px;">♡ 赞</button><div style="width:1px;height:14px;background:#e0e0e0;"></div><button type="button" data-action="comment" data-pidx="' + n + '" style="background:none;border:none;padding:0;cursor:pointer;font-size:14px;color:#ffffff;outline:none;display:flex;align-items:center;gap:4px;"><svg viewBox="0 0 24 24" fill=none stroke="#333333" stroke-width=2 stroke-linecap=round stroke-linejoin=round style="width:14px;height:14px;color:#333333;"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> <span style="color:#333333;">评论</span></button></div><button type="button" class="post-dots-trigger" data-pidx="' + n + '" style="background:#f7f7f7;border:none;border-radius:4px;padding:3px 8px;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;color:#576b95;font-weight:900;letter-spacing:1px;font-size:14px;line-height:1;" title="评论与赞">··</button></div></div>' +
               d),
@@ -16991,16 +16976,14 @@ window.akiniContacts = {
             },
             g = function (t) {
               if (!t) return "";
+              /* v978：统一自然时间（昨天/前天/M月D日），废弃"X天前/很久以前" */
+              if (window.__akiniNaturalTime) return window.__akiniNaturalTime(Number(t) || t);
               var e = Date.now() - t;
               return e < 6e4
                 ? "刚刚"
                 : e < 36e5
                   ? Math.floor(e / 6e4) + "分钟前"
-                  : e < 864e5
-                    ? Math.floor(e / 36e5) + "小时前"
-                    : e < 2592e6
-                      ? Math.floor(e / 864e5) + "天前"
-                      : "很久以前";
+                  : Math.floor(e / 36e5) + "小时前";
             };
           0 === l.length
             ? (c.innerHTML =
@@ -19578,14 +19561,18 @@ window.akiniContacts = {
                 } catch (e2) {}
               }
               const n = it(__myAv, "");
-              var i = null;
-              window.akiniContacts &&
-                (i = window.akiniContacts.getChatTarget(
-                  window.akiniContacts.getActiveChatId(),
-                ));
+              var i = window.akiniContacts
+                  ? window.akiniContacts.getChatTarget(
+                      window.akiniContacts.getActiveChatId(),
+                    )
+                  : null;
               var a = i
                   ? i.name
-                  : localStorage.getItem("akini_ta_name") || "哥哥",
+                  : (localStorage.getItem("akini_ta_name") && localStorage.getItem("akini_ta_name").trim() && localStorage.getItem("akini_ta_name") !== "对方"
+                      ? localStorage.getItem("akini_ta_name")
+                      : (window.akiniContacts && window.akiniContacts.getContacts && window.akiniContacts.getContacts()[0]
+                          ? window.akiniContacts.getContacts()[0].name
+                          : "对方")),
                 o = it(
                   i ? i.avatar : localStorage.getItem("akini_ta_avatar"),
                   "",
@@ -19666,17 +19653,28 @@ window.akiniContacts = {
               v && !v.dataset.userEdited && (v.value = e);
               const h = document.getElementById("myAvatarPreviewBeautify");
               (h && (h.innerHTML = n),
-                ["chatTaName"].forEach((t) => {
-                  const el = document.getElementById(t);
-                  if (el) {
-                    var _showName = a;
-                    if (window.akiniContacts && window.akiniContacts.getActiveChatId) {
-                      var _actC = window.akiniContacts.getChatTarget(window.akiniContacts.getActiveChatId());
-                      if (_actC && _actC.name) _showName = _actC.name;
+                /* v977：昵称条名字锁定——当前有活跃会话时绝不覆写聊天顶栏昵称，
+                   根治头像同步函数 Tn() 重绘把"对方/哥哥"覆盖真实联系人名导致的重置 */
+                function() {
+                  try {
+                    var _hasActiveChat = window.akiniContacts &&
+                      typeof window.akiniContacts.getActiveChatId === "function" &&
+                      window.akiniContacts.getActiveChatId();
+                    if (!_hasActiveChat) {
+                      ["chatTaName"].forEach((t) => {
+                        const el = document.getElementById(t);
+                        if (el) {
+                          var _showName = a;
+                          if (window.akiniContacts && window.akiniContacts.getChatTarget) {
+                            var _actC = window.akiniContacts.getChatTarget(window.akiniContacts.getActiveChatId());
+                            if (_actC && _actC.name) _showName = _actC.name;
+                          }
+                          el.textContent = _showName || a || "对方";
+                        }
+                      });
                     }
-                    el.textContent = _showName || a || "对方";
-                  }
-                }));
+                  } catch (_e) {}
+                }());
               const w = document.getElementById("callAvatarFull"),
                 k = document.getElementById("callNameFull");
               (!w ||
@@ -20531,16 +20529,11 @@ window.akiniContacts = {
             (p && ((p.textContent = k), p.classList.toggle("full", _)),
               h && h.classList.toggle("full", _));
             if (tm) {
-              var n = Date.now(),
-                diff = Math.floor((n - (i.ts || n)) / 1e3);
-              tm.textContent =
-                diff < 60
-                  ? "刚刚"
-                  : diff < 3600
-                    ? Math.floor(diff / 60) + "分钟前"
-                    : diff < 86400
-                      ? Math.floor(diff / 3600) + "小时前"
-                      : Math.floor(diff / 86400) + "天前";
+              var n = Date.now();
+              /* v978：通知时间统一自然时间（昨天/前天/M月D日），废弃"X天前" */
+              tm.textContent = window.__akiniNaturalTime
+                ? window.__akiniNaturalTime(i.ts || n)
+                : "刚刚";
             }
             var ava = document.getElementById("notifAvatar");
             if (ava) {
@@ -27391,6 +27384,8 @@ window.akiniContacts = {
     } catch (e3) {}
   }
   function _fmtTs(ts) {
+    /* v978：统一自然时间——昨天/前天/跨年带年份 */
+    if (window.__akiniNaturalTime) return window.__akiniNaturalTime(ts);
     try {
       var d = new Date(ts);
       var now = Date.now();

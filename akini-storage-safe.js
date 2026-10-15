@@ -453,8 +453,10 @@
     if (window.__akiniLowMem) _bootTight = true;
   } catch (eC3) {}
   var BIG_MEM_BUDGET = _bootTight ? 8 * 1024 * 1024 : (((typeof navigator !== 'undefined' && navigator.deviceMemory) || 4) <= 4 ? 12 * 1024 * 1024 : 24 * 1024 * 1024);
-  var _BOOT_BATCH = 4;
-  var _BOOT_BATCH_DELAY = 25;
+  /* v978 对齐 milk「进入即全部加载」：启动对账批 4→24 键、间隔 25→10ms，
+     247 键从 ~1.5s 缩到 ~150ms，首屏数据一次到位，不再"进去等半天" */
+  var _BOOT_BATCH = 24;
+  var _BOOT_BATCH_DELAY = 10;
   var _bigMemUsed = 0;
   if (!window.__akiniDeferredKeys) window.__akiniDeferredKeys = {};
   function restoreAll() {
