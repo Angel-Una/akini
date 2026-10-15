@@ -31632,6 +31632,11 @@ window.__akiniErrorLog = window.__akiniErrorLog || [];
   var _origErr = window.onerror;
   window.addEventListener('error', function(e){
     try {
+      /* v968：过滤 IndexedDB 良性竞态——localforage/IDBRequest.error 在 request 未结束时
+         读取属预期 InvalidStateError（无害）。不记为错误，更不触发崩溃恢复。 */
+      var _m = (e && e.message) || '';
+      if (_m.indexOf("IDBRequest") >= 0 && _m.indexOf("has not finished") >= 0) return;
+      if (_m.indexOf("InvalidStateError") >= 0 && _m.indexOf("'error'") >= 0) return;
       window.__akiniErrorLog.push({
         time: new Date().toISOString(),
         msg: (e && e.message) || 'unknown',
