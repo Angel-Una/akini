@@ -32236,3 +32236,75 @@ html, body, #phoneFrame, .content-wrapper, #homeScreens, .home-slider {
   margin-top: auto !important;
   margin-bottom: 4px !important;
 }
+
+
+
+
+/* ==========================================================================
+   v967 ① 撤销 v966 强制铺满导致的"横向拉长"——恢复 420 设计宽居中，
+        由 __akiniFitScale 做严格等比缩放（绝不横向拉宽/缩窄）。
+   ========================================================================== */
+html, body {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+}
+.phone-frame, #phoneFrame {
+  position: relative !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+.content-wrapper, #homeScreens, .fit-mod {
+  width: 100% !important;
+  max-width: 420px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
+}
+
+/* ==========================================================================
+   v967 ② 聊天返回键 / 通话键：底图、外尺寸、内部图标严格同规格，
+        用 id 强选择器覆盖历史所有互相打架的规则。
+   ========================================================================== */
+html body #app-chat .chat-top-bar #chatBackBtn,
+html body #app-chat .chat-top-bar #chatCallBtn {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  min-height: 42px !important;
+  max-width: 42px !important;
+  max-height: 42px !important;
+  border-radius: 50% !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  /* 底图严格同规格：同款透白磨砂底 + 同款描边 */
+  background: rgba(255, 255, 255, 0.22) !important;
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  border: 1px solid rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12) !important;
+}
+html body #app-chat .chat-top-bar #chatBackBtn .back-arrow-icon {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 24px !important;
+  line-height: 24px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  color: #1a1a1a !important;
+}
+html body #app-chat .chat-top-bar #chatCallBtn svg {
+  width: 24px !important;
+  height: 24px !important;
+  stroke: #1a1a1a !important;
+  stroke-width: 2 !important;
+  display: block !important;
+}
