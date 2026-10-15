@@ -36,10 +36,20 @@
             // 写入 IndexedDB 大容量数据库
             queueIdbWrite(k, v);
             if (isImgKey(k)) _stampImgKey(k);
-            // 从 localStorage 中删除，释放配额
-            if (origRemove) origRemove.call(rawLS, k); else rawLS.removeItem(k);
-            migrated++;
-            freedBytes += len;
+            // v975 对齐 milk/syy：只有非首页核心底图大键才从 LS 移除；
+            // 核心底图与头像白名单：在小于 1.8MB 时强行保留在 LS，同时写入 IDB，杜绝重进被清空！
+            var _ESSENTIAL_LS = {
+              akini_home_bg: 1, akini_s1_cover: 1, akini_s1_photo: 1, akini_cover_bg: 1,
+              akini_avatar_left: 1, akini_avatar_right: 1, akini_my_avatar: 1, akini_ta_avatar: 1,
+              akini_s1_avatar: 1, akini_music_bg: 1, akini_chat_bg: 1, akini_day_bg: 1,
+              akini_cover_img: 1, akini_bg_img: 1, akini_music_player_bg: 1
+            };
+            var isEssential = _ESSENTIAL_LS[k] || (k && k.indexOf('akini_chat_bg_') === 0);
+            if (!isEssential || len > (1800 * 1024)) {
+              if (origRemove) origRemove.call(rawLS, k); else rawLS.removeItem(k);
+              migrated++;
+              freedBytes += len;
+            }
           }
         } catch (eMig) {}
       });

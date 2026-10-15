@@ -1608,82 +1608,12 @@ window._idbStore = (function () {
     } catch (e) {}
     try {
       window._akiniRestoreFromSnapshot = function (e) {
-        function restoreFromSource(src) {
-          if (!src) return 0;
-          try {
-            var data = JSON.parse(src);
-            if (data && "object" == typeof data) {
-              var restored = 0;
-              /* v922 防回退守卫（对齐 milk「备份不比当前新就绝不覆盖」）：
-                 akini_key_mtime 登记每个核心键的最后修改/删除时刻；当前 LS 的 mtime
-                 晚于快照内嵌 mtime → 快照值是旧的 → 坚决不回填（宁缺勿旧），
-                 根治背景图/头像/自定义文字等被旧快照回填导致的"回退旧数据" */
-              var _curM = {};
-              try { _curM = JSON.parse(localStorage.getItem("akini_key_mtime") || "{}") || {}; } catch (eM) { _curM = {}; }
-              var _snapM = {};
-              try { _snapM = JSON.parse(data["akini_key_mtime"] || "{}") || {}; } catch (eM2) { _snapM = {}; }
-              for (var k in data) {
-                if (data.hasOwnProperty(k) && k.indexOf("akini_") === 0 && k !== "akini_key_mtime") {
-                  try {
-                    var cur = localStorage.getItem(k);
-                    if (
-                      !cur ||
-                      cur === "" ||
-                      cur === "null" ||
-                      cur === "undefined" ||
-                      cur === "[]" ||
-                      cur === "{}"
-                    ) {
-                      var _cm = Number(_curM[k]) || 0;
-                      var _sm = Number(_snapM[k]) || 0;
-                      if (_cm && Math.abs(_cm) > _sm) continue; // 当前动作晚于快照：快照过旧，禁止回填
-                      localStorage.setItem(k, data[k]);
-                      restored++;
-                    }
-                  } catch (x) {}
-                }
-              }
-              return restored;
-            }
-          } catch (p) {}
-          return 0;
+        /* v976 对齐 milk/syy 纯原生存储：彻底废弃旧快照回填机制！
+           禁止从任何 snapshot 或旧快照字符串中回填已被用户清空或更换的数据，
+           根治头像、背景图、网易云等数据被回退到旧版本 */
+        if (typeof e === "function") {
+          try { e(); } catch (err) {}
         }
-
-        // 快照同时保存在 localStorage 和 IndexedDB；先尝试 localStorage，再用 IDB 兜底
-        try {
-          var lsRestored = restoreFromSource(localStorage.getItem("akini_localstorage_snapshot")) +
-            restoreFromSource(localStorage.getItem("akini_localstorage_snapshot_backup"));
-          if (lsRestored > 0) {
-            console.log("[Akini] restoreFromSnapshot restored", lsRestored);
-            "function" == typeof e && e();
-            return;
-          }
-        } catch (p) {}
-
-        try {
-          if (window._idbStore && window._idbStore.get) {
-            var keys = ["akini_localstorage_snapshot", "akini_localstorage_snapshot_backup"];
-            var completed = 0;
-            var callbacked = !1;
-            var done = function () {
-              if (callbacked) return;
-              completed++;
-              if (completed >= keys.length) {
-                callbacked = !0;
-                "function" == typeof e && e();
-              }
-            };
-            keys.forEach(function (key) {
-              window._idbStore.get(key, function (v) {
-                if (v) restoreFromSource(v);
-                done();
-              });
-            });
-            setTimeout(done, 2000); // 安全兜底
-            return;
-          }
-        } catch (p) {}
-        "function" == typeof e && e();
       };
       window._akiniCacheStore &&
         window._akiniCacheStore.restoreAll &&
@@ -9294,7 +9224,9 @@ window.akiniContacts = {
                     '</div><div class="cli-info"><div class="cli-name">' +
                     rt(t.name) +
                     a +
-                    '</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;justify-content:center;height:48px;"><div style="font-size:11px;color:#bbb;">' +
+                    '</div>' +
+                    (t.lastMsg ? '<div class="cli-msg">' + (t.lastSenderName && t.type === 'group' ? rt(t.lastSenderName) + '：' : '') + rt(t.lastMsg) + '</div>' : '') +
+                    '</div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;justify-content:center;height:48px;"><div style="font-size:11px;color:#bbb;">' +
                     e +
                     '</div></div></div><div class="chat-list-actions"><button type="button" class="chat-list-pin-btn" data-id="' +
                     t.id +
@@ -18992,16 +18924,16 @@ window.akiniContacts = {
                   (c = __c))
                 : ((o =
                     '<span style="font-size:11px;background:#e8e8e8;color:#666;border-radius:8px;padding:2px 8px;">已寄出</span>'),
-                  (r = a + "寄给" + (e.to || "对方")),
+                  (r = (e.from && e.from !== "对方" ? e.from : (e.to && e.to !== "对方" ? e.to : a)) + "寄给" + (e.to && e.to !== (e.from || a) ? e.to : (localStorage.getItem("akini_my_name") || "我"))),
                   (c = __c))
               : "reply" === e.subtype
                 ? ((o =
                     '<span style="font-size:11px;background:#e8f4e8;color:#666666;border-radius:8px;padding:2px 8px;">回复</span>'),
-                  (r = (e.from || "对方") + "回复了" + a),
+                  (r = (e.from && e.from !== "对方" ? e.from : (localStorage.getItem("akini_ta_name") || "对方")) + "回复了" + a),
                   (c = __c))
                 : ((o =
                     '<span style="font-size:11px;background:#fce8e8;color:#c05050;border-radius:8px;padding:2px 8px;">来信</span>'),
-                  (r = (e.from || "对方") + "寄给" + a),
+                  (r = (e.from && e.from !== "对方" ? e.from : (localStorage.getItem("akini_ta_name") || "对方")) + "寄给" + a),
                   (c = __c));
           })(),
             (n.style.cssText =
@@ -19735,8 +19667,15 @@ window.akiniContacts = {
               const h = document.getElementById("myAvatarPreviewBeautify");
               (h && (h.innerHTML = n),
                 ["chatTaName"].forEach((t) => {
-                  const e = document.getElementById(t);
-                  e && (e.innerText = a);
+                  const el = document.getElementById(t);
+                  if (el) {
+                    var _showName = a;
+                    if (window.akiniContacts && window.akiniContacts.getActiveChatId) {
+                      var _actC = window.akiniContacts.getChatTarget(window.akiniContacts.getActiveChatId());
+                      if (_actC && _actC.name) _showName = _actC.name;
+                    }
+                    el.textContent = _showName || a || "对方";
+                  }
                 }));
               const w = document.getElementById("callAvatarFull"),
                 k = document.getElementById("callNameFull");
