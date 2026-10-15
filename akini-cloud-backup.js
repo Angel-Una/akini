@@ -286,23 +286,43 @@
            云端是旧值，拒绝回填该键（本地曾有更新的数据） */
         function _wtsOk(k) {
           try {
-            if (!window.__akiniImgWts || !window.__akiniImgWts.isImg(k)) return true;
-            var lw = window.__akiniImgWts.local(k) || 0;
+            var isImg = !!(window.__akiniImgWts && window.__akiniImgWts.isImg(k));
+            var lw = (window.__akiniImgWts && window.__akiniImgWts.local(k)) || 0;
             var cw = 0; try { cw = +(cloud["akini_wts_" + k] || 0) || 0; } catch (e1) {}
-            if (lw > cw + 3000) { console.warn("[云备份] 本地有更新记录，拒绝旧值回填: " + k); return false; }
+            /* 图片键：本地有新记录且云端不更新 → 拒绝回填(保护用户新图) */
+            if (isImg) {
+              if (lw > 0 && !(cw > lw)) { console.warn("[云备份] 拒绝用云端旧值覆盖本地更新的图片键: " + k); return false; }
+            } else {
+              /* v964：非图片键同样以时间戳仲裁——本地写入记录更新而云端不更新 → 拒绝回填(防数据回退) */
+              if (lw > 0 && cw > 0 && lw > cw + 3000) { console.warn("[云备份] 本地有更新记录，拒绝旧值回填: " + k); return false; }
+            }
           } catch (e) {}
           return true;
         }
         function _fill(k) {
           var val = cloud[k];
-          /* v961 根治：严禁把图片大键(头像/背景/media/会话Base64)回填到 localStorage——
-             localStorage 恒空(大键已迁移到IndexedDB)，原逻辑误判"本地缺失"回填【旧值】，
-             既覆盖了用户最新修改(回退旧数据)，又把数MB Base64塞进LS撑爆5MB配额导致闪退卡崩。
-             图片键只写入内存+IndexedDB，绝不碰 localStorage。 */
           var _isImg = !!(window.__akiniImgWts && window.__akiniImgWts.isImg(k)) || k.indexOf("akini_media_") === 0 || k.indexOf("akini_s1_") === 0 || k.indexOf("akini_s2_") === 0 || k.indexOf("avatar") >= 0 || k.indexOf("_bg") >= 0;
-          if (!_isImg) {
+          /* v964：图片键以时间戳为唯一仲裁——仅当【云端确属更新】时才覆盖本地。
+             核心规则：本地已有图片值时，必须有云端时间戳 cw 且 cw > lw 才允许覆盖；
+             lw 为 0(侧车缺失)时一律以本地现有值为准，绝不回填旧值。
+             修复"图片被重置/数据回退"——云恢复不再因内存时序或侧车缺失而回填旧图覆盖新图。 */
+          if (_isImg) {
             try {
-              /* v961：杜绝向 localStorage 写入超过 40KB 的数据，防止 QuotaExceeded 崩溃 */
+              var _mem = null;
+              try { if (window.akiniStore && window.akiniStore.memoryGet) _mem = window.akiniStore.memoryGet(k); } catch (e0) {}
+              var _hasLocal = _mem != null && _mem !== "" && _mem !== "null" && _mem !== "undefined";
+              var _lw = 0;
+              try { if (window.__akiniImgWts && window.__akiniImgWts.local) _lw = window.__akiniImgWts.local(k) || 0; } catch (e1) {}
+              var _cw = 0; try { _cw = +(cloud["akini_wts_" + k] || 0) || 0; } catch (e2) {}
+              var _cloudNewer = (_cw > 0) && (_cw > _lw);
+              if (_hasLocal && !_cloudNewer) {
+                console.warn("[云备份] 拒绝用云端值覆盖本地更新的图片键: " + k + " (lw=" + _lw + ",cw=" + _cw + ")");
+                return;
+              }
+            } catch (e3) { /* 仲裁失败时保守不写图片，宁可漏填也不覆盖 */ return; }
+          } else {
+            /* v961：非图片键写入 localStorage，限制 40KB 防止 QuotaExceeded */
+            try {
               if (typeof val === "string" && val.length > 40 * 1024) {
                 console.warn("[云备份] 跳过向 localStorage 写入过大数据: " + k + " (" + Math.round(val.length / 1024) + "KB)");
               } else {
@@ -334,10 +354,12 @@
               try { local = localStorage.getItem(k); } catch (e) {}
               var mem = null;
               try { if (window.akiniStore && window.akiniStore.memoryGet) mem = window.akiniStore.memoryGet(k); } catch (e) {}
-              var empty = (local == null || local === "") && (mem == null || mem === "");
+              var hasLocal = mem != null && mem !== "" && mem !== "null" && mem !== "undefined";
+              var empty = !hasLocal;
               var lw = (window.__akiniImgWts && window.__akiniImgWts.local(k)) || 0;
               var cw = 0; try { cw = +(cloud["akini_wts_" + k] || 0) || 0; } catch (e1) {}
-              if (cw > lw + 3000) { newer.push(k); return; } // 云端明显更新：覆盖本地(可能是被巩固的旧值)
+              /* v964：仅在云端时间戳确实更新(cw>lw)时才覆盖本地，杜绝"巩固旧值"再被旧值覆盖 */
+              if (cw > 0 && cw > lw) { newer.push(k); return; }
               if (empty && _wtsOk(k)) late.push(k);
             });
             var did = late.length + newer.length;

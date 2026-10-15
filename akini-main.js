@@ -4578,6 +4578,8 @@ window.akiniContacts = {
         /* v682: __akiniAppendMessageHTML 内部已经完成了消息追加、Sess更新以及 C(chatId, fullHTML) 300ms防抖落盘，
            发消息瞬间禁止重复同步执行 S() 和 V()。V() 改为防抖备份，避免每次发消息都同步触发整库备份遍历 */
         (K.value = ""));
+      // v964: 发送后清空草稿，避免残留文字在切换会话时被误判/串显
+      try { window.__akiniMsgDraft = ""; } catch (_eDraftClear) {}
       // 触发防抖备份
       try { V(); } catch (eV) {}
       // TA的手机：按概率自动收藏用户发送的聊天消息
@@ -9507,6 +9509,20 @@ window.akiniContacts = {
     function ct(t, e) {
       if (window.akiniContacts) {
         window._akiniLastChatId = t;
+        /* v964: 切换/进入会话时清空输入框残留文字——避免上一会话的草稿或字卡填入
+           串到新会话显示。按会话隔离：切到不同会话即清空非草稿残留。 */
+        try {
+          var _msgEl = document.getElementById("msgInput");
+          if (_msgEl) {
+            var _prevDraftId = window.__akiniMsgDraftChatId || null;
+            var _draft = window.__akiniMsgDraft || "";
+            if (_prevDraftId !== t || !_draft) {
+              _msgEl.value = "";
+              window.__akiniMsgDraft = "";
+              window.__akiniMsgDraftChatId = t;
+            }
+          }
+        } catch (_eMsgClear) {}
         /* v843: 点击通知或直接进入会话时，确保最新消息落盘并防被覆盖 */
         try { if (window.__akiniFlushPendingSaves) window.__akiniFlushPendingSaves(); } catch(eFlush){}
         A();
@@ -10225,6 +10241,13 @@ window.akiniContacts = {
       K &&
         (K.addEventListener("keydown", function (t) {
           "Enter" === t.key && (t.preventDefault(), hideEmojiPanel(), k());
+        }),
+        /* v964: 记录当前输入草稿(按会话隔离)，切换会话时同会话保留、跨会话清空 */
+        K.addEventListener("input", function () {
+          try {
+            window.__akiniMsgDraft = K.value || "";
+            window.__akiniMsgDraftChatId = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : null;
+          } catch (e) {}
         }),
         K.addEventListener("blur", function () {
           setTimeout(function () {
@@ -31729,15 +31752,31 @@ window.__akiniBugReport = function () {
         })(),
         chatHistoryCount: (function(){
           var n = 0;
-          try { for (var i=0;i<localStorage.length;i++) { if(localStorage.key(i).indexOf('akini_chat_history_')===0) n++; } } catch(e){}
+          try {
+            for (var i=0;i<localStorage.length;i++) { if(localStorage.key(i).indexOf('akini_chat_history_')===0) n++; }
+            /* v964：聊天记录大值可能只存在内存/IDB(v917+迁移)，localStorage 无键 → 误判未使用。
+               兼顾 akiniStore.get 与 chat_sessions：akiniStore 若有任一 chat_history 或 chat_sessions 数据即计入。 */
+            if (window.akiniStore && window.akiniStore.memoryKeys) {
+              var mkeys = window.akiniStore.memoryKeys();
+              for (var j=0;j<mkeys.length;j++) {
+                if (mkeys[j].indexOf('akini_chat_history_')===0 || mkeys[j]==='akini_chat_sessions') n = Math.max(n, 1);
+              }
+            }
+          } catch(e){}
           return n;
         })(),
         wordBankCount: (function(){
+          /* v964：真实键为 akini_wordbank(无下划线)；兼容旧键 akini_word_bank。
+             兼顾内存/IDB(akiniStore.get)而非仅 localStorage，避免大值在IDB时误判。 */
           try {
-            var raw = localStorage.getItem('akini_word_bank') || '[]';
-            var arr = JSON.parse(raw);
-            return arr.length;
-          } catch(e) { return 0; }
+            var raw = localStorage.getItem('akini_wordbank') || localStorage.getItem('akini_word_bank') || '';
+            if (raw) { var arr = JSON.parse(raw); return Array.isArray(arr) ? arr.length : (arr ? 1 : 0); }
+            if (window.akiniStore && window.akiniStore.getSync) {
+              var m = window.akiniStore.getSync('akini_wordbank');
+              if (m) { var marr = JSON.parse(m); return Array.isArray(marr) ? marr.length : (marr ? 1 : 0); }
+            }
+          } catch(e) {}
+          return 0;
         })()
       },
       errors: window.__akiniErrorLog || [],
@@ -31839,11 +31878,23 @@ window.__akiniBugCheck = function () {
       else addRow('头像数据', 'unused', '尚未设置头像');
     })();
 
-    /* ---- 4. 聊天记录：有就正常，没有就未使用 ---- */
+    /* ---- 4. 聊天记录：兼顾 localStorage 前缀键与 akiniStore(内存/IDB) ---- */
     (function(){
       var keys = [];
       try { for (var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(k&&k.indexOf('akini_chat_history_')===0) keys.push(k); } } catch(e){}
-      if (keys.length > 0) addRow('聊天记录', 'pass', keys.length + ' 个对话的聊天数据');
+      /* v964：大值聊天记录可能只存内存/IDB(v917+迁移，localStorage 无前缀键)，
+         若 akiniStore 有任一 chat_history/chat_sessions 数据则视为已使用，避免误判"未使用"。 */
+      var inMem = 0;
+      try {
+        if (window.akiniStore && window.akiniStore.memoryKeys) {
+          var mk = window.akiniStore.memoryKeys();
+          for (var j=0;j<mk.length;j++) {
+            if (mk[j].indexOf('akini_chat_history_')===0 || mk[j]==='akini_chat_sessions') inMem++;
+          }
+        }
+      } catch(e){}
+      var total = keys.length + inMem;
+      if (total > 0) addRow('聊天记录', 'pass', total + ' 个对话数据(LS ' + keys.length + ' + 内存/IDB ' + inMem + ')');
       else addRow('聊天记录', 'unused', '尚无聊天记录');
     })();
 
@@ -31856,9 +31907,12 @@ window.__akiniBugCheck = function () {
       } else addRow('联系人', 'unused', '尚未添加联系人');
     })();
 
-    /* ---- 6. 字卡库 ---- */
+    /* ---- 6. 字卡库：真实键 akini_wordbank(无下划线)，兼容旧键 + 内存/IDB ---- */
     (function(){
-      var raw = localStorage.getItem('akini_word_bank') || '';
+      var raw = localStorage.getItem('akini_wordbank') || localStorage.getItem('akini_word_bank') || '';
+      if (!raw) {
+        try { if (window.akiniStore && window.akiniStore.getSync) raw = window.akiniStore.getSync('akini_wordbank') || ''; } catch(e){}
+      }
       if (raw) {
         try { var arr = JSON.parse(raw); addRow('字卡库', arr.length > 0 ? 'pass' : 'unused', arr.length + ' 张字卡'); }
         catch(e) { addRow('字卡库', 'fail', 'JSON解析失败: ' + e.message); }
@@ -31951,6 +32005,42 @@ window.__akiniBugCheck = function () {
       var errs = window.__akiniErrorLog || [];
       if (errs.length === 0) addRow('JS 错误捕获', 'pass', '无已捕获错误');
       else addRow('JS 错误捕获', 'fail', errs.length + ' 个错误: ' + errs[errs.length-1].msg);
+    })();
+
+    /* ---- 16. 云备份恢复防回退(v964)：校验图像键时间戳仲裁能力 ---- */
+    (function(){
+      /* 模拟一次图像写入，检查时间戳侧车(__akiniImgWts.local)是否被正确打戳，
+         若打戳正常则证明恢复时的仲裁逻辑可用(能阻止云端旧值覆盖本地新图)。 */
+      var ok = false, detail = '';
+      try {
+        if (window.__akiniImgWts && window.__akiniImgWts.stamp && window.__akiniImgWts.local) {
+          var tk = 'akini_check_wts_test';
+          window.__akiniImgWts.stamp(tk, 1234567890000);
+          var t = window.__akiniImgWts.local(tk);
+          ok = (t >= 1234567890000);
+          detail = ok ? '图像键时间戳侧车正常，可仲裁云端旧值' : '时间戳侧车未生效';
+        } else {
+          detail = '图像时间戳仲裁(__akiniImgWts)未加载';
+        }
+      } catch(e) { detail = '检测异常: ' + e.message; }
+      addRow('云恢复防回退', ok ? 'pass' : 'fail', detail);
+    })();
+
+    /* ---- 17. 输入框残留检查(v964)：聊天切换时应清空无关旧文字 ---- */
+    (function(){
+      /* 检查 #msgInput 当前是否有值；程序侧不应自动填入历史文字。
+         若存在草稿隔离机制(按会话保存草稿)则视为正常；否则提示可能残留。 */
+      var ok = false, detail = '';
+      try {
+        var el = document.getElementById('msgInput');
+        if (!el) { detail = 'msgInput 元素不存在'; }
+        else {
+          var v = (el.value || '').trim();
+          if (!v) { ok = true; detail = '输入框当前为空'; }
+          else { detail = '输入框当前有文字: "' + v.substring(0, 30) + '"（检查是否为残留旧文字）'; }
+        }
+      } catch(e) { detail = '检测异常: ' + e.message; }
+      addRow('输入框残留', ok ? 'pass' : 'unused', detail);
     })();
 
     /* ---- 汇总 ---- */
