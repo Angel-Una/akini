@@ -311,76 +311,7 @@ function __akiniIncCount(html, cid, lane) {
 }
 window.__akiniIncCount = __akiniIncCount;
 
-/* 图片压缩：所有 FileReader 读取的图片统一压缩，避免 base64 过大撑爆 localStorage 配额导致数据丢失 */
-(function () {
-  if (window.__akiniFRCompress) return;
-  window.__akiniFRCompress = true;
-  if (typeof FileReader === "undefined" || !FileReader.prototype) return;
-  var orig = FileReader.prototype.readAsDataURL;
-  FileReader.prototype.readAsDataURL = function (blob) {
-    var self = this;
-    try {
-      var type = (blob && blob.type) || "";
-      if (type.indexOf("image/") !== 0) return orig.call(self, blob);
-      var url = URL.createObjectURL(blob);
-      var img = new Image();
-      /* zzt：heic/异常图片在部分机型（vivo 等）既不发 onload 也不发 onerror 会永久挂起，加 4s 超时兜底回落原图直读 */
-      var settled = false;
-      var fallbackTimer = setTimeout(function () {
-        if (settled) return; settled = true;
-        try { URL.revokeObjectURL(url); } catch (_) {}
-        orig.call(self, blob);
-      }, 4000);
-      img.onload = function () {
-        if (settled) return; settled = true; clearTimeout(fallbackTimer);
-        URL.revokeObjectURL(url);
-        try {
-          var w = img.naturalWidth || img.width;
-          var h = img.naturalHeight || img.height;
-          if (!w || !h) { orig.call(self, blob); return; }
-          var maxDim = 1024;
-          if (w > maxDim || h > maxDim) {
-            var s = Math.min(maxDim / w, maxDim / h);
-            w = Math.round(w * s);
-            h = Math.round(h * s);
-          }
-          var cv = document.createElement("canvas");
-          cv.width = w;
-          cv.height = h;
-          var ctx = cv.getContext("2d");
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = "high";
-          ctx.drawImage(img, 0, 0, w, h);
-          var q = 0.85;
-          var dataUrl = cv.toDataURL("image/jpeg", q);
-          var guard = 0;
-          while (dataUrl.length > 120000 && q > 0.3 && guard < 6) {
-            q -= 0.1;
-            guard++;
-            dataUrl = cv.toDataURL("image/jpeg", q);
-          }
-          try {
-            Object.defineProperty(self, "result", { value: dataUrl, configurable: true, writable: true, enumerable: true });
-          } catch (_) {
-            self.result = dataUrl;
-          }
-          try { self.dispatchEvent(new Event("load")); } catch (_) {}
-          try { self.dispatchEvent(new Event("loadend")); } catch (_) {}
-        } catch (e) {
-          orig.call(self, blob);
-        }
-      };
-      img.onerror = function () {
-        if (settled) return; settled = true; clearTimeout(fallbackTimer);
-        URL.revokeObjectURL(url);
-        orig.call(self, blob);
-      };
-      img.src = url;
-    } catch (e) {
-      orig.call(self, blob);
-    }
-  };
-})();
+/* v974：对齐 milk 纯原图直通策略，彻底移除对 FileReader.readAsDataURL 的 canvas 降质压缩，保证所有图片与壁纸 100% 原始画质 */
 
 /* 启动迁移：把 localStorage 中已存在的超大 base64 图片就地压缩，腾出配额 */
 window.__akiniCompressExistingImages = function (done) {
@@ -550,22 +481,8 @@ setTimeout(function () { try { window.__akiniRestoreSettled = true; } catch (eF)
                 try {
                   var w = __bgIm.naturalWidth || 0, h = __bgIm.naturalHeight || 0;
                   if (!w || !h) return;
-                  var md = 820;
-                  if (w > md || h > md) {
-                    var s = Math.min(md / w, md / h);
-                    w = Math.round(w * s); h = Math.round(h * s);
-                  }
-                  var cv = document.createElement("canvas");
-                  cv.width = w; cv.height = h;
-                  var ctx = cv.getContext("2d");
-                  ctx.imageSmoothingEnabled = true;
-                  ctx.imageSmoothingQuality = "high";
-                  ctx.drawImage(__bgIm, 0, 0, w, h);
-                  var q = 0.8, out = cv.toDataURL("image/jpeg", q), g = 0;
-                  while (out.length > 90000 && q > 0.35 && g < 5) { q -= 0.1; g++; out = cv.toDataURL("image/jpeg", q); }
-                  try { localStorage.setItem("akini_home_bg", out); } catch (e1) {}
-                  try { localStorage.removeItem("akini_home_bg_skip"); } catch (e1) {}
-                  __bgApply(out);
+                  /* v974 对齐 milk：不压缩 home_bg，保留高清原图直显 */
+                  __bgApply(bg);
                 } catch (e1) { /* 压缩失败不应用：保住启动 */ }
               };
               __bgIm.onerror = function () { __bgDone = true; };
@@ -6548,8 +6465,9 @@ window.akiniContacts = {
         )
           try {
             var v = localStorage.getItem(e);
+            /* v969：背景图同步备份到 IDB，但禁止粗暴 removeItem，
+               防止刷新或网络延迟时读不到背景图导致回退旧数据 */
             v && _idbStore.set(e, v);
-            localStorage.removeItem(e);
           } catch (t) {}
       }
     }
@@ -8145,10 +8063,8 @@ window.akiniContacts = {
         } catch (e) {}
         // 强制从已恢复的内存缓存/IDB 重新读取关键数据，避免启动期间 q()/O() 因 F/z 已被 [] 占用而不再读权威数据
         try { F = null; z = null; _postsIdbLoaded = false; } catch (e) {}
-        // 启动时空数据抢救与 iCity 多源合并：防止 iOS 刷新时数据未落盘导致界面为空
+        // 启动时单次检查空数据抢救，消除多重 1500ms/4000ms 定时器覆盖
         try { if (typeof window._akiniRescueEmptyData === "function") window._akiniRescueEmptyData(); } catch (e) {}
-        setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 1500);
-        setTimeout(function () { try { window._akiniRescueEmptyData && window._akiniRescueEmptyData(); } catch (e) {} }, 4000);
         // v509：低内存/iOS 设备在 boot 时不立刻跑全量合并，交给顶部的 deferred 合并；非低内存仍保留兜底
         try { if (!window.__akiniLowMem && typeof window._icitySafetyMerge === "function") window._icitySafetyMerge(); } catch (e) {}
         if ("function" == typeof window.renderChatList) window.renderChatList();
@@ -18371,6 +18287,14 @@ window.akiniContacts = {
               var i = w(t),
                 a = document.getElementById("icityTaProfileModal");
               if (a) {
+                /* v969：打开前立即重置模态框视图，防止上一任联系人或自身数据残留导致闪烁 */
+                var bgDiv = a.querySelector(".icity-ta-bg-div");
+                if (bgDiv) { bgDiv.style.backgroundImage = ""; bgDiv.style.background = "linear-gradient(135deg,#f4f7fa 0%,#e9eef3 40%,#dde5ec 75%,#cfd9e3 100%)"; }
+                var diariesEl = document.getElementById("icityTaProfileDiaries");
+                if (diariesEl) diariesEl.innerHTML = "";
+                var cntEl = document.getElementById("icityTaDiaryCount");
+                if (cntEl) cntEl.textContent = "0";
+
                 var o = document.getElementById("icityTaProfileEditBtn");
                 o && (o.style.display = "none");
                 var r = document.getElementById("icityTaAvatar3");
@@ -20413,24 +20337,8 @@ window.akiniContacts = {
               /* 压缩大于 1600px 或 > 1.5MB 的超大图片，防止超出配额回退 */
               var img = new Image();
               img.onload = function () {
-                try {
-                  var isSvg = String(dataURL).indexOf("data:image/svg") === 0;
-                  if (isSvg || (img.width <= 1600 && img.height <= 1600 && dataURL.length <= 1572864)) {
-                    saveAndApply(dataURL);
-                    return;
-                  }
-                  var cv = document.createElement("canvas");
-                  var sc = Math.min(1600 / Math.max(img.width, img.height), 1);
-                  cv.width = Math.max(1, Math.round(img.width * sc));
-                  cv.height = Math.max(1, Math.round(img.height * sc));
-                  var cx = cv.getContext("2d");
-                  if (!cx) { saveAndApply(dataURL); return; }
-                  cx.drawImage(img, 0, 0, cv.width, cv.height);
-                  var out = cv.toDataURL("image/jpeg", 0.85);
-                  saveAndApply(out && out.length > 100 ? out : dataURL);
-                } catch (e) {
-                  saveAndApply(dataURL);
-                }
+                /* v974 对齐 milk 原图直存，不压缩任何画质 */
+                saveAndApply(dataURL);
               };
               img.onerror = function () { saveAndApply(dataURL); };
               img.src = dataURL;
@@ -25684,7 +25592,11 @@ window.akiniContacts = {
           // 命中缓存时仍需把当前 URL 设置给音频，避免旧音频继续播放
           return E && vt(E, i ? "fetch-retry" : "fetch"), Promise.resolve();
         }
-        var o = t + "/song/url?id=" + encodeURIComponent(String(e.id)) + "&br=999000&cookie=" + encodeURIComponent(a || "") + "&realIP=" + encodeURIComponent((window._neteaseRealIp || "223.5.5.5"));
+        var _neteaseCookie = "";
+        try { _neteaseCookie = localStorage.getItem("akini_netease_cookie") || ""; } catch (eCk) {}
+        /* v971: 打通网易云 VIP 会员与高音质参数：附带用户的 Cookie 并请求 level=lossless / exhigh */
+        var _cookieParam = _neteaseCookie || a || "";
+        var o = t + "/song/url?id=" + encodeURIComponent(String(e.id)) + "&br=999000&level=lossless&cookie=" + encodeURIComponent(_cookieParam) + "&realIP=" + encodeURIComponent((window._neteaseRealIp || "223.5.5.5"));
         /* v639：fetch 无超时——代理慢/挂时界面"正在加载"永不结束（用户感知卡死）。8s 超时后走备用地址 */
         var _suAbort = (typeof AbortController !== "undefined") ? new AbortController() : null;
         var _suTimer = _suAbort ? setTimeout(function () { try { _suAbort.abort(); } catch (eS) {} }, 8000) : null;
@@ -25992,6 +25904,8 @@ window.akiniContacts = {
         setTimeout(function () { window._akiniMusicReloadPlaylist(); }, 100);
         window._TtNetease = Tt;
         window._importAllNeteasePlaylists = _importAllNeteasePlaylists;
+        
+        /* ===== v973 已彻底清理网易云扫码登录废代码 ===== */
         window._openMusicMenu = function () {
           try {
             if (typeof Nt === "function") {
@@ -26797,20 +26711,9 @@ window.akiniContacts = {
   function compressImage(file, cb) {
     var rd = new FileReader();
     rd.onload = function () {
-      var img = new Image();
-      img.onload = function () {
-        try {
-          var max = 1280, w = img.width, h = img.height;
-          if (w > max || h > max) { var r = Math.min(max / w, max / h); w = Math.round(w * r); h = Math.round(h * r); }
-          var cv = document.createElement("canvas");
-          cv.width = w; cv.height = h;
-          cv.getContext("2d").drawImage(img, 0, 0, w, h);
-          cb(cv.toDataURL("image/jpeg", 0.8));
-        } catch (e) { cb(rd.result); }
-      };
-      img.onerror = function () { cb(rd.result); };
-      img.src = rd.result;
+      cb(rd.result);
     };
+    rd.onerror = function () { cb(rd.result); };
     rd.readAsDataURL(file);
   }
   function importLocalVideo(file) {

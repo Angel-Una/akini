@@ -171,7 +171,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   padding-left: 14px !important;
   padding-right: 14px !important;
   box-sizing: border-box !important;
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   scrollbar-width: none !important;
   -ms-overflow-style: none !important;
 }
@@ -181,7 +181,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
    此处用 !important 全局兜底：无论任何模式/设备，content-wrapper 底部始终预留 84px+safe-area，
    底栏(fixed/absolute bottom:0)绝不与拍立得卡片/四功能按钮重叠。 */
 .content-wrapper {
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
 }
 .content-wrapper::-webkit-scrollbar {
   display: none !important;
@@ -928,7 +928,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex: 1;
 }
 .beautify-body {
-  padding: 19px 16px calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  padding: 19px 16px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -5556,7 +5556,7 @@ body.dark-mode .chat-top-bar::before {
 .settings-body,
 .beautify-body {
   padding-top: 65px !important;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
 }
 #icityArea > div:nth-child(2) {
   padding-top: 50px !important;
@@ -9190,7 +9190,7 @@ button#plusMenuBtn {
   height: 100% !important;
   /* v666: 充分避让顶栏控件（返回键/头像/昵称条/通话键），确保最顶部消息绝不与顶栏控件重叠遮挡 */
   padding-top: calc(env(safe-area-inset-top, 0px) + 94px) !important;
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   box-sizing: border-box !important;
   overflow-y: auto !important;
   z-index: 1 !important;
@@ -12880,7 +12880,7 @@ body, .phone-frame, .content-wrapper {
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
   scroll-behavior: smooth !important;
-  padding-bottom: max(80px, calc(env(safe-area-inset-bottom, 0px) + 60px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   min-height: 100% !important;
   height: auto !important;
   max-height: 100% !important;
@@ -13500,7 +13500,7 @@ html body .chat-body .msg-row.ta .msg-content-line > .bubble-wrap {
   margin: 0 auto !important;
 }
 .content-wrapper {
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   overflow-y: auto !important;
   -webkit-overflow-scrolling: touch !important;
 }
@@ -13598,7 +13598,7 @@ html body .chat-body .msg-row.ta .msg-content-line > .bubble-wrap {
 }
 /* content-wrapper 预留同步微调 */
 .content-wrapper {
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* ==========================================================================
@@ -13718,7 +13718,7 @@ html body .chat-body .msg-row.ta .msg-content-line > .bubble-wrap {
 }
 /* 内容预留与底栏匹配 */
 .content-wrapper {
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
 }
 
 /* ==========================================================================
@@ -14805,7 +14805,7 @@ body > div:first-child,
   display: flex !important;
   flex-direction: column !important;
   padding: 10px 14px 80px 14px !important;
-  padding-bottom: max(80px, calc(env(safe-area-inset-bottom, 0px) + 60px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   box-sizing: border-box !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
@@ -15059,7 +15059,7 @@ body.dark-mode .akini-center-modal-panel .akini-modal-btn-ok { background: #1a1a
   width: 100%;
   height: 100%;
   display: block; }
-.beautify-body { padding: 19px 16px calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+.beautify-body { padding: 19px 16px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -15698,7 +15698,7 @@ body.dark-mode .chat-top-bar::before { background: transparent !important;
 .contact-detail-body { padding-top: 50px !important; }
 .settings-body,
 .beautify-body { padding-top: 65px !important;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important; }
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important; }
 #icityArea > div:nth-child(2) { padding-top: 50px !important; }
 html,
 body { -webkit-text-size-adjust: 100%;
@@ -19322,7 +19322,7 @@ input[type="file"].file-input-local::-webkit-file-upload-button {
   flex: 1;
 }
 .beautify-body {
-  padding: 19px 16px calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  padding: 19px 16px calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -23950,7 +23950,7 @@ body.dark-mode .chat-top-bar::before {
 .settings-body,
 .beautify-body {
   padding-top: 65px !important;
-  padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
 }
 #icityArea > div:nth-child(2) {
   padding-top: 50px !important;
@@ -27590,7 +27590,7 @@ button#plusMenuBtn {
   height: 100% !important;
   /* v666: 充分避让顶栏控件（返回键/头像/昵称条/通话键），确保最顶部消息绝不与顶栏控件重叠遮挡 */
   padding-top: calc(env(safe-area-inset-top, 0px) + 94px) !important;
-  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   box-sizing: border-box !important;
   overflow-y: auto !important;
   z-index: 1 !important;
@@ -31280,7 +31280,7 @@ body, .phone-frame, .content-wrapper {
   overflow-x: hidden !important;
   -webkit-overflow-scrolling: touch !important;
   scroll-behavior: smooth !important;
-  padding-bottom: max(80px, calc(env(safe-area-inset-bottom, 0px) + 60px)) !important;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
   min-height: 100% !important;
   height: auto !important;
   max-height: 100% !important;
@@ -32307,4 +32307,27 @@ html body #app-chat .chat-top-bar #chatCallBtn svg {
   stroke: #1a1a1a !important;
   stroke-width: 2 !important;
   display: block !important;
+}
+
+
+/* ==========================================================================
+   v974 对齐 milk：高清背景图渲染优化，彻底根除模糊，启用高清抗锯齿与原图直显
+   ========================================================================== */
+#app-chat,
+#chatBody,
+.content-area,
+.chat-body,
+#phoneFrame,
+.phone-frame {
+  image-rendering: -webkit-optimize-contrast !important;
+  image-rendering: crisp-edges !important;
+}
+
+#app-chat {
+  background-color: transparent !important;
+}
+
+#chatBody {
+  /* 确保底图不被重复背景遮挡，子容器背景透明 */
+  background-color: transparent !important;
 }
