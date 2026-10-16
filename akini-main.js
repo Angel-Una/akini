@@ -32202,6 +32202,12 @@ window.__akiniBugCheck = function () {
         qrStatus(String((j && j.msg) || "登录服务异常") + "，请点「重新获取」");
         return;
       }
+      if (j.code === 400) {
+        /* 上游判定 key 无效 → 等同过期，立即换新 */
+        lsDel(LS_QR);
+        regenQr(true);
+        return;
+      }
       if (j.code === 8030) {
         stopPoll();
         lsDel(LS_QR);
@@ -32242,7 +32248,7 @@ window.__akiniBugCheck = function () {
           setTimeout(function () { try { window.__akiniNeLoadPl && window.__akiniNeLoadPl(); } catch (e5) {} }, 800);
         }, 400);
       }
-      else { qrStatus("状态查询异常，继续等待…"); schedulePoll(POLL_MS); }
+      else { var _raw = "code:" + (j && j.code) + (j && j.msg ? " " + String(j.msg) : ""); qrStatus("状态查询异常(" + _raw + ")，继续等待…"); schedulePoll(POLL_MS); }
     });
   }
 
