@@ -22968,14 +22968,22 @@ window.akiniContacts = {
           return (
             a ||
               ((function () {
-                /* v981 多歌单：每次导入追加为新歌单并切换过去，不再覆盖旧歌单 */
+                /* v993 重新导入同名歌单=同步更新（歌单内新增歌曲自动并入），全新名字才追加 */
                 var v = _plEnsure();
-                var plKey = "pl_" + Date.now();
                 var plName = res.name || playlistName || ("导入歌单 " + (v.length + 1));
-                v.push({ key: plKey, name: String(plName), cover: (o[0] && o[0].cover) || "", tracks: o });
-                try { localStorage.setItem("akini_music_playlists_v2", JSON.stringify(v)); } catch (t) {}
-                _plSwitchTo(plKey, false);
-                console.log("[歌单] 新增歌单:", plName, "歌曲数:", o.length);
+                var exK = "";
+                for (var qi2 = 0; qi2 < v.length; qi2++) { if (v[qi2] && String(v[qi2].name) === String(plName)) { exK = v[qi2].key; v[qi2].tracks = o; if (o[0] && o[0].cover) v[qi2].cover = o[0].cover; break; } }
+                if (exK) {
+                  try { localStorage.setItem("akini_music_playlists_v2", JSON.stringify(v)); } catch (t) {}
+                  _plSwitchTo(exK, false);
+                  console.log("[歌单] 同步更新:", plName, "歌曲数:", o.length);
+                } else {
+                  var plKey = "pl_" + Date.now();
+                  v.push({ key: plKey, name: String(plName), cover: (o[0] && o[0].cover) || "", tracks: o });
+                  try { localStorage.setItem("akini_music_playlists_v2", JSON.stringify(v)); } catch (t) {}
+                  _plSwitchTo(plKey, false);
+                  console.log("[歌单] 新增歌单:", plName, "歌曲数:", o.length);
+                }
               })(),
               e.playlistInput && (e.playlistInput.value = ""),
               Pt(),
@@ -30376,73 +30384,9 @@ if (!window.__akiniUnreadTickerStarted) {
   /* v672: 开屏公告查看与关闭逻辑（稳固保底版，支持随时调起） */
   window.__akiniOpenSplashNotice = function () {
     try {
-      var sp = document.getElementById("akiniSplash");
-      if (!sp) {
-        // 如果 DOM 被意外销毁，动态创建白黑极简版结构保底
-        var div = document.createElement("div");
-        div.id = "akiniSplash";
-        div.innerHTML = '<div class="akini-splash-inner">' +
-          '<div class="akini-splash-top">' +
-            '<div class="akini-splash-logo" style="background:#ffffff !important;border:1.5px solid #111111 !important;color:#111111 !important;">' +
-              '<svg viewBox="0 0 24 24" fill="none" stroke="#111111" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
-            '</div>' +
-            '<div class="akini-splash-title">Akini</div>' +
-            '<div class="akini-splash-subtitle">你的出现，是天意，是命运</div>' +
-          '</div>' +
-          '<div class="akini-splash-modules">' +
-            '<div class="akini-splash-module">' +
-              '<div class="akini-splash-module-head">开源作者 & 鸣谢</div>' +
-              '<div class="akini-splash-module-body">' +
-                '<p>抖音：QSL1027CYLOVO</p>' +
-                '<p>小红书：4297298313</p>' +
-                '<p>大部分功能灵感来源于 milk 老师</p>' +
-                '<p>TA 的手机是之缘老师</p>' +
-                '<p>观影是我要学英语老师</p>' +
-                '<p class="akini-splash-thanks">感谢以上老师</p>' +
-                '<hr/>' +
-                '<p>二传标明出处 🈲二改 发视频请打 tag</p>' +
-                '<p>嘴过乙游男主的使用替我挡灾</p>' +
-                '<p>请不要使用我的网站进行对比、拉踩、诋毁，请不要无端造谣</p>' +
-                '<p>网站无 AI 纯概率抽字卡，不存在👻说</p>' +
-                '<p>网站内容功能很简单，自行摸索</p>' +
-              '</div>' +
-            '</div>' +
-            '<div class="akini-splash-module">' +
-              '<div class="akini-splash-module-head">常见问题</div>' +
-              '<div class="akini-splash-module-body">' +
-                '<p><b>网易云歌单导入</b></p>' +
-                '<p>进入网易云 → 点进想要导入的歌单 → 点击分享复制链接 → 进入浏览器删掉文字搜索链接 → 进入界面后点击地址栏出现的长链接导入即可。观影链接步骤同。</p>' +
-                '<hr/>' +
-                '<p><b>MJ 头像在哪里更换/添加</b></p>' +
-                '<p>进入首页 → 微信 → 右上角加号创建 → 确认创建。后续更换名字/头像，进入聊天界面点击昵称条后面的小括号管理弹窗。</p>' +
-              '</div>' +
-            '</div>' +
-          '</div>' +
-          '<button class="akini-splash-enter" id="akiniSplashEnter" type="button" style="background:#111111 !important; color:#ffffff !important; border-radius:9999px !important; border:none !important; box-shadow:0 4px 16px rgba(0,0,0,0.25) !important;">我已知晓并遵守规则</button>' +
-        '</div>';
-        document.body.appendChild(div);
-        sp = div;
-      }
-      // 彻底重置所有 display / z-index / visibility / opacity 样式
-      sp.classList.remove("hidden");
-      sp.classList.add("loaded");
-      sp.style.removeProperty("display");
-      sp.style.removeProperty("visibility");
-      sp.style.removeProperty("pointer-events");
-      sp.style.removeProperty("z-index");
-      sp.style.removeProperty("opacity");
-      sp.style.setProperty("display", "flex", "important");
-      sp.style.setProperty("visibility", "visible", "important");
-      sp.style.setProperty("pointer-events", "auto", "important");
-      sp.style.setProperty("z-index", "9999999", "important");
-      sp.style.setProperty("opacity", "1", "important");
-
-      var enterBtn = sp.querySelector("#akiniSplashEnter");
-      if (enterBtn) {
-        enterBtn.onclick = function (e) {
-          if (e) e.stopPropagation();
-          window.__akiniCloseSplashNotice();
-        };
+      var modal = document.getElementById("akiniSiteNoticeModal");
+      if (modal) {
+        modal.style.display = "flex";
       }
     } catch (e) {
       console.error(e);
@@ -30451,16 +30395,10 @@ if (!window.__akiniUnreadTickerStarted) {
 
   window.__akiniCloseSplashNotice = function () {
     try {
-      var sp = document.getElementById("akiniSplash");
-      if (!sp) return;
-      sp.style.setProperty("opacity", "0", "important");
-      sp.style.setProperty("pointer-events", "none", "important");
-      setTimeout(function () {
-        sp.classList.add("hidden");
-        sp.style.setProperty("display", "none", "important");
-        sp.style.setProperty("visibility", "hidden", "important");
-        sp.style.setProperty("z-index", "-99999", "important");
-      }, 260);
+      var modal = document.getElementById("akiniSiteNoticeModal");
+      if (modal) {
+        modal.style.display = "none";
+      }
     } catch (e) {}
   };
 
