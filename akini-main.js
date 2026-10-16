@@ -32172,17 +32172,17 @@ window.__akiniBugCheck = function () {
         }
       }
       else if (j.code === 803) {
-        /* v982：确认成功路径做到极致轻量（iOS PWA 切回时内存敏感，绝不触发重型通知/渲染） */
+        /* v1002：确认成功时明确提示登录成功，稍作停留确保用户可见并刷新状态 */
         _curKey = "";
         stopPoll();
         try { lsDel(LS_QR); } catch (e0) {}
-        try { qrStatus("登录成功"); } catch (e1) {}
-        try { hideQr(); } catch (e2) {}
+        try { qrStatus("✓ 登录成功，正在进入…"); } catch (e1) {}
         setTimeout(function () {
+          try { hideQr(); } catch (e2) {}
           try { _sessCache = null; window.__akiniNeRefresh(true); } catch (e3) {}
           try { var b2 = el("neMyPlaylists"); if (b2) b2.removeAttribute("data-loaded"); } catch (e4) {}
-          setTimeout(function () { try { window.__akiniNeLoadPl && window.__akiniNeLoadPl(); } catch (e5) {} }, 800);
-        }, 400);
+          setTimeout(function () { try { window.__akiniNeLoadPl && window.__akiniNeLoadPl(); } catch (e5) {} }, 500);
+        }, 1000);
       }
       else { var _raw = "code:" + (j && j.code) + (j && j.msg ? " " + String(j.msg) : ""); qrStatus("状态查询异常(" + _raw + ")，继续等待…"); schedulePoll(POLL_MS); }
     });
@@ -32374,4 +32374,22 @@ window.__akiniBugCheck = function () {
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
   else bind();
+})();
+
+// v1002: 保证一起听发消息输入框必能点击呼起键盘
+(function(){
+  document.addEventListener("DOMContentLoaded", function(){
+    var inp = document.getElementById("musicChatInput");
+    var modal = document.getElementById("musicChatModal");
+    if (inp) {
+      inp.addEventListener("click", function(e){
+        e.stopPropagation();
+        try { inp.focus(); } catch(_) {}
+      });
+      inp.addEventListener("touchend", function(e){
+        e.stopPropagation();
+        try { inp.focus(); } catch(_) {}
+      });
+    }
+  });
 })();
