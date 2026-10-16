@@ -9159,15 +9159,88 @@ window.akiniContacts = {
                 }
                 return "";
               }
+              /* v983：会话元数据(lastMsg)缺失/未加载时，多级兜底提取最后一条消息：
+                 1) 内存 sessions.lastMsg  2) 内存 messagesHTML  3) LS聊天记录(同步)
+                 4) IDB聊天记录/会话(异步回填后自动重渲染列表) —— 根治"聊天列表最新消息一直不显示" */
+              var _akPendingLastMsg = window.__akPendingLastMsg = window.__akPendingLastMsg || {};
+              function _akExtractPreviewFromHTML(h) {
+                try {
+                  if (!h || typeof h !== "string" || h.length > 900000) return "";
+                  var d = document.createElement("div");
+                  d.innerHTML = h;
+                  var rows = Array.from(d.querySelectorAll(".msg-row"));
+                  for (var a = rows.length - 1; a >= 0; a--) {
+                    var row = rows[a];
+                    if (row.classList.contains("system")) {
+                      var cc = (row.textContent || "").trim();
+                      if (/(未接来电|拒接来电|取消来电|通话时长)/.test(cc)) continue;
+                      return cc;
+                    }
+                    var b2 = row.querySelector(".bubble");
+                    if (b2) {
+                      if (b2.querySelector("img") && "" === b2.textContent.trim()) return "【表情包】";
+                      if (b2.classList && b2.classList.contains("transfer-bubble")) {
+                        var s2 = b2.querySelector('div[style*="font-weight:700"]');
+                        return "【转账】" + (s2 ? s2.textContent.trim() : "");
+                      }
+                      var tc = b2.textContent.trim();
+                      if (tc) return tc;
+                    }
+                  }
+                } catch (e2) {}
+                return "";
+              }
+              function _akLastMsgFromHistory(id) {
+                try {
+                  var h = localStorage.getItem("akini_chat_history_" + id) || "";
+                  if (h) return _akExtractPreviewFromHTML(h);
+                } catch (e) {}
+                return "";
+              }
+              function _akAsyncFillLastMsg(id) {
+                if (_akPendingLastMsg[id] || _akPendingLastMsg[id + "_loading"]) return;
+                _akPendingLastMsg[id + "_loading"] = 1;
+                try {
+                  if (window._idbStore && window._idbStore.get) {
+                    window._idbStore.get("akini_chat_history_" + id, function (v) {
+                      var txt = _akExtractPreviewFromHTML(v);
+                      if (txt) {
+                        _akPendingLastMsg[id] = txt;
+                        delete _akPendingLastMsg[id + "_loading"];
+                        if (typeof window.__akiniRefreshChatListBadges === "function") window.__akiniRefreshChatListBadges();
+                        return;
+                      }
+                      /* 聊天记录 IDB 也无 → 从 IDB 的会话元数据找 lastMsg */
+                      try {
+                        window._idbStore.get("akini_chat_sessions", function (sv) {
+                          delete _akPendingLastMsg[id + "_loading"];
+                          try {
+                            var obj = typeof sv === "string" ? JSON.parse(sv) : sv;
+                            var lm = obj && obj[id] && obj[id].lastMsg;
+                            if (lm) {
+                              _akPendingLastMsg[id] = String(lm);
+                              if (typeof window.__akiniRefreshChatListBadges === "function") window.__akiniRefreshChatListBadges();
+                            }
+                          } catch (e3) {}
+                        });
+                      } catch (e4) { delete _akPendingLastMsg[id + "_loading"]; }
+                    });
+                  } else {
+                    delete _akPendingLastMsg[id + "_loading"];
+                  }
+                } catch (e5) { delete _akPendingLastMsg[id + "_loading"]; }
+              }
               var l = [];
               (e.forEach(function (t) {
                 var e = i[t.id] || {};
+                var _pv = r(e) || _akLastMsgFromHistory(t.id);
+                if (!_pv && window._idbStore) _akAsyncFillLastMsg(t.id);
                 l.push({
                   id: t.id,
                   type: "contact",
                   name: t.name,
                   avatar: t.avatar,
-                  lastMsg: r(e),
+                  lastMsg: _pv || _akPendingLastMsg[t.id] || "",
                   lastSenderName: c(e),
                   lastTime: e.lastTime || 0,
                   unread: e.unread || 0,
@@ -22765,7 +22838,11 @@ window.akiniContacts = {
           }
         }
         if (c.length) {
-          var t = head + '<div style="font-size:11.5px;color:#f5a623;line-height:1.45;padding:8px 10px;margin-bottom:10px;background:rgba(245,166,35,0.1);border-radius:8px;text-align:center">⚠️ VIP / 付费歌曲受版权限制，仅能试听片段</div>';
+          /* v984：已登录网易云时不再显示"仅能试听"提示（登录账号可播完整版） */
+          var _vipHint = window.__akiniNeLoggedIn
+            ? ""
+            : '<div style="font-size:11.5px;color:#f5a623;line-height:1.45;padding:8px 10px;margin-bottom:10px;background:rgba(245,166,35,0.1);border-radius:8px;text-align:center">⚠️ VIP / 付费歌曲受版权限制，未登录账号仅可试听片段</div>';
+          var t = head + _vipHint;
             (c.forEach(function (e, n) {
               var i = n === l;
               t +=
@@ -31993,6 +32070,33 @@ window.__akiniBugCheck = function () {
     if (bOut) bOut.style.display = logged ? "" : "none";
   }
 
+  /* v984：登录后展示网易云头像+昵称 */
+  function renderNeAccount(p) {
+    var s = el("neAccountStatus");
+    if (!s) return;
+    var nick = p && p.nickname ? String(p.nickname) : "已登录";
+    var av = p && p.avatarUrl ? String(p.avatarUrl) : "";
+    if (av) {
+      s.innerHTML = "";
+      var img = document.createElement("img");
+      img.src = av;
+      img.alt = nick;
+      img.style.cssText = "width:40px;height:40px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 6px;border:1px solid #eee;background:#f2f2f7;";
+      img.onerror = function () { this.style.display = "none"; };
+      s.appendChild(img);
+      var nm = document.createElement("div");
+      nm.textContent = nick;
+      nm.style.cssText = "font-size:13px;color:#1a1a1a;font-weight:600;";
+      s.appendChild(nm);
+      var sub = document.createElement("div");
+      sub.textContent = "已登录 · VIP歌曲可播完整版";
+      sub.style.cssText = "font-size:11px;color:#777;margin-top:2px;";
+      s.appendChild(sub);
+    } else {
+      s.textContent = "已登录 · " + nick;
+    }
+  }
+
   /* 账号资料 60s 缓存 + 并发刷新合并为一次 */
   window.__akiniNeRefresh = function (force) {
     var now = Date.now();
@@ -32004,8 +32108,11 @@ window.__akiniBugCheck = function () {
       _sessCache = j;
       if (j && j.loggedIn) {
         window.__akiniNeLoggedIn = true;
-        var nick = j.profile && j.profile.nickname ? String(j.profile.nickname) : "已登录";
-        setStatus("已登录 · " + nick, true);
+        window.__akiniNeProfile = j.profile || null;
+        renderNeAccount(j.profile);
+        var bIn2 = el("neLoginBtn"), bOut2 = el("neLogoutBtn");
+        if (bIn2) bIn2.style.display = "none";
+        if (bOut2) bOut2.style.display = "";
       } else {
         window.__akiniNeLoggedIn = false;
         setStatus("未登录 · VIP歌曲仅可试听", false);
@@ -32038,11 +32145,26 @@ window.__akiniBugCheck = function () {
     var box = el("neQrBox");
     if (!box) return;
     box.innerHTML = "";
+    /* v982：qrcode.min.js 为异步加载，库未就绪时短暂重试而非直接报错 */
+    if (typeof QRCode === "undefined") {
+      var _try = parseInt(box.getAttribute("data-retry") || "0", 10);
+      if (_try < 4) {
+        box.setAttribute("data-retry", String(_try + 1));
+        box.innerHTML = '<div style="font-size:12px;color:#999;padding:8px;text-align:center">二维码组件加载中…</div>';
+        setTimeout(function () {
+          var ov = el("neQrOverlay");
+          if (ov && ov.style.display !== "none") renderQr(qrurl);
+        }, 400);
+        return;
+      }
+      box.innerHTML = '<div style="font-size:11px;color:#c00;padding:8px;text-align:center">二维码组件加载失败<br>请检查网络后点「重新获取」</div>';
+      return;
+    }
+    box.removeAttribute("data-retry");
     try {
-      if (typeof QRCode === "undefined") throw new Error("no qrcode lib");
       new QRCode(box, { text: qrurl, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
     } catch (e) {
-      box.innerHTML = '<div style="font-size:11px;color:#c00;padding:8px;text-align:center">二维码组件加载失败<br>请检查网络后点「重新获取」</div>';
+      box.innerHTML = '<div style="font-size:11px;color:#c00;padding:8px;text-align:center">二维码渲染失败，请点「重新获取」</div>';
     }
   }
   function qrStatus(txt) { var s = el("neQrStatus"); if (s) s.textContent = txt; }
@@ -32088,22 +32210,15 @@ window.__akiniBugCheck = function () {
         }
       }
       else if (j.code === 803) {
+        /* v982：确认成功路径做到极致轻量（iOS PWA 切回时内存敏感，绝不触发重型通知/渲染） */
         _curKey = "";
         stopPoll();
-        lsDel(LS_QR);
-        qrStatus("登录成功，正在同步账号信息…");
-        setTimeout(function () { hideQr(); }, 900);
-        _sessCache = null;
-        window.__akiniNeRefresh(true);
-        try {
-          if (typeof window.showInAppNotif === "function") {
-            window.showInAppNotif({
-              app: "网易云", name: "扫码登录",
-              msg: (j.profile && j.profile.nickname ? String(j.profile.nickname) : "网易云账号") + " 登录成功，VIP歌曲可播放完整版",
-              fullContent: true, onTap: function () {}
-            });
-          }
-        } catch (e) {}
+        try { lsDel(LS_QR); } catch (e0) {}
+        try { qrStatus("登录成功"); } catch (e1) {}
+        try { hideQr(); } catch (e2) {}
+        setTimeout(function () {
+          try { _sessCache = null; window.__akiniNeRefresh(true); } catch (e3) {}
+        }, 400);
       }
       else { qrStatus("状态查询异常，继续等待…"); schedulePoll(POLL_MS); }
     });
@@ -32182,9 +32297,48 @@ window.__akiniBugCheck = function () {
       if (o && o.style.display !== "none" && _curKey) schedulePoll(800);
     });
 
-    /* 打开音乐菜单时刷新登录态（60s缓存自动合并） */
+    /* v984 回到前台：强制向服务端核对登录态（捕获其他标签页/扫码已确认但本会话未刷新） */
+    window.addEventListener("pageshow", function () {
+      try { _sessCache = null; window.__akiniNeRefresh(true); } catch (e) {}
+      /* 前台恢复时，若正打开聊天且内存里有新消息（后台期间到达），立即补渲染，无需返回重进 */
+      try {
+        var act = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+        var u = document.getElementById("chatBody");
+        if (act && u) {
+          var mem = (typeof window.__akiniGetChatMem === "function" ? window.__akiniGetChatMem(act) : "") || "";
+          if (mem && mem.length > (u.innerHTML || "").length + 40) {
+            u.innerHTML = mem;
+            try { window.__akiniMedia && window.__akiniMedia.resolve(u); } catch (e2) {}
+            u.scrollTop = u.scrollHeight;
+          }
+        }
+      } catch (e3) {}
+    });
+
+    /* 打开音乐菜单时刷新登录态（60s缓存自动合并）+ 静默续扫待确认二维码，捕获迟到的803 */
     var mb = el("musicMenuBtn");
-    if (mb && !mb._neBound) { mb._neBound = 1; mb.addEventListener("click", function () { setTimeout(function () { window.__akiniNeRefresh(false); }, 150); }); }
+    if (mb && !mb._neBound) {
+      mb._neBound = 1;
+      mb.addEventListener("click", function () {
+        setTimeout(function () { window.__akiniNeRefresh(false); }, 150);
+        setTimeout(function () {
+          try {
+            var ov = el("neQrOverlay");
+            if (!ov || ov.style.display !== "none" || _curKey) return;
+            var p = lsGet(LS_QR);
+            if (!p) return;
+            var o = JSON.parse(p);
+            if (o && o.key && (Date.now() - (o.ts || 0)) < 5 * 60 * 1000) {
+              _curKey = o.key;
+              _failStreak = 0; _backoffIdx = 0; _expiredWaits = 0;
+              schedulePoll(1200);
+            } else {
+              lsDel(LS_QR);
+            }
+          } catch (e) {}
+        }, 400);
+      });
+    }
 
     /* 老版本 localStorage Cookie 一次性迁入服务端（成功后本地删除） */
     var oldCk = lsGet(LS_OLDCK);
