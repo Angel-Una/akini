@@ -217,7 +217,7 @@ function __akiniStripMedia(html) {
   });
 }
 /* 深度安全模式首批渲染减半：少解码图片，降低崩溃风险 */
-var AKINI_CHAT_BATCH_SIZE = 25; // 参考 milk 与 syy：更保守控制单次挂载 25 条，极大降低 DOM 过载与内存溢出卡崩闪退
+var AKINI_CHAT_BATCH_SIZE = 25; // 参考 极简 与 极简：更保守控制单次挂载 25 条，极大降低 DOM 过载与内存溢出卡崩闪退
 function __akiniStripTypingRows(html) {
   if (!html || "string" != typeof html) return html || "";
   var hasTyping =
@@ -311,7 +311,7 @@ function __akiniIncCount(html, cid, lane) {
 }
 window.__akiniIncCount = __akiniIncCount;
 
-/* v974：对齐 milk 纯原图直通策略，彻底移除对 FileReader.readAsDataURL 的 canvas 降质压缩，保证所有图片与壁纸 100% 原始画质 */
+/* v974：对齐极简 纯原图直通策略，彻底移除对 FileReader.readAsDataURL 的 canvas 降质压缩，保证所有图片与壁纸 100% 原始画质 */
 
 /* 启动迁移：把 localStorage 中已存在的超大 base64 图片就地压缩，腾出配额 */
 window.__akiniCompressExistingImages = function (done) {
@@ -393,7 +393,7 @@ function __akiniShowBanner(msg, color) {
   b.textContent = msg;
 }
 window.__akiniBootStep = "start";
-/* v905 milk式容错改造：safeCall/safeAwait 全局工具——任何模块崩溃只损失该功能，不牵连整体启动 */
+/* v905 极简容错改造：safeCall/safeAwait 全局工具——任何模块崩溃只损失该功能，不牵连整体启动 */
 window.__akiniSafeCall = function (fn, label) {
   try { return typeof fn === "function" ? fn() : undefined; }
   catch (e) { try { console.error("[Akini][safe]", label || "", e); } catch (_e) {} }
@@ -409,7 +409,7 @@ window.__akiniSafeAwait = function (p, fallback, label) {
 /* v908 恢复放行 failsafe：IDB/快照对账因任何原因卡住时，3.5 秒强制放行 __akiniBootApp（与 boot 等待上限 12×250ms 对齐）——v907 的 10 秒上限在低配机上让开屏停 10 秒不消失，用户感知"卡在初始首页进不去" */
 setTimeout(function () { try { window.__akiniRestoreSettled = true; } catch (eF) {} }, 3500);
 /* v905 启动看门狗：主启动链若中途崩溃（未到达 boot-complete 标记），
-   6 秒后自动补跑关键数据恢复与首屏渲染，保证页面始终可用——对齐 milk 的 allSettled 容错语义 */
+   6 秒后自动补跑关键数据恢复与首屏渲染，保证页面始终可用——对齐极简 的 allSettled 容错语义 */
 (function () {
   setTimeout(function () {
     try {
@@ -481,7 +481,7 @@ setTimeout(function () { try { window.__akiniRestoreSettled = true; } catch (eF)
                 try {
                   var w = __bgIm.naturalWidth || 0, h = __bgIm.naturalHeight || 0;
                   if (!w || !h) return;
-                  /* v974 对齐 milk：不压缩 home_bg，保留高清原图直显 */
+                  /* v974 对齐极简：不压缩 home_bg，保留高清原图直显 */
                   __bgApply(bg);
                 } catch (e1) { /* 压缩失败不应用：保住启动 */ }
               };
@@ -1214,7 +1214,7 @@ window._idbStore = (function () {
             (function next() {
               if (idx >= lsItems.length) {
                 // 额外写一份全量快照单键（IDB 容量大），作为最终兜底恢复源
-                // v540 对齐 milk/syy：聚合快照只收 ≤100KB 小键，避免每次全库 stringify 数 MB 字符串（卡顿掉帧主源）；
+                // v540 对齐 极简标杆：聚合快照只收 ≤100KB 小键，避免每次全库 stringify 数 MB 字符串（卡顿掉帧主源）；
                 // 大键已由上方逐键 setItem 写入 IDB，不进聚合快照也不丢
                 try {
                   var snap = {};
@@ -1223,7 +1223,7 @@ window._idbStore = (function () {
                     snap[lsItems[si].k] = lsItems[si].v;
                   }
                   snap.__ts = _now;
-                  /* v640 对齐 milk：快照 stringify/setItem 移入空闲时段，不占交互帧 */
+                  /* v640 对齐极简：快照 stringify/setItem 移入空闲时段，不占交互帧 */
                   var _snapStr = JSON.stringify(snap);
                   var _idleSnap = function () {
                     try { inst.setItem("akini_idb_full_snapshot", _snapStr).then(done, done); }
@@ -1271,7 +1271,7 @@ window._idbStore = (function () {
             }).then(function () {
               /* 深度安全模式：跳过快照兜底的全量 JSON.parse（内存峰值大），逐键恢复已够 */
               if (document.documentElement.classList.contains("akini-deep-safe")) { done(); return; }
-              // v640 对齐 milk 启动轻量化：全量快照 JSON.parse 有数 MB 内存峰值，
+              // v640 对齐极简 启动轻量化：全量快照 JSON.parse 有数 MB 内存峰值，
               // 只在检测到关键键确实缺失时才 parse 兜底（逐键恢复正常时零成本）
               inst.getItem("akini_idb_full_snapshot").then(function (snapRaw) {
                 try {
@@ -1505,7 +1505,7 @@ window._idbStore = (function () {
             try { localStorage.removeItem("akini_localstorage_snapshot_backup"); } catch (e4) {}
           } catch (e) {}
         }
-        /* v922 切后台卡崩根治（对齐 milk：pagehide 只做轻量应急备份）：
+        /* v922 切后台卡崩根治（对齐极简：pagehide 只做轻量应急备份）：
            pagehide 的系统时间预算极短（移动端常 <1s），原在此同步跑
            「全量快照 + IDB 全量备份 + Cache 全量备份」三连重活，是切后台卡崩闪退主因。
            全量三连挪到 visibilitychange(hidden)——触发更早、App 仍在前台、CPU 预算充足
@@ -1608,7 +1608,7 @@ window._idbStore = (function () {
     } catch (e) {}
     try {
       window._akiniRestoreFromSnapshot = function (e) {
-        /* v976 对齐 milk/syy 纯原生存储：彻底废弃旧快照回填机制！
+        /* v976 对齐 极简标杆 纯原生存储：彻底废弃旧快照回填机制！
            禁止从任何 snapshot 或旧快照字符串中回填已被用户清空或更换的数据，
            根治头像、背景图、网易云等数据被回退到旧版本 */
         if (typeof e === "function") {
@@ -2671,7 +2671,7 @@ window._idbStore = (function () {
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
           if ("pat" === e || "pat" === n) return false;
-          // v881 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
+          // v881 对齐极简：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
           var _tx = ("string" == typeof t) ? t : (t.text || t.content || "");
           return "string" == typeof _tx && !!_tx.trim();
         });
@@ -3666,7 +3666,7 @@ window.akiniContacts = {
                row.querySelector(":scope > .msg-content-line .msg-rr");
       if (rr) {
         rr.style.visibility = "visible";
-        /* v614 关键修复：已读持久化改为轻量 readMark（chatId→最大已读 data-ts），对齐 syy 数据层思路。
+        /* v614 关键修复：已读持久化改为轻量 readMark（chatId→最大已读 data-ts），对齐极简 数据层思路。
            旧方案用 chatBody.innerHTML 覆盖 session：① chatBody 只含当前渲染的≤25条，全量记录被截断；
            ② 下次进聊天 tt() 五源合并时，旧全量(无已读标记)行数更多被选中 → 已读回执消失再出现；
            ③ ct() 的 IDB 行数比较恒成立 → 每次进聊天都二次全量重绘（进聊天卡顿元凶）。 */
@@ -4092,7 +4092,7 @@ window.akiniContacts = {
           f = i("akini_wordbank", []).filter(function (t) {
             if (!t) return false;
             if (t.tab && "main" !== t.tab) return false;
-            // v881 对齐 milk：抽到啥发啥——池内就是你添加的全部主字卡，仅排除空值，
+            // v881 对齐极简：抽到啥发啥——池内就是你添加的全部主字卡，仅排除空值，
             // 绝不做长度/符号/内容过滤（手动打的任何文字都必须能被抽中发出）
             var _txt = ("string" == typeof t) ? t : (t.text || t.content || "");
             return "string" == typeof _txt && !!_txt.trim();
@@ -4266,7 +4266,7 @@ window.akiniContacts = {
           });
           replyCount = Math.max(1, replyCount - 1);
         }
-        // v881 对齐 milk：抽到啥发啥——仅保留 milk 同款防呆（text 非字符串/空时跳过，等价 milk 的 filter(Boolean)）
+        // v881 对齐极简：抽到啥发啥——仅保留 极简 同款防呆（text 非字符串/空时跳过，等价 极简 的 filter(Boolean)）
         function __isValidTextCard(item) {
           var txt = ("string" == typeof item) ? item : (item && (item.text || item.content)) || "";
           return "string" == typeof txt && !!txt.trim();
@@ -4276,7 +4276,7 @@ window.akiniContacts = {
               ? o.forceText
               : f[Math.floor(Math.random() * f.length)],
             j = "string" == typeof q ? q : q.text || q.content || "";
-          // v881：池已对齐 milk，抽中的字卡直接发出（抽到啥发啥）
+          // v881：池已对齐极简，抽中的字卡直接发出（抽到啥发啥）
           if (!__isValidTextCard(q)) continue;
           msgArr.push({ html: rt(j), text: B + j });
         }
@@ -4623,7 +4623,7 @@ window.akiniContacts = {
       if (pending.readTimer) { clearTimeout(pending.readTimer); pending.readTimer = null; }
       if (pending.typingTimer) { clearTimeout(pending.typingTimer); pending.typingTimer = null; }
 
-      // 对齐 milk 回复延迟核心：严格在用户设置的最低和最高之间随机生成回复总时长
+      // 对齐极简 回复延迟核心：严格在用户设置的最低和最高之间随机生成回复总时长
       var _rm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
           _rx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
       if (!(_rm > 0)) _rm = 3;
@@ -4638,7 +4638,7 @@ window.akiniContacts = {
         }
       }
 
-      // milk 公式：randomDelay = replyDelayMin + Math.random() * (replyDelayMax - replyDelayMin)
+      // 极简 公式：randomDelay = replyDelayMin + Math.random() * (replyDelayMax - replyDelayMin)
       var delayRangeSec = Math.max(0, _rx - _rm);
       var randomDelaySec = _rm + Math.random() * delayRangeSec;
       var __replyDelay = Math.max(500, Math.round(randomDelaySec * 1000));
@@ -4673,7 +4673,7 @@ window.akiniContacts = {
         } catch (err) {}
       }
 
-      // 对齐 milk：发送后立即展示输入动态（仅当会回复时），不再等待已读延迟——用户反馈"秒显示"
+      // 对齐极简：发送后立即展示输入动态（仅当会回复时），不再等待已读延迟——用户反馈"秒显示"
       if ("none" !== n.type && chatId === window.akiniContacts.getActiveChatId()) {
         try {
           var _ti = document.getElementById("typingIndicator");
@@ -4876,7 +4876,7 @@ window.akiniContacts = {
         } catch (e) {}
       }, 120000);
     })();
-    /* v912 对齐 syy/milk 数据防丢失机制（_backupCriticalData/_tryRecoverFromBackup 数量守恒）：
+    /* v912 对齐极简/极简 数据防丢失机制（_backupCriticalData/_tryRecoverFromBackup 数量守恒）：
        切回前台时对核心列表键做「数量守恒」校验——localStorage 当前数组长度 < IDB 镜像长度
        （后台被系统强杀/写入丢失导致列表被截断或清空）时，自动用 IDB 镜像恢复该键并重渲染，
        杜绝数据消失；镜像不比当前多则绝不触碰，防误覆盖。 */
@@ -5546,7 +5546,7 @@ window.akiniContacts = {
         __readDelay + 400,
         __replyDelay - 1e3 * (_tm + Math.random() * (_tx - _tm))
       );
-      /* v614 对齐 __akiniScheduleReply 与 syy：调用瞬间（表情包/卡片刚发出）立即点亮输入动态。
+      /* v614 对齐 __akiniScheduleReply 与 极简：调用瞬间（表情包/卡片刚发出）立即点亮输入动态。
          旧时序 typing 排在 __typingDelay（最晚已读后 4s+ 才显示）——用户反馈
          "已读回执都显示了但输入动态等好久"的根因；typing 持续到回复到达，
          由 showTypingBubble 自带兜底计时器收尾 */
@@ -5736,7 +5736,7 @@ window.akiniContacts = {
       try { window.__akiniMedia && window.__akiniMedia.resolve(U); } catch (e) {}
       U.scrollTop = U.scrollHeight;
       /* v614: 每次 scrollTop=scrollHeight 都触发强制同步布局；图片多时一次 reflow 就贵，
-         砍掉 120/900 两次只留 500ms 一次兜底（rAF 滚动已在前面），对齐 syy 只滚一次的思路 */
+         砍掉 120/900 两次只留 500ms 一次兜底（rAF 滚动已在前面），对齐极简 只滚一次的思路 */
       [500].forEach(function (_ms) {
         setTimeout(function () { try { U.scrollTop = U.scrollHeight; } catch (e) {} }, _ms);
       });
@@ -6110,7 +6110,7 @@ window.akiniContacts = {
       var clean = __akiniIncMedia(__akiniIncTyping(e, t), t);
       E[t] = clean;
       
-      // 参考 milk/syy 防卡死机制：物理写盘（IDB/localStorage）实行 300ms 防抖合并
+      // 参考 极简标杆 防卡死机制：物理写盘（IDB/localStorage）实行 300ms 防抖合并
       // 彻底消除短时间内连续发送/接收多条消息时频繁同步序列化与写盘造成的阻塞与掉帧卡崩
       window.__akiniSaveDebounceTimers = window.__akiniSaveDebounceTimers || {};
       if (window.__akiniSaveDebounceTimers[t]) {
@@ -7116,7 +7116,7 @@ window.akiniContacts = {
         } catch (e) {}
       }),
       // 同步写应急快照到 sessionStorage：刷新/返回时 IDB 事务可能未落盘，sessionStorage 同步可靠
-      // v506：参照 milk 的截断保护——数据量大时只保留最近 N 条日记/评论，避免 pagehide 序列化数十MB卡死
+      // v506：参照 极简 的截断保护——数据量大时只保留最近 N 条日记/评论，避免 pagehide 序列化数十MB卡死
       (window._akiniEmergencySnapshot = function () {
         try {
           var diaries = q();
@@ -8836,7 +8836,7 @@ window.akiniContacts = {
           localStorage.length > 0
         )
           window._akiniCacheStore.backupAll();
-        /* v574 闪退卡崩根因修复（对齐 milk/syy）：
+        /* v574 闪退卡崩根因修复（对齐 极简标杆）：
            原代码在此处对「整个 localStorage」做 JSON.stringify(snapshot) 连续两次，
            localStorage 含聊天记录/图片可达数 MB~数十 MB，每次 stringify 分配数倍临时字符串，
            在 visibilitychange(hidden)/pagehide 这种「系统只给极短 CPU 时间 + 严格内存上限」的时机
@@ -16427,7 +16427,7 @@ window.akiniContacts = {
                   } catch (e) {}
 
                   try {
-                    /* v640 对齐 milk：大串同步写 LS 是卡顿/配额炸点。
+                    /* v640 对齐极简：大串同步写 LS 是卡顿/配额炸点。
                        主/备记录改走 akiniStore 大键通道（内存+IDB 队列，自动跳 LS）；
                        LS 仅保留 200 条截断应急副本 */
                     if (window.akiniStore && window.akiniStore.set) {
@@ -19718,7 +19718,7 @@ window.akiniContacts = {
                     }
                   },
                 ),
-                /* v640 对齐 milk/syy：全量重渲染仅在其界面可见时执行——
+                /* v640 对齐 极简标杆：全量重渲染仅在其界面可见时执行——
                    Tn 在每条消息/开关头像后都可能触发，隐藏界面的重排是纯浪费，
                    长会话+大朋友圈时是持续掉帧主源之一 */
                 (function () {
@@ -20229,7 +20229,7 @@ window.akiniContacts = {
               /* 压缩大于 1600px 或 > 1.5MB 的超大图片，防止超出配额回退 */
               var img = new Image();
               img.onload = function () {
-                /* v974 对齐 milk 原图直存，不压缩任何画质 */
+                /* v974 对齐极简 原图直存，不压缩任何画质 */
                 saveAndApply(dataURL);
               };
               img.onerror = function () { saveAndApply(dataURL); };
@@ -20364,7 +20364,7 @@ window.akiniContacts = {
           var e = (t.tab || "").toLowerCase(),
             n = (t.type || "").toLowerCase();
           if ("pat" === e || "pat" === n) return false;
-          // v881 对齐 milk：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
+          // v881 对齐极简：兼容字符串条目与 text/content 字段，仅排除空值，抽到啥发啥
           var _tx = ("string" == typeof t) ? t : (t.text || t.content || "");
           return "string" == typeof _tx && !!_tx.trim();
         });
@@ -20689,7 +20689,7 @@ window.akiniContacts = {
                 return;
               }
               var intervals = getSafePostIntervals();
-              /* v928：对齐 syy 主动来信逻辑——首次也在 [min, max] 范围内随机取延迟，
+              /* v928：对齐极简 主动来信逻辑——首次也在 [min, max] 范围内随机取延迟，
                  而非固定用 min（避免"一到最短时间就发"的机械感） */
               var delayMins = intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
               var delayMs = Math.max(10000, Math.floor(delayMins * 60 * 1000));
@@ -21298,7 +21298,7 @@ window.akiniContacts = {
             if (_kaAudioEnabled() && _kaStartAt && !_kaUpTimer) _kaUpStart();
             _kaUpTick();
           } else if ("hidden" === document.visibilityState) {
-            /* v912：挂后台时彻底停掉每秒计时器（对齐 milk/syy 后台零 DOM 轮询）——
+            /* v912：挂后台时彻底停掉每秒计时器（对齐 极简标杆 后台零 DOM 轮询）——
                保活音频继续播放不受影响，切回前台自动恢复，杜绝长挂后台累积能耗被系统强杀 */
             if (_kaUpTimer) { clearInterval(_kaUpTimer); _kaUpTimer = null; }
           }
@@ -21410,12 +21410,12 @@ window.akiniContacts = {
       var _kaDelay = 0;            // 下次补播间隔；0=不在退避轨道
       var _kaLastPlayAt = 0;       // 最近一次成功开播时间（稳定 30s 后清零退避）
       function _kaAudioEnabled() {
-        /* v680 对齐 milk/syy：静音保活默认关闭（原先 !== false 默认开启）。
+        /* v680 对齐 极简标杆：静音保活默认关闭（原先 !== false 默认开启）。
            后台循环音频会被 iOS/Android 判定为异常高能耗，触发系统强杀进程（闪退元凶之一）。
            仅在用户显式开启开关后才播放；通话场景另有独立音频管理，不受影响 */
         try { return "1" === localStorage.getItem("akini_toggle_keepAliveToggle"); } catch (e) { return false; }
       }
-      /* v686 保活无时限计时（对齐 syy）：从开启时刻起算，每秒刷新「已保活时长」，不设上限，挂多久显示多久 */
+      /* v686 保活无时限计时（对齐极简）：从开启时刻起算，每秒刷新「已保活时长」，不设上限，挂多久显示多久 */
       var _kaStartAt = 0, _kaUpTimer = null;
       function _kaFmtUp(ms) {
         var s = Math.max(0, Math.floor(ms / 1000));
@@ -21467,11 +21467,11 @@ window.akiniContacts = {
         try {
           _kaUserStopped = false;
           if (!_kaAudio) {
-            /* 对齐 syy 的超长静音音频：本地 7 天静音 FLAC（约 2MB）。
+            /* 对齐极简 的超长静音音频：本地 7 天静音 FLAC（约 2MB）。
                ① 锁屏媒体卡片进度由音频真实位置驱动——2 秒 wav 循环导致卡片时间每 2 秒重置（用户实测根因），
-                 换 7 天长音频后可近乎无上限持续累计，与 syy 一致；
+                 换 7 天长音频后可近乎无上限持续累计，与 极简 一致；
                ② 消除 2 秒 loop 循环重启的系统 IPC 风暴（后台每 2 秒被唤醒处理音频会话，卡崩诱因之一）；
-               ③ syy 的远程静音源 img.heliar.top 已 DNS 失效，本地文件彻底无外链依赖。 */
+               ③ 极简 的远程静音源 img.heliar.top 已 DNS 失效，本地文件彻底无外链依赖。 */
             _kaAudio = new Audio("silence.flac");
             _kaAudio.loop = true;
             _kaAudio.volume = 0.01;
@@ -21519,7 +21519,7 @@ window.akiniContacts = {
       /* ===== v505：全局系统通知发送器（安卓/iOS 平台分支，必须在任何调用前定义） =====
          根因实测（用户截图）：安卓 Chrome 一旦注册了 Service Worker，页面级 new Notification()
          会抛 "Illegal constructor. Use ServiceWorkerRegistration.showNotification() instead."
-         milk 未注册 SW 所以 new Notification 合法——这正是 milk 通知可用而本站报错的根因。
+         极简 未注册 SW 所以 new Notification 合法——这正是 极简 通知可用而本站报错的根因。
          修复：有 SW 注册一律走 reg.showNotification；仅无 SW 环境才退回 new Notification。
          另一 bug：此函数此前只在首条消息流经 showInAppNotif 时才被定义，测试推送时它还不存在，
          走 new Notification → 安卓必炸。现在提前全局定义。 */
@@ -22013,18 +22013,18 @@ window.akiniContacts = {
         t = t || window.akiniContacts.getActiveChatId();
         const e = window.akiniContacts.getChatTarget(t);
         if (!e) return;
-        /* v909 单聊专属硬约束：群聊严禁主动发消息（对齐 milk——其主动发送仅作用于单聊对象，
+        /* v909 单聊专属硬约束：群聊严禁主动发消息（对齐极简——其主动发送仅作用于单聊对象，
            群聊会话不触发、不展示该功能行为） */
         if ("group" === e.type) return;
         const a = t === window.akiniContacts.getActiveChatId();
-        /* v909 按 milk（simulateReply）逻辑重做主动发消息：
+        /* v909 按 极简（simulateReply）逻辑重做主动发消息：
            ① 到点即发：删除旧版内部再调度 5~10 分钟的二次等待（旧版一轮实际等 10~20 分钟）
-           ② 单轮条数加权随机（milk 同款公式）：75% 发 1 条 / 约 24% 发 2 条 / 约 1% 发 3 条
+           ② 单轮条数加权随机（极简 同款公式）：75% 发 1 条 / 约 24% 发 2 条 / 约 1% 发 3 条
            ③ 每条独立走 AKR.pickReplyBehavior 概率系统——文本/表情包/引用/emoji 融入/转账/
-              问卷/商店卡按各自开关与概率页配置触发；字卡库为空时不发送不空转（对齐 milk
+              问卷/商店卡按各自开关与概率页配置触发；字卡库为空时不发送不空转（对齐极简
               "回复库为空提示并终止本轮"）
            ④ 每条之间按「消息回复延迟」设置随机间隔（拟真节奏），发送前显示输入动态，
-              I 落地出消息时自动隐藏输入动态（打字→出一条→打字→出一条，比 milk 更拟真） */
+              I 落地出消息时自动隐藏输入动态（打字→出一条→打字→出一条，比 极简 更拟真） */
         var _rc = Math.random() < 0.75 ? 1 : (Math.random() < 0.95 ? 2 : 3);
         var _dm = parseFloat(localStorage.getItem("akini_num_replyDelayMin") || "3"),
             _dx = parseFloat(localStorage.getItem("akini_num_replyDelayMax") || "7");
@@ -22131,7 +22131,7 @@ window.akiniContacts = {
             }
             var _targetId = (function () {
               /* v909 单聊专属：目标池仅联系人（contacts），彻底排除全部群聊（groups）——
-                 对齐 milk 主动发送只作用于单聊对象；群聊不参与主动发消息引擎的任何分支 */
+                 对齐极简 主动发送只作用于单聊对象；群聊不参与主动发消息引擎的任何分支 */
               var t = window.akiniContacts.getContacts();
               return 0 === t.length
                 ? null
@@ -22144,7 +22144,7 @@ window.akiniContacts = {
               return;
             }
             /* v909：来电分支仅对单聊联系人生效（目标池已无群聊，群来电分支随之移除）；
-               其余情况走 triggerTaReplyOnce（内部已硬禁群聊）按 milk 逻辑发 1~3 条 */
+               其余情况走 triggerTaReplyOnce（内部已硬禁群聊）按 极简 逻辑发 1~3 条 */
             if (!isCallOngoing() && !(we && we.active) && Math.random() < window.AKR.getProb("groupCall") && n && n.type !== "group") {
               var i = { targetId: _targetId };
               i.callerName = n.name;
@@ -22200,7 +22200,7 @@ window.akiniContacts = {
           return;
         }
         var intervals = getSafeIcityIntervals();
-        /* v928：对齐 syy 主动来信逻辑——首次也在 [min, max] 范围内随机取延迟 */
+        /* v928：对齐极简 主动来信逻辑——首次也在 [min, max] 范围内随机取延迟 */
         var delayMins = intervals.min + Math.random() * Math.max(0, intervals.max - intervals.min);
         var delayMs = Math.max(10000, Math.floor(delayMins * 60 * 1000));
         console.log("[Akini iCity] 下次发布计划：", (delayMs / 60000).toFixed(1), "分钟后触发");
@@ -22838,10 +22838,8 @@ window.akiniContacts = {
           }
         }
         if (c.length) {
-          /* v984：已登录网易云时不再显示"仅能试听"提示（登录账号可播完整版） */
-          var _vipHint = window.__akiniNeLoggedIn
-            ? ""
-            : '<div style="font-size:11.5px;color:#f5a623;line-height:1.45;padding:8px 10px;margin-bottom:10px;background:rgba(245,166,35,0.1);border-radius:8px;text-align:center">⚠️ VIP / 付费歌曲受版权限制，未登录账号仅可试听片段</div>';
+          /* v1000：按需求移除播放列表VIP提示条 */
+          var _vipHint = "";
           var t = head + _vipHint;
             (c.forEach(function (e, n) {
               var i = n === l;
@@ -24952,7 +24950,7 @@ window.akiniContacts = {
         }
       }
       function Q() {
-        // 对齐 syy：避免无节制创建 AudioContext 与 Oscillator，防止移动端音频管道耗尽闪退
+        // 对齐极简：避免无节制创建 AudioContext 与 Oscillator，防止移动端音频管道耗尽闪退
         return;
       }
       function __akiniStopAudio() {
@@ -26257,7 +26255,7 @@ window.akiniContacts = {
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) return;
       if (window._restoringData || window._restoringChatHistory) return;
-      /* v896 对齐 syy/milk：内存被系统回收是分钟级事件，恢复对比加 30s 节流——
+      /* v896 对齐极简/极简：内存被系统回收是分钟级事件，恢复对比加 30s 节流——
          避免频繁前后台切换时每次都遍历全部会话+逐会话 IDB 读取 */
       var _vcNow = Date.now();
       if (window.__akiniVcRecoverTs && _vcNow - window.__akiniVcRecoverTs < 30000) return;
@@ -26711,7 +26709,7 @@ window.akiniContacts = {
       // 与微信聊天一致：一轮回复 1~3 条（75%/20%/5% 同 AKR.getReplyCount），逐条间隔发出
       var r = Math.random();
       var replyCount = r < 0.75 ? 1 : r < 0.95 ? 2 : 3;
-      /* 表情包：概率与 syy 聊天一致（20%），仅用该联系人自己的专属表情包，裸图无气泡 */
+      /* 表情包：概率与 极简 聊天一致（20%），仅用该联系人自己的专属表情包，裸图无气泡 */
       var c0 = watchPartners[Math.floor(Math.random() * watchPartners.length)];
       var stkProb = 0.2;
       if (c0 && Math.random() < stkProb) {
@@ -28611,7 +28609,7 @@ window.__akiniNowTs = function () {
       var selOn = !!_stkSel[i];
       var inMode = _stkSelMode || _stkBlockMode;
       h += '<div class="wb-stk-item" data-idx="' + i + '" style="position:relative;aspect-ratio:1/1;background:#fff;border:1px solid ' + (selOn ? '#1a1a1a' : '#eee') + ';border-radius:10px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent;' + (it.b ? 'opacity:.4;' : '') + '">' +
-        /* v660: 懒加载（对齐 syy）——上千张表情不再一次性全部解码，只解码滚动到可视区的 */
+        /* v660: 懒加载（对齐极简）——上千张表情不再一次性全部解码，只解码滚动到可视区的 */
         '<img src="' + it.s + '" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:contain;" alt=""/>' +
         (inMode ? '<span class="stk-chk" style="position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;border:1.5px solid ' + (selOn ? '#1a1a1a' : '#ccc') + ';background:' + (selOn ? '#1a1a1a' : 'rgba(255,255,255,.9)') + ';color:#fff;font-size:12px;line-height:17px;text-align:center;">' + (selOn ? '✓' : '') + '</span>' : '') +
         (it.b ? '<span style="position:absolute;bottom:3px;right:3px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);border-radius:6px;padding:1px 5px;">已屏蔽</span>' : '') +
@@ -29025,7 +29023,7 @@ window.__akiniNowTs = function () {
           var cid = _getCid();
           var arr = _stkRead(cid);
           var total = items.length;
-          /* v660 防卡死（对齐 syy/milk 秒导体验）：
+          /* v660 防卡死（对齐极简/极简 秒导体验）：
              1) 纯内存 push 全量完成（微秒级，无 DOM 操作）；
              2) 一次 _stkWrite 落盘（akiniStore.setJson 自动分流 IDB）；
              3) 渲染一次且 img 全部 loading=lazy（浏览器只解码可视区）；
@@ -30377,7 +30375,7 @@ if (!window.__akiniUnreadTickerStarted) {
 
   window.__akiniEnterFavSelectMode = _enterFavSelect;
 
-  /* v676: 引用消息点击跳转已移除，符合 milk 逻辑 */
+  /* v676: 引用消息点击跳转已移除，符合 极简 逻辑 */
 })();
 
   
@@ -32160,7 +32158,7 @@ window.__akiniBugCheck = function () {
         schedulePoll(120000);
         return;
       }
-      if (j.code === 801) { _expiredWaits = 0; qrStatus("请使用网易云音乐APP扫码"); schedulePoll(POLL_MS); }
+      if (j.code === 801) { _expiredWaits = 0; qrStatus("等待扫码登录…"); schedulePoll(POLL_MS); }
       else if (j.code === 802) { _expiredWaits = 0; qrStatus("已扫码，请在APP中确认登录"); schedulePoll(POLL_MS); }
       else if (j.code === 800) {
         /* 过期后短时等待可能迟到的授权结果，不再误导用户扫已失效码 */
@@ -32209,7 +32207,7 @@ window.__akiniBugCheck = function () {
       if (j && j.key) {
         renderQr(j.qrurl);
         lsSet(LS_QR, JSON.stringify({ key: j.key, ts: Date.now() }));
-        qrStatus("请使用网易云音乐APP扫码");
+        qrStatus("等待扫码登录…");
         startQr(j.key);
       } else {
         qrStatus("生成失败：无法连接登录服务，请检查网络后点「重新获取」");
@@ -32217,6 +32215,18 @@ window.__akiniBugCheck = function () {
     });
   }
 
+  /* v999：启动/回前台自动恢复挂起的扫码轮询——此前页面被系统重载后无人轮询，
+     服务器永远收不到803确认，凭据不落盘，表现为"APP确认了回来却没登录" */
+  function resumeQrIfPending() {
+    if (_curKey) return;
+    try {
+      var p = lsGet(LS_QR);
+      if (!p) return;
+      var o = JSON.parse(p);
+      if (o && o.key && (Date.now() - (o.ts || 0)) < 5 * 60 * 1000) { startQr(o.key); }
+      else lsDel(LS_QR);
+    } catch (e) { lsDel(LS_QR); }
+  }
   function openQrPanel() {
     showQr();
     /* 未过期二维码直接复用，只有点「重新获取」才替换 */
@@ -32254,10 +32264,12 @@ window.__akiniBugCheck = function () {
     /* 切后台暂停轮询，回前台立即恢复（不取消二维码） */
     document.addEventListener("visibilitychange", function () {
       if (document.visibilityState === "hidden") { stopPoll(); return; }
-      var o = el("neQrOverlay");
-      if (o && o.style.display !== "none" && _curKey) { qrStatus("正在恢复扫码状态…"); schedulePoll(800); }
+      if (_curKey) { qrStatus("正在恢复扫码状态…"); schedulePoll(800); }
+      else { resumeQrIfPending(); }
     });
     window.addEventListener("pagehide", function () { stopPoll(); });
+    /* v999：启动即恢复未完成的扫码（页面曾被重载也不丢登录确认） */
+    resumeQrIfPending();
     window.addEventListener("pageshow", function () {
       var o = el("neQrOverlay");
       if (o && o.style.display !== "none" && _curKey) schedulePoll(800);

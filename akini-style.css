@@ -32331,3 +32331,19 @@ html body #app-chat .chat-top-bar #chatCallBtn svg {
   /* 确保底图不被重复背景遮挡，子容器背景透明 */
   background-color: transparent !important;
 }
+
+/* v1000: 聊天顶栏 返回/通话 按钮统一规格——同尺寸、同底色、去描边去阴影，终结历史层叠冲突 */
+#app-chat .chat-top-bar .back-btn, #app-chat .chat-top-bar .call-btn,
+#app-chat .chat-top-bar #chatBackBtn, #app-chat .chat-top-bar #chatCallBtn,
+.chat-top-bar .back-btn, .chat-top-bar .call-btn,
+.chat-top-bar #chatBackBtn, .chat-top-bar #chatCallBtn {
+  width: 40px !important; height: 40px !important;
+  min-width: 40px !important; max-width: 40px !important;
+  padding: 0 !important; margin: 0 !important;
+  border-radius: 50% !important; border: none !important; outline: none !important;
+  box-shadow: none !important; -webkit-box-shadow: none !important;
+  background: rgba(0,0,0,0.28) !important;
+  color: #fff !important;
+  display: flex !important; align-items: center !important; justify-content: center !important;
+  flex-shrink: 0 !important; font-size: 20px !important; line-height: 1 !important;
+}
