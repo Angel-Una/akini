@@ -25689,6 +25689,8 @@ window.akiniContacts = {
       /* zzu：提前挂接播放列表渲染——Bt 与外层 __akiniOpenPlaylist 不在同一作用域，
          首次启动未播放时 _renderPlaylist 未挂载导致列表空白 */
       window._renderPlaylist = Bt;
+      /* v985：暴露导入函数给网易云客户端（"我的歌单"点击直达导入） */
+      window.__akiniMusicImport = Tt;
       window.Bt = Bt;
       function kt(t) {
         return E && A === (t && t.id) && Date.now() - S < 6e5;
@@ -32029,8 +32031,13 @@ window.__akiniBugCheck = function () {
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
   function el(id) { return document.getElementById(id); }
 
+  /* v985：sid 是登录体系的命根子。用户 localStorage 已用 4.8MB/5MB，LS 写入随时整体失败，
+     会导致每次请求换新 sid → 服务端会话存了也查不到 → "扫码后永远未登录"。
+     sessionStorage 独立配额几乎必成功，作为第一存储；LS 仅作跨标签页备份。 */
   function getSid() {
-    var s = lsGet(LS_SID);
+    var s = "";
+    try { s = sessionStorage.getItem(LS_SID) || ""; } catch (e) {}
+    if (!s) s = lsGet(LS_SID);
     if (!s) {
       try {
         var b = new Uint8Array(16);
@@ -32039,8 +32046,9 @@ window.__akiniBugCheck = function () {
         for (var i = 0; i < 16; i++) s += chars[b[i] & 63];
       } catch (e) { s = ""; }
       if (!s) s = "s" + Date.now() + "" + Math.floor(Math.random() * 1e9);
-      lsSet(LS_SID, s);
     }
+    try { sessionStorage.setItem(LS_SID, s); } catch (e) {}
+    try { localStorage.setItem(LS_SID, s); } catch (e) {}
     return s;
   }
 
@@ -32188,6 +32196,18 @@ window.__akiniBugCheck = function () {
         return;
       }
       _failStreak = 0; _backoffIdx = 0;
+      /* v985：服务端错误明确展示并停止，不再无声死循环 */
+      if (j.code === 401 || j.code === 502) {
+        stopPoll();
+        qrStatus(String((j && j.msg) || "登录服务异常") + "，请点「重新获取」");
+        return;
+      }
+      if (j.code === 8030) {
+        stopPoll();
+        lsDel(LS_QR);
+        qrStatus(String((j && j.msg) || "授权凭据获取失败，请重新扫码"));
+        return;
+      }
       /* 限频/人工验证：暂停120s并明确提示，不绕过平台风控 */
       var msg = String((j && (j.message || j.msg)) || "");
       if ((j.code === 405) || (j.code === -462) || (msg.indexOf("验证") >= 0) || (msg.indexOf("频繁") >= 0)) {
@@ -32218,6 +32238,8 @@ window.__akiniBugCheck = function () {
         try { hideQr(); } catch (e2) {}
         setTimeout(function () {
           try { _sessCache = null; window.__akiniNeRefresh(true); } catch (e3) {}
+          try { var b2 = el("neMyPlaylists"); if (b2) b2.removeAttribute("data-loaded"); } catch (e4) {}
+          setTimeout(function () { try { window.__akiniNeLoadPl && window.__akiniNeLoadPl(); } catch (e5) {} }, 800);
         }, 400);
       }
       else { qrStatus("状态查询异常，继续等待…"); schedulePoll(POLL_MS); }
@@ -32337,8 +32359,47 @@ window.__akiniBugCheck = function () {
             }
           } catch (e) {}
         }, 400);
+        setTimeout(function () { loadMyPlaylists(); }, 600);
       });
     }
+
+    /* v985：登录后展示"我的网易云歌单"，点击直接导入播放 */
+    function loadMyPlaylists() {
+      var box = el("neMyPlaylists");
+      if (!box) return;
+      if (!window.__akiniNeLoggedIn) { box.innerHTML = ""; return; }
+      if (box.getAttribute("data-loaded") === "1") return;
+      box.setAttribute("data-loaded", "1");
+      box.innerHTML = '<div style="font-size:12px;color:#999;text-align:center;padding:10px">正在获取我的歌单…</div>';
+      neApi("playlists", {}, 15000).then(function (j) {
+        if (!box) return;
+        if (!j || j.code === 401) { box.innerHTML = ""; box.removeAttribute("data-loaded"); return; }
+        if (j.code !== 200 || !j.playlists || !j.playlists.length) {
+          box.innerHTML = '<div style="font-size:12px;color:#999;text-align:center;padding:10px">未获取到歌单</div>';
+          return;
+        }
+        var h = '<div style="font-size:12px;color:#777;margin:2px 0 6px;padding:0 2px">我的网易云歌单（点击导入）：</div>';
+        for (var i = 0; i < j.playlists.length; i++) {
+          var p = j.playlists[i];
+          var cov = p.coverImgUrl ? String(p.coverImgUrl) : "";
+          h += '<div data-ne-pl="' + String(p.id) + '" style="display:flex;align-items:center;gap:10px;padding:8px;border-radius:10px;background:#f8f8f8;border:1px solid #f0f0f0;margin-bottom:8px;cursor:pointer;-webkit-tap-highlight-color:transparent;">' +
+            (cov ? '<img src="' + cov + '" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#eee;">' : '<div style="width:36px;height:36px;border-radius:6px;background:#eee;flex-shrink:0;"></div>') +
+            '<div style="flex:1;min-width:0;"><div style="font-size:13px;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + String(p.name || "") + '</div>' +
+            '<div style="font-size:11px;color:#999;">' + (p.trackCount || 0) + '首</div></div>' +
+            '<span style="font-size:12px;color:#1a1a1a;flex-shrink:0;border:1px solid #e0e0e0;border-radius:8px;padding:4px 10px;">导入</span></div>';
+        }
+        box.innerHTML = h;
+      });
+    }
+    window.__akiniNeLoadPl = loadMyPlaylists;
+    document.addEventListener("click", function (ev) {
+      var t = ev.target.closest && ev.target.closest("[data-ne-pl]");
+      if (!t) return;
+      var pid = t.getAttribute("data-ne-pl");
+      if (window.__akiniMusicImport) {
+        try { window.__akiniMusicImport(pid, "", false); } catch (e) {}
+      }
+    });
 
     /* 老版本 localStorage Cookie 一次性迁入服务端（成功后本地删除） */
     var oldCk = lsGet(LS_OLDCK);
