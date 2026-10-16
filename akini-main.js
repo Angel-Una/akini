@@ -22667,11 +22667,105 @@ window.akiniContacts = {
         e.playIcon.style.display = realPlaying ? "none" : "block";
         e.pauseIcon.style.display = realPlaying ? "block" : "none";
       }
+      var _plSwitchOpen = false;
+      /* v981 多歌单：playlists_v2 为全部歌单，akini_music_playlist 恒为"当前歌单"镜像（播放器全链路零改动） */
+      function _plReadAll() {
+        try {
+          var v = JSON.parse(localStorage.getItem("akini_music_playlists_v2") || "null");
+          if (Array.isArray(v)) return v;
+        } catch (e) {}
+        return null;
+      }
+      function _plEnsure() {
+        var v = _plReadAll();
+        if (v) return v;
+        v = [];
+        try {
+          var old = JSON.parse(localStorage.getItem("akini_music_playlist") || "[]");
+          if (Array.isArray(old) && old.length) {
+            v = [{ key: "pl_default", name: "默认歌单", cover: (old[0] && old[0].cover) || "", tracks: old }];
+            localStorage.setItem("akini_music_playlists_v2", JSON.stringify(v));
+          }
+        } catch (e) {}
+        return v;
+      }
+      function _plActiveKey() {
+        var v = _plEnsure();
+        var cur = "";
+        try { cur = localStorage.getItem("akini_music_playlist_cur") || ""; } catch (e) {}
+        for (var i = 0; i < v.length; i++) if (v[i].key === cur) return cur;
+        return v.length ? v[0].key : "";
+      }
+      function _plSyncActive() {
+        var v = _plReadAll();
+        if (!v || !v.length) return;
+        var cur = "";
+        try { cur = localStorage.getItem("akini_music_playlist_cur") || ""; } catch (e) {}
+        for (var i = 0; i < v.length; i++) if (v[i].key === cur) v[i].tracks = c;
+        try { localStorage.setItem("akini_music_playlists_v2", JSON.stringify(v)); } catch (e) {}
+      }
+      function _plSwitchTo(key, autoplay) {
+        var v = _plEnsure();
+        var pl = null;
+        for (var i = 0; i < v.length; i++) if (v[i].key === key) pl = v[i];
+        if (!pl) return;
+        c = pl.tracks || [];
+        l = 0;
+        try { localStorage.setItem("akini_music_playlist", JSON.stringify(c)); } catch (e) {}
+        try { localStorage.setItem("akini_music_index", "0"); } catch (e) {}
+        try { localStorage.setItem("akini_music_playlist_cur", key); } catch (e) {}
+        try { window._idbStore && window._idbStore.set("akini_music_playlist", JSON.stringify(c)); } catch (e) {}
+        _plSwitchOpen = false;
+        Bt();
+        if (autoplay !== false && c.length) {
+          try { localStorage.setItem("akini_music_current_time", "0"); } catch (e) {}
+          w = 0;
+          if (u) { try { u.pause(); u.removeAttribute("src"); u.load(); } catch (e) {} }
+          (E = null), (S = 0), (A = null);
+          updateTrackUI();
+          _t();
+          It();
+          Ht();
+        }
+      }
       function Bt() {
         var _pc = document.getElementById("musicPlaylistContainer");
-        if (_pc)
-          if (c.length) {
-            var t = '<div style="font-size:11.5px;color:#f5a623;line-height:1.45;padding:8px 10px;margin-bottom:10px;background:rgba(245,166,35,0.1);border-radius:8px;text-align:center">⚠️ VIP / 付费歌曲受版权限制，仅能试听片段</div>';
+        if (!_pc) return;
+        var _pls = _plEnsure();
+        var _curKey = _plActiveKey();
+        var _cur = null;
+        for (var pi = 0; pi < _pls.length; pi++) if (_pls[pi].key === _curKey) _cur = _pls[pi];
+        var head = "";
+        if (_cur) {
+          head =
+            '<div data-pl-head="1" style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin-bottom:10px;background:rgba(255,255,255,0.06);border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;">' +
+            (_cur.cover
+              ? '<img src="' + _cur.cover + '" style="width:42px;height:42px;border-radius:8px;object-fit:cover;background:#333;flex-shrink:0;">'
+              : '<div style="width:42px;height:42px;border-radius:8px;background:#333;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:18px;">🎵</div>') +
+            '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + J(_cur.name || "未命名歌单") + '</div>' +
+            '<div style="font-size:11px;color:#999;margin-top:2px;">' + ((_cur.tracks || []).length) + '首 · 点击切换歌单</div></div>' +
+            '<span style="color:#999;font-size:13px;flex-shrink:0;">' + (_plSwitchOpen ? "收起 ▴" : "切换 ▾") + "</span></div>";
+          if (_plSwitchOpen) {
+            var sw = '<div style="margin:-4px 0 10px;background:rgba(255,255,255,0.04);border-radius:12px;overflow:hidden;">';
+            for (var si = 0; si < _pls.length; si++) {
+              var sp = _pls[si];
+              var on = sp.key === _curKey;
+              sw +=
+                '<div data-pl-pick="' + sp.key + '" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:' + (on ? "rgba(79,124,255,0.16)" : "transparent") + ';border-bottom:1px solid rgba(255,255,255,0.05);cursor:pointer;-webkit-tap-highlight-color:transparent;">' +
+                (sp.cover
+                  ? '<img src="' + sp.cover + '" style="width:32px;height:32px;border-radius:6px;object-fit:cover;background:#333;flex-shrink:0;">'
+                  : '<div style="width:32px;height:32px;border-radius:6px;background:#333;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px;">🎵</div>') +
+                '<div style="flex:1;min-width:0;"><div style="font-size:13px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + J(sp.name || "未命名歌单") + '</div>' +
+                '<div style="font-size:11px;color:#888;">' + ((sp.tracks || []).length) + "首</div></div>" +
+                (on ? '<span style="font-size:12px;color:#4f7cff;flex-shrink:0;">播放中</span>' : "") +
+                "</div>";
+            }
+            sw += "</div>";
+            head += sw;
+          }
+        }
+        if (c.length) {
+          var t = head + '<div style="font-size:11.5px;color:#f5a623;line-height:1.45;padding:8px 10px;margin-bottom:10px;background:rgba(245,166,35,0.1);border-radius:8px;text-align:center">⚠️ VIP / 付费歌曲受版权限制，仅能试听片段</div>';
             (c.forEach(function (e, n) {
               var i = n === l;
               t +=
@@ -22700,6 +22794,7 @@ window.akiniContacts = {
               (_pc.innerHTML = t));
           } else
             _pc.innerHTML =
+              head +
               '<div style="text-align:center;color:#888;padding:20px;font-size:14px;">暂无歌曲，请导入歌单</div>';
       }
       function Tt(n, i, a) {
@@ -22795,17 +22890,16 @@ window.akiniContacts = {
           var o = _parseTracks(tracks, playlistName);
           return (
             a ||
-              ((c = o),
-              localStorage.setItem("akini_music_playlist", JSON.stringify(c)),
-              (function () {
-                try {
-                  window._idbStore &&
-                    window._idbStore.set("akini_music_playlist", JSON.stringify(c));
-                } catch (t) {}
+              ((function () {
+                /* v981 多歌单：每次导入追加为新歌单并切换过去，不再覆盖旧歌单 */
+                var v = _plEnsure();
+                var plKey = "pl_" + Date.now();
+                var plName = res.name || playlistName || ("导入歌单 " + (v.length + 1));
+                v.push({ key: plKey, name: String(plName), cover: (o[0] && o[0].cover) || "", tracks: o });
+                try { localStorage.setItem("akini_music_playlists_v2", JSON.stringify(v)); } catch (t) {}
+                _plSwitchTo(plKey, false);
+                console.log("[歌单] 新增歌单:", plName, "歌曲数:", o.length);
               })(),
-              console.log("[歌单] 保存,歌曲数:", c.length),
-              (l = 0),
-              localStorage.setItem("akini_music_index", 0),
               e.playlistInput && (e.playlistInput.value = ""),
               Pt(),
               wt(c[l], !1),
@@ -24221,10 +24315,25 @@ window.akiniContacts = {
               ("Enter" !== t.key && 13 !== t.keyCode) || Ut();
             }),
           (window.__clearAll = function () {
-            if (!c.length) {
+            /* v981：「删除歌单」只删除当前所在歌单；有剩余自动切换到第一个，无则清空 */
+            var v = _plEnsure();
+            var cur = "";
+            try { cur = localStorage.getItem("akini_music_playlist_cur") || ""; } catch (t) {}
+            var nv = [];
+            for (var vi = 0; vi < v.length; vi++) if (v[vi].key !== cur) nv.push(v[vi]);
+            if (!v.length && !c.length) {
               pt("歌单已为空");
               return;
             }
+            if (v.length) {
+              try { localStorage.setItem("akini_music_playlists_v2", JSON.stringify(nv)); } catch (t) {}
+              if (nv.length) {
+                _plSwitchTo(nv[0].key, false);
+                pt("已删除歌单");
+                return;
+              }
+            }
+            /* 没有剩余歌单：清空当前播放 */
             c = [];
             try {
               localStorage.setItem("akini_music_playlist", "[]");
@@ -24233,6 +24342,7 @@ window.akiniContacts = {
             try {
               localStorage.setItem("akini_music_index", "0");
             } catch (t) {}
+            try { localStorage.removeItem("akini_music_playlist_cur"); } catch (t) {}
             xt();
             e.songName && (e.songName.textContent = "一起听");
             e.artist && (e.artist.textContent = "点击右上角导入歌单");
@@ -24241,7 +24351,7 @@ window.akiniContacts = {
                 "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7");
             Bt();
             Ht();
-            pt("已删除全部歌曲");
+            pt("已删除歌单");
           }),
           e.playlistClose &&
             (e.playlistClose.addEventListener("click", Ht),
@@ -24302,6 +24412,20 @@ window.akiniContacts = {
                 { passive: true },
               );
               function __plTap(t) {
+                /* v981 歌单头点击展开/收起切换器；点某个歌单即切换并播放 */
+                var _pk = t.target.closest("[data-pl-pick]");
+                if (_pk) {
+                  t.stopPropagation();
+                  _plSwitchTo(_pk.getAttribute("data-pl-pick"), true);
+                  return;
+                }
+                var _hd = t.target.closest("[data-pl-head]");
+                if (_hd) {
+                  t.stopPropagation();
+                  _plSwitchOpen = !_plSwitchOpen;
+                  Bt();
+                  return;
+                }
                 var n = t.target.closest(".playlist-del-btn");
                 if (n)
                   return (
@@ -24315,6 +24439,7 @@ window.akiniContacts = {
                             JSON.stringify(c),
                           );
                         } catch (t) {}
+                        _plSyncActive();
                         if (0 === c.length) {
                           l = 0;
                           try {
@@ -25406,6 +25531,27 @@ window.akiniContacts = {
           // 命中缓存时仍需把当前 URL 设置给音频，避免旧音频继续播放
           return E && vt(E, i ? "fetch-retry" : "fetch"), Promise.resolve();
         }
+        /* v980：已登录本站网易云后端 → 先走自有加固接口取官方地址（VIP/已购完整版、精确权限提示）；
+           未登录/失败/无权限时自动回落下方原链路，播放永不中断 */
+        if (window.__akiniNeLoggedIn && typeof window._akiniNeSongUrl === "function") {
+          return window._akiniNeSongUrl(e.id).then(function (res) {
+            if (__wtGen !== window.__akiniWtGen) return; /* 已切歌，丢弃过期结果 */
+            if (res && res.url) {
+              var u0 = res.url.replace(/^http:\/\//i, "https://");
+              ((E = u0), (S = Date.now()), (A = e.id), vt(u0, i ? "fetch-retry" : "fetch"));
+              try {
+                var vh0 = document.getElementById("musicVipHint");
+                if (vh0) vh0.style.display = res.trial ? "block" : "none";
+              } catch (eVh) {}
+              return;
+            }
+            if (res && res.code === 401) { try { window.__akiniNeLogoutLocal && window.__akiniNeLogoutLocal(); } catch (eLo) {} }
+            if (res && res.msg && !n) pt(res.msg);
+            return _akiniLegacySongUrl();
+          });
+        }
+        return _akiniLegacySongUrl();
+        function _akiniLegacySongUrl() {
         var _neteaseCookie = "";
         try { _neteaseCookie = localStorage.getItem("akini_netease_cookie") || ""; } catch (eCk) {}
         /* v971: 打通网易云 VIP 会员与高音质参数：附带用户的 Cookie 并请求 level=lossless / exhigh */
@@ -25461,6 +25607,7 @@ window.akiniContacts = {
               vt(fb, i ? "fetch-retry" : "fetch"));
             if (!n) pt("歌曲地址获取失败，正在尝试备用地址…");
           });
+        }
       }
       /* zzu：提前挂接播放列表渲染——Bt 与外层 __akiniOpenPlaylist 不在同一作用域，
          首次启动未播放时 _renderPlaylist 未挂载导致列表空白 */
@@ -31787,3 +31934,273 @@ window.__akiniBugCheck = function () {
     if (window.akiniToast) window.akiniToast('检查失败: ' + e.message);
   }
 };
+
+
+/* ==================== v981 网易云自有后端客户端（扫码登录加固·对照稳定性修复记录） ====================
+   网易云 Cookie 只存服务端数据库；前端仅持有随机网站会话ID(sid)。
+   加固项：text/plain 简单请求免预检 / 5秒级查询间隔 / 断网指数退避(5,10,20,40,60s) /
+   限频·人工验证暂停120s / 未过期二维码复用+15s防连点冷却 / 过期后等待迟到授权再刷新 /
+   切后台暂停轮询·回前台恢复 / 账号资料60s缓存并发合并。 */
+(function () {
+  var NE_API = "https://backend.miaoda.online/projects/supabase364656900228300800/functions/v1/akini-netease";
+  var LS_SID = "akini_ne_sid", LS_QR = "akini_ne_qr", LS_OLDCK = "akini_netease_cookie";
+  var POLL_MS = 4000;
+  var _pollTimer = null, _curKey = "", _regenAt = 0, _lastSessAt = 0, _sessCache = null, _sessInflight = null;
+
+  function lsGet(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+  function el(id) { return document.getElementById(id); }
+
+  function getSid() {
+    var s = lsGet(LS_SID);
+    if (!s) {
+      try {
+        var b = new Uint8Array(16);
+        if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(b);
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        for (var i = 0; i < 16; i++) s += chars[b[i] & 63];
+      } catch (e) { s = ""; }
+      if (!s) s = "s" + Date.now() + "" + Math.floor(Math.random() * 1e9);
+      lsSet(LS_SID, s);
+    }
+    return s;
+  }
+
+  /* text/plain + sid入body = 简单请求，旧WebView/微信内免CORS预检，失败面最小化 */
+  function neApi(action, payload, timeoutMs) {
+    var body = {};
+    try { body = payload || {}; } catch (e) { body = {}; }
+    body.sid = getSid();
+    var ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { try { ctrl.abort(); } catch (e) {} }, timeoutMs || 15000) : null;
+    var p = fetch(NE_API + "?action=" + action, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(body),
+      signal: ctrl ? ctrl.signal : undefined
+    }).then(function (r) { return r.json().catch(function () { return null; }); })
+      .catch(function () { return null; });
+    if (timer) { p.then(function () { clearTimeout(timer); }, function () { clearTimeout(timer); }); }
+    return p;
+  }
+
+  function setStatus(txt, logged) {
+    var s = el("neAccountStatus");
+    if (s) s.textContent = txt;
+    var bIn = el("neLoginBtn"), bOut = el("neLogoutBtn");
+    if (bIn) bIn.style.display = logged ? "none" : "";
+    if (bOut) bOut.style.display = logged ? "" : "none";
+  }
+
+  /* 账号资料 60s 缓存 + 并发刷新合并为一次 */
+  window.__akiniNeRefresh = function (force) {
+    var now = Date.now();
+    if (!force && _sessCache && now - _lastSessAt < 60000) return Promise.resolve(_sessCache);
+    if (_sessInflight) return _sessInflight;
+    _sessInflight = neApi("session", {}, 15000).then(function (j) {
+      _sessInflight = null;
+      _lastSessAt = Date.now();
+      _sessCache = j;
+      if (j && j.loggedIn) {
+        window.__akiniNeLoggedIn = true;
+        var nick = j.profile && j.profile.nickname ? String(j.profile.nickname) : "已登录";
+        setStatus("已登录 · " + nick, true);
+      } else {
+        window.__akiniNeLoggedIn = false;
+        setStatus("未登录 · VIP歌曲仅可试听", false);
+      }
+      return j;
+    });
+    return _sessInflight;
+  };
+
+  window.__akiniNeLogoutLocal = function () {
+    window.__akiniNeLoggedIn = false;
+    _sessCache = null;
+    setStatus("登录已失效，请重新扫码", false);
+  };
+
+  /* 音乐模块 v981 路由：返回 Promise<{url,trial}|{code,msg}|null> */
+  window._akiniNeSongUrl = function (songId) {
+    return neApi("song/url", { id: String(songId), level: "lossless" }, 15000).then(function (j) {
+      if (j && j.url) return { url: j.url, trial: !!j.trial, level: j.level };
+      if (j && j.code === 403 && j.trial) return { code: 403, trial: true, msg: "该歌曲仅试听权限" };
+      if (j && j.code === 401) return { code: 401, msg: "网易云登录已失效，请重新扫码" };
+      if (j && j.msg) return { code: j.code || 403, msg: j.msg };
+      return null;
+    });
+  };
+
+  function stopPoll() { if (_pollTimer) { clearTimeout(_pollTimer); _pollTimer = null; } }
+  function schedulePoll(ms) { stopPoll(); _pollTimer = setTimeout(pollOnce, ms); }
+  function renderQr(qrurl) {
+    var box = el("neQrBox");
+    if (!box) return;
+    box.innerHTML = "";
+    try {
+      if (typeof QRCode === "undefined") throw new Error("no qrcode lib");
+      new QRCode(box, { text: qrurl, width: 200, height: 200, correctLevel: QRCode.CorrectLevel.M });
+    } catch (e) {
+      box.innerHTML = '<div style="font-size:11px;color:#c00;padding:8px;text-align:center">二维码组件加载失败<br>请检查网络后点「重新获取」</div>';
+    }
+  }
+  function qrStatus(txt) { var s = el("neQrStatus"); if (s) s.textContent = txt; }
+  function showQr() { var o = el("neQrOverlay"); if (o) o.style.display = "flex"; }
+  function hideQr() { var o = el("neQrOverlay"); if (o) o.style.display = "none"; stopPoll(); }
+
+  var _failStreak = 0, _backoffIdx = 0, _pausedUntil = 0, _expiredWaits = 0;
+  var BACKOFF = [5000, 10000, 20000, 40000, 60000];
+
+  function pollOnce() {
+    if (!_curKey) return;
+    neApi("qr/check", { key: _curKey }, 15000).then(function (j) {
+      if (!_curKey) return;
+      if (!j) {
+        /* 断网/超时：指数退避，绝不删二维码（朋友修复记录同款） */
+        _failStreak++;
+        var d = BACKOFF[Math.min(_backoffIdx, BACKOFF.length - 1)];
+        if (_failStreak > 1) _backoffIdx++;
+        qrStatus("网络异常，" + Math.round(d / 1000) + "秒后重试（二维码仍有效）");
+        schedulePoll(d);
+        return;
+      }
+      _failStreak = 0; _backoffIdx = 0;
+      /* 限频/人工验证：暂停120s并明确提示，不绕过平台风控 */
+      var msg = String((j && (j.message || j.msg)) || "");
+      if ((j.code === 405) || (j.code === -462) || (msg.indexOf("验证") >= 0) || (msg.indexOf("频繁") >= 0)) {
+        _pausedUntil = Date.now() + 120000;
+        qrStatus("网易云要求验证/限频，已暂停查询2分钟，请稍后再试");
+        schedulePoll(120000);
+        return;
+      }
+      if (j.code === 801) { _expiredWaits = 0; qrStatus("请使用网易云音乐APP扫码"); schedulePoll(POLL_MS); }
+      else if (j.code === 802) { _expiredWaits = 0; qrStatus("已扫码，请在APP中确认登录"); schedulePoll(POLL_MS); }
+      else if (j.code === 800) {
+        /* 过期后短时等待可能迟到的授权结果，不再误导用户扫已失效码 */
+        _expiredWaits++;
+        if (_expiredWaits <= 3) {
+          qrStatus("二维码已过期，正在等待最后的确认结果…");
+          schedulePoll(4000);
+        } else {
+          qrStatus("二维码显示已过期，正在刷新…");
+          regenQr(true);
+        }
+      }
+      else if (j.code === 803) {
+        _curKey = "";
+        stopPoll();
+        lsDel(LS_QR);
+        qrStatus("登录成功，正在同步账号信息…");
+        setTimeout(function () { hideQr(); }, 900);
+        _sessCache = null;
+        window.__akiniNeRefresh(true);
+        try {
+          if (typeof window.showInAppNotif === "function") {
+            window.showInAppNotif({
+              app: "网易云", name: "扫码登录",
+              msg: (j.profile && j.profile.nickname ? String(j.profile.nickname) : "网易云账号") + " 登录成功，VIP歌曲可播放完整版",
+              fullContent: true, onTap: function () {}
+            });
+          }
+        } catch (e) {}
+      }
+      else { qrStatus("状态查询异常，继续等待…"); schedulePoll(POLL_MS); }
+    });
+  }
+
+  function startQr(key) {
+    _curKey = key;
+    _failStreak = 0; _backoffIdx = 0; _expiredWaits = 0;
+    schedulePoll(1200);
+  }
+
+  function regenQr(auto) {
+    var now = Date.now();
+    if (!auto && now - _regenAt < 15000) {
+      qrStatus("操作太频繁，请" + Math.ceil((15000 - (now - _regenAt)) / 1000) + "秒后再获取");
+      return;
+    }
+    _regenAt = now;
+    stopPoll();
+    qrStatus("正在生成二维码…");
+    neApi("qr/new", {}, 15000).then(function (j) {
+      if (j && j.key) {
+        renderQr(j.qrurl);
+        lsSet(LS_QR, JSON.stringify({ key: j.key, ts: Date.now() }));
+        qrStatus("请使用网易云音乐APP扫码");
+        startQr(j.key);
+      } else {
+        qrStatus("生成失败：无法连接登录服务，请检查网络后点「重新获取」");
+      }
+    });
+  }
+
+  function openQrPanel() {
+    showQr();
+    /* 未过期二维码直接复用，只有点「重新获取」才替换 */
+    try {
+      var p = lsGet(LS_QR);
+      if (p) {
+        var o = JSON.parse(p);
+        if (o && o.key && (Date.now() - (o.ts || 0)) < 5 * 60 * 1000) {
+          renderQr("https://music.163.com/login?codekey=" + o.key);
+          qrStatus("正在恢复扫码状态…");
+          startQr(o.key);
+          return;
+        }
+        lsDel(LS_QR);
+      }
+    } catch (e) { lsDel(LS_QR); }
+    regenQr(true);
+  }
+
+  function bind() {
+    var bIn = el("neLoginBtn"), bOut = el("neLogoutBtn"), bC = el("neQrCancel"), bR = el("neQrRegen");
+    if (bIn && !bIn._neBound) { bIn._neBound = 1; bIn.onclick = function () { openQrPanel(); }; }
+    if (bOut && !bOut._neBound) {
+      bOut._neBound = 1;
+      bOut.onclick = function () {
+        neApi("logout", {});
+        window.__akiniNeLoggedIn = false;
+        _sessCache = null;
+        setStatus("未登录 · VIP歌曲仅可试听", false);
+      };
+    }
+    if (bC && !bC._neBound) { bC._neBound = 1; bC.onclick = function () { _curKey = ""; stopPoll(); lsDel(LS_QR); hideQr(); }; }
+    if (bR && !bR._neBound) { bR._neBound = 1; bR.onclick = function () { regenQr(false); }; }
+
+    /* 切后台暂停轮询，回前台立即恢复（不取消二维码） */
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "hidden") { stopPoll(); return; }
+      var o = el("neQrOverlay");
+      if (o && o.style.display !== "none" && _curKey) { qrStatus("正在恢复扫码状态…"); schedulePoll(800); }
+    });
+    window.addEventListener("pagehide", function () { stopPoll(); });
+    window.addEventListener("pageshow", function () {
+      var o = el("neQrOverlay");
+      if (o && o.style.display !== "none" && _curKey) schedulePoll(800);
+    });
+
+    /* 打开音乐菜单时刷新登录态（60s缓存自动合并） */
+    var mb = el("musicMenuBtn");
+    if (mb && !mb._neBound) { mb._neBound = 1; mb.addEventListener("click", function () { setTimeout(function () { window.__akiniNeRefresh(false); }, 150); }); }
+
+    /* 老版本 localStorage Cookie 一次性迁入服务端（成功后本地删除） */
+    var oldCk = lsGet(LS_OLDCK);
+    if (oldCk) {
+      window.__akiniNeRefresh(true).then(function (j) {
+        if (j && j.loggedIn) { lsDel(LS_OLDCK); return; }
+        neApi("session/adopt", { cookie: oldCk }, 20000).then(function (a) {
+          if (a && a.loggedIn) { lsDel(LS_OLDCK); _sessCache = null; window.__akiniNeRefresh(true); }
+          else if (a && (a.code === 401 || a.code === 400)) lsDel(LS_OLDCK);
+        });
+      });
+    } else {
+      window.__akiniNeRefresh(false);
+    }
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", bind);
+  else bind();
+})();
