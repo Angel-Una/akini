@@ -32297,3 +32297,9 @@ html body #app-chat .chat-top-bar #chatCallBtn svg {
   max-width: none !important;
   width: 100% !important;
 }
+
+/* v1015 拍立得与右四功能向中间聚拢：只改二者的相对位置（父容器 justify），模块内部布局一概不动 */
+.s1-bottom-fig3 {
+  justify-content: center !important;
+  gap: 14px !important;
+}
