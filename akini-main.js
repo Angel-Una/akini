@@ -36,7 +36,7 @@ window.__akiniImgKeys = window.__akiniImgKeys || {};
     "akini_callmini_bg":1,"akini_chat_bg":1,"akini_cover_bg":1,"akini_day_bg":1,"akini_friends_bg":1,
     "akini_home_bg":1,"akini_icity_my_bg":1,"akini_icity_ta_bg":1,"akini_music_bg":1,"akini_watch_wallpaper":1,
     /* v1023 大数据键：聊天记录/日记/邮件/歌单/词库/整库备份——全部搬进 IndexedDB（几十G空间），LS 只留小开关 */
-    "akini_icity_diaries":1,"akini_icity_diaries_backup":1,"akini_mail_received":1,
+    "akini_icity_diaries":1,"akini_icity_diaries_backup":1,"akini_mail_received":1,"akini_mail_sent":1,"akini_mail_sent_backup":1,
     "akini_music_playlists_v2":1,"akini_wordbank":1,"akini_chat_sessions":1,"akini_chat_pins":1,
     "akini_chat_pins_backup":1,"akini_chat_history_backup":1
   };
@@ -50,7 +50,7 @@ window.__akiniImgKeys = window.__akiniImgKeys || {};
   };
   window.__akiniImgSet = function (k, v) {
     window.__akiniImgCache[k] = v;
-    try { if (window.localforage) localforage.setItem(k, v); } catch (e) {}
+    try { if (window.localforage) localforage.setItem(k, v).catch(function(){}); } catch (e) {}
   };
   window.__akiniImgGetLS = function (k) {
     try { return localStorage.getItem(k) || ""; } catch (e) { return ""; }
@@ -59,7 +59,7 @@ window.__akiniImgKeys = window.__akiniImgKeys || {};
     var v = window.__akiniImgGetLS(k);
     if (v) {
       window.__akiniImgCache[k] = v;
-      try { if (window.localforage) localforage.setItem(k, v).then(function(){ try { localStorage.removeItem(k); } catch(e){} }); } catch (e) {}
+      try { if (window.localforage) localforage.setItem(k, v).then(function(){ try { localStorage.removeItem(k); } catch(e){} }).catch(function(){}); } catch (e) {}
     }
   };
   /* 开机：把仍在 LS 的旧图迁进 IndexedDB 并删除 LS 副本（释放配额）；同时预热内存缓存 */
@@ -76,8 +76,67 @@ window.__akiniImgKeys = window.__akiniImgKeys || {};
       } catch (e) {}
     } catch (e) {}
   };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function(){ setTimeout(window.__akiniImgStoreInit, 800); });
-  else setTimeout(window.__akiniImgStoreInit, 800);
+  /* v1025：脚本解析期立即预热（不等 DOMContentLoaded），读完 IDB 后重放首页上脸——
+     根治"刷新后首页图/布局重置、需手动再刷一次"的竞态 */
+  window.__akiniImgReady = false;
+  var _doInit = function () {
+    try { window.__akiniImgStoreInit(); } catch (e) {}
+    try {
+      if (window.localforage && localforage.iterate) {
+        localforage.iterate(function (v, k) {
+          if (window.__akiniIsImgKey(k) && typeof v === "string") window.__akiniImgCache[k] = v;
+        }).then(function () {
+          window.__akiniImgReady = true;
+          try { window.dispatchEvent(new Event("akini-img-ready")); } catch (e) {}
+          try { if (typeof applyBg === "function") applyBg(); } catch (e) {}
+          try { if (window.__akiniRenderUserText) __akiniRenderUserText(); } catch (e) {}
+          setTimeout(function(){ try { if (typeof applyBg === "function") applyBg(); } catch (e) {} }, 1200);
+        }).catch(function () { window.__akiniImgReady = true; });
+      } else window.__akiniImgReady = true;
+    } catch (e) { window.__akiniImgReady = true; }
+  };
+  _doInit();
+})();
+
+
+/* v1025 三件套：备份雪崩止血 + IDB错误风暴封口 + 图库预热提前/就绪重渲染 */
+(function () {
+  /* 1) 备份雪崩止血：任何写入落到 X_backup 为止，绝不生成 X_backup_backup 深层键 */
+  var _origSet = Storage.prototype.setItem;
+  try {
+    Storage.prototype.setItem = function (k, v) {
+      try {
+        if (typeof k === "string" && k.indexOf("_backup") >= 0) {
+          var fixed = k.replace(/(_backup)+$/, "_backup");
+          if (fixed !== k) { try { console.warn("[v1025] 拦截深层备份键: " + k); } catch (e) {} k = fixed; }
+        }
+      } catch (e) {}
+      return _origSet.call(this, k, v);
+    };
+  } catch (e) {}
+  window.__akiniBackupJanitor = function () {
+    try {
+      var del = 0;
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && /_backup(?:_backup)+$/.test(k)) { try { localStorage.removeItem(k); del++; } catch (e) {} }
+      }
+      if (del) console.warn("[v1025] 已清理深层备份垃圾键 " + del + " 个（备份雪崩止血）");
+    } catch (e) {}
+  };
+  /* 立即 + 回前台 各清一次 */
+  try { window.__akiniBackupJanitor(); } catch (e) {}
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) setTimeout(window.__akiniBackupJanitor, 2000);
+  });
+
+  /* 2) IDB 错误风暴封口：本地库事务竞态的 unhandledrejection 一律静默 */
+  window.addEventListener("unhandledrejection", function (ev) {
+    try {
+      var m = String((ev.reason && ev.reason.message) || ev.reason || "");
+      if (/in-progress transaction|delete range|Transaction|IndexedDB|IDB/i.test(m)) ev.preventDefault();
+    } catch (e) {}
+  });
 })();
 
 window.__akiniConfirmDialog = function(onConfirm) {
@@ -4964,8 +5023,8 @@ window.akiniContacts = {
       var _CORE_LIST_KEYS = [
         { key: "akini_posts", render: "_renderPosts" },
         { key: "akini_icity_diaries", render: "_renderIcity" },
-        { key: "akini_mail_sent", render: null },
-        { key: "akini_mail_received", render: null },
+        { key: "akini_mail_sent", render: "__renderMail" },
+        { key: "akini_mail_received", render: "__renderMail" },
         { key: "akini_contacts", render: null }
       ];
       function _akiniCountGuardRestore() {
@@ -18846,13 +18905,15 @@ window.akiniContacts = {
             }
           }, 200);
         }
-        /* 数据门等待期间，先静默尝试从本地缓存渲染一次已有数据，防止界面空白 */
-        if (_mailRawCache[t] == null) {
-          var cached = localStorage.getItem(e);
-          if (cached) {
-            _mailRawCache[t] = cached;
-            _renderMailList(t, cached);
-          }
+        /* v1026 数据门防挂起：不等 _akiniDataRestored，先从本地全渠道（内存/LS/IDB）直读渲染，杜绝刷新/退出后信箱空白 */
+        var cached = (window.akiniStore && window.akiniStore.memoryGet && window.akiniStore.memoryGet(e)) || localStorage.getItem(e);
+        if (cached && cached !== "[]") {
+          _mailRawCache[t] = cached;
+          _renderMailList(t, cached);
+        } else {
+          D(e, function (v) {
+            if (v && v !== "[]") { _mailRawCache[t] = v; _renderMailList(t, v); }
+          });
         }
         return;
       }
@@ -19347,6 +19408,7 @@ window.akiniContacts = {
       var e = JSON.stringify(t || []);
       _mailRawCache.sent = e;
       if (dn) dn.__mailSig = null;
+      try { if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet("akini_mail_sent", e); } catch (eM) {}
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_mail_sent", e);
       }
@@ -19355,11 +19417,13 @@ window.akiniContacts = {
         window._idbStore.set("akini_mail_sent", e);
         window._idbStore.set("akini_mail_sent_backup", e);
       }
+      try { if (window.localforage) localforage.setItem("akini_mail_sent", e).catch(function(){}); } catch (eL) {}
     }
     function saveMailReceived(t) {
       var e = JSON.stringify(t || []);
       _mailRawCache.received = e;
       if (dn) dn.__mailSig = null;
+      try { if (window.akiniStore && window.akiniStore.memorySet) window.akiniStore.memorySet("akini_mail_received", e); } catch (eM) {}
       if (window.akiniStore && window.akiniStore.set) {
         window.akiniStore.set("akini_mail_received", e);
       }
@@ -19368,6 +19432,7 @@ window.akiniContacts = {
         window._idbStore.set("akini_mail_received", e);
         window._idbStore.set("akini_mail_received_backup", e);
       }
+      try { if (window.localforage) localforage.setItem("akini_mail_received", e).catch(function(){}); } catch (eL) {}
       // v922：已读游标随每次已读落盘同步推进——任何"ts ≤ 游标"的旧快照回填都无效
       var _lrt = 0;
       try {
@@ -32079,7 +32144,7 @@ window.__akiniBugCheck = function () {
       if (window.__akiniImgCache[k] != null) return window.__akiniImgCache[k];
       var _lv = window.__akiniImgGetLS(k);
       if (_lv) { window.__akiniImgCache[k] = _lv; setTimeout(function(){ window.__akiniImgMigrateLS(k); }, 50); return _lv; }
-      try { if (window.localforage) localforage.getItem(k).then(function(v){ if (v != null) window.__akiniImgCache[k] = v; }); } catch (e) {}
+      try { if (window.localforage) localforage.getItem(k).then(function(v){ if (v != null) window.__akiniImgCache[k] = v; }).catch(function(){}); } catch (e) {}
       return "";
     }
     try { return localStorage.getItem(k) || ""; } catch (e) { return ""; }
