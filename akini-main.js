@@ -32000,7 +32000,7 @@ window.__akiniBugCheck = function () {
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(body),
       signal: ctrl ? ctrl.signal : undefined
-    }).then(function (r) { return r.json().catch(function () { return null; }); })
+    }).then(function (r) { return r.json().catch(function () { return { _http: r.status }; }); })
       .catch(function () { return null; });
     if (timer) { p.then(function () { clearTimeout(timer); }, function () { clearTimeout(timer); }); }
     return p;
@@ -32203,14 +32203,44 @@ window.__akiniBugCheck = function () {
     _regenAt = now;
     stopPoll();
     qrStatus("正在生成二维码…");
-    neApi("qr/new", {}, 15000).then(function (j) {
+    neApi("qr/new", {}, 25000).then(function (j) {
       if (j && j.key) {
         renderQr(j.qrurl);
         lsSet(LS_QR, JSON.stringify({ key: j.key, ts: Date.now() }));
         qrStatus("等待扫码登录…");
         startQr(j.key);
+      } else if (j && j._http) {
+        /* v1003：服务返回非JSON（网关异常等），自动重试一次并显示真实状态码 */
+        qrStatus("登录服务响应异常（HTTP " + j._http + "），正在自动重试…");
+        setTimeout(function () {
+          neApi("qr/new", {}, 25000).then(function (j2) {
+            if (j2 && j2.key) {
+              renderQr(j2.qrurl);
+              lsSet(LS_QR, JSON.stringify({ key: j2.key, ts: Date.now() }));
+              qrStatus("等待扫码登录…");
+              startQr(j2.key);
+            } else {
+              qrStatus("生成失败：登录服务暂时不可用（HTTP " + (j2 && j2._http ? j2._http : "无响应") + "），请稍后点「重新获取」");
+            }
+          });
+        }, 1500);
+      } else if (j === null) {
+        /* 完全无网络：自动重试一次 */
+        qrStatus("网络连接失败，正在自动重试…");
+        setTimeout(function () {
+          neApi("qr/new", {}, 25000).then(function (j2) {
+            if (j2 && j2.key) {
+              renderQr(j2.qrurl);
+              lsSet(LS_QR, JSON.stringify({ key: j2.key, ts: Date.now() }));
+              qrStatus("等待扫码登录…");
+              startQr(j2.key);
+            } else {
+              qrStatus("生成失败：无法连接登录服务，请检查网络/浏览器是否拦截跨站请求后点「重新获取」");
+            }
+          });
+        }, 1500);
       } else {
-        qrStatus("生成失败：无法连接登录服务，请检查网络后点「重新获取」");
+        qrStatus("生成失败：" + ((j && j.msg) || "登录服务异常") + "，请点「重新获取」");
       }
     });
   }

@@ -7665,25 +7665,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   justify-content: center;
   transform: none;
 }
-.chat-top-bar .call-btn#chatCallBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  color: #111;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.chat-top-bar .call-btn#chatCallBtn svg {
-  width: 20px;
-  height: 20px;
-}
+
 
 /* 输入栏：去除内层重复的安全区 padding，消除底部留白悬空问题 */
 .chat-input-bar {
@@ -8391,24 +8373,7 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
   justify-content: center !important;
   align-self: center !important;
 }
-.chat-top-bar .call-btn,
-#app-chat .chat-top-bar #chatCallBtn,
-.chat-top-bar .call-btn#chatCallBtn {
-  width: 42px !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  min-height: 42px !important;
-  border-radius: 50% !important;
-  margin-top: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  align-self: center !important;
-}
-.chat-top-bar .call-btn#chatCallBtn svg {
-  width: 25px !important;
-  height: 25px !important;
-}
+
   height: 22px !important;
 }
 
@@ -26059,25 +26024,7 @@ html body:not(.bubble-css-on) .chat-body .msg-row.system .bubble:not(.transfer-b
   justify-content: center;
   transform: none;
 }
-.chat-top-bar .call-btn#chatCallBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  color: #111;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.chat-top-bar .call-btn#chatCallBtn svg {
-  width: 20px;
-  height: 20px;
-}
+
 
 /* 输入栏：去除内层重复的安全区 padding，消除底部留白悬空问题 */
 .chat-input-bar {
@@ -26791,24 +26738,7 @@ html.akini-safe-mode body .phone-frame .content-wrapper {
   justify-content: center !important;
   align-self: center !important;
 }
-.chat-top-bar .call-btn,
-#app-chat .chat-top-bar #chatCallBtn,
-.chat-top-bar .call-btn#chatCallBtn {
-  width: 42px !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  min-height: 42px !important;
-  border-radius: 50% !important;
-  margin-top: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  align-self: center !important;
-}
-.chat-top-bar .call-btn#chatCallBtn svg {
-  width: 25px !important;
-  height: 25px !important;
-}
+
   height: 22px !important;
 }
 
@@ -32346,4 +32276,17 @@ html body #app-chat .chat-top-bar #chatCallBtn svg {
   color: #fff !important;
   display: flex !important; align-items: center !important; justify-content: center !important;
   flex-shrink: 0 !important; font-size: 20px !important; line-height: 1 !important;
+}
+
+/* v1003: 首页全宽——去除左右内边距造成的缩窄感；等比缩放逻辑不变 */
+.home-screen { padding-left: 0 !important; padding-right: 0 !important; }
+/* v1003: 通话键内图标与返回键同规格，彻底同质 */
+.chat-top-bar .call-btn svg, .chat-top-bar #chatCallBtn svg,
+#app-chat .chat-top-bar .call-btn svg, #app-chat .chat-top-bar #chatCallBtn svg {
+  width: 20px !important; height: 20px !important;
+}
+/* v1003: 图片平滑渲染，消除导入图锯齿感 */
+.home-screen img, .fit-scale-box img, #phoneFrame img {
+  image-rendering: auto !important;
+  -webkit-transform: translateZ(0);
 }
