@@ -32179,13 +32179,7 @@ html, body {
   max-width: none !important;
   margin: 0 auto !important;
 }
-.phone-frame, #phoneFrame {
-  position: relative !important;
-  width: 100% !important;
-  max-width: 420px !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
+
 .content-wrapper, #homeScreens, .fit-mod {
   width: 100% !important;
   max-width: 420px !important;
@@ -32288,4 +32282,18 @@ html body #app-chat .chat-top-bar #chatCallBtn svg {
 .chat-top-bar .back-btn svg, .chat-top-bar .call-btn svg {
   width: 20px !important;
   height: 20px !important;
+}
+
+/* v1011 终局：手机框/内容层/底栏全部取消 420px 上限——宽屏手机背景图与内容两侧不再留余白 */
+.phone-frame, #phoneFrame,
+.content-wrapper, #homeScreens, .fit-mod, .fit-inner,
+.content-area, .settings-area, .beautify-area, .icity-area {
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.phone-frame > .bottom-bar, .bottom-bar, #bottomBar {
+  max-width: none !important;
+  width: 100% !important;
 }
