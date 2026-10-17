@@ -16006,12 +16006,16 @@ window.akiniContacts = {
       (window.confirmCollect = function (t) {
         const e = window._transferStates[t];
         if (!e || "ta" !== e.who) return;
+        /* v1018 幂等：同一转账的系统消息只发一次（双击/重复触发不再叠两条） */
+        if (e._sysDone) return;
+        e._sysDone = !0;
         e.status = "已收款";
         const n = document.getElementById(t + "_status"),
           i = document.getElementById(t + "_bubble");
         (n && (n.textContent = "已收款"), i && nn(i));
         __akiniSyncTransferStatusToHistory(t, "已收款");
         const a = document.createElement("div");
+        a.setAttribute("data-tfsys", t);
         ((a.className = "msg-row system"),
           (a.innerHTML = '<div class="bubble">你已收款</div>'),
           U.appendChild(a),
@@ -16031,6 +16035,9 @@ window.akiniContacts = {
       (window.refundTransfer = function (t) {
         const e = window._transferStates[t];
         if (!e || "ta" !== e.who) return;
+        /* v1018 幂等：同一笔转账的退款系统消息只发一次 */
+        if (e._sysDone) return;
+        e._sysDone = !0;
         ((e.status = "已退回"), (e.refunded = !0));
         const n = document.getElementById(t + "_status"),
           i = document.getElementById(t + "_bubble");
@@ -31959,6 +31966,8 @@ window.__akiniBugCheck = function () {
 (function () {
   var NE_API = "https://backend.miaoda.online/projects/supabase364656900228300800/functions/v1/akini-netease";
   var LS_SID = "akini_ne_sid", LS_QR = "akini_ne_qr", LS_OLDCK = "akini_netease_cookie";
+  /* v1020：登录 cookie 唯一存储键（常量，全模块统一） */
+  var NE_CK_KEY = "akini_ne_ck";
   var POLL_MS = 4000;
   var _pollTimer = null, _curKey = "", _regenAt = 0, _lastSessAt = 0, _sessCache = null, _sessInflight = null;
 
@@ -32059,6 +32068,29 @@ window.__akiniBugCheck = function () {
         if (bOut2) bOut2.style.display = "";
       } else {
         window.__akiniNeLoggedIn = false;
+        /* v1020 自救：服务端会话丢失（实例回收/数据库只读）时，用本地凭据重新登记，无需重新扫码；
+           本地有凭据期间界面保持"已登录"，绝不闪回未登录 */
+        try {
+          var _lck = lsGet(NE_CK_KEY);
+          if (_lck && _lck.indexOf("MUSIC_U=") >= 0) {
+            window.__akiniNeLoggedIn = true;
+            setStatus("已登录（长度 " + _lck.length + "）", true);
+          }
+          if (_lck && _lck.indexOf("MUSIC_U=") >= 0 && !_reAdoptIn) {
+            _reAdoptIn = true;
+            neApi("session/adopt", { cookie: _lck }, 15000).then(function (ja) {
+              _reAdoptIn = false;
+              if (ja && ja.loggedIn) {
+                try { if (ja.ck) lsSet(NE_CK_KEY, ja.ck); } catch (e) {}
+                _sessCache = null; _lastSessAt = 0;
+                window.__akiniNeLoggedIn = true;
+                window.__akiniNeProfile = ja.profile || null;
+                renderNeAccount(ja.profile);
+                setStatus("已登录" + (ja.profile && ja.profile.nickname ? " · " + ja.profile.nickname : ""), true);
+              }
+            }).catch(function () { _reAdoptIn = false; });
+          }
+        } catch (eR) {}
         setStatus("未登录 · VIP歌曲仅可试听", false);
       }
       return j;
@@ -32066,9 +32098,31 @@ window.__akiniBugCheck = function () {
     return _sessInflight;
   };
 
+  /* v1020：页面加载即从统一常量键读 cookie——有则显示"已登录（长度 N）"并静默补资料，无则"未登录" */
+  try {
+    var _bootCk = lsGet(NE_CK_KEY);
+    if (_bootCk && _bootCk.indexOf("MUSIC_U=") >= 0) {
+      window.__akiniNeCk = _bootCk;
+      window.__akiniNeLoggedIn = true;
+      setStatus("已登录（长度 " + _bootCk.length + "）", true);
+      neApi("session/adopt", { cookie: _bootCk }, 15000).then(function (ja) {
+        if (ja && ja.loggedIn) {
+          try { if (ja.ck) lsSet(NE_CK_KEY, ja.ck); } catch (e) {}
+          _sessCache = null; _lastSessAt = 0;
+          window.__akiniNeProfile = ja.profile || null;
+          try { renderNeAccount(ja.profile); } catch (e) {}
+          setStatus("已登录" + (ja.profile && ja.profile.nickname ? " · " + ja.profile.nickname : "（长度 " + _bootCk.length + "）"), true);
+        }
+      }).catch(function () {});
+    } else {
+      setStatus("未登录", false);
+    }
+  } catch (eB) {}
+
   window.__akiniNeLogoutLocal = function () {
     window.__akiniNeLoggedIn = false;
     _sessCache = null;
+    try { lsDel(NE_CK_KEY); } catch (e) {}
     setStatus("登录已失效，请重新扫码", false);
   };
 
@@ -32177,7 +32231,12 @@ window.__akiniBugCheck = function () {
         _curKey = "";
         stopPoll();
         try { lsDel(LS_QR); } catch (e0) {}
-        try { qrStatus("✓ 登录成功，正在进入…"); } catch (e1) {}
+        /* v1020：803 的 cookie 原样存入统一常量键（服务器与本地双保险，掉线自动自救重登） */
+        try { if (j.ck) { lsSet(NE_CK_KEY, j.ck); window.__akiniNeCk = j.ck; } } catch (eCk) {}
+        window.__akiniNeLoggedIn = true;
+        window.__akiniNeProfile = j.profile || null;
+        try { renderNeAccount(j.profile); } catch (eR0) {}
+        try { qrStatus("✓ 已登录" + (j.profile && j.profile.nickname ? " · " + j.profile.nickname : "（长度 " + String(j.ck || "").length + "）")); } catch (e1) {}
         if (j.profile && j.profile.nickname) {
           try {
             window.__akiniNeLoggedIn = true;
