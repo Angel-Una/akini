@@ -32248,10 +32248,7 @@ html body #app-chat .chat-top-bar #chatCallBtn svg {
 .content-area,
 .chat-body,
 #phoneFrame,
-.phone-frame {
-  image-rendering: -webkit-optimize-contrast !important;
-  image-rendering: crisp-edges !important;
-}
+
 
 #app-chat {
   background-color: transparent !important;
@@ -32262,31 +32259,33 @@ html body #app-chat .chat-top-bar #chatCallBtn svg {
   background-color: transparent !important;
 }
 
-/* v1000: 聊天顶栏 返回/通话 按钮统一规格——同尺寸、同底色、去描边去阴影，终结历史层叠冲突 */
+
+/* v1009 聊天顶栏按钮：只统一几何与去装饰，颜色/底图由 JS 克隆返回键计算样式保证绝对一致 */
 #app-chat .chat-top-bar .back-btn, #app-chat .chat-top-bar .call-btn,
 #app-chat .chat-top-bar #chatBackBtn, #app-chat .chat-top-bar #chatCallBtn,
 .chat-top-bar .back-btn, .chat-top-bar .call-btn,
 .chat-top-bar #chatBackBtn, .chat-top-bar #chatCallBtn {
-  width: 40px !important; height: 40px !important;
-  min-width: 40px !important; max-width: 40px !important;
-  padding: 0 !important; margin: 0 !important;
-  border-radius: 50% !important; border: none !important; outline: none !important;
-  box-shadow: none !important; -webkit-box-shadow: none !important;
-  background: rgba(0,0,0,0.28) !important;
-  color: #fff !important;
-  display: flex !important; align-items: center !important; justify-content: center !important;
-  flex-shrink: 0 !important; font-size: 20px !important; line-height: 1 !important;
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  min-height: 38px !important;
+  max-height: 38px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  align-self: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
 }
-
-/* v1003: 首页全宽——去除左右内边距造成的缩窄感；等比缩放逻辑不变 */
-.home-screen { padding-left: 0 !important; padding-right: 0 !important; }
-/* v1003: 通话键内图标与返回键同规格，彻底同质 */
-.chat-top-bar .call-btn svg, .chat-top-bar #chatCallBtn svg,
-#app-chat .chat-top-bar .call-btn svg, #app-chat .chat-top-bar #chatCallBtn svg {
-  width: 20px !important; height: 20px !important;
-}
-/* v1003: 图片平滑渲染，消除导入图锯齿感 */
-.home-screen img, .fit-scale-box img, #phoneFrame img {
-  image-rendering: auto !important;
-  -webkit-transform: translateZ(0);
+#app-chat .chat-top-bar .back-btn svg, #app-chat .chat-top-bar .call-btn svg,
+#app-chat .chat-top-bar #chatBackBtn svg, #app-chat .chat-top-bar #chatCallBtn svg,
+.chat-top-bar .back-btn svg, .chat-top-bar .call-btn svg {
+  width: 20px !important;
+  height: 20px !important;
 }

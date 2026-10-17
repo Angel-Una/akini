@@ -32172,16 +32172,37 @@ window.__akiniBugCheck = function () {
         }
       }
       else if (j.code === 803) {
-        /* v1002：确认成功时明确提示登录成功，稍作停留确保用户可见并刷新状态 */
+        /* v1004：确认成功——优先直接使用服务器随 803 返回的 profile 立即上脸，
+           绝不再出现"提示登录成功但界面还是未登录"；随后会话补刷失败再自动重试 */
         _curKey = "";
         stopPoll();
         try { lsDel(LS_QR); } catch (e0) {}
         try { qrStatus("✓ 登录成功，正在进入…"); } catch (e1) {}
+        if (j.profile && j.profile.nickname) {
+          try {
+            window.__akiniNeLoggedIn = true;
+            window.__akiniNeProfile = j.profile;
+            _sessCache = { loggedIn: true, profile: j.profile };
+            _lastSessAt = Date.now();
+            renderNeAccount(j.profile);
+            var bIn3 = el("neLoginBtn"), bOut3 = el("neLogoutBtn");
+            if (bIn3) bIn3.style.display = "none";
+            if (bOut3) bOut3.style.display = "";
+          } catch (eP) {}
+        }
+        var neRetry = function (n) {
+          try {
+            _sessCache = null; window.__akiniNeRefresh(true).then(function (r) {
+              if (r && r.loggedIn) {
+                try { var b2 = el("neMyPlaylists"); if (b2) b2.removeAttribute("data-loaded"); } catch (e4) {}
+                try { window.__akiniNeLoadPl && window.__akiniNeLoadPl(); } catch (e5) {}
+              } else if (n > 0) { setTimeout(function () { neRetry(n - 1); }, 2500); }
+            });
+          } catch (e3) {}
+        };
         setTimeout(function () {
           try { hideQr(); } catch (e2) {}
-          try { _sessCache = null; window.__akiniNeRefresh(true); } catch (e3) {}
-          try { var b2 = el("neMyPlaylists"); if (b2) b2.removeAttribute("data-loaded"); } catch (e4) {}
-          setTimeout(function () { try { window.__akiniNeLoadPl && window.__akiniNeLoadPl(); } catch (e5) {} }, 500);
+          neRetry(4);
         }, 1000);
       }
       else { var _raw = "code:" + (j && j.code) + (j && j.msg ? " " + String(j.msg) : ""); qrStatus("状态查询异常(" + _raw + ")，继续等待…"); schedulePoll(POLL_MS); }
@@ -32422,4 +32443,28 @@ window.__akiniBugCheck = function () {
       });
     }
   });
+})();
+
+
+
+/* v1009 通话键=返回键：直接克隆返回键的计算样式（底图透明度/颜色绝对一致，一条逻辑） */
+(function(){
+  function f(){
+    try{
+      var b=document.getElementById("chatBackBtn"),c=document.getElementById("chatCallBtn");
+      if(!b||!c)return;
+      var cs=getComputedStyle(b);
+      c.style.setProperty("width",cs.width,"important");
+      c.style.setProperty("height",cs.height,"important");
+      c.style.setProperty("border-radius",cs.borderRadius,"important");
+      c.style.setProperty("background",cs.backgroundColor,"important");
+      c.style.setProperty("backdrop-filter",cs.backdropFilter||"none","important");
+      c.style.setProperty("-webkit-backdrop-filter",cs.webkitBackdropFilter||(cs.backdropFilter||"none"),"important");
+      c.style.setProperty("color",cs.color,"important");
+      c.style.setProperty("border","none","important");
+      c.style.setProperty("box-shadow","none","important");
+    }catch(e){}
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function(){ f(); setInterval(f, 1500); });
+  else { f(); setInterval(f, 1500); }
 })();
