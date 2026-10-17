@@ -10,6 +10,76 @@ window.__akiniNextTs = function(){
   return t;
 };
 
+
+/* v1021 滑动误触守卫：滑动(>12px)刚结束后的 500ms 内忽略导航点击——滑动屏幕不再误点进软件 */
+(function () {
+  var _sx = 0, _sy = 0;
+  document.addEventListener("touchstart", function (e) {
+    var t = e.touches && e.touches[0];
+    if (t) { _sx = t.clientX; _sy = t.clientY; }
+  }, { passive: true });
+  document.addEventListener("touchend", function (e) {
+    var t = e.changedTouches && e.changedTouches[0];
+    if (t && (Math.abs(t.clientX - _sx) > 12 || Math.abs(t.clientY - _sy) > 12)) window.__akiniSwiped = Date.now();
+  }, { passive: true });
+})();
+window.__akiniSwipeBlock = function () { return window.__akiniSwiped && Date.now() - window.__akiniSwiped < 500; };
+
+
+/* v1022 图像键内核：所有大体积背景图/头像图不再走 localStorage（5MB 配额一满全站卡），
+   改走 IndexedDB（localforage，容量大几百倍）+ 内存缓存；旧 LS 里的图开机自动迁移并腾空配额 */
+window.__akiniImgCache = window.__akiniImgCache || {};
+window.__akiniImgKeys = window.__akiniImgKeys || {};
+(function () {
+  var EXACT = {
+    "aki_day_bg":1,"akini_anniv_bg":1,"akini_bg_img":1,"akini_call_bg":1,"akini_call_mini_bg":1,
+    "akini_callmini_bg":1,"akini_chat_bg":1,"akini_cover_bg":1,"akini_day_bg":1,"akini_friends_bg":1,
+    "akini_home_bg":1,"akini_icity_my_bg":1,"akini_icity_ta_bg":1,"akini_music_bg":1,"akini_watch_wallpaper":1,
+    /* v1023 大数据键：聊天记录/日记/邮件/歌单/词库/整库备份——全部搬进 IndexedDB（几十G空间），LS 只留小开关 */
+    "akini_icity_diaries":1,"akini_icity_diaries_backup":1,"akini_mail_received":1,
+    "akini_music_playlists_v2":1,"akini_wordbank":1,"akini_chat_sessions":1,"akini_chat_pins":1,
+    "akini_chat_pins_backup":1,"akini_chat_history_backup":1
+  };
+  var PREFIX = ["akini_chat_bg_", "akini_icity_my_bg_", "akini_icity_ta_bg_",
+    "akini_chat_history_", "akini_full_backup_", "akini_backup_", "akini_chat_critical_", "akini_contacts_backup"];
+  window.__akiniIsImgKey = function (k) {
+    if (!k) return false;
+    if (EXACT[k]) return true;
+    for (var i = 0; i < PREFIX.length; i++) if (k.indexOf(PREFIX[i]) === 0) return true;
+    return false;
+  };
+  window.__akiniImgSet = function (k, v) {
+    window.__akiniImgCache[k] = v;
+    try { if (window.localforage) localforage.setItem(k, v); } catch (e) {}
+  };
+  window.__akiniImgGetLS = function (k) {
+    try { return localStorage.getItem(k) || ""; } catch (e) { return ""; }
+  };
+  window.__akiniImgMigrateLS = function (k) {
+    var v = window.__akiniImgGetLS(k);
+    if (v) {
+      window.__akiniImgCache[k] = v;
+      try { if (window.localforage) localforage.setItem(k, v).then(function(){ try { localStorage.removeItem(k); } catch(e){} }); } catch (e) {}
+    }
+  };
+  /* 开机：把仍在 LS 的旧图迁进 IndexedDB 并删除 LS 副本（释放配额）；同时预热内存缓存 */
+  window.__akiniImgStoreInit = function () {
+    try {
+      if (!window.localforage) return;
+      localforage.iterate(function (v, k) {
+        if (window.__akiniIsImgKey(k) && typeof v === "string") window.__akiniImgCache[k] = v;
+      });
+      for (var k in EXACT) window.__akiniImgMigrateLS(k);
+      try {
+        var chatId = window.akiniContacts && window.akiniContacts.getActiveChatId ? window.akiniContacts.getActiveChatId() : "";
+        if (chatId) { window.__akiniImgMigrateLS("akini_chat_bg_" + chatId); }
+      } catch (e) {}
+    } catch (e) {}
+  };
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function(){ setTimeout(window.__akiniImgStoreInit, 800); });
+  else setTimeout(window.__akiniImgStoreInit, 800);
+})();
+
 window.__akiniConfirmDialog = function(onConfirm) {
   try {
     var oldOverlay = document.getElementById('akiniDeleteModalOverlay');
@@ -1162,7 +1232,10 @@ window._idbStore = (function () {
         });
       }
 
-      function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+      function lsSet(k, v) {
+        if (window.__akiniIsImgKey && window.__akiniIsImgKey(k)) { window.__akiniImgSet(k, v); return; }
+        try { localStorage.setItem(k, v); } catch (e) {}
+      }
       function isEmpty(v) {
         return v === null || v === undefined || v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}";
       }
@@ -4365,6 +4438,11 @@ window.akiniContacts = {
       if (!K || !U || !window.akiniContacts) return;
       const t = K.value.trim();
       if ("" === t) return;
+      /* v1021：粘贴长文后立刻同步构建消息+触发回复模拟会卡死/闪退——先清空输入、让出主线程30ms再处理 */
+      K.value = "";
+      setTimeout(function () { __akiniSendBody(t); }, 30);
+    }
+    function __akiniSendBody(t) {
       h();
       const n = !!zt && zt.classList.contains("show"),
         i = K.getAttribute("data-quote") || "",
@@ -31966,13 +32044,44 @@ window.__akiniBugCheck = function () {
 (function () {
   var NE_API = "https://backend.miaoda.online/projects/supabase364656900228300800/functions/v1/akini-netease";
   var LS_SID = "akini_ne_sid", LS_QR = "akini_ne_qr", LS_OLDCK = "akini_netease_cookie";
-  /* v1020：登录 cookie 唯一存储键（常量，全模块统一） */
+  /* v1021：登录 cookie 唯一存储键（常量，全模块统一） */
   var NE_CK_KEY = "akini_ne_ck";
+  /* 三级存储：localStorage 爆配额(站点存了大量base64背景图)时落 sessionStorage，再内存兜底——登录态绝不丢 */
+  function neCkSave(v) {
+    window.__akiniNeCk = v;
+    try { localStorage.setItem(NE_CK_KEY, v); return; } catch (e) {}
+    try { sessionStorage.setItem(NE_CK_KEY, v); } catch (e) {}
+  }
+  function neCkLoad() {
+    if (window.__akiniNeCk) return window.__akiniNeCk;
+    try { var v = localStorage.getItem(NE_CK_KEY); if (v) return v; } catch (e) {}
+    try { var s = sessionStorage.getItem(NE_CK_KEY); if (s) { window.__akiniNeCk = s; return s; } } catch (e) {}
+    return "";
+  }
+  function neCkClear() {
+    window.__akiniNeCk = "";
+    try { localStorage.removeItem(NE_CK_KEY); } catch (e) {}
+    try { sessionStorage.removeItem(NE_CK_KEY); } catch (e) {}
+  }
   var POLL_MS = 4000;
   var _pollTimer = null, _curKey = "", _regenAt = 0, _lastSessAt = 0, _sessCache = null, _sessInflight = null;
 
-  function lsGet(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
-  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  function lsGet(k) {
+    /* v1022：图像键走 IDB 内存缓存，旧 LS 副本作为兜底并异步迁移 */
+    if (window.__akiniIsImgKey && window.__akiniIsImgKey(k)) {
+      if (window.__akiniImgCache[k] != null) return window.__akiniImgCache[k];
+      var _lv = window.__akiniImgGetLS(k);
+      if (_lv) { window.__akiniImgCache[k] = _lv; setTimeout(function(){ window.__akiniImgMigrateLS(k); }, 50); return _lv; }
+      try { if (window.localforage) localforage.getItem(k).then(function(v){ if (v != null) window.__akiniImgCache[k] = v; }); } catch (e) {}
+      return "";
+    }
+    try { return localStorage.getItem(k) || ""; } catch (e) { return ""; }
+  }
+  function lsSet(k, v) {
+    /* v1022：图像键写入 IDB + 内存，绝不再占 localStorage 配额 */
+    if (window.__akiniIsImgKey && window.__akiniIsImgKey(k)) { window.__akiniImgSet(k, v); return; }
+    try { localStorage.setItem(k, v); } catch (e) {}
+  }
   function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
   function el(id) { return document.getElementById(id); }
 
@@ -32071,7 +32180,7 @@ window.__akiniBugCheck = function () {
         /* v1020 自救：服务端会话丢失（实例回收/数据库只读）时，用本地凭据重新登记，无需重新扫码；
            本地有凭据期间界面保持"已登录"，绝不闪回未登录 */
         try {
-          var _lck = lsGet(NE_CK_KEY);
+          var _lck = neCkLoad();
           if (_lck && _lck.indexOf("MUSIC_U=") >= 0) {
             window.__akiniNeLoggedIn = true;
             setStatus("已登录（长度 " + _lck.length + "）", true);
@@ -32081,7 +32190,7 @@ window.__akiniBugCheck = function () {
             neApi("session/adopt", { cookie: _lck }, 15000).then(function (ja) {
               _reAdoptIn = false;
               if (ja && ja.loggedIn) {
-                try { if (ja.ck) lsSet(NE_CK_KEY, ja.ck); } catch (e) {}
+                try { if (ja.ck) neCkSave(ja.ck); } catch (e) {}
                 _sessCache = null; _lastSessAt = 0;
                 window.__akiniNeLoggedIn = true;
                 window.__akiniNeProfile = ja.profile || null;
@@ -32100,14 +32209,14 @@ window.__akiniBugCheck = function () {
 
   /* v1020：页面加载即从统一常量键读 cookie——有则显示"已登录（长度 N）"并静默补资料，无则"未登录" */
   try {
-    var _bootCk = lsGet(NE_CK_KEY);
+    var _bootCk = neCkLoad();
     if (_bootCk && _bootCk.indexOf("MUSIC_U=") >= 0) {
       window.__akiniNeCk = _bootCk;
       window.__akiniNeLoggedIn = true;
       setStatus("已登录（长度 " + _bootCk.length + "）", true);
       neApi("session/adopt", { cookie: _bootCk }, 15000).then(function (ja) {
         if (ja && ja.loggedIn) {
-          try { if (ja.ck) lsSet(NE_CK_KEY, ja.ck); } catch (e) {}
+          try { if (ja.ck) neCkSave(ja.ck); } catch (e) {}
           _sessCache = null; _lastSessAt = 0;
           window.__akiniNeProfile = ja.profile || null;
           try { renderNeAccount(ja.profile); } catch (e) {}
@@ -32122,7 +32231,7 @@ window.__akiniBugCheck = function () {
   window.__akiniNeLogoutLocal = function () {
     window.__akiniNeLoggedIn = false;
     _sessCache = null;
-    try { lsDel(NE_CK_KEY); } catch (e) {}
+    try { neCkClear(); } catch (e) {}
     setStatus("登录已失效，请重新扫码", false);
   };
 
@@ -32232,7 +32341,7 @@ window.__akiniBugCheck = function () {
         stopPoll();
         try { lsDel(LS_QR); } catch (e0) {}
         /* v1020：803 的 cookie 原样存入统一常量键（服务器与本地双保险，掉线自动自救重登） */
-        try { if (j.ck) { lsSet(NE_CK_KEY, j.ck); window.__akiniNeCk = j.ck; } } catch (eCk) {}
+        try { if (j.ck) neCkSave(j.ck); } catch (eCk) {}
         window.__akiniNeLoggedIn = true;
         window.__akiniNeProfile = j.profile || null;
         try { renderNeAccount(j.profile); } catch (eR0) {}
