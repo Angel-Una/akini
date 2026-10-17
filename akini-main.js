@@ -4950,6 +4950,8 @@ window.akiniContacts = {
          性能优化：8s→15s，60s→120s，减少频繁定时器导致的卡顿 */
       setInterval(function () {
         try {
+          /* v1024：后台绝不跑补发清扫——长任务在后台被系统强杀=切后台秒闪退的根因之一 */
+          if (document.hidden) return;
           window._akiniTimer && window._akiniTimer.catchUp(actions);
         } catch (e) {}
       }, 120000);
@@ -24896,6 +24898,7 @@ window.akiniContacts = {
         localStorage.setItem("akini_music_listen_seconds", String(I));
       }
       setInterval(function () {
+        if (document.hidden) return;
         if (d && x) {
           reconcileListen();
           var delta = Math.floor((Date.now() - x) / 1e3);
@@ -26323,7 +26326,11 @@ window.akiniContacts = {
         window._akiniCacheStore && window._akiniCacheStore.backupAll && window._akiniCacheStore.backupAll();
       } catch (e) {}
     }
-    setInterval(_akiniImmediateBackup, 180000);
+    setInterval(function () {
+      /* v1024：后台跑全量备份（序列化整个数据域）=内存尖峰=被系统强杀；后台只标记，回前台补跑 */
+      if (document.hidden) { try { _akiniHideDirty = true; } catch (e) {} return; }
+      _akiniImmediateBackup();
+    }, 180000);
     var _akiniHideDirty = false;
     document.addEventListener("visibilitychange", function () {
       if (document.hidden) {
